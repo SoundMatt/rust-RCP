@@ -60,7 +60,7 @@ impl Controller for UdpBridge {
             return Err(RcpError::ZoneMismatch);
         }
 
-        let frame = wire::encode_command(cmd)?;
+        let frame = wire::encode_command(cmd);
         self.socket.send_to(&frame, self.remote)?;
         let (resp_frame, _) = self.socket.recv_from(timeout)?;
         wire::decode_response(&resp_frame)
@@ -97,7 +97,7 @@ mod tests {
                 payload: None,
             };
             let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
-            Ok((wire::encode_response(&resp)?, addr))
+            Ok((wire::encode_response(&resp), addr))
         }
     }
 

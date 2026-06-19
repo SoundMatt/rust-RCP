@@ -57,8 +57,7 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
 
 use crate::{
-    Command, CommandType, Controller, RcpError, Registry, Response, ResponseStatus, Status,
-    Subscription, Zone,
+    Command, Controller, RcpError, Registry, Response, ResponseStatus, Status, Subscription, Zone,
 };
 
 // ── Subscription inner state ──────────────────────────────────────────────────
@@ -87,6 +86,7 @@ pub struct MockController {
     closed: AtomicBool,
     seq: AtomicU32,
     inner: Arc<Mutex<Inner>>,
+    #[allow(dead_code)]
     next_id: AtomicU64,
 }
 
@@ -355,7 +355,8 @@ impl Registry for MockRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicUsize, Ordering as AO};
+    use crate::CommandType;
+    use std::sync::atomic::Ordering as AO;
     use std::time::Duration;
 
     // ── Controller.Zone ───────────────────────────────────────────────────────
@@ -628,7 +629,7 @@ mod tests {
     fn subscribe_after_close_returns_err_closed() {
         let c = MockController::new(Zone::FRONT_LEFT, None);
         c.close().unwrap();
-        let err = c.subscribe().unwrap_err();
+        let err = c.subscribe().err().unwrap();
         assert_eq!(err, RcpError::Closed);
     }
 
@@ -781,7 +782,7 @@ mod tests {
     fn deregister_removes_zone_and_closes_controller() {
         let r = MockRegistry::new();
         r.deregister(Zone::FRONT_LEFT).unwrap();
-        let err = r.lookup(Zone::FRONT_LEFT).unwrap_err();
+        let err = r.lookup(Zone::FRONT_LEFT).err().unwrap();
         assert_eq!(err, RcpError::NotFound);
     }
 
@@ -790,7 +791,7 @@ mod tests {
     fn lookup_not_registered_returns_not_found() {
         let r = MockRegistry::new();
         r.deregister(Zone::FRONT_LEFT).unwrap();
-        let err = r.lookup(Zone::FRONT_LEFT).unwrap_err();
+        let err = r.lookup(Zone::FRONT_LEFT).err().unwrap();
         assert_eq!(err, RcpError::NotFound);
         assert!(err.is_relay_not_connected());
     }
@@ -864,7 +865,7 @@ mod tests {
     fn lookup_on_closed_registry_returns_err_closed() {
         let r = MockRegistry::new();
         r.close().unwrap();
-        let err = r.lookup(Zone::FRONT_LEFT).unwrap_err();
+        let err = r.lookup(Zone::FRONT_LEFT).err().unwrap();
         assert_eq!(
             err,
             RcpError::Closed,

@@ -83,8 +83,8 @@ mod tests {
     // fusa:test REQ-FED-002
     fn add_and_list_peers() {
         let r = FederationRouter::new();
-        r.add_peer("VIN-001", Arc::new(MockRegistry::new()));
-        r.add_peer("VIN-002", Arc::new(MockRegistry::new()));
+        r.add_peer("VIN-001", MockRegistry::new());
+        r.add_peer("VIN-002", MockRegistry::new());
         let mut ids = r.peer_ids();
         ids.sort();
         assert_eq!(ids, vec!["VIN-001", "VIN-002"]);
@@ -94,7 +94,7 @@ mod tests {
     // fusa:test REQ-FED-003
     fn remove_peer() {
         let r = FederationRouter::new();
-        r.add_peer("VIN-001", Arc::new(MockRegistry::new()));
+        r.add_peer("VIN-001", MockRegistry::new());
         r.remove_peer("VIN-001");
         assert!(r.peer_ids().is_empty());
     }
@@ -103,7 +103,7 @@ mod tests {
     // fusa:test REQ-FED-005
     fn lookup_unknown_peer_returns_not_found() {
         let r = FederationRouter::new();
-        let err = r.lookup_peer("VIN-999", Zone::FRONT_LEFT).unwrap_err();
+        let err = r.lookup_peer("VIN-999", Zone::FRONT_LEFT).err().unwrap();
         assert_eq!(err, RcpError::NotFound);
     }
 
@@ -111,7 +111,7 @@ mod tests {
     // fusa:test REQ-FED-005
     fn lookup_peer_zone() {
         let r = FederationRouter::new();
-        r.add_peer("VIN-001", Arc::new(MockRegistry::new()));
+        r.add_peer("VIN-001", MockRegistry::new());
         r.lookup_peer("VIN-001", Zone::FRONT_LEFT).unwrap();
     }
 

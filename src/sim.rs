@@ -139,7 +139,7 @@ impl Controller for SimController {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Command, Priority, Zone};
+    use crate::{Command, Zone};
 
     #[test]
     // fusa:test REQ-SIM-001

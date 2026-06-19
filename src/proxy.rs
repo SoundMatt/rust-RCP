@@ -161,7 +161,7 @@ mod tests {
     fn subscribe_detached_returns_not_connected() {
         let proxy = ProxyController::new(ok_ctrl(Zone::FRONT_LEFT));
         proxy.detach();
-        let err = proxy.subscribe().unwrap_err();
+        let err = proxy.subscribe().err().unwrap();
         assert_eq!(err, RcpError::NotConnected);
     }
 }

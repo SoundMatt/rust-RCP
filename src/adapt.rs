@@ -12,7 +12,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::{Command, Controller, RcpError, Response, Subscription, Zone};
+use crate::{Command, Controller, RcpError, Response};
 
 // ── Adapter trait ─────────────────────────────────────────────────────────────
 

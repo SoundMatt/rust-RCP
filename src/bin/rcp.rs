@@ -14,6 +14,8 @@
 use std::process;
 use std::time::Duration;
 
+use rcp::Registry;
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
@@ -159,6 +161,7 @@ fn hex_encode(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rcp::Registry;
 
     #[test]
     // fusa:test REQ-CLI-001

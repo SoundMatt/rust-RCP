@@ -69,7 +69,7 @@ impl Controller for TlsBridge {
         if cmd.zone != self.zone {
             return Err(RcpError::ZoneMismatch);
         }
-        let frame = wire::encode_command(cmd)?;
+        let frame = wire::encode_command(cmd);
         self.stream.write_all(&frame)?;
         let resp_frame = self.stream.read_to_vec(timeout)?;
         wire::decode_response(&resp_frame)
@@ -107,7 +107,7 @@ mod tests {
                 status: ResponseStatus::OK,
                 payload: None,
             };
-            wire::encode_response(&resp).map_err(|e| e)
+            Ok(wire::encode_response(&resp))
         }
         fn peer_verified(&self) -> bool {
             self.verified
@@ -118,7 +118,7 @@ mod tests {
     // fusa:test REQ-TLS-002
     fn unverified_peer_rejected() {
         let stream = Arc::new(MockTls { verified: false }) as Arc<dyn TlsStream>;
-        let err = TlsBridge::new(Zone::FRONT_LEFT, stream).unwrap_err();
+        let err = TlsBridge::new(Zone::FRONT_LEFT, stream).err().unwrap();
         assert_eq!(err, RcpError::NotConnected);
     }
 

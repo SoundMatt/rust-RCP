@@ -15,7 +15,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-use crate::{Command, CommandType, Controller, RcpError, Response, Subscription, Zone};
+use crate::{Command, Controller, RcpError, Response, Subscription, Zone};
 
 // ── Policy ────────────────────────────────────────────────────────────────────
 

@@ -14,7 +14,7 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
-use crate::{Command, CommandType, Controller, Priority, RcpError, Response, Subscription, Zone};
+use crate::{Command, Controller, Priority, RcpError, Response, Subscription, Zone};
 
 // ── Pending item ──────────────────────────────────────────────────────────────
 
@@ -151,13 +151,11 @@ impl Controller for PrioController {
         let (lock, cvar) = &*self.state;
         let mut q = lock.lock().unwrap();
         q.closed = true;
-        // Drain and signal error to all waiting callers
-        for p in q
-            .critical
-            .drain(..)
-            .chain(q.high.drain(..))
-            .chain(q.normal.drain(..))
-        {
+        let mut pending = Vec::new();
+        pending.extend(q.critical.drain(..));
+        pending.extend(q.high.drain(..));
+        pending.extend(q.normal.drain(..));
+        for p in pending {
             let _ = p.reply.send(Err(RcpError::Closed));
         }
         cvar.notify_all();

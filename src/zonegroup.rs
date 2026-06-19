@@ -172,7 +172,7 @@ mod tests {
     #[test]
     // fusa:test REQ-ZG-004
     fn first_member_error_is_propagated() {
-        let err_ctrl: crate::mock::Handler = Box::new(|_cmd| Response {
+        let _err_ctrl: crate::mock::Handler = Box::new(|_cmd| Response {
             command_id: 0,
             zone: Zone::FRONT_LEFT,
             status: ResponseStatus::ERROR,

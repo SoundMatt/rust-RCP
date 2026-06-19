@@ -93,7 +93,7 @@ mod tests {
     use crate::mock::MockRegistry;
 
     fn admin() -> AdminServer {
-        AdminServer::new(Arc::new(MockRegistry::new()))
+        AdminServer::new(MockRegistry::new())
     }
 
     #[test]

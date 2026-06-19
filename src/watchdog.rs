@@ -14,10 +14,10 @@
 //! closed. Implements ISO 26262 §6 periodic-monitoring requirement.
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
-use crate::{Command, CommandType, Controller, RcpError, Zone};
+use crate::{Command, CommandType, Controller, Zone};
 
 // ── WatchdogConfig ────────────────────────────────────────────────────────────
 
@@ -141,7 +141,7 @@ impl WatchdogMonitor {
 mod tests {
     use super::*;
     use crate::mock::MockController;
-    use crate::{Command, Response, ResponseStatus, Zone};
+    use crate::{Response, ResponseStatus, Zone};
 
     fn ok_ctrl() -> Arc<dyn Controller> {
         let h: crate::mock::Handler = Box::new(|cmd| Response {

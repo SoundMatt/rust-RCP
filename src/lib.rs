@@ -267,7 +267,7 @@ impl fmt::Display for ResponseStatus {
 /// `Zone::UNKNOWN`, `CommandType::NOOP`, `Priority::NORMAL`, payload `None`.
 // fusa:req REQ-CMDSTRUCT-001
 // fusa:req REQ-CMDSTRUCT-002
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Command {
     pub id: u32,
     pub zone: Zone,
@@ -280,7 +280,7 @@ pub struct Command {
 ///
 /// A zero-value `Response` has `status == ResponseStatus::OK`.
 // fusa:req REQ-RESP-003
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Response {
     pub command_id: u32,
     pub zone: Zone,
@@ -290,7 +290,7 @@ pub struct Response {
 
 /// Periodic telemetry update published by a zone controller.
 // fusa:req REQ-STAT-001
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Status {
     pub zone: Zone,
     pub seq: u32,

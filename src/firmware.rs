@@ -13,7 +13,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::{Command, CommandType, Controller, RcpError, Response, ResponseStatus, Zone};
+use crate::{Command, CommandType, Controller, RcpError, ResponseStatus};
 
 // ── FirmwareUpdater ───────────────────────────────────────────────────────────
 
@@ -98,7 +98,7 @@ impl FirmwareUpdater {
 mod tests {
     use super::*;
     use crate::mock::MockController;
-    use crate::{Command, Response, ResponseStatus, Zone};
+    use crate::{Response, ResponseStatus, Zone};
     use std::sync::atomic::{AtomicU32, Ordering};
 
     fn ok_ctrl() -> Arc<dyn Controller> {

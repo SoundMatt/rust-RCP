@@ -84,7 +84,7 @@ impl Controller for RecordController {
 mod tests {
     use super::*;
     use crate::mock::MockController;
-    use crate::{Command, ResponseStatus, Zone};
+    use crate::{Command, Zone};
 
     fn rec() -> RecordController {
         let inner = MockController::new(Zone::FRONT_LEFT, None) as Arc<dyn Controller>;

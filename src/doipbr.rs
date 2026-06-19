@@ -36,6 +36,7 @@ pub trait DoipSocket: Send + Sync {
 
 // ── Encode / decode helpers ───────────────────────────────────────────────────
 
+#[cfg(test)]
 fn encode_doip_frame(payload_type: u16, data: &[u8]) -> Vec<u8> {
     let mut frame = Vec::with_capacity(DOIP_HEADER_LEN + data.len());
     frame.push(0xFF);

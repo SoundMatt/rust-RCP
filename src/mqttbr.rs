@@ -174,7 +174,7 @@ mod tests {
     fn subscribe_returns_not_found() {
         let client = MockMqtt::new();
         let bridge = MqttBridge::new(Zone::FRONT_LEFT, Arc::clone(&client) as Arc<dyn MqttClient>);
-        let err = bridge.subscribe().unwrap_err();
+        let err = bridge.subscribe().err().unwrap();
         assert_eq!(err, RcpError::NotFound);
     }
 }
