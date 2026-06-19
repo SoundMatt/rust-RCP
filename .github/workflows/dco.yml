@@ -20,7 +20,7 @@ jobs:
             if ! echo "$body" | grep -qE '^(Signed-off-by:|Co-Authored-By:)'; then
               missing="$missing\n  $sha"
             fi
-          done < <(git log --format='%H' "origin/${{ github.base_ref }}..HEAD")
+          done < <(git log --no-merges --format='%H' "origin/${{ github.base_ref }}..HEAD")
           if [ -n "$missing" ]; then
             echo "The following commits lack Signed-off-by or Co-Authored-By:"
             printf "$missing\n"
