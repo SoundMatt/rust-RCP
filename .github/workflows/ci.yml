@@ -111,9 +111,50 @@ jobs:
       - name: bench (1 iteration)
         run: cargo bench -- --test 2>/dev/null || cargo test --release
 
-  # ── RELAY spec conformance ────────────────────────────────────────────────
+  # ── RELAY §12 CLI conformance (relay conform) ─────────────────────────────
+  relay-conform:
+    name: RELAY conform --strict
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: install relay
+        run: go install github.com/SoundMatt/RELAY/cmd/relay@latest
+      - name: build rcp binary
+        run: cargo build --bin rcp --release
+      - name: relay conform --strict
+        run: relay conform --strict target/release/rcp
+
+  # ── RELAY interop ─────────────────────────────────────────────────────────
+  relay-interop:
+    name: RELAY interop
+    needs: relay-conform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: install relay
+        run: go install github.com/SoundMatt/RELAY/cmd/relay@latest
+      - name: build rcp binary
+        run: cargo build --bin rcp --release
+      - name: relay interop (rcp-status EQUIVALENT)
+        run: |
+          output=$(relay interop target/release/rcp 2>&1)
+          echo "$output"
+          echo "$output" | grep -A3 "^rcp-status" | grep "rcp" | grep -q "EQUIVALENT"
+
+  # ── RELAY wire+e2e unit tests (spec traceability) ─────────────────────────
   relay-conformance:
-    name: RELAY spec v1.6 conformance
+    name: RELAY spec v1.10 unit conformance
     needs: lint
     runs-on: ubuntu-latest
     steps:
@@ -134,6 +175,25 @@ jobs:
       - uses: actions/checkout@v4
       - name: run cyber gap check
         run: bash scripts/cyber-gap-check.sh
+
+  # ── SBOM ─────────────────────────────────────────────────────────────────
+  sbom:
+    name: SBOM (CycloneDX)
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: install cargo-cyclonedx
+        run: cargo install cargo-cyclonedx --locked
+      - name: generate SBOM
+        run: cargo cyclonedx --format json --output-cdx bom.json
+      - name: upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: bom.json
 
   # ── Security audit ────────────────────────────────────────────────────────
   audit:

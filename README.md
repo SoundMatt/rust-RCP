@@ -10,7 +10,7 @@ RCP is used by a central HPC to dispatch `Command`s to zone controllers (front-l
 
 ## Features
 
-- Full RELAY spec v1.6 compliance
+- Full RELAY spec v1.10 compliance
 - **ASIL-B** (ISO 26262:2018) with full FuSa artifact set
 - **IEC 62443 SL-2** cybersecurity controls
 - `#![forbid(unsafe_code)]` — 100% safe Rust

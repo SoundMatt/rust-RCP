@@ -1,339 +1,2394 @@
 [
-  {"id":"REQ-SPEC-001","title":"RELAY spec version","description":"The crate must implement RELAY specification version 1.6","asil":"ASIL-B","category":"spec","source":"relay-spec-1.6"},
-  {"id":"REQ-ZONE-001","title":"Zone string representation","description":"Each zone must have a unique non-empty PascalCase string name","asil":"ASIL-B","category":"zone"},
-  {"id":"REQ-ZONE-002","title":"Zone inner value","description":"Zone is a newtype over u8; inner value is stable across versions","asil":"ASIL-B","category":"zone"},
-  {"id":"REQ-ZONE-003","title":"FRONT_LEFT is 1","description":"Zone::FRONT_LEFT.0 == 1","asil":"ASIL-B","category":"zone"},
-  {"id":"REQ-ZONE-004","title":"FRONT_RIGHT is 2","description":"Zone::FRONT_RIGHT.0 == 2","asil":"ASIL-B","category":"zone"},
-  {"id":"REQ-ZONE-005","title":"REAR_LEFT is 3","description":"Zone::REAR_LEFT.0 == 3","asil":"ASIL-B","category":"zone"},
-  {"id":"REQ-ZONE-006","title":"REAR_RIGHT is 4","description":"Zone::REAR_RIGHT.0 == 4","asil":"ASIL-B","category":"zone"},
-  {"id":"REQ-ZONE-007","title":"CENTRAL is 5","description":"Zone::CENTRAL.0 == 5","asil":"ASIL-B","category":"zone"},
-  {"id":"REQ-ZONE-008","title":"Zone constants are distinct","description":"All zone constants must have distinct inner values","asil":"ASIL-B","category":"zone"},
-  {"id":"REQ-PRI-001","title":"NORMAL priority","description":"Priority::NORMAL.0 == 0","asil":"ASIL-B","category":"priority"},
-  {"id":"REQ-PRI-002","title":"HIGH > NORMAL","description":"Priority::HIGH > Priority::NORMAL","asil":"ASIL-B","category":"priority"},
-  {"id":"REQ-PRI-003","title":"CRITICAL > HIGH","description":"Priority::CRITICAL > Priority::HIGH","asil":"ASIL-B","category":"priority"},
-  {"id":"REQ-CMD-001","title":"NOOP is 0","description":"CommandType::NOOP.0 == 0","asil":"ASIL-B","category":"cmd"},
-  {"id":"REQ-CMD-002","title":"SET is 1","description":"CommandType::SET.0 == 1","asil":"ASIL-B","category":"cmd"},
-  {"id":"REQ-CMD-003","title":"GET is 2","description":"CommandType::GET.0 == 2","asil":"ASIL-B","category":"cmd"},
-  {"id":"REQ-CMD-004","title":"RESET is 3","description":"CommandType::RESET.0 == 3","asil":"ASIL-B","category":"cmd"},
-  {"id":"REQ-CMD-005","title":"WATCHDOG is 4","description":"CommandType::WATCHDOG.0 == 4","asil":"ASIL-B","category":"cmd"},
-  {"id":"REQ-CMD-006","title":"Command types distinct","description":"All command type constants must have distinct inner values","asil":"ASIL-B","category":"cmd"},
-  {"id":"REQ-STATUS-001","title":"ResponseStatus strings unique","description":"All response status values must have unique non-empty string representations","asil":"ASIL-B","category":"status"},
-  {"id":"REQ-STATUS-002","title":"OK is 0","description":"ResponseStatus::OK.0 == 0","asil":"ASIL-B","category":"status"},
-  {"id":"REQ-STATUS-003","title":"ERROR is 1","description":"ResponseStatus::ERROR.0 == 1","asil":"ASIL-B","category":"status"},
-  {"id":"REQ-STATUS-004","title":"TIMEOUT is 2","description":"ResponseStatus::TIMEOUT.0 == 2","asil":"ASIL-B","category":"status"},
-  {"id":"REQ-STATUS-005","title":"BUSY is 3","description":"ResponseStatus::BUSY.0 == 3","asil":"ASIL-B","category":"status"},
-  {"id":"REQ-STATUS-006","title":"Status constants distinct","description":"All response status constants must have distinct inner values","asil":"ASIL-B","category":"status"},
-  {"id":"REQ-CMDSTRUCT-001","title":"Zero Command is safe NOOP","description":"Command::default() must have zone=UNKNOWN, cmd_type=NOOP, priority=NORMAL, payload=None","asil":"ASIL-B","category":"struct"},
-  {"id":"REQ-CMDSTRUCT-002","title":"Command payload optional","description":"Command.payload may be None","asil":"ASIL-B","category":"struct"},
-  {"id":"REQ-RESP-001","title":"Response carries command ID","description":"Response.command_id echoes the dispatched command ID","asil":"ASIL-B","category":"struct"},
-  {"id":"REQ-RESP-002","title":"Response carries zone","description":"Response.zone identifies the responding zone","asil":"ASIL-B","category":"struct"},
-  {"id":"REQ-RESP-003","title":"Zero Response has status OK","description":"Response::default().status == ResponseStatus::OK","asil":"ASIL-B","category":"struct"},
-  {"id":"REQ-STAT-001","title":"Status carries zone","description":"Status.zone identifies the publishing zone controller","asil":"ASIL-B","category":"struct"},
-  {"id":"REQ-STAT-002","title":"Status carries seq","description":"Status.seq is a monotonically increasing sequence number","asil":"ASIL-B","category":"struct"},
-  {"id":"REQ-STAT-003","title":"Status healthy flag","description":"Status.healthy reports whether the controller is operational","asil":"ASIL-B","category":"struct"},
-  {"id":"REQ-STAT-004","title":"Status seq per controller","description":"Each zone controller maintains its own seq counter","asil":"ASIL-B","category":"struct"},
-  {"id":"REQ-STAT-005","title":"Status payload optional","description":"Status.payload may be None","asil":"ASIL-B","category":"struct"},
-  {"id":"REQ-ERR-001","title":"Closed error distinct","description":"RcpError::Closed must be a distinct variant","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-ERR-002","title":"NotFound error distinct","description":"RcpError::NotFound must be a distinct variant","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-ERR-003","title":"AlreadyExists error distinct","description":"RcpError::AlreadyExists must be a distinct variant","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-ERR-004","title":"Timeout error distinct","description":"RcpError::Timeout must be a distinct variant","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-ERR-005","title":"Busy error distinct","description":"RcpError::Busy must be a distinct variant","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-ERR-006","title":"Sentinel errors are mutually distinct","description":"All RELAY sentinel error variants must be pairwise distinct","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-ERR-007","title":"Closed is relay-closed","description":"RcpError::Closed.is_relay_closed() == true","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-ERR-008","title":"NotConnected is relay-not-connected","description":"RcpError::NotConnected.is_relay_not_connected() == true","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-ERR-009","title":"AlreadyExists is standalone","description":"RcpError::AlreadyExists.is_already_exists() == true and is not relay-closed/timeout/not-connected","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-ERR-010","title":"Timeout is relay-timeout","description":"RcpError::Timeout.is_relay_timeout() == true","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-ERR-011","title":"ZoneMismatch is distinct","description":"RcpError::ZoneMismatch.is_zone_mismatch() == true and is also is_relay_not_connected()","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-ERR-012","title":"NotConnected test","description":"Direct test of NotConnected is_relay_not_connected","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-ERR-013","title":"PayloadTooLarge test","description":"Direct test of PayloadTooLarge is_relay_payload_too_large","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-ERR-014","title":"Only Closed is relay-closed","description":"is_relay_closed() returns false for non-Closed variants","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-ERR-015","title":"is_relay_not_connected coverage","description":"is_relay_not_connected returns false for Closed and Timeout","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-ERR-016","title":"Timeout is relay-timeout","description":"RcpError::Timeout.is_relay_timeout() == true","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-ERR-017","title":"PayloadTooLarge not relay-closed","description":"PayloadTooLarge.is_relay_closed() == false","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-ERR-018","title":"ZoneMismatch is relay-not-connected","description":"ZoneMismatch wraps NotConnected per RELAY spec","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-ERR-019","title":"AlreadyExists is not relay-timeout","description":"AlreadyExists.is_relay_timeout() == false","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-ERR-020","title":"Busy is relay-timeout","description":"Busy.is_relay_timeout() == true; Busy wraps Timeout","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-ERR-021","title":"ZoneMismatch is relay-not-connected (named)","description":"ZoneMismatch.is_relay_not_connected() == true","asil":"ASIL-B","category":"error"},
-  {"id":"REQ-MSG-001","title":"zone_from_str PascalCase and kebab-case","description":"zone_from_str accepts both PascalCase and kebab-case zone names","asil":"ASIL-B","category":"parse"},
-  {"id":"REQ-MSG-002","title":"zone_from_str unknown returns NotFound","description":"zone_from_str returns Err(RcpError::NotFound) for unknown strings","asil":"ASIL-B","category":"parse"},
-  {"id":"REQ-PWR-001","title":"SLEEP and WAKE command types distinct","description":"CommandType::SLEEP != CommandType::WAKE; both differ from other command types","asil":"ASIL-B","category":"power"},
-  {"id":"REQ-PWR-002","title":"PowerState variants distinct","description":"PowerState::Active, Sleep, Standby are pairwise distinct","asil":"ASIL-B","category":"power"},
-  {"id":"REQ-PWR-003","title":"Initial state is Active","description":"PowerStateController starts in Active state","asil":"ASIL-B","category":"power"},
-  {"id":"REQ-PWR-004","title":"power_state query","description":"PowerStateController.power_state() returns current state","asil":"ASIL-B","category":"power"},
-  {"id":"REQ-PWR-005","title":"SLEEP transitions to Sleep","description":"Sending SLEEP command transitions to PowerState::Sleep","asil":"ASIL-B","category":"power"},
-  {"id":"REQ-PWR-006","title":"Commands during Sleep return BUSY","description":"Non-WAKE commands while in Sleep state return ResponseStatus::BUSY","asil":"ASIL-B","category":"power"},
-  {"id":"REQ-PWR-007","title":"WAKE transitions to Active","description":"Sending WAKE command from Sleep transitions to PowerState::Active","asil":"ASIL-B","category":"power"},
-  {"id":"REQ-PWR-008","title":"Close returns Closed","description":"PowerStateController.send() after close() returns Err(Closed)","asil":"ASIL-B","category":"power"},
-  {"id":"REQ-CTRL-001","title":"Controller is a trait","description":"Controller is a trait with zone/send/subscribe/close methods","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-002","title":"send invokes handler","description":"MockController.send() invokes the registered handler and returns its result","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-003","title":"send returns Result","description":"Controller.send() returns Result<Response, RcpError>","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-004","title":"subscribe returns Subscription","description":"Controller.subscribe() returns Result<Subscription, RcpError>","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-005","title":"close safe to call multiple times","description":"Controller.close() must be idempotent","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-006","title":"send after close returns Closed","description":"Controller.send() after close() returns Err(RcpError::Closed)","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-007","title":"zero timeout returns Timeout","description":"send() with timeout=Some(Duration::ZERO) returns Err(RcpError::Timeout)","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-008","title":"zone mismatch returns ZoneMismatch","description":"send() with cmd.zone != ctrl.zone() returns Err(RcpError::ZoneMismatch)","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-009","title":"zone getter stable","description":"Controller.zone() returns the same value across calls","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-010","title":"subscribe seq strictly increasing","description":"Each published Status carries a seq number strictly greater than the previous","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-011","title":"subscribe on closed returns Closed","description":"subscribe() after close() returns Err(Closed)","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-012","title":"multiple concurrent subscribers","description":"Multiple concurrent subscribers each receive their own copy of published Status","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-013","title":"NOOP command accepted","description":"Controller accepts NOOP command type without error","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-014","title":"WATCHDOG command accepted","description":"Controller accepts WATCHDOG command type without error","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-015","title":"RESET command accepted","description":"Controller accepts RESET command type without error","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-016","title":"handler response returned verbatim","description":"The Response returned by the handler is returned unchanged from send()","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-017","title":"publish on closed controller is safe","description":"Calling publish() on a closed controller must not panic","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-018","title":"concurrent sends are race-free","description":"Multiple concurrent send() calls from different threads are safe","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-019","title":"concurrent publish and subscribe are race-free","description":"Simultaneous publish() and subscribe() from different threads are safe","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-020","title":"status carries correct zone","description":"Published Status.zone matches the controller's zone","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-021","title":"status carries correct payload","description":"Published Status.payload matches the payload passed to publish()","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-022","title":"status healthy while open","description":"Status.healthy == true while the controller is open","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-023","title":"zero timeout is pre-cancelled","description":"Timeout=Some(ZERO) is treated as pre-cancelled context (no handler invoked)","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-024","title":"nil payload does not panic","description":"send() with payload=None must not panic","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-025","title":"Controller is Send+Sync","description":"Controller implementations must be Send + Sync","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-026","title":"Payload copied before handler","description":"MockController copies payload before passing to handler","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-CTRL-027","title":"Publish copies payload","description":"MockController.publish() copies the payload for each subscriber","asil":"ASIL-B","category":"ctrl"},
-  {"id":"REQ-REG-001","title":"Registry is a trait","description":"Registry is a trait with register/deregister/lookup/controllers/close","asil":"ASIL-B","category":"registry"},
-  {"id":"REQ-REG-002","title":"register returns AlreadyExists on duplicate","description":"Registering the same zone twice returns Err(AlreadyExists)","asil":"ASIL-B","category":"registry"},
-  {"id":"REQ-REG-003","title":"deregister returns NotFound for absent zone","description":"Deregistering an unregistered zone returns Err(NotFound)","asil":"ASIL-B","category":"registry"},
-  {"id":"REQ-REG-004","title":"lookup returns NotFound for absent zone","description":"Looking up an unregistered zone returns Err(NotFound)","asil":"ASIL-B","category":"registry"},
-  {"id":"REQ-REG-005","title":"lookup returns Closed when registry is closed","description":"lookup() after registry.close() returns Err(Closed)","asil":"ASIL-B","category":"registry"},
-  {"id":"REQ-REG-006","title":"controllers returns all registered","description":"controllers() returns one entry per registered zone","asil":"ASIL-B","category":"registry"},
-  {"id":"REQ-REG-007","title":"close closes all controllers","description":"registry.close() propagates close to all registered controllers","asil":"ASIL-B","category":"registry"},
-  {"id":"REQ-REG-008","title":"Registry is Send+Sync","description":"Registry implementations must be Send + Sync","asil":"ASIL-B","category":"registry"},
-  {"id":"REQ-REG-009","title":"deregister closes the controller","description":"deregister() calls close() on the removed controller","asil":"ASIL-B","category":"registry"},
-  {"id":"REQ-REG-010","title":"MockRegistry pre-populates 5 zones","description":"MockRegistry.new() registers controllers for all 5 standard zones","asil":"ASIL-B","category":"registry"},
-  {"id":"REQ-REG-011","title":"register after close returns Closed","description":"registry.register() after registry.close() returns Err(Closed)","asil":"ASIL-B","category":"registry"},
-  {"id":"REQ-REG-012","title":"deregister after close returns Closed","description":"registry.deregister() after registry.close() returns Err(Closed)","asil":"ASIL-B","category":"registry"},
-  {"id":"REQ-REG-013","title":"close is idempotent","description":"Calling registry.close() multiple times is safe","asil":"ASIL-B","category":"registry"},
-  {"id":"REQ-WIRE-001","title":"Magic bytes","description":"Wire frames start with 0x52 0x43","asil":"ASIL-B","category":"wire"},
-  {"id":"REQ-WIRE-002","title":"Protocol version byte","description":"Wire frames include PROTO_VER=0x01 at byte offset 2","asil":"ASIL-B","category":"wire"},
-  {"id":"REQ-WIRE-003","title":"Message type byte","description":"Wire frame includes message type byte (Command=0x01, Response=0x02, Status=0x03)","asil":"ASIL-B","category":"wire"},
-  {"id":"REQ-WIRE-004","title":"Header length","description":"Wire header is exactly 16 bytes","asil":"ASIL-B","category":"wire"},
-  {"id":"REQ-WIRE-005","title":"Command encode/decode round-trip","description":"encode_command(cmd) followed by decode_command() recovers the original command","asil":"ASIL-B","category":"wire"},
-  {"id":"REQ-WIRE-006","title":"Response encode/decode round-trip","description":"encode_response(resp) followed by decode_response() recovers the original response","asil":"ASIL-B","category":"wire"},
-  {"id":"REQ-WIRE-007","title":"Payload size limit","description":"Payloads exceeding MAX_PAYLOAD=65491 bytes are rejected with PayloadTooLarge","asil":"ASIL-B","category":"wire"},
-  {"id":"REQ-WIRE-008","title":"Bad magic rejected","description":"Frames with wrong magic bytes return Err(BadMagic)","asil":"ASIL-B","category":"wire"},
-  {"id":"REQ-WIRE-009","title":"Bad version rejected","description":"Frames with wrong protocol version return Err(BadVersion)","asil":"ASIL-B","category":"wire"},
-  {"id":"REQ-E2E-001","title":"E2E wrap prepends seqNum","description":"wrap() prepends a 4-byte big-endian sequence number","asil":"ASIL-B","category":"e2e"},
-  {"id":"REQ-E2E-002","title":"CRC covers seqNum and payload","description":"CRC-16/CCITT-FALSE is computed over [seqNum bytes ++ payload]","asil":"ASIL-B","category":"e2e"},
-  {"id":"REQ-E2E-003","title":"CRC mismatch rejected","description":"unwrap() returns Err(CrcMismatch) when CRC does not match","asil":"ASIL-B","category":"e2e"},
-  {"id":"REQ-E2E-004","title":"E2eController auto-increments seq","description":"E2eController atomically increments sequence number per send","asil":"ASIL-B","category":"e2e"},
-  {"id":"REQ-E2E-005","title":"ReplayGuard rejects replayed seq","description":"ReplayGuard.check() returns Err(Replay) for previously seen seq numbers","asil":"ASIL-B","category":"e2e"},
-  {"id":"REQ-E2E-006","title":"E2E header is 6 bytes","description":"E2E header length is 4 (seqNum) + 2 (CRC) = 6 bytes","asil":"ASIL-B","category":"e2e"},
-  {"id":"REQ-E2E-007","title":"wrap/unwrap are inverse","description":"unwrap(wrap(seq, payload)) == Ok((seq, payload))","asil":"ASIL-B","category":"e2e"},
-  {"id":"REQ-E2E-008","title":"Single-bit corruption detected","description":"Flipping any bit in payload or seqNum causes CRC mismatch","asil":"ASIL-B","category":"e2e"},
-  {"id":"REQ-PQ-001","title":"PrioController wraps inner","description":"PrioController delegates commands to an inner Controller","asil":"ASIL-B","category":"prioqueue"},
-  {"id":"REQ-PQ-002","title":"Dispatch thread spawned on new","description":"PrioController.new() spawns a dispatch thread immediately","asil":"ASIL-B","category":"prioqueue"},
-  {"id":"REQ-PQ-003","title":"Zone matches inner","description":"PrioController.zone() returns the inner controller's zone","asil":"ASIL-B","category":"prioqueue"},
-  {"id":"REQ-PQ-004","title":"Critical dispatched before High/Normal","description":"Critical-priority commands are dequeued before High and Normal","asil":"ASIL-B","category":"prioqueue"},
-  {"id":"REQ-PQ-005","title":"FIFO within priority level","description":"Commands at the same priority level are dispatched in submission order","asil":"ASIL-B","category":"prioqueue"},
-  {"id":"REQ-PQ-006","title":"Payload forwarded unchanged","description":"PrioController forwards payloads to inner without modification","asil":"ASIL-B","category":"prioqueue"},
-  {"id":"REQ-PQ-007","title":"All command types routed","description":"PrioController handles all CommandType variants","asil":"ASIL-B","category":"prioqueue"},
-  {"id":"REQ-PQ-008","title":"Close drains queue with Closed error","description":"close() returns Err(Closed) to all pending callers","asil":"ASIL-B","category":"prioqueue"},
-  {"id":"REQ-RL-001","title":"Token bucket burst capacity","description":"Commands up to burst capacity succeed without delay","asil":"ASIL-B","category":"ratelimit"},
-  {"id":"REQ-RL-002","title":"Default config values","description":"DefaultConfig() returns rate=100, burst=20, exempt_critical=true","asil":"ASIL-B","category":"ratelimit"},
-  {"id":"REQ-RL-003","title":"Zone matches inner","description":"RateLimitController.zone() returns inner controller's zone","asil":"ASIL-B","category":"ratelimit"},
-  {"id":"REQ-RL-004","title":"Tokens replenish over time","description":"Token bucket refills at rate tokens/second","asil":"ASIL-B","category":"ratelimit"},
-  {"id":"REQ-RL-005","title":"Normal and High obey bucket","description":"NORMAL and HIGH priority commands consume tokens from the bucket","asil":"ASIL-B","category":"ratelimit"},
-  {"id":"REQ-RL-006","title":"Empty bucket returns Busy","description":"When bucket is empty, send() returns Err(RcpError::Busy) immediately","asil":"ASIL-B","category":"ratelimit"},
-  {"id":"REQ-RL-007","title":"Critical exempt from rate limit","description":"When exempt_critical=true, CRITICAL commands bypass the token bucket","asil":"ASIL-B","category":"ratelimit"},
-  {"id":"REQ-RL-008","title":"Busy is relay-timeout sentinel","description":"RcpError::Busy.is_relay_timeout() == true (Busy wraps Timeout)","asil":"ASIL-B","category":"ratelimit"},
-  {"id":"REQ-SIM-001","title":"SimController accepts commands","description":"SimController processes commands and returns responses","asil":"ASIL-B","category":"sim"},
-  {"id":"REQ-SIM-002","title":"Queued responses delivered in order","description":"queue_response() pre-programs responses consumed FIFO","asil":"ASIL-B","category":"sim"},
-  {"id":"REQ-SIM-003","title":"Commands recorded","description":"SimController records all dispatched commands for inspection","asil":"ASIL-B","category":"sim"},
-  {"id":"REQ-SIM-004","title":"Zero timeout returns Timeout","description":"send() with timeout=Some(ZERO) returns Err(Timeout)","asil":"ASIL-B","category":"sim"},
-  {"id":"REQ-SIM-005","title":"Zone mismatch returns ZoneMismatch","description":"send() with wrong zone returns Err(ZoneMismatch)","asil":"ASIL-B","category":"sim"},
-  {"id":"REQ-SIM-006","title":"subscribe receives publish","description":"Subscription receives Status updates from publish()","asil":"ASIL-B","category":"sim"},
-  {"id":"REQ-SIM-007","title":"Publish increments seq","description":"Each publish() call increments the seq counter","asil":"ASIL-B","category":"sim"},
-  {"id":"REQ-SIM-008","title":"Close returns Closed","description":"send() after close() returns Err(Closed)","asil":"ASIL-B","category":"sim"},
-  {"id":"REQ-WDG-001","title":"Watchdog default config","description":"WatchdogConfig::default() returns interval=1s, miss_window=3, close_on_miss=false","asil":"ASIL-B","category":"watchdog"},
-  {"id":"REQ-WDG-002","title":"Closed controller accumulates misses","description":"WatchdogMonitor accumulates miss_count when controller is unresponsive","asil":"ASIL-B","category":"watchdog"},
-  {"id":"REQ-WDG-003","title":"Background thread starts on new","description":"WatchdogMonitor::start() spawns a background thread immediately","asil":"ASIL-B","category":"watchdog"},
-  {"id":"REQ-WDG-004","title":"Healthy when responsive","description":"is_healthy() returns true when controller responds to WATCHDOG commands","asil":"ASIL-B","category":"watchdog"},
-  {"id":"REQ-WDG-005","title":"Miss count is zero on responsive controller","description":"miss_count() returns 0 when controller is responsive","asil":"ASIL-B","category":"watchdog"},
-  {"id":"REQ-WDG-006","title":"stop terminates monitor","description":"stop() terminates the watchdog thread without deadlock","asil":"ASIL-B","category":"watchdog"},
-  {"id":"REQ-WDG-007","title":"Zone getter","description":"WatchdogMonitor.zone() returns the monitored zone","asil":"ASIL-B","category":"watchdog"},
-  {"id":"REQ-WDG-008","title":"Unhealthy after miss window exceeded","description":"is_healthy() returns false after miss_window consecutive misses","asil":"ASIL-B","category":"watchdog"},
-  {"id":"REQ-DL-001","title":"DeadlineController enforces latency","description":"DeadlineController sends with a maximum response deadline","asil":"ASIL-B","category":"deadline"},
-  {"id":"REQ-DL-002","title":"Deadline getter","description":"DeadlineController.deadline() returns configured deadline","asil":"ASIL-B","category":"deadline"},
-  {"id":"REQ-DL-003","title":"Commands forwarded to inner","description":"DeadlineController forwards commands to inner controller","asil":"ASIL-B","category":"deadline"},
-  {"id":"REQ-DL-004","title":"Zero timeout returns Timeout","description":"send() with timeout=Some(ZERO) returns Err(Timeout)","asil":"ASIL-B","category":"deadline"},
-  {"id":"REQ-DL-005","title":"Shorter of deadline and caller timeout wins","description":"Effective timeout = min(caller_timeout, deadline)","asil":"ASIL-B","category":"deadline"},
-  {"id":"REQ-DL-006","title":"Close forwarded","description":"DeadlineController.close() is forwarded to inner","asil":"ASIL-B","category":"deadline"},
-  {"id":"REQ-LOAN-001","title":"LoanPool pre-allocates buffers","description":"LoanPool.new(count, size) pre-allocates count buffers of size bytes","asil":"ASIL-B","category":"loan"},
-  {"id":"REQ-LOAN-002","title":"Correct pool count","description":"LoanPool.available() returns count immediately after creation","asil":"ASIL-B","category":"loan"},
-  {"id":"REQ-LOAN-003","title":"Buffer returned on drop","description":"Dropping a Loan returns the buffer to the pool","asil":"ASIL-B","category":"loan"},
-  {"id":"REQ-LOAN-004","title":"try_acquire returns None when empty","description":"try_acquire() returns None when no buffers are available","asil":"ASIL-B","category":"loan"},
-  {"id":"REQ-LOAN-005","title":"Zone matches inner","description":"LoanPoolController.zone() returns inner controller's zone","asil":"ASIL-B","category":"loan"},
-  {"id":"REQ-LOAN-006","title":"Oversized loan request rejected","description":"loan(size > buffer_size) returns Err(PayloadTooLarge)","asil":"ASIL-B","category":"loan"},
-  {"id":"REQ-LOAN-007","title":"send_loaned forwards payload","description":"send_loaned() copies loan payload into command and forwards to inner","asil":"ASIL-B","category":"loan"},
-  {"id":"REQ-ZG-001","title":"ZoneGroup wraps multiple controllers","description":"ZoneGroup holds a Vec of zone controllers","asil":"ASIL-B","category":"zonegroup"},
-  {"id":"REQ-ZG-002","title":"Zone is logical zone ID","description":"ZoneGroup.zone() returns the logical group zone, not a member zone","asil":"ASIL-B","category":"zonegroup"},
-  {"id":"REQ-ZG-003","title":"Send broadcasts to all members","description":"send() dispatches the command to every member controller","asil":"ASIL-B","category":"zonegroup"},
-  {"id":"REQ-ZG-004","title":"First member error propagated","description":"If any member returns an error, send() returns that error","asil":"ASIL-B","category":"zonegroup"},
-  {"id":"REQ-ZG-005","title":"Subscribe via first member","description":"subscribe() delegates to the first member controller","asil":"ASIL-B","category":"zonegroup"},
-  {"id":"REQ-ZG-006","title":"Close closes all members","description":"close() closes all member controllers","asil":"ASIL-B","category":"zonegroup"},
-  {"id":"REQ-ZG-007","title":"Empty group send returns default OK","description":"send() on an empty group returns Ok(Response::default())","asil":"ASIL-B","category":"zonegroup"},
-  {"id":"REQ-PROXY-001","title":"ProxyController wraps inner","description":"ProxyController forwards all calls to an interchangeable inner controller","asil":"ASIL-B","category":"proxy"},
-  {"id":"REQ-PROXY-002","title":"Zone set from original inner","description":"ProxyController.zone() is set from the original inner controller at construction","asil":"ASIL-B","category":"proxy"},
-  {"id":"REQ-PROXY-003","title":"send forwarded","description":"ProxyController.send() forwards to the current inner controller","asil":"ASIL-B","category":"proxy"},
-  {"id":"REQ-PROXY-004","title":"subscribe forwarded","description":"ProxyController.subscribe() forwards to the current inner controller","asil":"ASIL-B","category":"proxy"},
-  {"id":"REQ-PROXY-005","title":"swap replaces inner atomically","description":"swap() atomically replaces the inner controller","asil":"ASIL-B","category":"proxy"},
-  {"id":"REQ-PROXY-006","title":"detach returns NotConnected","description":"After detach(), send() and subscribe() return Err(NotConnected)","asil":"ASIL-B","category":"proxy"},
-  {"id":"REQ-RED-001","title":"RedundancyController provides hot standby","description":"RedundancyController implements 1-of-2 hot standby","asil":"ASIL-B","category":"redundancy"},
-  {"id":"REQ-RED-002","title":"Zone matches primary","description":"RedundancyController.zone() matches the primary controller's zone","asil":"ASIL-B","category":"redundancy"},
-  {"id":"REQ-RED-003","title":"Primary success no failover","description":"When primary succeeds, no failover is triggered","asil":"ASIL-B","category":"redundancy"},
-  {"id":"REQ-RED-004","title":"Primary failure triggers failover","description":"On primary error, secondary is promoted and command is retried","asil":"ASIL-B","category":"redundancy"},
-  {"id":"REQ-RED-005","title":"Both failed returns error","description":"When both primary and secondary fail, the error is returned to caller","asil":"ASIL-B","category":"redundancy"},
-  {"id":"REQ-RED-006","title":"Failover count increments","description":"failover_count() increments each time a failover occurs","asil":"ASIL-B","category":"redundancy"},
-  {"id":"REQ-RED-007","title":"No secondary after failover","description":"After one failover, has_secondary() returns false","asil":"ASIL-B","category":"redundancy"},
-  {"id":"REQ-RED-008","title":"subscribe forwarded to primary","description":"subscribe() delegates to the current primary","asil":"ASIL-B","category":"redundancy"},
-  {"id":"REQ-FI-001","title":"FaultSpec defines rule and error","description":"FaultSpec holds a FaultRule and the error to inject","asil":"ASIL-B","category":"faultinject"},
-  {"id":"REQ-FI-002","title":"FaultRule variants","description":"FaultRule supports Always, OnNthCall, and AfterNthCall","asil":"ASIL-B","category":"faultinject"},
-  {"id":"REQ-FI-003","title":"No fault passes through","description":"Without fault rules, commands are forwarded to inner unchanged","asil":"ASIL-B","category":"faultinject"},
-  {"id":"REQ-FI-004","title":"Multiple rules first match wins","description":"When multiple rules match, the first one installed takes effect","asil":"ASIL-B","category":"faultinject"},
-  {"id":"REQ-FI-005","title":"Clear removes all rules","description":"clear() removes all installed fault rules","asil":"ASIL-B","category":"faultinject"},
-  {"id":"REQ-FI-006","title":"Fault rule checked on each send","description":"Each send() call evaluates all installed fault rules in order","asil":"ASIL-B","category":"faultinject"},
-  {"id":"REQ-FI-007","title":"Close forwarded","description":"FaultInjectController.close() is forwarded to inner","asil":"ASIL-B","category":"faultinject"},
-  {"id":"REQ-OBS-001","title":"Metrics struct","description":"ObserveController maintains Metrics with call count, error count, latency","asil":"ASIL-B","category":"observe"},
-  {"id":"REQ-OBS-002","title":"ObserveController wraps inner","description":"ObserveController wraps an inner controller","asil":"ASIL-B","category":"observe"},
-  {"id":"REQ-OBS-003","title":"Metrics updated on each send","description":"call count and error count are updated on every send()","asil":"ASIL-B","category":"observe"},
-  {"id":"REQ-OBS-004","title":"Hook registered via add_hook","description":"add_hook() registers a callback invoked after each send()","asil":"ASIL-B","category":"observe"},
-  {"id":"REQ-OBS-005","title":"Hook receives command, result, and latency","description":"Hook function receives (&Command, &Result, Duration)","asil":"ASIL-B","category":"observe"},
-  {"id":"REQ-OBS-006","title":"Close forwarded","description":"ObserveController.close() forwards to inner","asil":"ASIL-B","category":"observe"},
-  {"id":"REQ-TSN-001","title":"TrafficClass type","description":"TrafficClass is a newtype over u8 with BEST_EFFORT(0), CONTROL(5), CRITICAL(7)","asil":"ASIL-B","category":"tsn"},
-  {"id":"REQ-TSN-002","title":"Priority to traffic class mapping","description":"TrafficClass::from_priority() maps NORMAL→BEST_EFFORT, HIGH→CONTROL, CRITICAL→CRITICAL","asil":"ASIL-B","category":"tsn"},
-  {"id":"REQ-TSN-003","title":"Zone forwarded","description":"TsnController.zone() returns the inner controller's zone","asil":"ASIL-B","category":"tsn"},
-  {"id":"REQ-TSN-004","title":"TSN byte prepended to payload","description":"TsnController prepends traffic class byte to command payload","asil":"ASIL-B","category":"tsn"},
-  {"id":"REQ-TSN-005","title":"Close forwarded","description":"TsnController.close() forwards to inner","asil":"ASIL-B","category":"tsn"},
-  {"id":"REQ-AUTHZ-001","title":"Policy defines allowed cmd types","description":"Policy.allowed_cmd_types controls which command types are permitted","asil":"ASIL-B","category":"authz"},
-  {"id":"REQ-AUTHZ-002","title":"allow_all permits any command","description":"Policy::allow_all() permits all command types","asil":"ASIL-B","category":"authz"},
-  {"id":"REQ-AUTHZ-003","title":"deny_all blocks every command","description":"Policy::deny_all() blocks all command types","asil":"ASIL-B","category":"authz"},
-  {"id":"REQ-AUTHZ-004","title":"AuthzController wraps inner","description":"AuthzController wraps an inner controller with a policy","asil":"ASIL-B","category":"authz"},
-  {"id":"REQ-AUTHZ-005","title":"Policy enforced on send","description":"send() returns Err(NotFound) when command type is not in allowlist","asil":"ASIL-B","category":"authz"},
-  {"id":"REQ-AUTHZ-006","title":"Policy hot-swappable","description":"set_policy() atomically replaces the active policy","asil":"ASIL-B","category":"authz"},
-  {"id":"REQ-AUTHZ-007","title":"Close forwarded","description":"AuthzController.close() forwards to inner","asil":"ASIL-B","category":"authz"},
-  {"id":"REQ-FW-001","title":"MAX_CHUNK constant","description":"MAX_CHUNK == 512 bytes per firmware chunk","asil":"ASIL-B","category":"firmware"},
-  {"id":"REQ-FW-002","title":"Empty image rejected","description":"flash() with empty image returns Err(InvalidSize)","asil":"ASIL-B","category":"firmware"},
-  {"id":"REQ-FW-003","title":"Single chunk flash","description":"flash() with image <= chunk_size sends exactly one chunk","asil":"ASIL-B","category":"firmware"},
-  {"id":"REQ-FW-004","title":"Multiple chunks","description":"flash() sends ceil(image_len/chunk_size) SET commands","asil":"ASIL-B","category":"firmware"},
-  {"id":"REQ-FW-005","title":"Chunk error aborts","description":"Non-OK response from any chunk aborts flash and returns error","asil":"ASIL-B","category":"firmware"},
-  {"id":"REQ-FW-006","title":"Chunk size capped at MAX_CHUNK","description":"Chunk sizes larger than MAX_CHUNK are silently capped","asil":"ASIL-B","category":"firmware"},
-  {"id":"REQ-REC-001","title":"Entry carries timestamp","description":"Record Entry includes SystemTime timestamp","asil":"ASIL-B","category":"record"},
-  {"id":"REQ-REC-002","title":"RecordController wraps inner","description":"RecordController wraps an inner controller and logs interactions","asil":"ASIL-B","category":"record"},
-  {"id":"REQ-REC-003","title":"Entries in chronological order","description":"entries() returns interactions in submission order","asil":"ASIL-B","category":"record"},
-  {"id":"REQ-REC-004","title":"Clear empties log","description":"clear() removes all recorded entries","asil":"ASIL-B","category":"record"},
-  {"id":"REQ-REC-005","title":"Errors recorded","description":"RecordController records both successful and error results","asil":"ASIL-B","category":"record"},
-  {"id":"REQ-FED-001","title":"FederationRouter routes by vehicle ID","description":"FederationRouter maps vehicle IDs to remote registries","asil":"ASIL-B","category":"federation"},
-  {"id":"REQ-FED-002","title":"add_peer registers a remote registry","description":"add_peer() registers a registry under a vehicle ID string","asil":"ASIL-B","category":"federation"},
-  {"id":"REQ-FED-003","title":"remove_peer deregisters","description":"remove_peer() removes a registered vehicle registry","asil":"ASIL-B","category":"federation"},
-  {"id":"REQ-FED-004","title":"peer_ids lists all","description":"peer_ids() returns all registered vehicle ID strings","asil":"ASIL-B","category":"federation"},
-  {"id":"REQ-FED-005","title":"lookup_peer resolves zone","description":"lookup_peer(vehicle_id, zone) returns the controller from the peer registry","asil":"ASIL-B","category":"federation"},
-  {"id":"REQ-DYN-001","title":"DynStore is a thread-safe KV store","description":"DynStore provides a thread-safe key/value store","asil":"ASIL-B","category":"dyndata"},
-  {"id":"REQ-DYN-002","title":"set inserts or replaces","description":"set() inserts a new key or replaces an existing value","asil":"ASIL-B","category":"dyndata"},
-  {"id":"REQ-DYN-003","title":"get returns value or None","description":"get() returns Some(value) for existing keys, None otherwise","asil":"ASIL-B","category":"dyndata"},
-  {"id":"REQ-DYN-004","title":"delete removes key","description":"delete() removes a key; returns true if it existed","asil":"ASIL-B","category":"dyndata"},
-  {"id":"REQ-DYN-005","title":"keys lists all","description":"keys() returns all parameter names currently in the store","asil":"ASIL-B","category":"dyndata"},
-  {"id":"REQ-CFG-001","title":"RcpConfig default is valid","description":"RcpConfig::default() passes validate()","asil":"ASIL-B","category":"config"},
-  {"id":"REQ-CFG-002","title":"ControllerConfig per-controller","description":"ControllerConfig holds zone, timeout_ms, max_payload_bytes","asil":"ASIL-B","category":"config"},
-  {"id":"REQ-CFG-003","title":"WatchdogConfig defaults","description":"WatchdogConfig::default() returns interval_ms=1000, window=3","asil":"ASIL-B","category":"config"},
-  {"id":"REQ-CFG-004","title":"RateLimitConfig defaults","description":"RateLimitConfig::default() returns rate=100, burst=20, exempt_critical=true","asil":"ASIL-B","category":"config"},
-  {"id":"REQ-CFG-005","title":"JSON and YAML parsing","description":"from_json() and from_yaml() parse RcpConfig from text","asil":"ASIL-B","category":"config"},
-  {"id":"REQ-CFG-006","title":"Validation rejects invalid values","description":"validate() returns Err for zone > 5, negative rate, zero watchdog window, oversized payload","asil":"ASIL-B","category":"config"},
-  {"id":"REQ-CG-001","title":"FieldType maps to Rust types","description":"FieldType::rust_type() returns correct Rust primitive type names","asil":"ASIL-B","category":"codegen"},
-  {"id":"REQ-CG-002","title":"StructSchema defines name and fields","description":"StructSchema holds name and Vec<Field> with optional flag","asil":"ASIL-B","category":"codegen"},
-  {"id":"REQ-CG-003","title":"generate_structs emits Rust code","description":"generate_structs() emits valid Rust struct definitions","asil":"ASIL-B","category":"codegen"},
-  {"id":"REQ-CG-004","title":"parse_schema converts JSON schema","description":"parse_schema() converts a HashMap schema definition into StructSchemas","asil":"ASIL-B","category":"codegen"},
-  {"id":"REQ-CYB-001","title":"Feasibility variants","description":"Feasibility has Low, Medium, High, Critical variants with Display","asil":"ASIL-B","category":"iso21434"},
-  {"id":"REQ-CYB-002","title":"Impact variants","description":"Impact has Negligible, Moderate, Major, Severe variants with Display","asil":"ASIL-B","category":"iso21434"},
-  {"id":"REQ-CYB-003","title":"RiskLevel variants","description":"RiskLevel has Low, Medium, High, Critical variants","asil":"ASIL-B","category":"iso21434"},
-  {"id":"REQ-CYB-004","title":"risk_level function","description":"risk_level(f, i) returns RiskLevel per ISO 21434 Table 14","asil":"ASIL-B","category":"iso21434"},
-  {"id":"REQ-CYB-005","title":"Threat.risk_level()","description":"Threat.risk_level() computes risk from its feasibility and impact","asil":"ASIL-B","category":"iso21434"},
-  {"id":"REQ-CYB-006","title":"filter_by_risk","description":"filter_by_risk() returns threats at or above the minimum risk level","asil":"ASIL-B","category":"iso21434"},
-  {"id":"REQ-GAP-001","title":"GapReport has_gaps flag","description":"GapReport.has_gaps() returns true when any gap list is non-empty","asil":"ASIL-B","category":"certgap"},
-  {"id":"REQ-GAP-002","title":"analyse detects gaps","description":"analyse() identifies unimplemented, untested, and undeclared requirements","asil":"ASIL-B","category":"certgap"},
-  {"id":"REQ-GAP-003","title":"coverage ratio","description":"coverage() returns ratio of covered to declared requirements","asil":"ASIL-B","category":"certgap"},
-  {"id":"REQ-GAP-004","title":"coverage_by_prefix","description":"coverage_by_prefix() groups coverage statistics by requirement prefix","asil":"ASIL-B","category":"certgap"},
-  {"id":"REQ-GAP-005","title":"zero coverage baseline","description":"coverage() returns 0.0 when no requirements are covered; coverage_by_prefix() returns 0.0 per prefix","asil":"ASIL-B","category":"certgap"},
-  {"id":"REQ-FORMAL-001","title":"Invariant type","description":"Invariant holds a name and a checkable predicate","asil":"ASIL-B","category":"formal"},
-  {"id":"REQ-FORMAL-002","title":"CheckResult tracks pass/fail","description":"CheckResult records passed and failed invariant names","asil":"ASIL-B","category":"formal"},
-  {"id":"REQ-FORMAL-003","title":"check_all evaluates all invariants","description":"check_all() checks every invariant against the state","asil":"ASIL-B","category":"formal"},
-  {"id":"REQ-FORMAL-004","title":"witness finds first violation","description":"witness() returns the first state that violates the invariant","asil":"ASIL-B","category":"formal"},
-  {"id":"REQ-ADMIN-001","title":"AdminServer health check","description":"AdminServer.is_healthy() returns true when all controllers respond","asil":"ASIL-B","category":"admin"},
-  {"id":"REQ-ADMIN-002","title":"Request count","description":"record_request() and request_count() track admin endpoint hits","asil":"ASIL-B","category":"admin"},
-  {"id":"REQ-ADMIN-003","title":"Uptime","description":"uptime() returns non-negative duration since construction","asil":"ASIL-B","category":"admin"},
-  {"id":"REQ-ADMIN-004","title":"Controller count","description":"controller_count() returns number of registered controllers","asil":"ASIL-B","category":"admin"},
-  {"id":"REQ-ADMIN-005","title":"Shutdown closes registry","description":"shutdown() closes the registry and sets is_shutting_down()","asil":"ASIL-B","category":"admin"},
-  {"id":"REQ-CANBR-001","title":"CAN FD max payload","description":"CAN_FD_MAX_PAYLOAD == 64 bytes","asil":"ASIL-B","category":"canbr"},
-  {"id":"REQ-CANBR-002","title":"CanSocket trait","description":"CanSocket defines send_frame and recv_frame","asil":"ASIL-B","category":"canbr"},
-  {"id":"REQ-CANBR-003","title":"CanBridge sends CAN frame","description":"CanBridge.send() encodes and transmits a CAN frame","asil":"ASIL-B","category":"canbr"},
-  {"id":"REQ-CANBR-004","title":"Zone mismatch and payload size checks","description":"CanBridge rejects wrong zone and oversized payloads","asil":"ASIL-B","category":"canbr"},
-  {"id":"REQ-CANBR-005","title":"Close is no-op","description":"CanBridge.close() returns Ok(())","asil":"ASIL-B","category":"canbr"},
-  {"id":"REQ-LINBR-001","title":"LIN max data","description":"LIN_MAX_DATA == 8 bytes","asil":"ASIL-B","category":"linbr"},
-  {"id":"REQ-LINBR-002","title":"LinMaster trait","description":"LinMaster defines send_frame and recv_frame","asil":"ASIL-B","category":"linbr"},
-  {"id":"REQ-LINBR-003","title":"LinBridge wraps master","description":"LinBridge delegates to a LinMaster","asil":"ASIL-B","category":"linbr"},
-  {"id":"REQ-LINBR-004","title":"Payload, zone, and timeout checks","description":"LinBridge rejects oversized payload, wrong zone, zero timeout","asil":"ASIL-B","category":"linbr"},
-  {"id":"REQ-SOMEIP-001","title":"SOME/IP header length","description":"SOMEIP_HEADER_LEN == 16 bytes","asil":"ASIL-B","category":"someip"},
-  {"id":"REQ-SOMEIP-002","title":"encode_request","description":"encode_request() produces a valid SOME/IP header + payload","asil":"ASIL-B","category":"someip"},
-  {"id":"REQ-SOMEIP-003","title":"decode_response","description":"decode_response() parses SOME/IP response and maps status codes","asil":"ASIL-B","category":"someip"},
-  {"id":"REQ-SOMEIP-004","title":"SomeIpSocket trait","description":"SomeIpSocket defines send and recv","asil":"ASIL-B","category":"someip"},
-  {"id":"REQ-SOMEIP-005","title":"SomeIpBridge delegates","description":"SomeIpBridge.send() uses encode_request/decode_response cycle","asil":"ASIL-B","category":"someip"},
-  {"id":"REQ-MQTT-001","title":"MqttClient trait","description":"MqttClient defines publish, subscribe_topic, recv_message","asil":"ASIL-B","category":"mqttbr"},
-  {"id":"REQ-MQTT-002","title":"MqttBridge wraps client","description":"MqttBridge delegates to a MqttClient","asil":"ASIL-B","category":"mqttbr"},
-  {"id":"REQ-MQTT-003","title":"Topic scheme","description":"MqttBridge publishes to rcp/{zone}/cmd/{id}","asil":"ASIL-B","category":"mqttbr"},
-  {"id":"REQ-MQTT-004","title":"Zone mismatch rejected","description":"MqttBridge rejects commands with wrong zone","asil":"ASIL-B","category":"mqttbr"},
-  {"id":"REQ-MQTT-005","title":"subscribe returns NotFound","description":"MqttBridge.subscribe() returns Err(NotFound)","asil":"ASIL-B","category":"mqttbr"},
-  {"id":"REQ-DDS-001","title":"DdsParticipant trait","description":"DdsParticipant defines write and take","asil":"ASIL-B","category":"ddsbr"},
-  {"id":"REQ-DDS-002","title":"DdsBridge wraps participant","description":"DdsBridge delegates to a DdsParticipant","asil":"ASIL-B","category":"ddsbr"},
-  {"id":"REQ-DDS-003","title":"Commands mapped to DDS topics","description":"DdsBridge.send() writes to rcp.zone{N}.cmd and reads from rcp.zone{N}.resp","asil":"ASIL-B","category":"ddsbr"},
-  {"id":"REQ-DDS-004","title":"Close is no-op","description":"DdsBridge.close() returns Ok(())","asil":"ASIL-B","category":"ddsbr"},
-  {"id":"REQ-UDP-001","title":"UdpSocket trait","description":"UdpSocket defines send_to and recv_from","asil":"ASIL-B","category":"udp"},
-  {"id":"REQ-UDP-002","title":"UdpBridge wraps socket","description":"UdpBridge delegates to a UdpSocket and a remote SocketAddr","asil":"ASIL-B","category":"udp"},
-  {"id":"REQ-UDP-003","title":"Commands encoded as wire frames","description":"UdpBridge.send() uses wire::encode_command and decode_response","asil":"ASIL-B","category":"udp"},
-  {"id":"REQ-UDP-004","title":"Zone mismatch rejected","description":"UdpBridge rejects commands with wrong zone","asil":"ASIL-B","category":"udp"},
-  {"id":"REQ-UDP-005","title":"Close is no-op","description":"UdpBridge.close() returns Ok(())","asil":"ASIL-B","category":"udp"},
-  {"id":"REQ-SHM-001","title":"ShmChannel trait","description":"ShmChannel defines write and read","asil":"ASIL-B","category":"shmem"},
-  {"id":"REQ-SHM-002","title":"InProcChannel is FIFO","description":"InProcChannel maintains FIFO ordering","asil":"ASIL-B","category":"shmem"},
-  {"id":"REQ-SHM-003","title":"ShmBridge wraps tx/rx channels","description":"ShmBridge holds a write channel (tx) and read channel (rx)","asil":"ASIL-B","category":"shmem"},
-  {"id":"REQ-SHM-004","title":"Zone mismatch and timeout checks","description":"ShmBridge rejects wrong zone and zero timeout","asil":"ASIL-B","category":"shmem"},
-  {"id":"REQ-SHM-005","title":"Close is no-op","description":"ShmBridge.close() returns Ok(())","asil":"ASIL-B","category":"shmem"},
-  {"id":"REQ-MDNS-001","title":"ServiceRecord type","description":"ServiceRecord holds host, port, zone, and txt fields","asil":"ASIL-B","category":"mdns"},
-  {"id":"REQ-MDNS-002","title":"MdnsRegistry in-process impl","description":"MdnsRegistry provides announce, withdraw, resolve, names","asil":"ASIL-B","category":"mdns"},
-  {"id":"REQ-MDNS-003","title":"announce registers service","description":"announce() registers a ServiceRecord under a name","asil":"ASIL-B","category":"mdns"},
-  {"id":"REQ-MDNS-004","title":"resolve returns record","description":"resolve() returns Some(record) for announced names, None otherwise","asil":"ASIL-B","category":"mdns"},
-  {"id":"REQ-TLS-001","title":"MIN_TLS_VERSION constant","description":"MIN_TLS_VERSION == \"TLSv1.2\"","asil":"ASIL-B","category":"tls"},
-  {"id":"REQ-TLS-002","title":"Mutual auth required","description":"REQUIRE_MUTUAL_AUTH == true; unverified peer returns Err(NotConnected)","asil":"ASIL-B","category":"tls"},
-  {"id":"REQ-TLS-003","title":"TlsStream trait","description":"TlsStream defines write_all, read_to_vec, peer_verified","asil":"ASIL-B","category":"tls"},
-  {"id":"REQ-TLS-004","title":"TlsBridge uses wire encoding","description":"TlsBridge.send() uses wire::encode_command and decode_response","asil":"ASIL-B","category":"tls"},
-  {"id":"REQ-TLS-005","title":"Close is no-op","description":"TlsBridge.close() returns Ok(())","asil":"ASIL-B","category":"tls"},
-  {"id":"REQ-GRPC-001","title":"GrpcRequest/Response types","description":"GrpcRequest and GrpcResponse are Vec<u8> newtypes","asil":"ASIL-B","category":"grpcbridge"},
-  {"id":"REQ-GRPC-002","title":"Encode/decode helpers","description":"encode_grpc_request and decode_grpc_response marshal RCP types","asil":"ASIL-B","category":"grpcbridge"},
-  {"id":"REQ-GRPC-003","title":"GrpcStub trait","description":"GrpcStub defines unary_call","asil":"ASIL-B","category":"grpcbridge"},
-  {"id":"REQ-GRPC-004","title":"GrpcBridge delegates","description":"GrpcBridge.send() uses encode/decode cycle via GrpcStub","asil":"ASIL-B","category":"grpcbridge"},
-  {"id":"REQ-REST-001","title":"HttpClient trait","description":"HttpClient defines post","asil":"ASIL-B","category":"restbridge"},
-  {"id":"REQ-REST-002","title":"RestBridge wraps client","description":"RestBridge delegates to an HttpClient","asil":"ASIL-B","category":"restbridge"},
-  {"id":"REQ-REST-003","title":"HTTP status codes mapped","description":"200→OK, 408/504→TIMEOUT, 429→BUSY, other→ERROR","asil":"ASIL-B","category":"restbridge"},
-  {"id":"REQ-REST-004","title":"Close is no-op","description":"RestBridge.close() returns Ok(())","asil":"ASIL-B","category":"restbridge"},
-  {"id":"REQ-UDS-001","title":"UDS service IDs","description":"READ_DATA=0x22, WRITE_DATA=0x2E, ECU_RESET=0x11","asil":"ASIL-B","category":"udsbr"},
-  {"id":"REQ-UDS-002","title":"cmd_to_uds_sid mapping","description":"GET→READ_DATA, SET→WRITE_DATA, RESET→ECU_RESET","asil":"ASIL-B","category":"udsbr"},
-  {"id":"REQ-UDS-003","title":"UdsTransport trait","description":"UdsTransport defines request()","asil":"ASIL-B","category":"udsbr"},
-  {"id":"REQ-UDS-004","title":"UdsBridge delegates","description":"UdsBridge.send() maps to UDS service and checks positive response SID","asil":"ASIL-B","category":"udsbr"},
-  {"id":"REQ-UDS-005","title":"Close is no-op","description":"UdsBridge.close() returns Ok(())","asil":"ASIL-B","category":"udsbr"},
-  {"id":"REQ-DOIP-001","title":"DoIP protocol version","description":"DOIP_PROTO_VER == 0x02; DOIP_HEADER_LEN == 8","asil":"ASIL-B","category":"doipbr"},
-  {"id":"REQ-DOIP-002","title":"DoipSocket trait and frame encoding","description":"DoipSocket defines send/recv; encode_doip_frame produces 8-byte header","asil":"ASIL-B","category":"doipbr"},
-  {"id":"REQ-DOIP-003","title":"DoipBridge delegates","description":"DoipBridge.send() encodes via DoIP and checks response","asil":"ASIL-B","category":"doipbr"},
-  {"id":"REQ-DOIP-004","title":"Close is no-op","description":"DoipBridge.close() returns Ok(())","asil":"ASIL-B","category":"doipbr"},
-  {"id":"REQ-CAPI-001","title":"CCommand is repr(C)","description":"CCommand uses #[repr(C)] with C-compatible field types","asil":"ASIL-B","category":"capi"},
-  {"id":"REQ-CAPI-002","title":"CResponse is repr(C)","description":"CResponse uses #[repr(C)] with C-compatible field types","asil":"ASIL-B","category":"capi"},
-  {"id":"REQ-CAPI-003","title":"Command/CCommand conversion","description":"From<&Command> for CCommand and From<&CCommand> for Command are inverses","asil":"ASIL-B","category":"capi"},
-  {"id":"REQ-CAPI-004","title":"CError maps RcpError","description":"From<&RcpError> for CError maps all RcpError variants to CError codes","asil":"ASIL-B","category":"capi"},
-  {"id":"REQ-ADAPT-001","title":"Adapter trait","description":"Adapter<M> defines to_command and to_message","asil":"ASIL-B","category":"adapt"},
-  {"id":"REQ-ADAPT-002","title":"AdaptController wraps inner","description":"AdaptController delegates sends via Adapter conversion","asil":"ASIL-B","category":"adapt"},
-  {"id":"REQ-ADAPT-003","title":"send_msg uses adapter","description":"send_msg() converts M to Command, sends, and converts Response back to M","asil":"ASIL-B","category":"adapt"},
-  {"id":"REQ-ADAPT-004","title":"PassthroughAdapter identity","description":"PassthroughAdapter for Command implements identity conversion","asil":"ASIL-B","category":"adapt"},
-  {"id":"REQ-ADAPT-005","title":"Payload preserved","description":"PassthroughAdapter preserves payload through round-trip","asil":"ASIL-B","category":"adapt"},
-  {"id":"REQ-CLI-001","title":"send command","description":"rcp send dispatches a command to a zone controller","asil":"QM","category":"cli"},
-  {"id":"REQ-CLI-002","title":"send options","description":"rcp send accepts --zone, --type, --priority, --payload flags","asil":"QM","category":"cli"},
-  {"id":"REQ-CLI-003","title":"version command","description":"rcp version prints crate version and RELAY spec version","asil":"QM","category":"cli"},
-  {"id":"REQ-CLI-004","title":"zones command","description":"rcp zones lists all standard zone IDs and names","asil":"QM","category":"cli"},
-  {"id":"REQ-CLI-005","title":"status command","description":"rcp status subscribes to a zone and prints the first Status","asil":"QM","category":"cli"}
+  {
+    "id": "REQ-SPEC-001",
+    "title": "RELAY spec version",
+    "description": "The crate must implement RELAY specification version 1.6",
+    "asil": "ASIL-B",
+    "category": "spec",
+    "source": "relay-spec-1.10"
+  },
+  {
+    "id": "REQ-ZONE-001",
+    "title": "Zone string representation",
+    "description": "Each zone must have a unique non-empty PascalCase string name",
+    "asil": "ASIL-B",
+    "category": "zone"
+  },
+  {
+    "id": "REQ-ZONE-002",
+    "title": "Zone inner value",
+    "description": "Zone is a newtype over u8; inner value is stable across versions",
+    "asil": "ASIL-B",
+    "category": "zone"
+  },
+  {
+    "id": "REQ-ZONE-003",
+    "title": "FRONT_LEFT is 1",
+    "description": "Zone::FRONT_LEFT.0 == 1",
+    "asil": "ASIL-B",
+    "category": "zone"
+  },
+  {
+    "id": "REQ-ZONE-004",
+    "title": "FRONT_RIGHT is 2",
+    "description": "Zone::FRONT_RIGHT.0 == 2",
+    "asil": "ASIL-B",
+    "category": "zone"
+  },
+  {
+    "id": "REQ-ZONE-005",
+    "title": "REAR_LEFT is 3",
+    "description": "Zone::REAR_LEFT.0 == 3",
+    "asil": "ASIL-B",
+    "category": "zone"
+  },
+  {
+    "id": "REQ-ZONE-006",
+    "title": "REAR_RIGHT is 4",
+    "description": "Zone::REAR_RIGHT.0 == 4",
+    "asil": "ASIL-B",
+    "category": "zone"
+  },
+  {
+    "id": "REQ-ZONE-007",
+    "title": "CENTRAL is 5",
+    "description": "Zone::CENTRAL.0 == 5",
+    "asil": "ASIL-B",
+    "category": "zone"
+  },
+  {
+    "id": "REQ-ZONE-008",
+    "title": "Zone constants are distinct",
+    "description": "All zone constants must have distinct inner values",
+    "asil": "ASIL-B",
+    "category": "zone"
+  },
+  {
+    "id": "REQ-PRI-001",
+    "title": "NORMAL priority",
+    "description": "Priority::NORMAL.0 == 0",
+    "asil": "ASIL-B",
+    "category": "priority"
+  },
+  {
+    "id": "REQ-PRI-002",
+    "title": "HIGH > NORMAL",
+    "description": "Priority::HIGH > Priority::NORMAL",
+    "asil": "ASIL-B",
+    "category": "priority"
+  },
+  {
+    "id": "REQ-PRI-003",
+    "title": "CRITICAL > HIGH",
+    "description": "Priority::CRITICAL > Priority::HIGH",
+    "asil": "ASIL-B",
+    "category": "priority"
+  },
+  {
+    "id": "REQ-CMD-001",
+    "title": "NOOP is 0",
+    "description": "CommandType::NOOP.0 == 0",
+    "asil": "ASIL-B",
+    "category": "cmd"
+  },
+  {
+    "id": "REQ-CMD-002",
+    "title": "SET is 1",
+    "description": "CommandType::SET.0 == 1",
+    "asil": "ASIL-B",
+    "category": "cmd"
+  },
+  {
+    "id": "REQ-CMD-003",
+    "title": "GET is 2",
+    "description": "CommandType::GET.0 == 2",
+    "asil": "ASIL-B",
+    "category": "cmd"
+  },
+  {
+    "id": "REQ-CMD-004",
+    "title": "RESET is 3",
+    "description": "CommandType::RESET.0 == 3",
+    "asil": "ASIL-B",
+    "category": "cmd"
+  },
+  {
+    "id": "REQ-CMD-005",
+    "title": "WATCHDOG is 4",
+    "description": "CommandType::WATCHDOG.0 == 4",
+    "asil": "ASIL-B",
+    "category": "cmd"
+  },
+  {
+    "id": "REQ-CMD-006",
+    "title": "Command types distinct",
+    "description": "All command type constants must have distinct inner values",
+    "asil": "ASIL-B",
+    "category": "cmd"
+  },
+  {
+    "id": "REQ-STATUS-001",
+    "title": "ResponseStatus strings unique",
+    "description": "All response status values must have unique non-empty string representations",
+    "asil": "ASIL-B",
+    "category": "status"
+  },
+  {
+    "id": "REQ-STATUS-002",
+    "title": "OK is 0",
+    "description": "ResponseStatus::OK.0 == 0",
+    "asil": "ASIL-B",
+    "category": "status"
+  },
+  {
+    "id": "REQ-STATUS-003",
+    "title": "ERROR is 1",
+    "description": "ResponseStatus::ERROR.0 == 1",
+    "asil": "ASIL-B",
+    "category": "status"
+  },
+  {
+    "id": "REQ-STATUS-004",
+    "title": "TIMEOUT is 2",
+    "description": "ResponseStatus::TIMEOUT.0 == 2",
+    "asil": "ASIL-B",
+    "category": "status"
+  },
+  {
+    "id": "REQ-STATUS-005",
+    "title": "BUSY is 3",
+    "description": "ResponseStatus::BUSY.0 == 3",
+    "asil": "ASIL-B",
+    "category": "status"
+  },
+  {
+    "id": "REQ-STATUS-006",
+    "title": "Status constants distinct",
+    "description": "All response status constants must have distinct inner values",
+    "asil": "ASIL-B",
+    "category": "status"
+  },
+  {
+    "id": "REQ-CMDSTRUCT-001",
+    "title": "Zero Command is safe NOOP",
+    "description": "Command::default() must have zone=UNKNOWN, cmd_type=NOOP, priority=NORMAL, payload=None",
+    "asil": "ASIL-B",
+    "category": "struct"
+  },
+  {
+    "id": "REQ-CMDSTRUCT-002",
+    "title": "Command payload optional",
+    "description": "Command.payload may be None",
+    "asil": "ASIL-B",
+    "category": "struct"
+  },
+  {
+    "id": "REQ-RESP-001",
+    "title": "Response carries command ID",
+    "description": "Response.command_id echoes the dispatched command ID",
+    "asil": "ASIL-B",
+    "category": "struct"
+  },
+  {
+    "id": "REQ-RESP-002",
+    "title": "Response carries zone",
+    "description": "Response.zone identifies the responding zone",
+    "asil": "ASIL-B",
+    "category": "struct"
+  },
+  {
+    "id": "REQ-RESP-003",
+    "title": "Zero Response has status OK",
+    "description": "Response::default().status == ResponseStatus::OK",
+    "asil": "ASIL-B",
+    "category": "struct"
+  },
+  {
+    "id": "REQ-STAT-001",
+    "title": "Status carries zone",
+    "description": "Status.zone identifies the publishing zone controller",
+    "asil": "ASIL-B",
+    "category": "struct"
+  },
+  {
+    "id": "REQ-STAT-002",
+    "title": "Status carries seq",
+    "description": "Status.seq is a monotonically increasing sequence number",
+    "asil": "ASIL-B",
+    "category": "struct"
+  },
+  {
+    "id": "REQ-STAT-003",
+    "title": "Status healthy flag",
+    "description": "Status.healthy reports whether the controller is operational",
+    "asil": "ASIL-B",
+    "category": "struct"
+  },
+  {
+    "id": "REQ-STAT-004",
+    "title": "Status seq per controller",
+    "description": "Each zone controller maintains its own seq counter",
+    "asil": "ASIL-B",
+    "category": "struct"
+  },
+  {
+    "id": "REQ-STAT-005",
+    "title": "Status payload optional",
+    "description": "Status.payload may be None",
+    "asil": "ASIL-B",
+    "category": "struct"
+  },
+  {
+    "id": "REQ-ERR-001",
+    "title": "Closed error distinct",
+    "description": "RcpError::Closed must be a distinct variant",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-ERR-002",
+    "title": "NotFound error distinct",
+    "description": "RcpError::NotFound must be a distinct variant",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-ERR-003",
+    "title": "AlreadyExists error distinct",
+    "description": "RcpError::AlreadyExists must be a distinct variant",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-ERR-004",
+    "title": "Timeout error distinct",
+    "description": "RcpError::Timeout must be a distinct variant",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-ERR-005",
+    "title": "Busy error distinct",
+    "description": "RcpError::Busy must be a distinct variant",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-ERR-006",
+    "title": "Sentinel errors are mutually distinct",
+    "description": "All RELAY sentinel error variants must be pairwise distinct",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-ERR-007",
+    "title": "Closed is relay-closed",
+    "description": "RcpError::Closed.is_relay_closed() == true",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-ERR-008",
+    "title": "NotConnected is relay-not-connected",
+    "description": "RcpError::NotConnected.is_relay_not_connected() == true",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-ERR-009",
+    "title": "AlreadyExists is standalone",
+    "description": "RcpError::AlreadyExists.is_already_exists() == true and is not relay-closed/timeout/not-connected",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-ERR-010",
+    "title": "Timeout is relay-timeout",
+    "description": "RcpError::Timeout.is_relay_timeout() == true",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-ERR-011",
+    "title": "ZoneMismatch is distinct",
+    "description": "RcpError::ZoneMismatch.is_zone_mismatch() == true and is also is_relay_not_connected()",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-ERR-012",
+    "title": "NotConnected test",
+    "description": "Direct test of NotConnected is_relay_not_connected",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-ERR-013",
+    "title": "PayloadTooLarge test",
+    "description": "Direct test of PayloadTooLarge is_relay_payload_too_large",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-ERR-014",
+    "title": "Only Closed is relay-closed",
+    "description": "is_relay_closed() returns false for non-Closed variants",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-ERR-015",
+    "title": "is_relay_not_connected coverage",
+    "description": "is_relay_not_connected returns false for Closed and Timeout",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-ERR-016",
+    "title": "Timeout is relay-timeout",
+    "description": "RcpError::Timeout.is_relay_timeout() == true",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-ERR-017",
+    "title": "PayloadTooLarge not relay-closed",
+    "description": "PayloadTooLarge.is_relay_closed() == false",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-ERR-018",
+    "title": "ZoneMismatch is relay-not-connected",
+    "description": "ZoneMismatch wraps NotConnected per RELAY spec",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-ERR-019",
+    "title": "AlreadyExists is not relay-timeout",
+    "description": "AlreadyExists.is_relay_timeout() == false",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-ERR-020",
+    "title": "Busy is relay-timeout",
+    "description": "Busy.is_relay_timeout() == true; Busy wraps Timeout",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-ERR-021",
+    "title": "ZoneMismatch is relay-not-connected (named)",
+    "description": "ZoneMismatch.is_relay_not_connected() == true",
+    "asil": "ASIL-B",
+    "category": "error"
+  },
+  {
+    "id": "REQ-MSG-001",
+    "title": "zone_from_str PascalCase and kebab-case",
+    "description": "zone_from_str accepts both PascalCase and kebab-case zone names",
+    "asil": "ASIL-B",
+    "category": "parse"
+  },
+  {
+    "id": "REQ-MSG-002",
+    "title": "zone_from_str unknown returns NotFound",
+    "description": "zone_from_str returns Err(RcpError::NotFound) for unknown strings",
+    "asil": "ASIL-B",
+    "category": "parse"
+  },
+  {
+    "id": "REQ-PWR-001",
+    "title": "SLEEP and WAKE command types distinct",
+    "description": "CommandType::SLEEP != CommandType::WAKE; both differ from other command types",
+    "asil": "ASIL-B",
+    "category": "power"
+  },
+  {
+    "id": "REQ-PWR-002",
+    "title": "PowerState variants distinct",
+    "description": "PowerState::Active, Sleep, Standby are pairwise distinct",
+    "asil": "ASIL-B",
+    "category": "power"
+  },
+  {
+    "id": "REQ-PWR-003",
+    "title": "Initial state is Active",
+    "description": "PowerStateController starts in Active state",
+    "asil": "ASIL-B",
+    "category": "power"
+  },
+  {
+    "id": "REQ-PWR-004",
+    "title": "power_state query",
+    "description": "PowerStateController.power_state() returns current state",
+    "asil": "ASIL-B",
+    "category": "power"
+  },
+  {
+    "id": "REQ-PWR-005",
+    "title": "SLEEP transitions to Sleep",
+    "description": "Sending SLEEP command transitions to PowerState::Sleep",
+    "asil": "ASIL-B",
+    "category": "power"
+  },
+  {
+    "id": "REQ-PWR-006",
+    "title": "Commands during Sleep return BUSY",
+    "description": "Non-WAKE commands while in Sleep state return ResponseStatus::BUSY",
+    "asil": "ASIL-B",
+    "category": "power"
+  },
+  {
+    "id": "REQ-PWR-007",
+    "title": "WAKE transitions to Active",
+    "description": "Sending WAKE command from Sleep transitions to PowerState::Active",
+    "asil": "ASIL-B",
+    "category": "power"
+  },
+  {
+    "id": "REQ-PWR-008",
+    "title": "Close returns Closed",
+    "description": "PowerStateController.send() after close() returns Err(Closed)",
+    "asil": "ASIL-B",
+    "category": "power"
+  },
+  {
+    "id": "REQ-CTRL-001",
+    "title": "Controller is a trait",
+    "description": "Controller is a trait with zone/send/subscribe/close methods",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-002",
+    "title": "send invokes handler",
+    "description": "MockController.send() invokes the registered handler and returns its result",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-003",
+    "title": "send returns Result",
+    "description": "Controller.send() returns Result<Response, RcpError>",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-004",
+    "title": "subscribe returns Subscription",
+    "description": "Controller.subscribe() returns Result<Subscription, RcpError>",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-005",
+    "title": "close safe to call multiple times",
+    "description": "Controller.close() must be idempotent",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-006",
+    "title": "send after close returns Closed",
+    "description": "Controller.send() after close() returns Err(RcpError::Closed)",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-007",
+    "title": "zero timeout returns Timeout",
+    "description": "send() with timeout=Some(Duration::ZERO) returns Err(RcpError::Timeout)",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-008",
+    "title": "zone mismatch returns ZoneMismatch",
+    "description": "send() with cmd.zone != ctrl.zone() returns Err(RcpError::ZoneMismatch)",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-009",
+    "title": "zone getter stable",
+    "description": "Controller.zone() returns the same value across calls",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-010",
+    "title": "subscribe seq strictly increasing",
+    "description": "Each published Status carries a seq number strictly greater than the previous",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-011",
+    "title": "subscribe on closed returns Closed",
+    "description": "subscribe() after close() returns Err(Closed)",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-012",
+    "title": "multiple concurrent subscribers",
+    "description": "Multiple concurrent subscribers each receive their own copy of published Status",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-013",
+    "title": "NOOP command accepted",
+    "description": "Controller accepts NOOP command type without error",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-014",
+    "title": "WATCHDOG command accepted",
+    "description": "Controller accepts WATCHDOG command type without error",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-015",
+    "title": "RESET command accepted",
+    "description": "Controller accepts RESET command type without error",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-016",
+    "title": "handler response returned verbatim",
+    "description": "The Response returned by the handler is returned unchanged from send()",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-017",
+    "title": "publish on closed controller is safe",
+    "description": "Calling publish() on a closed controller must not panic",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-018",
+    "title": "concurrent sends are race-free",
+    "description": "Multiple concurrent send() calls from different threads are safe",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-019",
+    "title": "concurrent publish and subscribe are race-free",
+    "description": "Simultaneous publish() and subscribe() from different threads are safe",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-020",
+    "title": "status carries correct zone",
+    "description": "Published Status.zone matches the controller's zone",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-021",
+    "title": "status carries correct payload",
+    "description": "Published Status.payload matches the payload passed to publish()",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-022",
+    "title": "status healthy while open",
+    "description": "Status.healthy == true while the controller is open",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-023",
+    "title": "zero timeout is pre-cancelled",
+    "description": "Timeout=Some(ZERO) is treated as pre-cancelled context (no handler invoked)",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-024",
+    "title": "nil payload does not panic",
+    "description": "send() with payload=None must not panic",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-025",
+    "title": "Controller is Send+Sync",
+    "description": "Controller implementations must be Send + Sync",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-026",
+    "title": "Payload copied before handler",
+    "description": "MockController copies payload before passing to handler",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-CTRL-027",
+    "title": "Publish copies payload",
+    "description": "MockController.publish() copies the payload for each subscriber",
+    "asil": "ASIL-B",
+    "category": "ctrl"
+  },
+  {
+    "id": "REQ-REG-001",
+    "title": "Registry is a trait",
+    "description": "Registry is a trait with register/deregister/lookup/controllers/close",
+    "asil": "ASIL-B",
+    "category": "registry"
+  },
+  {
+    "id": "REQ-REG-002",
+    "title": "register returns AlreadyExists on duplicate",
+    "description": "Registering the same zone twice returns Err(AlreadyExists)",
+    "asil": "ASIL-B",
+    "category": "registry"
+  },
+  {
+    "id": "REQ-REG-003",
+    "title": "deregister returns NotFound for absent zone",
+    "description": "Deregistering an unregistered zone returns Err(NotFound)",
+    "asil": "ASIL-B",
+    "category": "registry"
+  },
+  {
+    "id": "REQ-REG-004",
+    "title": "lookup returns NotFound for absent zone",
+    "description": "Looking up an unregistered zone returns Err(NotFound)",
+    "asil": "ASIL-B",
+    "category": "registry"
+  },
+  {
+    "id": "REQ-REG-005",
+    "title": "lookup returns Closed when registry is closed",
+    "description": "lookup() after registry.close() returns Err(Closed)",
+    "asil": "ASIL-B",
+    "category": "registry"
+  },
+  {
+    "id": "REQ-REG-006",
+    "title": "controllers returns all registered",
+    "description": "controllers() returns one entry per registered zone",
+    "asil": "ASIL-B",
+    "category": "registry"
+  },
+  {
+    "id": "REQ-REG-007",
+    "title": "close closes all controllers",
+    "description": "registry.close() propagates close to all registered controllers",
+    "asil": "ASIL-B",
+    "category": "registry"
+  },
+  {
+    "id": "REQ-REG-008",
+    "title": "Registry is Send+Sync",
+    "description": "Registry implementations must be Send + Sync",
+    "asil": "ASIL-B",
+    "category": "registry"
+  },
+  {
+    "id": "REQ-REG-009",
+    "title": "deregister closes the controller",
+    "description": "deregister() calls close() on the removed controller",
+    "asil": "ASIL-B",
+    "category": "registry"
+  },
+  {
+    "id": "REQ-REG-010",
+    "title": "MockRegistry pre-populates 5 zones",
+    "description": "MockRegistry.new() registers controllers for all 5 standard zones",
+    "asil": "ASIL-B",
+    "category": "registry"
+  },
+  {
+    "id": "REQ-REG-011",
+    "title": "register after close returns Closed",
+    "description": "registry.register() after registry.close() returns Err(Closed)",
+    "asil": "ASIL-B",
+    "category": "registry"
+  },
+  {
+    "id": "REQ-REG-012",
+    "title": "deregister after close returns Closed",
+    "description": "registry.deregister() after registry.close() returns Err(Closed)",
+    "asil": "ASIL-B",
+    "category": "registry"
+  },
+  {
+    "id": "REQ-REG-013",
+    "title": "close is idempotent",
+    "description": "Calling registry.close() multiple times is safe",
+    "asil": "ASIL-B",
+    "category": "registry"
+  },
+  {
+    "id": "REQ-WIRE-001",
+    "title": "Magic bytes",
+    "description": "Wire frames start with 0x52 0x43",
+    "asil": "ASIL-B",
+    "category": "wire"
+  },
+  {
+    "id": "REQ-WIRE-002",
+    "title": "Protocol version byte",
+    "description": "Wire frames include PROTO_VER=0x01 at byte offset 2",
+    "asil": "ASIL-B",
+    "category": "wire"
+  },
+  {
+    "id": "REQ-WIRE-003",
+    "title": "Message type byte",
+    "description": "Wire frame includes message type byte (Command=0x01, Response=0x02, Status=0x03)",
+    "asil": "ASIL-B",
+    "category": "wire"
+  },
+  {
+    "id": "REQ-WIRE-004",
+    "title": "Header length",
+    "description": "Wire header is exactly 16 bytes",
+    "asil": "ASIL-B",
+    "category": "wire"
+  },
+  {
+    "id": "REQ-WIRE-005",
+    "title": "Command encode/decode round-trip",
+    "description": "encode_command(cmd) followed by decode_command() recovers the original command",
+    "asil": "ASIL-B",
+    "category": "wire"
+  },
+  {
+    "id": "REQ-WIRE-006",
+    "title": "Response encode/decode round-trip",
+    "description": "encode_response(resp) followed by decode_response() recovers the original response",
+    "asil": "ASIL-B",
+    "category": "wire"
+  },
+  {
+    "id": "REQ-WIRE-007",
+    "title": "Payload size limit",
+    "description": "Payloads exceeding MAX_PAYLOAD=65491 bytes are rejected with PayloadTooLarge",
+    "asil": "ASIL-B",
+    "category": "wire"
+  },
+  {
+    "id": "REQ-WIRE-008",
+    "title": "Bad magic rejected",
+    "description": "Frames with wrong magic bytes return Err(BadMagic)",
+    "asil": "ASIL-B",
+    "category": "wire"
+  },
+  {
+    "id": "REQ-WIRE-009",
+    "title": "Bad version rejected",
+    "description": "Frames with wrong protocol version return Err(BadVersion)",
+    "asil": "ASIL-B",
+    "category": "wire"
+  },
+  {
+    "id": "REQ-E2E-001",
+    "title": "E2E wrap prepends seqNum",
+    "description": "wrap() prepends a 4-byte big-endian sequence number",
+    "asil": "ASIL-B",
+    "category": "e2e"
+  },
+  {
+    "id": "REQ-E2E-002",
+    "title": "CRC covers seqNum and payload",
+    "description": "CRC-16/CCITT-FALSE is computed over [seqNum bytes ++ payload]",
+    "asil": "ASIL-B",
+    "category": "e2e"
+  },
+  {
+    "id": "REQ-E2E-003",
+    "title": "CRC mismatch rejected",
+    "description": "unwrap() returns Err(CrcMismatch) when CRC does not match",
+    "asil": "ASIL-B",
+    "category": "e2e"
+  },
+  {
+    "id": "REQ-E2E-004",
+    "title": "E2eController auto-increments seq",
+    "description": "E2eController atomically increments sequence number per send",
+    "asil": "ASIL-B",
+    "category": "e2e"
+  },
+  {
+    "id": "REQ-E2E-005",
+    "title": "ReplayGuard rejects replayed seq",
+    "description": "ReplayGuard.check() returns Err(Replay) for previously seen seq numbers",
+    "asil": "ASIL-B",
+    "category": "e2e"
+  },
+  {
+    "id": "REQ-E2E-006",
+    "title": "E2E header is 6 bytes",
+    "description": "E2E header length is 4 (seqNum) + 2 (CRC) = 6 bytes",
+    "asil": "ASIL-B",
+    "category": "e2e"
+  },
+  {
+    "id": "REQ-E2E-007",
+    "title": "wrap/unwrap are inverse",
+    "description": "unwrap(wrap(seq, payload)) == Ok((seq, payload))",
+    "asil": "ASIL-B",
+    "category": "e2e"
+  },
+  {
+    "id": "REQ-E2E-008",
+    "title": "Single-bit corruption detected",
+    "description": "Flipping any bit in payload or seqNum causes CRC mismatch",
+    "asil": "ASIL-B",
+    "category": "e2e"
+  },
+  {
+    "id": "REQ-PQ-001",
+    "title": "PrioController wraps inner",
+    "description": "PrioController delegates commands to an inner Controller",
+    "asil": "ASIL-B",
+    "category": "prioqueue"
+  },
+  {
+    "id": "REQ-PQ-002",
+    "title": "Dispatch thread spawned on new",
+    "description": "PrioController.new() spawns a dispatch thread immediately",
+    "asil": "ASIL-B",
+    "category": "prioqueue"
+  },
+  {
+    "id": "REQ-PQ-003",
+    "title": "Zone matches inner",
+    "description": "PrioController.zone() returns the inner controller's zone",
+    "asil": "ASIL-B",
+    "category": "prioqueue"
+  },
+  {
+    "id": "REQ-PQ-004",
+    "title": "Critical dispatched before High/Normal",
+    "description": "Critical-priority commands are dequeued before High and Normal",
+    "asil": "ASIL-B",
+    "category": "prioqueue"
+  },
+  {
+    "id": "REQ-PQ-005",
+    "title": "FIFO within priority level",
+    "description": "Commands at the same priority level are dispatched in submission order",
+    "asil": "ASIL-B",
+    "category": "prioqueue"
+  },
+  {
+    "id": "REQ-PQ-006",
+    "title": "Payload forwarded unchanged",
+    "description": "PrioController forwards payloads to inner without modification",
+    "asil": "ASIL-B",
+    "category": "prioqueue"
+  },
+  {
+    "id": "REQ-PQ-007",
+    "title": "All command types routed",
+    "description": "PrioController handles all CommandType variants",
+    "asil": "ASIL-B",
+    "category": "prioqueue"
+  },
+  {
+    "id": "REQ-PQ-008",
+    "title": "Close drains queue with Closed error",
+    "description": "close() returns Err(Closed) to all pending callers",
+    "asil": "ASIL-B",
+    "category": "prioqueue"
+  },
+  {
+    "id": "REQ-RL-001",
+    "title": "Token bucket burst capacity",
+    "description": "Commands up to burst capacity succeed without delay",
+    "asil": "ASIL-B",
+    "category": "ratelimit"
+  },
+  {
+    "id": "REQ-RL-002",
+    "title": "Default config values",
+    "description": "DefaultConfig() returns rate=100, burst=20, exempt_critical=true",
+    "asil": "ASIL-B",
+    "category": "ratelimit"
+  },
+  {
+    "id": "REQ-RL-003",
+    "title": "Zone matches inner",
+    "description": "RateLimitController.zone() returns inner controller's zone",
+    "asil": "ASIL-B",
+    "category": "ratelimit"
+  },
+  {
+    "id": "REQ-RL-004",
+    "title": "Tokens replenish over time",
+    "description": "Token bucket refills at rate tokens/second",
+    "asil": "ASIL-B",
+    "category": "ratelimit"
+  },
+  {
+    "id": "REQ-RL-005",
+    "title": "Normal and High obey bucket",
+    "description": "NORMAL and HIGH priority commands consume tokens from the bucket",
+    "asil": "ASIL-B",
+    "category": "ratelimit"
+  },
+  {
+    "id": "REQ-RL-006",
+    "title": "Empty bucket returns Busy",
+    "description": "When bucket is empty, send() returns Err(RcpError::Busy) immediately",
+    "asil": "ASIL-B",
+    "category": "ratelimit"
+  },
+  {
+    "id": "REQ-RL-007",
+    "title": "Critical exempt from rate limit",
+    "description": "When exempt_critical=true, CRITICAL commands bypass the token bucket",
+    "asil": "ASIL-B",
+    "category": "ratelimit"
+  },
+  {
+    "id": "REQ-RL-008",
+    "title": "Busy is relay-timeout sentinel",
+    "description": "RcpError::Busy.is_relay_timeout() == true (Busy wraps Timeout)",
+    "asil": "ASIL-B",
+    "category": "ratelimit"
+  },
+  {
+    "id": "REQ-SIM-001",
+    "title": "SimController accepts commands",
+    "description": "SimController processes commands and returns responses",
+    "asil": "ASIL-B",
+    "category": "sim"
+  },
+  {
+    "id": "REQ-SIM-002",
+    "title": "Queued responses delivered in order",
+    "description": "queue_response() pre-programs responses consumed FIFO",
+    "asil": "ASIL-B",
+    "category": "sim"
+  },
+  {
+    "id": "REQ-SIM-003",
+    "title": "Commands recorded",
+    "description": "SimController records all dispatched commands for inspection",
+    "asil": "ASIL-B",
+    "category": "sim"
+  },
+  {
+    "id": "REQ-SIM-004",
+    "title": "Zero timeout returns Timeout",
+    "description": "send() with timeout=Some(ZERO) returns Err(Timeout)",
+    "asil": "ASIL-B",
+    "category": "sim"
+  },
+  {
+    "id": "REQ-SIM-005",
+    "title": "Zone mismatch returns ZoneMismatch",
+    "description": "send() with wrong zone returns Err(ZoneMismatch)",
+    "asil": "ASIL-B",
+    "category": "sim"
+  },
+  {
+    "id": "REQ-SIM-006",
+    "title": "subscribe receives publish",
+    "description": "Subscription receives Status updates from publish()",
+    "asil": "ASIL-B",
+    "category": "sim"
+  },
+  {
+    "id": "REQ-SIM-007",
+    "title": "Publish increments seq",
+    "description": "Each publish() call increments the seq counter",
+    "asil": "ASIL-B",
+    "category": "sim"
+  },
+  {
+    "id": "REQ-SIM-008",
+    "title": "Close returns Closed",
+    "description": "send() after close() returns Err(Closed)",
+    "asil": "ASIL-B",
+    "category": "sim"
+  },
+  {
+    "id": "REQ-WDG-001",
+    "title": "Watchdog default config",
+    "description": "WatchdogConfig::default() returns interval=1s, miss_window=3, close_on_miss=false",
+    "asil": "ASIL-B",
+    "category": "watchdog"
+  },
+  {
+    "id": "REQ-WDG-002",
+    "title": "Closed controller accumulates misses",
+    "description": "WatchdogMonitor accumulates miss_count when controller is unresponsive",
+    "asil": "ASIL-B",
+    "category": "watchdog"
+  },
+  {
+    "id": "REQ-WDG-003",
+    "title": "Background thread starts on new",
+    "description": "WatchdogMonitor::start() spawns a background thread immediately",
+    "asil": "ASIL-B",
+    "category": "watchdog"
+  },
+  {
+    "id": "REQ-WDG-004",
+    "title": "Healthy when responsive",
+    "description": "is_healthy() returns true when controller responds to WATCHDOG commands",
+    "asil": "ASIL-B",
+    "category": "watchdog"
+  },
+  {
+    "id": "REQ-WDG-005",
+    "title": "Miss count is zero on responsive controller",
+    "description": "miss_count() returns 0 when controller is responsive",
+    "asil": "ASIL-B",
+    "category": "watchdog"
+  },
+  {
+    "id": "REQ-WDG-006",
+    "title": "stop terminates monitor",
+    "description": "stop() terminates the watchdog thread without deadlock",
+    "asil": "ASIL-B",
+    "category": "watchdog"
+  },
+  {
+    "id": "REQ-WDG-007",
+    "title": "Zone getter",
+    "description": "WatchdogMonitor.zone() returns the monitored zone",
+    "asil": "ASIL-B",
+    "category": "watchdog"
+  },
+  {
+    "id": "REQ-WDG-008",
+    "title": "Unhealthy after miss window exceeded",
+    "description": "is_healthy() returns false after miss_window consecutive misses",
+    "asil": "ASIL-B",
+    "category": "watchdog"
+  },
+  {
+    "id": "REQ-DL-001",
+    "title": "DeadlineController enforces latency",
+    "description": "DeadlineController sends with a maximum response deadline",
+    "asil": "ASIL-B",
+    "category": "deadline"
+  },
+  {
+    "id": "REQ-DL-002",
+    "title": "Deadline getter",
+    "description": "DeadlineController.deadline() returns configured deadline",
+    "asil": "ASIL-B",
+    "category": "deadline"
+  },
+  {
+    "id": "REQ-DL-003",
+    "title": "Commands forwarded to inner",
+    "description": "DeadlineController forwards commands to inner controller",
+    "asil": "ASIL-B",
+    "category": "deadline"
+  },
+  {
+    "id": "REQ-DL-004",
+    "title": "Zero timeout returns Timeout",
+    "description": "send() with timeout=Some(ZERO) returns Err(Timeout)",
+    "asil": "ASIL-B",
+    "category": "deadline"
+  },
+  {
+    "id": "REQ-DL-005",
+    "title": "Shorter of deadline and caller timeout wins",
+    "description": "Effective timeout = min(caller_timeout, deadline)",
+    "asil": "ASIL-B",
+    "category": "deadline"
+  },
+  {
+    "id": "REQ-DL-006",
+    "title": "Close forwarded",
+    "description": "DeadlineController.close() is forwarded to inner",
+    "asil": "ASIL-B",
+    "category": "deadline"
+  },
+  {
+    "id": "REQ-LOAN-001",
+    "title": "LoanPool pre-allocates buffers",
+    "description": "LoanPool.new(count, size) pre-allocates count buffers of size bytes",
+    "asil": "ASIL-B",
+    "category": "loan"
+  },
+  {
+    "id": "REQ-LOAN-002",
+    "title": "Correct pool count",
+    "description": "LoanPool.available() returns count immediately after creation",
+    "asil": "ASIL-B",
+    "category": "loan"
+  },
+  {
+    "id": "REQ-LOAN-003",
+    "title": "Buffer returned on drop",
+    "description": "Dropping a Loan returns the buffer to the pool",
+    "asil": "ASIL-B",
+    "category": "loan"
+  },
+  {
+    "id": "REQ-LOAN-004",
+    "title": "try_acquire returns None when empty",
+    "description": "try_acquire() returns None when no buffers are available",
+    "asil": "ASIL-B",
+    "category": "loan"
+  },
+  {
+    "id": "REQ-LOAN-005",
+    "title": "Zone matches inner",
+    "description": "LoanPoolController.zone() returns inner controller's zone",
+    "asil": "ASIL-B",
+    "category": "loan"
+  },
+  {
+    "id": "REQ-LOAN-006",
+    "title": "Oversized loan request rejected",
+    "description": "loan(size > buffer_size) returns Err(PayloadTooLarge)",
+    "asil": "ASIL-B",
+    "category": "loan"
+  },
+  {
+    "id": "REQ-LOAN-007",
+    "title": "send_loaned forwards payload",
+    "description": "send_loaned() copies loan payload into command and forwards to inner",
+    "asil": "ASIL-B",
+    "category": "loan"
+  },
+  {
+    "id": "REQ-ZG-001",
+    "title": "ZoneGroup wraps multiple controllers",
+    "description": "ZoneGroup holds a Vec of zone controllers",
+    "asil": "ASIL-B",
+    "category": "zonegroup"
+  },
+  {
+    "id": "REQ-ZG-002",
+    "title": "Zone is logical zone ID",
+    "description": "ZoneGroup.zone() returns the logical group zone, not a member zone",
+    "asil": "ASIL-B",
+    "category": "zonegroup"
+  },
+  {
+    "id": "REQ-ZG-003",
+    "title": "Send broadcasts to all members",
+    "description": "send() dispatches the command to every member controller",
+    "asil": "ASIL-B",
+    "category": "zonegroup"
+  },
+  {
+    "id": "REQ-ZG-004",
+    "title": "First member error propagated",
+    "description": "If any member returns an error, send() returns that error",
+    "asil": "ASIL-B",
+    "category": "zonegroup"
+  },
+  {
+    "id": "REQ-ZG-005",
+    "title": "Subscribe via first member",
+    "description": "subscribe() delegates to the first member controller",
+    "asil": "ASIL-B",
+    "category": "zonegroup"
+  },
+  {
+    "id": "REQ-ZG-006",
+    "title": "Close closes all members",
+    "description": "close() closes all member controllers",
+    "asil": "ASIL-B",
+    "category": "zonegroup"
+  },
+  {
+    "id": "REQ-ZG-007",
+    "title": "Empty group send returns default OK",
+    "description": "send() on an empty group returns Ok(Response::default())",
+    "asil": "ASIL-B",
+    "category": "zonegroup"
+  },
+  {
+    "id": "REQ-PROXY-001",
+    "title": "ProxyController wraps inner",
+    "description": "ProxyController forwards all calls to an interchangeable inner controller",
+    "asil": "ASIL-B",
+    "category": "proxy"
+  },
+  {
+    "id": "REQ-PROXY-002",
+    "title": "Zone set from original inner",
+    "description": "ProxyController.zone() is set from the original inner controller at construction",
+    "asil": "ASIL-B",
+    "category": "proxy"
+  },
+  {
+    "id": "REQ-PROXY-003",
+    "title": "send forwarded",
+    "description": "ProxyController.send() forwards to the current inner controller",
+    "asil": "ASIL-B",
+    "category": "proxy"
+  },
+  {
+    "id": "REQ-PROXY-004",
+    "title": "subscribe forwarded",
+    "description": "ProxyController.subscribe() forwards to the current inner controller",
+    "asil": "ASIL-B",
+    "category": "proxy"
+  },
+  {
+    "id": "REQ-PROXY-005",
+    "title": "swap replaces inner atomically",
+    "description": "swap() atomically replaces the inner controller",
+    "asil": "ASIL-B",
+    "category": "proxy"
+  },
+  {
+    "id": "REQ-PROXY-006",
+    "title": "detach returns NotConnected",
+    "description": "After detach(), send() and subscribe() return Err(NotConnected)",
+    "asil": "ASIL-B",
+    "category": "proxy"
+  },
+  {
+    "id": "REQ-RED-001",
+    "title": "RedundancyController provides hot standby",
+    "description": "RedundancyController implements 1-of-2 hot standby",
+    "asil": "ASIL-B",
+    "category": "redundancy"
+  },
+  {
+    "id": "REQ-RED-002",
+    "title": "Zone matches primary",
+    "description": "RedundancyController.zone() matches the primary controller's zone",
+    "asil": "ASIL-B",
+    "category": "redundancy"
+  },
+  {
+    "id": "REQ-RED-003",
+    "title": "Primary success no failover",
+    "description": "When primary succeeds, no failover is triggered",
+    "asil": "ASIL-B",
+    "category": "redundancy"
+  },
+  {
+    "id": "REQ-RED-004",
+    "title": "Primary failure triggers failover",
+    "description": "On primary error, secondary is promoted and command is retried",
+    "asil": "ASIL-B",
+    "category": "redundancy"
+  },
+  {
+    "id": "REQ-RED-005",
+    "title": "Both failed returns error",
+    "description": "When both primary and secondary fail, the error is returned to caller",
+    "asil": "ASIL-B",
+    "category": "redundancy"
+  },
+  {
+    "id": "REQ-RED-006",
+    "title": "Failover count increments",
+    "description": "failover_count() increments each time a failover occurs",
+    "asil": "ASIL-B",
+    "category": "redundancy"
+  },
+  {
+    "id": "REQ-RED-007",
+    "title": "No secondary after failover",
+    "description": "After one failover, has_secondary() returns false",
+    "asil": "ASIL-B",
+    "category": "redundancy"
+  },
+  {
+    "id": "REQ-RED-008",
+    "title": "subscribe forwarded to primary",
+    "description": "subscribe() delegates to the current primary",
+    "asil": "ASIL-B",
+    "category": "redundancy"
+  },
+  {
+    "id": "REQ-FI-001",
+    "title": "FaultSpec defines rule and error",
+    "description": "FaultSpec holds a FaultRule and the error to inject",
+    "asil": "ASIL-B",
+    "category": "faultinject"
+  },
+  {
+    "id": "REQ-FI-002",
+    "title": "FaultRule variants",
+    "description": "FaultRule supports Always, OnNthCall, and AfterNthCall",
+    "asil": "ASIL-B",
+    "category": "faultinject"
+  },
+  {
+    "id": "REQ-FI-003",
+    "title": "No fault passes through",
+    "description": "Without fault rules, commands are forwarded to inner unchanged",
+    "asil": "ASIL-B",
+    "category": "faultinject"
+  },
+  {
+    "id": "REQ-FI-004",
+    "title": "Multiple rules first match wins",
+    "description": "When multiple rules match, the first one installed takes effect",
+    "asil": "ASIL-B",
+    "category": "faultinject"
+  },
+  {
+    "id": "REQ-FI-005",
+    "title": "Clear removes all rules",
+    "description": "clear() removes all installed fault rules",
+    "asil": "ASIL-B",
+    "category": "faultinject"
+  },
+  {
+    "id": "REQ-FI-006",
+    "title": "Fault rule checked on each send",
+    "description": "Each send() call evaluates all installed fault rules in order",
+    "asil": "ASIL-B",
+    "category": "faultinject"
+  },
+  {
+    "id": "REQ-FI-007",
+    "title": "Close forwarded",
+    "description": "FaultInjectController.close() is forwarded to inner",
+    "asil": "ASIL-B",
+    "category": "faultinject"
+  },
+  {
+    "id": "REQ-OBS-001",
+    "title": "Metrics struct",
+    "description": "ObserveController maintains Metrics with call count, error count, latency",
+    "asil": "ASIL-B",
+    "category": "observe"
+  },
+  {
+    "id": "REQ-OBS-002",
+    "title": "ObserveController wraps inner",
+    "description": "ObserveController wraps an inner controller",
+    "asil": "ASIL-B",
+    "category": "observe"
+  },
+  {
+    "id": "REQ-OBS-003",
+    "title": "Metrics updated on each send",
+    "description": "call count and error count are updated on every send()",
+    "asil": "ASIL-B",
+    "category": "observe"
+  },
+  {
+    "id": "REQ-OBS-004",
+    "title": "Hook registered via add_hook",
+    "description": "add_hook() registers a callback invoked after each send()",
+    "asil": "ASIL-B",
+    "category": "observe"
+  },
+  {
+    "id": "REQ-OBS-005",
+    "title": "Hook receives command, result, and latency",
+    "description": "Hook function receives (&Command, &Result, Duration)",
+    "asil": "ASIL-B",
+    "category": "observe"
+  },
+  {
+    "id": "REQ-OBS-006",
+    "title": "Close forwarded",
+    "description": "ObserveController.close() forwards to inner",
+    "asil": "ASIL-B",
+    "category": "observe"
+  },
+  {
+    "id": "REQ-TSN-001",
+    "title": "TrafficClass type",
+    "description": "TrafficClass is a newtype over u8 with BEST_EFFORT(0), CONTROL(5), CRITICAL(7)",
+    "asil": "ASIL-B",
+    "category": "tsn"
+  },
+  {
+    "id": "REQ-TSN-002",
+    "title": "Priority to traffic class mapping",
+    "description": "TrafficClass::from_priority() maps NORMAL\u2192BEST_EFFORT, HIGH\u2192CONTROL, CRITICAL\u2192CRITICAL",
+    "asil": "ASIL-B",
+    "category": "tsn"
+  },
+  {
+    "id": "REQ-TSN-003",
+    "title": "Zone forwarded",
+    "description": "TsnController.zone() returns the inner controller's zone",
+    "asil": "ASIL-B",
+    "category": "tsn"
+  },
+  {
+    "id": "REQ-TSN-004",
+    "title": "TSN byte prepended to payload",
+    "description": "TsnController prepends traffic class byte to command payload",
+    "asil": "ASIL-B",
+    "category": "tsn"
+  },
+  {
+    "id": "REQ-TSN-005",
+    "title": "Close forwarded",
+    "description": "TsnController.close() forwards to inner",
+    "asil": "ASIL-B",
+    "category": "tsn"
+  },
+  {
+    "id": "REQ-AUTHZ-001",
+    "title": "Policy defines allowed cmd types",
+    "description": "Policy.allowed_cmd_types controls which command types are permitted",
+    "asil": "ASIL-B",
+    "category": "authz"
+  },
+  {
+    "id": "REQ-AUTHZ-002",
+    "title": "allow_all permits any command",
+    "description": "Policy::allow_all() permits all command types",
+    "asil": "ASIL-B",
+    "category": "authz"
+  },
+  {
+    "id": "REQ-AUTHZ-003",
+    "title": "deny_all blocks every command",
+    "description": "Policy::deny_all() blocks all command types",
+    "asil": "ASIL-B",
+    "category": "authz"
+  },
+  {
+    "id": "REQ-AUTHZ-004",
+    "title": "AuthzController wraps inner",
+    "description": "AuthzController wraps an inner controller with a policy",
+    "asil": "ASIL-B",
+    "category": "authz"
+  },
+  {
+    "id": "REQ-AUTHZ-005",
+    "title": "Policy enforced on send",
+    "description": "send() returns Err(NotFound) when command type is not in allowlist",
+    "asil": "ASIL-B",
+    "category": "authz"
+  },
+  {
+    "id": "REQ-AUTHZ-006",
+    "title": "Policy hot-swappable",
+    "description": "set_policy() atomically replaces the active policy",
+    "asil": "ASIL-B",
+    "category": "authz"
+  },
+  {
+    "id": "REQ-AUTHZ-007",
+    "title": "Close forwarded",
+    "description": "AuthzController.close() forwards to inner",
+    "asil": "ASIL-B",
+    "category": "authz"
+  },
+  {
+    "id": "REQ-FW-001",
+    "title": "MAX_CHUNK constant",
+    "description": "MAX_CHUNK == 512 bytes per firmware chunk",
+    "asil": "ASIL-B",
+    "category": "firmware"
+  },
+  {
+    "id": "REQ-FW-002",
+    "title": "Empty image rejected",
+    "description": "flash() with empty image returns Err(InvalidSize)",
+    "asil": "ASIL-B",
+    "category": "firmware"
+  },
+  {
+    "id": "REQ-FW-003",
+    "title": "Single chunk flash",
+    "description": "flash() with image <= chunk_size sends exactly one chunk",
+    "asil": "ASIL-B",
+    "category": "firmware"
+  },
+  {
+    "id": "REQ-FW-004",
+    "title": "Multiple chunks",
+    "description": "flash() sends ceil(image_len/chunk_size) SET commands",
+    "asil": "ASIL-B",
+    "category": "firmware"
+  },
+  {
+    "id": "REQ-FW-005",
+    "title": "Chunk error aborts",
+    "description": "Non-OK response from any chunk aborts flash and returns error",
+    "asil": "ASIL-B",
+    "category": "firmware"
+  },
+  {
+    "id": "REQ-FW-006",
+    "title": "Chunk size capped at MAX_CHUNK",
+    "description": "Chunk sizes larger than MAX_CHUNK are silently capped",
+    "asil": "ASIL-B",
+    "category": "firmware"
+  },
+  {
+    "id": "REQ-REC-001",
+    "title": "Entry carries timestamp",
+    "description": "Record Entry includes SystemTime timestamp",
+    "asil": "ASIL-B",
+    "category": "record"
+  },
+  {
+    "id": "REQ-REC-002",
+    "title": "RecordController wraps inner",
+    "description": "RecordController wraps an inner controller and logs interactions",
+    "asil": "ASIL-B",
+    "category": "record"
+  },
+  {
+    "id": "REQ-REC-003",
+    "title": "Entries in chronological order",
+    "description": "entries() returns interactions in submission order",
+    "asil": "ASIL-B",
+    "category": "record"
+  },
+  {
+    "id": "REQ-REC-004",
+    "title": "Clear empties log",
+    "description": "clear() removes all recorded entries",
+    "asil": "ASIL-B",
+    "category": "record"
+  },
+  {
+    "id": "REQ-REC-005",
+    "title": "Errors recorded",
+    "description": "RecordController records both successful and error results",
+    "asil": "ASIL-B",
+    "category": "record"
+  },
+  {
+    "id": "REQ-FED-001",
+    "title": "FederationRouter routes by vehicle ID",
+    "description": "FederationRouter maps vehicle IDs to remote registries",
+    "asil": "ASIL-B",
+    "category": "federation"
+  },
+  {
+    "id": "REQ-FED-002",
+    "title": "add_peer registers a remote registry",
+    "description": "add_peer() registers a registry under a vehicle ID string",
+    "asil": "ASIL-B",
+    "category": "federation"
+  },
+  {
+    "id": "REQ-FED-003",
+    "title": "remove_peer deregisters",
+    "description": "remove_peer() removes a registered vehicle registry",
+    "asil": "ASIL-B",
+    "category": "federation"
+  },
+  {
+    "id": "REQ-FED-004",
+    "title": "peer_ids lists all",
+    "description": "peer_ids() returns all registered vehicle ID strings",
+    "asil": "ASIL-B",
+    "category": "federation"
+  },
+  {
+    "id": "REQ-FED-005",
+    "title": "lookup_peer resolves zone",
+    "description": "lookup_peer(vehicle_id, zone) returns the controller from the peer registry",
+    "asil": "ASIL-B",
+    "category": "federation"
+  },
+  {
+    "id": "REQ-DYN-001",
+    "title": "DynStore is a thread-safe KV store",
+    "description": "DynStore provides a thread-safe key/value store",
+    "asil": "ASIL-B",
+    "category": "dyndata"
+  },
+  {
+    "id": "REQ-DYN-002",
+    "title": "set inserts or replaces",
+    "description": "set() inserts a new key or replaces an existing value",
+    "asil": "ASIL-B",
+    "category": "dyndata"
+  },
+  {
+    "id": "REQ-DYN-003",
+    "title": "get returns value or None",
+    "description": "get() returns Some(value) for existing keys, None otherwise",
+    "asil": "ASIL-B",
+    "category": "dyndata"
+  },
+  {
+    "id": "REQ-DYN-004",
+    "title": "delete removes key",
+    "description": "delete() removes a key; returns true if it existed",
+    "asil": "ASIL-B",
+    "category": "dyndata"
+  },
+  {
+    "id": "REQ-DYN-005",
+    "title": "keys lists all",
+    "description": "keys() returns all parameter names currently in the store",
+    "asil": "ASIL-B",
+    "category": "dyndata"
+  },
+  {
+    "id": "REQ-CFG-001",
+    "title": "RcpConfig default is valid",
+    "description": "RcpConfig::default() passes validate()",
+    "asil": "ASIL-B",
+    "category": "config"
+  },
+  {
+    "id": "REQ-CFG-002",
+    "title": "ControllerConfig per-controller",
+    "description": "ControllerConfig holds zone, timeout_ms, max_payload_bytes",
+    "asil": "ASIL-B",
+    "category": "config"
+  },
+  {
+    "id": "REQ-CFG-003",
+    "title": "WatchdogConfig defaults",
+    "description": "WatchdogConfig::default() returns interval_ms=1000, window=3",
+    "asil": "ASIL-B",
+    "category": "config"
+  },
+  {
+    "id": "REQ-CFG-004",
+    "title": "RateLimitConfig defaults",
+    "description": "RateLimitConfig::default() returns rate=100, burst=20, exempt_critical=true",
+    "asil": "ASIL-B",
+    "category": "config"
+  },
+  {
+    "id": "REQ-CFG-005",
+    "title": "JSON and YAML parsing",
+    "description": "from_json() and from_yaml() parse RcpConfig from text",
+    "asil": "ASIL-B",
+    "category": "config"
+  },
+  {
+    "id": "REQ-CFG-006",
+    "title": "Validation rejects invalid values",
+    "description": "validate() returns Err for zone > 5, negative rate, zero watchdog window, oversized payload",
+    "asil": "ASIL-B",
+    "category": "config"
+  },
+  {
+    "id": "REQ-CG-001",
+    "title": "FieldType maps to Rust types",
+    "description": "FieldType::rust_type() returns correct Rust primitive type names",
+    "asil": "ASIL-B",
+    "category": "codegen"
+  },
+  {
+    "id": "REQ-CG-002",
+    "title": "StructSchema defines name and fields",
+    "description": "StructSchema holds name and Vec<Field> with optional flag",
+    "asil": "ASIL-B",
+    "category": "codegen"
+  },
+  {
+    "id": "REQ-CG-003",
+    "title": "generate_structs emits Rust code",
+    "description": "generate_structs() emits valid Rust struct definitions",
+    "asil": "ASIL-B",
+    "category": "codegen"
+  },
+  {
+    "id": "REQ-CG-004",
+    "title": "parse_schema converts JSON schema",
+    "description": "parse_schema() converts a HashMap schema definition into StructSchemas",
+    "asil": "ASIL-B",
+    "category": "codegen"
+  },
+  {
+    "id": "REQ-CYB-001",
+    "title": "Feasibility variants",
+    "description": "Feasibility has Low, Medium, High, Critical variants with Display",
+    "asil": "ASIL-B",
+    "category": "iso21434"
+  },
+  {
+    "id": "REQ-CYB-002",
+    "title": "Impact variants",
+    "description": "Impact has Negligible, Moderate, Major, Severe variants with Display",
+    "asil": "ASIL-B",
+    "category": "iso21434"
+  },
+  {
+    "id": "REQ-CYB-003",
+    "title": "RiskLevel variants",
+    "description": "RiskLevel has Low, Medium, High, Critical variants",
+    "asil": "ASIL-B",
+    "category": "iso21434"
+  },
+  {
+    "id": "REQ-CYB-004",
+    "title": "risk_level function",
+    "description": "risk_level(f, i) returns RiskLevel per ISO 21434 Table 14",
+    "asil": "ASIL-B",
+    "category": "iso21434"
+  },
+  {
+    "id": "REQ-CYB-005",
+    "title": "Threat.risk_level()",
+    "description": "Threat.risk_level() computes risk from its feasibility and impact",
+    "asil": "ASIL-B",
+    "category": "iso21434"
+  },
+  {
+    "id": "REQ-CYB-006",
+    "title": "filter_by_risk",
+    "description": "filter_by_risk() returns threats at or above the minimum risk level",
+    "asil": "ASIL-B",
+    "category": "iso21434"
+  },
+  {
+    "id": "REQ-GAP-001",
+    "title": "GapReport has_gaps flag",
+    "description": "GapReport.has_gaps() returns true when any gap list is non-empty",
+    "asil": "ASIL-B",
+    "category": "certgap"
+  },
+  {
+    "id": "REQ-GAP-002",
+    "title": "analyse detects gaps",
+    "description": "analyse() identifies unimplemented, untested, and undeclared requirements",
+    "asil": "ASIL-B",
+    "category": "certgap"
+  },
+  {
+    "id": "REQ-GAP-003",
+    "title": "coverage ratio",
+    "description": "coverage() returns ratio of covered to declared requirements",
+    "asil": "ASIL-B",
+    "category": "certgap"
+  },
+  {
+    "id": "REQ-GAP-004",
+    "title": "coverage_by_prefix",
+    "description": "coverage_by_prefix() groups coverage statistics by requirement prefix",
+    "asil": "ASIL-B",
+    "category": "certgap"
+  },
+  {
+    "id": "REQ-GAP-005",
+    "title": "zero coverage baseline",
+    "description": "coverage() returns 0.0 when no requirements are covered; coverage_by_prefix() returns 0.0 per prefix",
+    "asil": "ASIL-B",
+    "category": "certgap"
+  },
+  {
+    "id": "REQ-FORMAL-001",
+    "title": "Invariant type",
+    "description": "Invariant holds a name and a checkable predicate",
+    "asil": "ASIL-B",
+    "category": "formal"
+  },
+  {
+    "id": "REQ-FORMAL-002",
+    "title": "CheckResult tracks pass/fail",
+    "description": "CheckResult records passed and failed invariant names",
+    "asil": "ASIL-B",
+    "category": "formal"
+  },
+  {
+    "id": "REQ-FORMAL-003",
+    "title": "check_all evaluates all invariants",
+    "description": "check_all() checks every invariant against the state",
+    "asil": "ASIL-B",
+    "category": "formal"
+  },
+  {
+    "id": "REQ-FORMAL-004",
+    "title": "witness finds first violation",
+    "description": "witness() returns the first state that violates the invariant",
+    "asil": "ASIL-B",
+    "category": "formal"
+  },
+  {
+    "id": "REQ-ADMIN-001",
+    "title": "AdminServer health check",
+    "description": "AdminServer.is_healthy() returns true when all controllers respond",
+    "asil": "ASIL-B",
+    "category": "admin"
+  },
+  {
+    "id": "REQ-ADMIN-002",
+    "title": "Request count",
+    "description": "record_request() and request_count() track admin endpoint hits",
+    "asil": "ASIL-B",
+    "category": "admin"
+  },
+  {
+    "id": "REQ-ADMIN-003",
+    "title": "Uptime",
+    "description": "uptime() returns non-negative duration since construction",
+    "asil": "ASIL-B",
+    "category": "admin"
+  },
+  {
+    "id": "REQ-ADMIN-004",
+    "title": "Controller count",
+    "description": "controller_count() returns number of registered controllers",
+    "asil": "ASIL-B",
+    "category": "admin"
+  },
+  {
+    "id": "REQ-ADMIN-005",
+    "title": "Shutdown closes registry",
+    "description": "shutdown() closes the registry and sets is_shutting_down()",
+    "asil": "ASIL-B",
+    "category": "admin"
+  },
+  {
+    "id": "REQ-CANBR-001",
+    "title": "CAN FD max payload",
+    "description": "CAN_FD_MAX_PAYLOAD == 64 bytes",
+    "asil": "ASIL-B",
+    "category": "canbr"
+  },
+  {
+    "id": "REQ-CANBR-002",
+    "title": "CanSocket trait",
+    "description": "CanSocket defines send_frame and recv_frame",
+    "asil": "ASIL-B",
+    "category": "canbr"
+  },
+  {
+    "id": "REQ-CANBR-003",
+    "title": "CanBridge sends CAN frame",
+    "description": "CanBridge.send() encodes and transmits a CAN frame",
+    "asil": "ASIL-B",
+    "category": "canbr"
+  },
+  {
+    "id": "REQ-CANBR-004",
+    "title": "Zone mismatch and payload size checks",
+    "description": "CanBridge rejects wrong zone and oversized payloads",
+    "asil": "ASIL-B",
+    "category": "canbr"
+  },
+  {
+    "id": "REQ-CANBR-005",
+    "title": "Close is no-op",
+    "description": "CanBridge.close() returns Ok(())",
+    "asil": "ASIL-B",
+    "category": "canbr"
+  },
+  {
+    "id": "REQ-LINBR-001",
+    "title": "LIN max data",
+    "description": "LIN_MAX_DATA == 8 bytes",
+    "asil": "ASIL-B",
+    "category": "linbr"
+  },
+  {
+    "id": "REQ-LINBR-002",
+    "title": "LinMaster trait",
+    "description": "LinMaster defines send_frame and recv_frame",
+    "asil": "ASIL-B",
+    "category": "linbr"
+  },
+  {
+    "id": "REQ-LINBR-003",
+    "title": "LinBridge wraps master",
+    "description": "LinBridge delegates to a LinMaster",
+    "asil": "ASIL-B",
+    "category": "linbr"
+  },
+  {
+    "id": "REQ-LINBR-004",
+    "title": "Payload, zone, and timeout checks",
+    "description": "LinBridge rejects oversized payload, wrong zone, zero timeout",
+    "asil": "ASIL-B",
+    "category": "linbr"
+  },
+  {
+    "id": "REQ-SOMEIP-001",
+    "title": "SOME/IP header length",
+    "description": "SOMEIP_HEADER_LEN == 16 bytes",
+    "asil": "ASIL-B",
+    "category": "someip"
+  },
+  {
+    "id": "REQ-SOMEIP-002",
+    "title": "encode_request",
+    "description": "encode_request() produces a valid SOME/IP header + payload",
+    "asil": "ASIL-B",
+    "category": "someip"
+  },
+  {
+    "id": "REQ-SOMEIP-003",
+    "title": "decode_response",
+    "description": "decode_response() parses SOME/IP response and maps status codes",
+    "asil": "ASIL-B",
+    "category": "someip"
+  },
+  {
+    "id": "REQ-SOMEIP-004",
+    "title": "SomeIpSocket trait",
+    "description": "SomeIpSocket defines send and recv",
+    "asil": "ASIL-B",
+    "category": "someip"
+  },
+  {
+    "id": "REQ-SOMEIP-005",
+    "title": "SomeIpBridge delegates",
+    "description": "SomeIpBridge.send() uses encode_request/decode_response cycle",
+    "asil": "ASIL-B",
+    "category": "someip"
+  },
+  {
+    "id": "REQ-MQTT-001",
+    "title": "MqttClient trait",
+    "description": "MqttClient defines publish, subscribe_topic, recv_message",
+    "asil": "ASIL-B",
+    "category": "mqttbr"
+  },
+  {
+    "id": "REQ-MQTT-002",
+    "title": "MqttBridge wraps client",
+    "description": "MqttBridge delegates to a MqttClient",
+    "asil": "ASIL-B",
+    "category": "mqttbr"
+  },
+  {
+    "id": "REQ-MQTT-003",
+    "title": "Topic scheme",
+    "description": "MqttBridge publishes to rcp/{zone}/cmd/{id}",
+    "asil": "ASIL-B",
+    "category": "mqttbr"
+  },
+  {
+    "id": "REQ-MQTT-004",
+    "title": "Zone mismatch rejected",
+    "description": "MqttBridge rejects commands with wrong zone",
+    "asil": "ASIL-B",
+    "category": "mqttbr"
+  },
+  {
+    "id": "REQ-MQTT-005",
+    "title": "subscribe returns NotFound",
+    "description": "MqttBridge.subscribe() returns Err(NotFound)",
+    "asil": "ASIL-B",
+    "category": "mqttbr"
+  },
+  {
+    "id": "REQ-DDS-001",
+    "title": "DdsParticipant trait",
+    "description": "DdsParticipant defines write and take",
+    "asil": "ASIL-B",
+    "category": "ddsbr"
+  },
+  {
+    "id": "REQ-DDS-002",
+    "title": "DdsBridge wraps participant",
+    "description": "DdsBridge delegates to a DdsParticipant",
+    "asil": "ASIL-B",
+    "category": "ddsbr"
+  },
+  {
+    "id": "REQ-DDS-003",
+    "title": "Commands mapped to DDS topics",
+    "description": "DdsBridge.send() writes to rcp.zone{N}.cmd and reads from rcp.zone{N}.resp",
+    "asil": "ASIL-B",
+    "category": "ddsbr"
+  },
+  {
+    "id": "REQ-DDS-004",
+    "title": "Close is no-op",
+    "description": "DdsBridge.close() returns Ok(())",
+    "asil": "ASIL-B",
+    "category": "ddsbr"
+  },
+  {
+    "id": "REQ-UDP-001",
+    "title": "UdpSocket trait",
+    "description": "UdpSocket defines send_to and recv_from",
+    "asil": "ASIL-B",
+    "category": "udp"
+  },
+  {
+    "id": "REQ-UDP-002",
+    "title": "UdpBridge wraps socket",
+    "description": "UdpBridge delegates to a UdpSocket and a remote SocketAddr",
+    "asil": "ASIL-B",
+    "category": "udp"
+  },
+  {
+    "id": "REQ-UDP-003",
+    "title": "Commands encoded as wire frames",
+    "description": "UdpBridge.send() uses wire::encode_command and decode_response",
+    "asil": "ASIL-B",
+    "category": "udp"
+  },
+  {
+    "id": "REQ-UDP-004",
+    "title": "Zone mismatch rejected",
+    "description": "UdpBridge rejects commands with wrong zone",
+    "asil": "ASIL-B",
+    "category": "udp"
+  },
+  {
+    "id": "REQ-UDP-005",
+    "title": "Close is no-op",
+    "description": "UdpBridge.close() returns Ok(())",
+    "asil": "ASIL-B",
+    "category": "udp"
+  },
+  {
+    "id": "REQ-SHM-001",
+    "title": "ShmChannel trait",
+    "description": "ShmChannel defines write and read",
+    "asil": "ASIL-B",
+    "category": "shmem"
+  },
+  {
+    "id": "REQ-SHM-002",
+    "title": "InProcChannel is FIFO",
+    "description": "InProcChannel maintains FIFO ordering",
+    "asil": "ASIL-B",
+    "category": "shmem"
+  },
+  {
+    "id": "REQ-SHM-003",
+    "title": "ShmBridge wraps tx/rx channels",
+    "description": "ShmBridge holds a write channel (tx) and read channel (rx)",
+    "asil": "ASIL-B",
+    "category": "shmem"
+  },
+  {
+    "id": "REQ-SHM-004",
+    "title": "Zone mismatch and timeout checks",
+    "description": "ShmBridge rejects wrong zone and zero timeout",
+    "asil": "ASIL-B",
+    "category": "shmem"
+  },
+  {
+    "id": "REQ-SHM-005",
+    "title": "Close is no-op",
+    "description": "ShmBridge.close() returns Ok(())",
+    "asil": "ASIL-B",
+    "category": "shmem"
+  },
+  {
+    "id": "REQ-MDNS-001",
+    "title": "ServiceRecord type",
+    "description": "ServiceRecord holds host, port, zone, and txt fields",
+    "asil": "ASIL-B",
+    "category": "mdns"
+  },
+  {
+    "id": "REQ-MDNS-002",
+    "title": "MdnsRegistry in-process impl",
+    "description": "MdnsRegistry provides announce, withdraw, resolve, names",
+    "asil": "ASIL-B",
+    "category": "mdns"
+  },
+  {
+    "id": "REQ-MDNS-003",
+    "title": "announce registers service",
+    "description": "announce() registers a ServiceRecord under a name",
+    "asil": "ASIL-B",
+    "category": "mdns"
+  },
+  {
+    "id": "REQ-MDNS-004",
+    "title": "resolve returns record",
+    "description": "resolve() returns Some(record) for announced names, None otherwise",
+    "asil": "ASIL-B",
+    "category": "mdns"
+  },
+  {
+    "id": "REQ-TLS-001",
+    "title": "MIN_TLS_VERSION constant",
+    "description": "MIN_TLS_VERSION == \"TLSv1.2\"",
+    "asil": "ASIL-B",
+    "category": "tls"
+  },
+  {
+    "id": "REQ-TLS-002",
+    "title": "Mutual auth required",
+    "description": "REQUIRE_MUTUAL_AUTH == true; unverified peer returns Err(NotConnected)",
+    "asil": "ASIL-B",
+    "category": "tls"
+  },
+  {
+    "id": "REQ-TLS-003",
+    "title": "TlsStream trait",
+    "description": "TlsStream defines write_all, read_to_vec, peer_verified",
+    "asil": "ASIL-B",
+    "category": "tls"
+  },
+  {
+    "id": "REQ-TLS-004",
+    "title": "TlsBridge uses wire encoding",
+    "description": "TlsBridge.send() uses wire::encode_command and decode_response",
+    "asil": "ASIL-B",
+    "category": "tls"
+  },
+  {
+    "id": "REQ-TLS-005",
+    "title": "Close is no-op",
+    "description": "TlsBridge.close() returns Ok(())",
+    "asil": "ASIL-B",
+    "category": "tls"
+  },
+  {
+    "id": "REQ-GRPC-001",
+    "title": "GrpcRequest/Response types",
+    "description": "GrpcRequest and GrpcResponse are Vec<u8> newtypes",
+    "asil": "ASIL-B",
+    "category": "grpcbridge"
+  },
+  {
+    "id": "REQ-GRPC-002",
+    "title": "Encode/decode helpers",
+    "description": "encode_grpc_request and decode_grpc_response marshal RCP types",
+    "asil": "ASIL-B",
+    "category": "grpcbridge"
+  },
+  {
+    "id": "REQ-GRPC-003",
+    "title": "GrpcStub trait",
+    "description": "GrpcStub defines unary_call",
+    "asil": "ASIL-B",
+    "category": "grpcbridge"
+  },
+  {
+    "id": "REQ-GRPC-004",
+    "title": "GrpcBridge delegates",
+    "description": "GrpcBridge.send() uses encode/decode cycle via GrpcStub",
+    "asil": "ASIL-B",
+    "category": "grpcbridge"
+  },
+  {
+    "id": "REQ-REST-001",
+    "title": "HttpClient trait",
+    "description": "HttpClient defines post",
+    "asil": "ASIL-B",
+    "category": "restbridge"
+  },
+  {
+    "id": "REQ-REST-002",
+    "title": "RestBridge wraps client",
+    "description": "RestBridge delegates to an HttpClient",
+    "asil": "ASIL-B",
+    "category": "restbridge"
+  },
+  {
+    "id": "REQ-REST-003",
+    "title": "HTTP status codes mapped",
+    "description": "200\u2192OK, 408/504\u2192TIMEOUT, 429\u2192BUSY, other\u2192ERROR",
+    "asil": "ASIL-B",
+    "category": "restbridge"
+  },
+  {
+    "id": "REQ-REST-004",
+    "title": "Close is no-op",
+    "description": "RestBridge.close() returns Ok(())",
+    "asil": "ASIL-B",
+    "category": "restbridge"
+  },
+  {
+    "id": "REQ-UDS-001",
+    "title": "UDS service IDs",
+    "description": "READ_DATA=0x22, WRITE_DATA=0x2E, ECU_RESET=0x11",
+    "asil": "ASIL-B",
+    "category": "udsbr"
+  },
+  {
+    "id": "REQ-UDS-002",
+    "title": "cmd_to_uds_sid mapping",
+    "description": "GET\u2192READ_DATA, SET\u2192WRITE_DATA, RESET\u2192ECU_RESET",
+    "asil": "ASIL-B",
+    "category": "udsbr"
+  },
+  {
+    "id": "REQ-UDS-003",
+    "title": "UdsTransport trait",
+    "description": "UdsTransport defines request()",
+    "asil": "ASIL-B",
+    "category": "udsbr"
+  },
+  {
+    "id": "REQ-UDS-004",
+    "title": "UdsBridge delegates",
+    "description": "UdsBridge.send() maps to UDS service and checks positive response SID",
+    "asil": "ASIL-B",
+    "category": "udsbr"
+  },
+  {
+    "id": "REQ-UDS-005",
+    "title": "Close is no-op",
+    "description": "UdsBridge.close() returns Ok(())",
+    "asil": "ASIL-B",
+    "category": "udsbr"
+  },
+  {
+    "id": "REQ-DOIP-001",
+    "title": "DoIP protocol version",
+    "description": "DOIP_PROTO_VER == 0x02; DOIP_HEADER_LEN == 8",
+    "asil": "ASIL-B",
+    "category": "doipbr"
+  },
+  {
+    "id": "REQ-DOIP-002",
+    "title": "DoipSocket trait and frame encoding",
+    "description": "DoipSocket defines send/recv; encode_doip_frame produces 8-byte header",
+    "asil": "ASIL-B",
+    "category": "doipbr"
+  },
+  {
+    "id": "REQ-DOIP-003",
+    "title": "DoipBridge delegates",
+    "description": "DoipBridge.send() encodes via DoIP and checks response",
+    "asil": "ASIL-B",
+    "category": "doipbr"
+  },
+  {
+    "id": "REQ-DOIP-004",
+    "title": "Close is no-op",
+    "description": "DoipBridge.close() returns Ok(())",
+    "asil": "ASIL-B",
+    "category": "doipbr"
+  },
+  {
+    "id": "REQ-CAPI-001",
+    "title": "CCommand is repr(C)",
+    "description": "CCommand uses #[repr(C)] with C-compatible field types",
+    "asil": "ASIL-B",
+    "category": "capi"
+  },
+  {
+    "id": "REQ-CAPI-002",
+    "title": "CResponse is repr(C)",
+    "description": "CResponse uses #[repr(C)] with C-compatible field types",
+    "asil": "ASIL-B",
+    "category": "capi"
+  },
+  {
+    "id": "REQ-CAPI-003",
+    "title": "Command/CCommand conversion",
+    "description": "From<&Command> for CCommand and From<&CCommand> for Command are inverses",
+    "asil": "ASIL-B",
+    "category": "capi"
+  },
+  {
+    "id": "REQ-CAPI-004",
+    "title": "CError maps RcpError",
+    "description": "From<&RcpError> for CError maps all RcpError variants to CError codes",
+    "asil": "ASIL-B",
+    "category": "capi"
+  },
+  {
+    "id": "REQ-ADAPT-001",
+    "title": "Adapter trait",
+    "description": "Adapter<M> defines to_command and to_message",
+    "asil": "ASIL-B",
+    "category": "adapt"
+  },
+  {
+    "id": "REQ-ADAPT-002",
+    "title": "AdaptController wraps inner",
+    "description": "AdaptController delegates sends via Adapter conversion",
+    "asil": "ASIL-B",
+    "category": "adapt"
+  },
+  {
+    "id": "REQ-ADAPT-003",
+    "title": "send_msg uses adapter",
+    "description": "send_msg() converts M to Command, sends, and converts Response back to M",
+    "asil": "ASIL-B",
+    "category": "adapt"
+  },
+  {
+    "id": "REQ-ADAPT-004",
+    "title": "PassthroughAdapter identity",
+    "description": "PassthroughAdapter for Command implements identity conversion",
+    "asil": "ASIL-B",
+    "category": "adapt"
+  },
+  {
+    "id": "REQ-ADAPT-005",
+    "title": "Payload preserved",
+    "description": "PassthroughAdapter preserves payload through round-trip",
+    "asil": "ASIL-B",
+    "category": "adapt"
+  },
+  {
+    "id": "REQ-CLI-001",
+    "title": "send command",
+    "description": "rcp send dispatches a command to a zone controller",
+    "asil": "QM",
+    "category": "cli"
+  },
+  {
+    "id": "REQ-CLI-002",
+    "title": "send options",
+    "description": "rcp send accepts --zone, --type, --priority, --payload flags",
+    "asil": "QM",
+    "category": "cli"
+  },
+  {
+    "id": "REQ-CLI-003",
+    "title": "version command",
+    "description": "rcp version prints crate version and RELAY spec version",
+    "asil": "QM",
+    "category": "cli"
+  },
+  {
+    "id": "REQ-CLI-004",
+    "title": "zones command",
+    "description": "rcp zones lists all standard zone IDs and names",
+    "asil": "QM",
+    "category": "cli"
+  },
+  {
+    "id": "REQ-CLI-005",
+    "title": "status command",
+    "description": "rcp status subscribes to a zone and prints the first Status",
+    "asil": "QM",
+    "category": "cli"
+  },
+  {
+    "id": "REQ-CLI-006",
+    "title": "version --format json",
+    "description": "The CLI must emit a valid \u00a712.1 JSON document when invoked with version --format json containing tool, version, spec_version, language, runtime fields",
+    "asil": "ASIL-B",
+    "category": "cli",
+    "source": "relay-spec-1.10"
+  },
+  {
+    "id": "REQ-CLI-007",
+    "title": "capabilities subcommand",
+    "description": "The CLI must emit a valid \u00a712.2 capabilities JSON document when invoked with capabilities",
+    "asil": "ASIL-B",
+    "category": "cli",
+    "source": "relay-spec-1.10"
+  },
+  {
+    "id": "REQ-CLI-008",
+    "title": "status --format json",
+    "description": "The CLI must emit a valid \u00a712.3 status JSON document when invoked with status --format json (no --zone) containing protocol, tool, version, healthy, connected, endpoint, details fields",
+    "asil": "ASIL-B",
+    "category": "cli",
+    "source": "relay-spec-1.10"
+  },
+  {
+    "id": "REQ-CLI-009",
+    "title": "convert --protocol RCP",
+    "description": "The CLI must accept a relay.Status JSON on stdin and emit a relay.Message JSON on stdout when invoked with convert --protocol RCP; exit 1 on invalid input, exit 2 on wrong/missing --protocol",
+    "asil": "ASIL-B",
+    "category": "cli",
+    "source": "relay-spec-1.10"
+  }
 ]

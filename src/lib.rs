@@ -117,7 +117,7 @@ use std::time::Duration;
 
 /// RELAY specification version this crate implements.
 // fusa:req REQ-SPEC-001
-pub const SPEC_VERSION: &str = "1.6";
+pub const SPEC_VERSION: &str = "1.10";
 
 // ── Zone ────────────────────────────────────────────────────────────────────
 

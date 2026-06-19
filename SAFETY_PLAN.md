@@ -18,7 +18,7 @@ This safety plan covers the **rust-RCP** crate — a Rust implementation of the 
 |---|---|---|
 | ISO 26262 | 2018 | ASIL-B |
 | IEC 62443 | 2019 | SL-2 |
-| RELAY Spec | 1.6 | Full compliance |
+| RELAY Spec | 1.10 | Full compliance |
 
 ## 4. Safety Lifecycle Activities
 
