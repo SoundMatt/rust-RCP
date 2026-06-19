@@ -56,7 +56,8 @@ impl Controller for ZoneGroup {
                 .members
                 .iter()
                 .map(|m| {
-                    let cmd = cmd.clone();
+                    let mut cmd = cmd.clone();
+                    cmd.zone = m.zone();
                     s.spawn(move || m.send(&cmd, timeout))
                 })
                 .collect();

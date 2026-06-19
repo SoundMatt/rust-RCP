@@ -112,11 +112,11 @@ impl ReplayGuard {
     /// Records `seq_num` on success.
     pub fn check(&self, seq_num: u32) -> Result<(), RcpError> {
         let mut window = self.window.lock().unwrap();
-        if window.contains(&seq_num) {
-            return Err(RcpError::Replay);
-        }
         if window.len() >= REPLAY_WINDOW {
             window.remove(0);
+        }
+        if window.contains(&seq_num) {
+            return Err(RcpError::Replay);
         }
         window.push(seq_num);
         Ok(())

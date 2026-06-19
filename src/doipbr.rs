@@ -39,10 +39,8 @@ pub trait DoipSocket: Send + Sync {
 #[cfg(test)]
 fn encode_doip_frame(payload_type: u16, data: &[u8]) -> Vec<u8> {
     let mut frame = Vec::with_capacity(DOIP_HEADER_LEN + data.len());
-    frame.push(0xFF);
     frame.push(DOIP_PROTO_VER);
     frame.push(!DOIP_PROTO_VER); // inverse protocol version
-    frame.push(0x00);
     frame.extend_from_slice(&payload_type.to_be_bytes());
     frame.extend_from_slice(&(data.len() as u32).to_be_bytes());
     frame.extend_from_slice(data);

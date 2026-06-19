@@ -489,7 +489,15 @@ impl Loan {
     /// Return the buffer to the pool without sending.
     pub fn return_loan(mut self) {
         if let Some(f) = self.release.take() {
-            f(self.payload);
+            f(std::mem::take(&mut self.payload));
+        }
+    }
+}
+
+impl Drop for Loan {
+    fn drop(&mut self) {
+        if let Some(f) = self.release.take() {
+            f(std::mem::take(&mut self.payload));
         }
     }
 }
