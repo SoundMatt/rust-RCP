@@ -220,19 +220,26 @@ mod tests {
     fn closed_controller_increments_miss_count() {
         let ctrl = ok_ctrl();
         ctrl.close().unwrap();
-        // miss_window=3 with 20ms interval; sleep 250ms gives ~12 polls — plenty
-        // of headroom on macOS CI where timer resolution can be coarse.
+        // Poll actively rather than fixed sleep so macOS CI timer jitter
+        // doesn't cause flakes: wait up to 2s for miss_window to be reached.
+        let miss_window = 3u32;
         let cfg = WatchdogConfig {
             interval: Duration::from_millis(20),
-            miss_window: 3,
+            miss_window,
             close_on_miss: false,
         };
         let w = WatchdogMonitor::start(ctrl, cfg);
-        std::thread::sleep(Duration::from_millis(250));
-        assert!(
-            w.miss_count() > 0,
-            "misses must accumulate for closed controller"
-        );
+        let deadline = std::time::Instant::now() + Duration::from_millis(2000);
+        loop {
+            if w.miss_count() >= miss_window {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "watchdog did not accumulate {miss_window} misses within 2000ms"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
         assert!(!w.is_healthy(), "unhealthy after misses");
         w.stop();
     }
