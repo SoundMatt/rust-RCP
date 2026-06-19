@@ -26,7 +26,11 @@ fn main() {
     match args[1].as_str() {
         // fusa:req REQ-CLI-003
         "version" => {
-            println!("rcp {} (RELAY spec {})", env!("CARGO_PKG_VERSION"), rcp::SPEC_VERSION);
+            println!(
+                "rcp {} (RELAY spec {})",
+                env!("CARGO_PKG_VERSION"),
+                rcp::SPEC_VERSION
+            );
         }
 
         // fusa:req REQ-CLI-004
@@ -65,7 +69,13 @@ fn main() {
                     process::exit(2);
                 }
                 Ok(ctrl) => {
-                    let cmd = rcp::Command { id: 1, zone, cmd_type, priority, payload };
+                    let cmd = rcp::Command {
+                        id: 1,
+                        zone,
+                        cmd_type,
+                        priority,
+                        payload,
+                    };
                     match ctrl.send(&cmd, Some(Duration::from_secs(5))) {
                         Ok(resp) => {
                             println!("status={} zone={}", resp.status, resp.zone);
@@ -99,7 +109,7 @@ fn main() {
                     println!("subscribed to zone {}; waiting for status...", zone);
                     match sub.recv_timeout(Duration::from_secs(5)) {
                         Some(s) => println!("seq={} healthy={}", s.seq, s.healthy),
-                        None    => println!("no status received within 5s"),
+                        None => println!("no status received within 5s"),
                     }
                 }
             }
@@ -154,7 +164,14 @@ mod tests {
     // fusa:test REQ-CLI-001
     // fusa:test REQ-CLI-002
     fn flag_value_finds_option() {
-        let args: Vec<String> = vec!["rcp".into(), "send".into(), "--zone".into(), "front-left".into(), "--type".into(), "1".into()];
+        let args: Vec<String> = vec![
+            "rcp".into(),
+            "send".into(),
+            "--zone".into(),
+            "front-left".into(),
+            "--type".into(),
+            "1".into(),
+        ];
         assert_eq!(flag_value(&args, "--zone"), Some("front-left"));
         assert_eq!(flag_value(&args, "--type"), Some("1"));
         assert_eq!(flag_value(&args, "--priority"), None);
@@ -184,8 +201,13 @@ mod tests {
     #[test]
     // fusa:test REQ-CLI-004
     fn all_zones_have_string_names() {
-        for z in [rcp::Zone::FRONT_LEFT, rcp::Zone::FRONT_RIGHT,
-                  rcp::Zone::REAR_LEFT,  rcp::Zone::REAR_RIGHT, rcp::Zone::CENTRAL] {
+        for z in [
+            rcp::Zone::FRONT_LEFT,
+            rcp::Zone::FRONT_RIGHT,
+            rcp::Zone::REAR_LEFT,
+            rcp::Zone::REAR_RIGHT,
+            rcp::Zone::CENTRAL,
+        ] {
             assert!(!z.as_str().is_empty());
         }
     }
@@ -194,9 +216,18 @@ mod tests {
     // fusa:test REQ-CLI-005
     fn mock_registry_has_all_zones_for_status() {
         let registry = rcp::mock::MockRegistry::new();
-        for zone in [rcp::Zone::FRONT_LEFT, rcp::Zone::FRONT_RIGHT,
-                     rcp::Zone::REAR_LEFT,  rcp::Zone::REAR_RIGHT, rcp::Zone::CENTRAL] {
-            assert!(registry.lookup(zone).is_ok(), "zone {:?} should be registered", zone);
+        for zone in [
+            rcp::Zone::FRONT_LEFT,
+            rcp::Zone::FRONT_RIGHT,
+            rcp::Zone::REAR_LEFT,
+            rcp::Zone::REAR_RIGHT,
+            rcp::Zone::CENTRAL,
+        ] {
+            assert!(
+                registry.lookup(zone).is_ok(),
+                "zone {:?} should be registered",
+                zone
+            );
         }
     }
 
@@ -205,8 +236,14 @@ mod tests {
     fn mock_registry_send_returns_ok() {
         let registry = rcp::mock::MockRegistry::new();
         let ctrl = registry.lookup(rcp::Zone::FRONT_LEFT).unwrap();
-        let cmd = rcp::Command { id: 1, zone: rcp::Zone::FRONT_LEFT, ..Default::default() };
-        let resp = ctrl.send(&cmd, Some(std::time::Duration::from_secs(1))).unwrap();
+        let cmd = rcp::Command {
+            id: 1,
+            zone: rcp::Zone::FRONT_LEFT,
+            ..Default::default()
+        };
+        let resp = ctrl
+            .send(&cmd, Some(std::time::Duration::from_secs(1)))
+            .unwrap();
         assert_eq!(resp.status, rcp::ResponseStatus::OK);
     }
 
