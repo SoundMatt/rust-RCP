@@ -220,13 +220,15 @@ mod tests {
     fn closed_controller_increments_miss_count() {
         let ctrl = ok_ctrl();
         ctrl.close().unwrap();
+        // miss_window=3 with 20ms interval; sleep 250ms gives ~12 polls — plenty
+        // of headroom on macOS CI where timer resolution can be coarse.
         let cfg = WatchdogConfig {
-            interval: Duration::from_millis(10),
-            miss_window: 5,
+            interval: Duration::from_millis(20),
+            miss_window: 3,
             close_on_miss: false,
         };
         let w = WatchdogMonitor::start(ctrl, cfg);
-        std::thread::sleep(Duration::from_millis(60));
+        std::thread::sleep(Duration::from_millis(250));
         assert!(
             w.miss_count() > 0,
             "misses must accumulate for closed controller"
