@@ -19,27 +19,27 @@ use crate::{Command, CommandType, Controller, Priority, RcpError, Response, Subs
 // ── Pending item ──────────────────────────────────────────────────────────────
 
 struct Pending {
-    cmd:     Command,
+    cmd: Command,
     timeout: Option<Duration>,
-    reply:   std::sync::mpsc::SyncSender<Result<Response, RcpError>>,
+    reply: std::sync::mpsc::SyncSender<Result<Response, RcpError>>,
 }
 
 // ── Internal queue state ──────────────────────────────────────────────────────
 
 struct Queues {
     critical: VecDeque<Pending>,
-    high:     VecDeque<Pending>,
-    normal:   VecDeque<Pending>,
-    closed:   bool,
+    high: VecDeque<Pending>,
+    normal: VecDeque<Pending>,
+    closed: bool,
 }
 
 impl Queues {
     fn new() -> Self {
         Queues {
             critical: VecDeque::new(),
-            high:     VecDeque::new(),
-            normal:   VecDeque::new(),
-            closed:   false,
+            high: VecDeque::new(),
+            normal: VecDeque::new(),
+            closed: false,
         }
     }
 
@@ -48,8 +48,12 @@ impl Queues {
     }
 
     fn pop_highest(&mut self) -> Option<Pending> {
-        if let Some(p) = self.critical.pop_front() { return Some(p); }
-        if let Some(p) = self.high.pop_front()     { return Some(p); }
+        if let Some(p) = self.critical.pop_front() {
+            return Some(p);
+        }
+        if let Some(p) = self.high.pop_front() {
+            return Some(p);
+        }
         self.normal.pop_front()
     }
 }
@@ -62,8 +66,8 @@ impl Queues {
 /// Critical > High > Normal order, FIFO within each level.
 // fusa:req REQ-PQ-001
 pub struct PrioController {
-    zone:   Zone,
-    state:  Arc<(Mutex<Queues>, Condvar)>,
+    zone: Zone,
+    state: Arc<(Mutex<Queues>, Condvar)>,
 }
 
 impl PrioController {
@@ -106,14 +110,20 @@ impl PrioController {
 }
 
 impl Controller for PrioController {
-    fn zone(&self) -> Zone { self.zone }
+    fn zone(&self) -> Zone {
+        self.zone
+    }
 
     // fusa:req REQ-PQ-003
     // fusa:req REQ-PQ-004
     // fusa:req REQ-PQ-005
     fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
         let (tx, rx) = std::sync::mpsc::sync_channel(1);
-        let pending = Pending { cmd: cmd.clone(), timeout, reply: tx };
+        let pending = Pending {
+            cmd: cmd.clone(),
+            timeout,
+            reply: tx,
+        };
 
         {
             let (lock, cvar) = &*self.state;
@@ -123,8 +133,8 @@ impl Controller for PrioController {
             }
             match cmd.priority {
                 Priority::CRITICAL => q.critical.push_back(pending),
-                Priority::HIGH     => q.high.push_back(pending),
-                _                  => q.normal.push_back(pending),
+                Priority::HIGH => q.high.push_back(pending),
+                _ => q.normal.push_back(pending),
             }
             cvar.notify_one();
         }
@@ -142,7 +152,12 @@ impl Controller for PrioController {
         let mut q = lock.lock().unwrap();
         q.closed = true;
         // Drain and signal error to all waiting callers
-        for p in q.critical.drain(..).chain(q.high.drain(..)).chain(q.normal.drain(..)) {
+        for p in q
+            .critical
+            .drain(..)
+            .chain(q.high.drain(..))
+            .chain(q.normal.drain(..))
+        {
             let _ = p.reply.send(Err(RcpError::Closed));
         }
         cvar.notify_all();
@@ -179,7 +194,10 @@ mod tests {
     fn new_controller_sends_command() {
         let inner = echo_controller(Zone::FRONT_LEFT);
         let pq = Arc::new(PrioController::new(inner));
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         let resp = pq.send(&cmd, None).unwrap();
         assert_eq!(resp.status, ResponseStatus::OK);
     }
@@ -203,8 +221,12 @@ mod tests {
 
         let h: crate::mock::Handler = Box::new(move |cmd| {
             order2.lock().unwrap().push(cmd.priority);
-            Response { command_id: cmd.id, zone: cmd.zone,
-                status: ResponseStatus::OK, payload: None }
+            Response {
+                command_id: cmd.id,
+                zone: cmd.zone,
+                status: ResponseStatus::OK,
+                payload: None,
+            }
         });
         let inner = MockController::new(Zone::FRONT_LEFT, Some(h)) as Arc<dyn Controller>;
         let pq = Arc::new(PrioController::new(inner));
@@ -218,13 +240,37 @@ mod tests {
         let pq3 = Arc::clone(&pq);
 
         let t1 = std::thread::spawn(move || {
-            pq1.send(&Command { zone: Zone::FRONT_LEFT, priority: Priority::NORMAL, ..Default::default() }, None).unwrap()
+            pq1.send(
+                &Command {
+                    zone: Zone::FRONT_LEFT,
+                    priority: Priority::NORMAL,
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap()
         });
         let t2 = std::thread::spawn(move || {
-            pq2.send(&Command { zone: Zone::FRONT_LEFT, priority: Priority::HIGH, ..Default::default() }, None).unwrap()
+            pq2.send(
+                &Command {
+                    zone: Zone::FRONT_LEFT,
+                    priority: Priority::HIGH,
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap()
         });
         let t3 = std::thread::spawn(move || {
-            pq3.send(&Command { zone: Zone::FRONT_LEFT, priority: Priority::CRITICAL, ..Default::default() }, None).unwrap()
+            pq3.send(
+                &Command {
+                    zone: Zone::FRONT_LEFT,
+                    priority: Priority::CRITICAL,
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap()
         });
 
         t1.join().unwrap();
@@ -245,20 +291,33 @@ mod tests {
             order2.lock().unwrap().push(cmd.id);
             // Simulate some processing time so ordering is observable
             std::thread::sleep(Duration::from_millis(5));
-            Response { command_id: cmd.id, zone: cmd.zone,
-                status: ResponseStatus::OK, payload: None }
+            Response {
+                command_id: cmd.id,
+                zone: cmd.zone,
+                status: ResponseStatus::OK,
+                payload: None,
+            }
         });
         let inner = MockController::new(Zone::FRONT_LEFT, Some(h)) as Arc<dyn Controller>;
         let pq = Arc::new(PrioController::new(inner));
 
         // Send several commands at the same priority sequentially
         for id in 1u32..=4 {
-            let cmd = Command { id, zone: Zone::FRONT_LEFT, priority: Priority::NORMAL, ..Default::default() };
+            let cmd = Command {
+                id,
+                zone: Zone::FRONT_LEFT,
+                priority: Priority::NORMAL,
+                ..Default::default()
+            };
             pq.send(&cmd, None).unwrap();
         }
 
         let seen = order.lock().unwrap();
-        assert_eq!(*seen, vec![1, 2, 3, 4], "FIFO order must be preserved within a level");
+        assert_eq!(
+            *seen,
+            vec![1, 2, 3, 4],
+            "FIFO order must be preserved within a level"
+        );
     }
 
     // ── Close ─────────────────────────────────────────────────────────────────
@@ -269,7 +328,15 @@ mod tests {
         let inner = echo_controller(Zone::FRONT_LEFT);
         let pq = PrioController::new(inner);
         pq.close().unwrap();
-        let err = pq.send(&Command { zone: Zone::FRONT_LEFT, ..Default::default() }, None).unwrap_err();
+        let err = pq
+            .send(
+                &Command {
+                    zone: Zone::FRONT_LEFT,
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap_err();
         assert_eq!(err, RcpError::Closed);
     }
 
@@ -298,14 +365,28 @@ mod tests {
         let count2 = Arc::clone(&count);
         let h: crate::mock::Handler = Box::new(move |cmd| {
             count2.fetch_add(1, Ordering::SeqCst);
-            Response { command_id: cmd.id, zone: cmd.zone,
-                status: ResponseStatus::OK, payload: None }
+            Response {
+                command_id: cmd.id,
+                zone: cmd.zone,
+                status: ResponseStatus::OK,
+                payload: None,
+            }
         });
         let inner = MockController::new(Zone::FRONT_LEFT, Some(h)) as Arc<dyn Controller>;
         let pq = PrioController::new(inner);
-        for ct in [CommandType::SET, CommandType::GET, CommandType::RESET,
-                   CommandType::WATCHDOG, CommandType::SLEEP, CommandType::WAKE] {
-            let cmd = Command { zone: Zone::FRONT_LEFT, cmd_type: ct, ..Default::default() };
+        for ct in [
+            CommandType::SET,
+            CommandType::GET,
+            CommandType::RESET,
+            CommandType::WATCHDOG,
+            CommandType::SLEEP,
+            CommandType::WAKE,
+        ] {
+            let cmd = Command {
+                zone: Zone::FRONT_LEFT,
+                cmd_type: ct,
+                ..Default::default()
+            };
             pq.send(&cmd, None).unwrap();
         }
         assert_eq!(count.load(Ordering::SeqCst), 6);

@@ -14,13 +14,16 @@
 /// A named invariant with a checkable predicate.
 // fusa:req REQ-FORMAL-001
 pub struct Invariant<S> {
-    pub name:      &'static str,
+    pub name: &'static str,
     pub predicate: Box<dyn Fn(&S) -> bool + Send + Sync>,
 }
 
 impl<S> Invariant<S> {
     pub fn new(name: &'static str, f: impl Fn(&S) -> bool + Send + Sync + 'static) -> Self {
-        Invariant { name, predicate: Box::new(f) }
+        Invariant {
+            name,
+            predicate: Box::new(f),
+        }
     }
 
     pub fn check(&self, state: &S) -> bool {
@@ -32,12 +35,14 @@ impl<S> Invariant<S> {
 // fusa:req REQ-FORMAL-002
 #[derive(Debug, Default)]
 pub struct CheckResult {
-    pub passed:  Vec<&'static str>,
-    pub failed:  Vec<&'static str>,
+    pub passed: Vec<&'static str>,
+    pub failed: Vec<&'static str>,
 }
 
 impl CheckResult {
-    pub fn all_passed(&self) -> bool { self.failed.is_empty() }
+    pub fn all_passed(&self) -> bool {
+        self.failed.is_empty()
+    }
 }
 
 /// Check all invariants against `state`.

@@ -57,8 +57,8 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
 
 use crate::{
-    Command, Controller, RcpError, Registry, Response, ResponseStatus, Status, Subscription, Zone,
-    CommandType,
+    Command, CommandType, Controller, RcpError, Registry, Response, ResponseStatus, Status,
+    Subscription, Zone,
 };
 
 // ── Subscription inner state ──────────────────────────────────────────────────
@@ -69,7 +69,7 @@ struct SubEntry {
 }
 
 struct Inner {
-    subs:        Vec<SubEntry>,
+    subs: Vec<SubEntry>,
     next_sub_id: u64,
 }
 
@@ -82,11 +82,11 @@ pub type Handler = Box<dyn Fn(&Command) -> Response + Send + Sync>;
 
 /// Mock zone controller — in-process, zero-dependency, race-free.
 pub struct MockController {
-    zone:    Zone,
+    zone: Zone,
     handler: Option<Handler>,
-    closed:  AtomicBool,
-    seq:     AtomicU32,
-    inner:   Arc<Mutex<Inner>>,
+    closed: AtomicBool,
+    seq: AtomicU32,
+    inner: Arc<Mutex<Inner>>,
     next_id: AtomicU64,
 }
 
@@ -97,8 +97,11 @@ impl MockController {
             zone,
             handler,
             closed: AtomicBool::new(false),
-            seq:    AtomicU32::new(0),
-            inner:  Arc::new(Mutex::new(Inner { subs: Vec::new(), next_sub_id: 0 })),
+            seq: AtomicU32::new(0),
+            inner: Arc::new(Mutex::new(Inner {
+                subs: Vec::new(),
+                next_sub_id: 0,
+            })),
             next_id: AtomicU64::new(0),
         })
     }
@@ -115,13 +118,15 @@ impl MockController {
         // fusa:req REQ-CTRL-027
         let p = payload.as_ref().map(|v| v.clone());
         let st = Arc::new(Status {
-            zone:    self.zone,
+            zone: self.zone,
             seq,
             healthy: !self.closed.load(Ordering::SeqCst),
             payload: p,
         });
         let mut inner = self.inner.lock().unwrap();
-        inner.subs.retain(|e| e.tx.try_send(Arc::clone(&st)).is_ok());
+        inner
+            .subs
+            .retain(|e| e.tx.try_send(Arc::clone(&st)).is_ok());
     }
 }
 
@@ -154,9 +159,9 @@ impl Controller for MockController {
             // fusa:req REQ-CTRL-001
             Ok(Response {
                 command_id: cmd.id,
-                zone:       self.zone,
-                status:     ResponseStatus::OK,
-                payload:    None,
+                zone: self.zone,
+                status: ResponseStatus::OK,
+                payload: None,
             })
         }
     }
@@ -177,8 +182,14 @@ impl Controller for MockController {
         // Wrap receiver with cleanup so dropping the Subscription removes the sender.
         // fusa:req REQ-CTRL-011
         let inner_clone = Arc::clone(&self.inner);
-        let rx = SubReceiver { rx, id, inner: inner_clone };
-        Ok(Subscription { rx: rx.into_std_receiver() })
+        let rx = SubReceiver {
+            rx,
+            id,
+            inner: inner_clone,
+        };
+        Ok(Subscription {
+            rx: rx.into_std_receiver(),
+        })
     }
 
     fn close(&self) -> Result<(), RcpError> {
@@ -195,8 +206,8 @@ impl Controller for MockController {
 
 // Helper: wraps the raw receiver so Drop cleans up the subscription entry.
 struct SubReceiver {
-    rx:    mpsc::Receiver<Arc<Status>>,
-    id:    u64,
+    rx: mpsc::Receiver<Arc<Status>>,
+    id: u64,
     inner: Arc<Mutex<Inner>>,
 }
 
@@ -227,7 +238,7 @@ impl SubReceiver {
 
 struct RegistryInner {
     controllers: std::collections::HashMap<Zone, Arc<dyn Controller>>,
-    closed:      bool,
+    closed: bool,
 }
 
 /// In-process registry backed by mock controllers.
@@ -250,7 +261,10 @@ impl MockRegistry {
             map.insert(z, MockController::new(z, None) as Arc<dyn Controller>);
         }
         Arc::new(Self {
-            inner: Mutex::new(RegistryInner { controllers: map, closed: false }),
+            inner: Mutex::new(RegistryInner {
+                controllers: map,
+                closed: false,
+            }),
         })
     }
 }
@@ -267,7 +281,12 @@ impl Default for MockRegistry {
         ] {
             map.insert(z, MockController::new(z, None) as Arc<dyn Controller>);
         }
-        Self { inner: Mutex::new(RegistryInner { controllers: map, closed: false }) }
+        Self {
+            inner: Mutex::new(RegistryInner {
+                controllers: map,
+                closed: false,
+            }),
+        }
     }
 }
 
@@ -301,7 +320,11 @@ impl Registry for MockRegistry {
             return Err(RcpError::Closed);
         }
         // fusa:req REQ-REG-004 / REQ-REG-011
-        inner.controllers.get(&zone).cloned().ok_or(RcpError::NotFound)
+        inner
+            .controllers
+            .get(&zone)
+            .cloned()
+            .ok_or(RcpError::NotFound)
     }
 
     fn controllers(&self) -> Vec<Arc<dyn Controller>> {
@@ -350,7 +373,11 @@ mod tests {
     // fusa:test REQ-CTRL-001
     fn send_no_handler_returns_status_ok() {
         let c = MockController::new(Zone::FRONT_LEFT, None);
-        let cmd = Command { id: 1, zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            id: 1,
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         let resp = c.send(&cmd, None).unwrap();
         assert_eq!(resp.status, ResponseStatus::OK);
     }
@@ -362,10 +389,19 @@ mod tests {
         let called2 = Arc::clone(&called);
         let h: Handler = Box::new(move |cmd| {
             called2.store(true, AO::SeqCst);
-            Response { command_id: cmd.id, zone: cmd.zone, status: ResponseStatus::OK, payload: None }
+            Response {
+                command_id: cmd.id,
+                zone: cmd.zone,
+                status: ResponseStatus::OK,
+                payload: None,
+            }
         });
         let c = MockController::new(Zone::FRONT_LEFT, Some(h));
-        let cmd = Command { id: 7, zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            id: 7,
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         let _ = c.send(&cmd, None).unwrap();
         assert!(called.load(AO::SeqCst));
     }
@@ -375,7 +411,10 @@ mod tests {
     fn send_after_close_returns_err_closed() {
         let c = MockController::new(Zone::FRONT_LEFT, None);
         c.close().unwrap();
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         let err = c.send(&cmd, None).unwrap_err();
         assert_eq!(err, RcpError::Closed);
         assert!(err.is_relay_closed());
@@ -392,7 +431,10 @@ mod tests {
             Response::default()
         });
         let c = MockController::new(Zone::FRONT_LEFT, Some(h));
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         let err = c.send(&cmd, Some(Duration::ZERO)).unwrap_err();
         assert_eq!(err, RcpError::Timeout);
         assert!(err.is_relay_timeout());
@@ -412,7 +454,11 @@ mod tests {
     // fusa:test REQ-CTRL-013
     fn cmd_noop_is_accepted_without_error() {
         let c = MockController::new(Zone::FRONT_LEFT, None);
-        let cmd = Command { zone: Zone::FRONT_LEFT, cmd_type: CommandType::NOOP, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            cmd_type: CommandType::NOOP,
+            ..Default::default()
+        };
         let r = c.send(&cmd, None).unwrap();
         assert_eq!(r.status, ResponseStatus::OK);
     }
@@ -421,7 +467,12 @@ mod tests {
     // fusa:test REQ-CTRL-014
     fn cmd_watchdog_is_accepted_without_error() {
         let c = MockController::new(Zone::FRONT_LEFT, None);
-        let cmd = Command { zone: Zone::FRONT_LEFT, cmd_type: CommandType::WATCHDOG, priority: crate::Priority::HIGH, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            cmd_type: CommandType::WATCHDOG,
+            priority: crate::Priority::HIGH,
+            ..Default::default()
+        };
         let r = c.send(&cmd, None).unwrap();
         assert_eq!(r.status, ResponseStatus::OK);
     }
@@ -430,7 +481,11 @@ mod tests {
     // fusa:test REQ-CTRL-015
     fn cmd_reset_is_accepted_without_error() {
         let c = MockController::new(Zone::FRONT_LEFT, None);
-        let cmd = Command { zone: Zone::FRONT_LEFT, cmd_type: CommandType::RESET, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            cmd_type: CommandType::RESET,
+            ..Default::default()
+        };
         let r = c.send(&cmd, None).unwrap();
         assert_eq!(r.status, ResponseStatus::OK);
     }
@@ -447,7 +502,10 @@ mod tests {
         let custom2 = custom.clone();
         let h: Handler = Box::new(move |_| custom2.clone());
         let c = MockController::new(Zone::FRONT_LEFT, Some(h));
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         let resp = c.send(&cmd, None).unwrap();
         assert_eq!(resp.status, custom.status);
         assert_eq!(resp.command_id, custom.command_id);
@@ -458,7 +516,10 @@ mod tests {
     // fusa:test REQ-CTRL-025
     fn send_zone_mismatch_returns_err() {
         let c = MockController::new(Zone::FRONT_LEFT, None);
-        let cmd = Command { zone: Zone::REAR_RIGHT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::REAR_RIGHT,
+            ..Default::default()
+        };
         let err = c.send(&cmd, None).unwrap_err();
         assert_eq!(err, RcpError::ZoneMismatch);
         assert!(err.is_zone_mismatch());
@@ -472,11 +533,20 @@ mod tests {
         let seen2 = Arc::clone(&seen_payload);
         let h: Handler = Box::new(move |cmd| {
             *seen2.lock().unwrap() = cmd.payload.clone().unwrap_or_default();
-            Response { command_id: cmd.id, zone: cmd.zone, status: ResponseStatus::OK, payload: None }
+            Response {
+                command_id: cmd.id,
+                zone: cmd.zone,
+                status: ResponseStatus::OK,
+                payload: None,
+            }
         });
         let c = MockController::new(Zone::FRONT_LEFT, Some(h));
         let mut payload = vec![1u8, 2, 3];
-        let cmd = Command { zone: Zone::FRONT_LEFT, payload: Some(payload.clone()), ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            payload: Some(payload.clone()),
+            ..Default::default()
+        };
         c.send(&cmd, None).unwrap();
         // Mutate original - handler copy must not change
         payload[0] = 0xFF;
@@ -488,7 +558,11 @@ mod tests {
     // fusa:test REQ-CTRL-024
     fn send_nil_payload_does_not_panic() {
         let c = MockController::new(Zone::FRONT_LEFT, None);
-        let cmd = Command { zone: Zone::FRONT_LEFT, payload: None, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            payload: None,
+            ..Default::default()
+        };
         assert!(c.send(&cmd, None).is_ok());
     }
 
@@ -498,7 +572,11 @@ mod tests {
     // fusa:test REQ-RESP-001
     fn response_command_id_echoes_command_id() {
         let c = MockController::new(Zone::FRONT_LEFT, None);
-        let cmd = Command { id: 0xDEAD_BEEF, zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            id: 0xDEAD_BEEF,
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         let resp = c.send(&cmd, None).unwrap();
         assert_eq!(resp.command_id, cmd.id);
     }
@@ -507,7 +585,10 @@ mod tests {
     // fusa:test REQ-RESP-002
     fn response_zone_matches_controller_zone() {
         let c = MockController::new(Zone::FRONT_LEFT, None);
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         let resp = c.send(&cmd, None).unwrap();
         assert_eq!(resp.zone, Zone::FRONT_LEFT);
     }
@@ -520,7 +601,9 @@ mod tests {
         let c = MockController::new(Zone::FRONT_LEFT, None);
         let sub = c.subscribe().unwrap();
         c.publish(Some(vec![1, 2, 3]));
-        let st = sub.recv_timeout(Duration::from_secs(1)).expect("expected status");
+        let st = sub
+            .recv_timeout(Duration::from_secs(1))
+            .expect("expected status");
         assert_eq!(st.zone, Zone::FRONT_LEFT);
         assert_eq!(st.payload.as_deref(), Some([1u8, 2, 3].as_ref()));
     }
@@ -533,7 +616,10 @@ mod tests {
         c.close().unwrap();
         // After close, channel should have closed - recv returns None
         let result = sub.recv_timeout(Duration::from_millis(200));
-        assert!(result.is_none(), "channel should be closed after controller close");
+        assert!(
+            result.is_none(),
+            "channel should be closed after controller close"
+        );
     }
 
     #[test]
@@ -591,12 +677,18 @@ mod tests {
             .map(|i| {
                 let c2 = Arc::clone(&c);
                 std::thread::spawn(move || {
-                    let cmd = Command { id: i, zone: Zone::FRONT_LEFT, ..Default::default() };
+                    let cmd = Command {
+                        id: i,
+                        zone: Zone::FRONT_LEFT,
+                        ..Default::default()
+                    };
                     c2.send(&cmd, None).unwrap();
                 })
             })
             .collect();
-        for h in handles { h.join().unwrap(); }
+        for h in handles {
+            h.join().unwrap();
+        }
     }
 
     #[test]
@@ -663,7 +755,13 @@ mod tests {
     // fusa:test REQ-REG-001
     fn new_registry_pre_populates_all_five_zones() {
         let r = MockRegistry::new();
-        for z in [Zone::FRONT_LEFT, Zone::FRONT_RIGHT, Zone::REAR_LEFT, Zone::REAR_RIGHT, Zone::CENTRAL] {
+        for z in [
+            Zone::FRONT_LEFT,
+            Zone::FRONT_RIGHT,
+            Zone::REAR_LEFT,
+            Zone::REAR_RIGHT,
+            Zone::CENTRAL,
+        ] {
             assert!(r.lookup(z).is_ok(), "zone {z:?} should be pre-populated");
         }
     }
@@ -752,7 +850,10 @@ mod tests {
         r.register(ctrl_arc).unwrap();
         r.close().unwrap();
         // After close, controller should be closed — send returns Err
-        let cmd = Command { zone: Zone::UNKNOWN, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::UNKNOWN,
+            ..Default::default()
+        };
         let err = ctrl.send(&cmd, None).unwrap_err();
         assert_eq!(err, RcpError::Closed);
     }
@@ -764,7 +865,11 @@ mod tests {
         let r = MockRegistry::new();
         r.close().unwrap();
         let err = r.lookup(Zone::FRONT_LEFT).unwrap_err();
-        assert_eq!(err, RcpError::Closed, "must return ErrClosed, not ErrNotFound");
+        assert_eq!(
+            err,
+            RcpError::Closed,
+            "must return ErrClosed, not ErrNotFound"
+        );
     }
 
     #[test]

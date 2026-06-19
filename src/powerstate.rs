@@ -15,7 +15,9 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crate::{Command, CommandType, Controller, RcpError, Response, ResponseStatus, Subscription, Zone};
+use crate::{
+    Command, CommandType, Controller, RcpError, Response, ResponseStatus, Subscription, Zone,
+};
 
 // ── PowerState ────────────────────────────────────────────────────────────────
 
@@ -31,8 +33,8 @@ pub enum PowerState {
 impl PowerState {
     pub fn as_str(self) -> &'static str {
         match self {
-            PowerState::Active  => "active",
-            PowerState::Sleep   => "sleep",
+            PowerState::Active => "active",
+            PowerState::Sleep => "sleep",
             PowerState::Standby => "standby",
         }
     }
@@ -41,7 +43,7 @@ impl PowerState {
 // ── PowerStateController ──────────────────────────────────────────────────────
 
 struct Inner {
-    state:  PowerState,
+    state: PowerState,
     closed: bool,
 }
 
@@ -53,14 +55,17 @@ struct Inner {
 // fusa:req REQ-PWR-003
 pub struct PowerStateController {
     inner: Arc<dyn Controller>,
-    st:    Mutex<Inner>,
+    st: Mutex<Inner>,
 }
 
 impl PowerStateController {
     pub fn new(inner: Arc<dyn Controller>) -> Self {
         PowerStateController {
             inner,
-            st: Mutex::new(Inner { state: PowerState::Active, closed: false }),
+            st: Mutex::new(Inner {
+                state: PowerState::Active,
+                closed: false,
+            }),
         }
     }
 
@@ -72,14 +77,18 @@ impl PowerStateController {
 }
 
 impl Controller for PowerStateController {
-    fn zone(&self) -> Zone { self.inner.zone() }
+    fn zone(&self) -> Zone {
+        self.inner.zone()
+    }
 
     // fusa:req REQ-PWR-005
     // fusa:req REQ-PWR-006
     // fusa:req REQ-PWR-007
     fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
         let mut g = self.st.lock().unwrap();
-        if g.closed { return Err(RcpError::Closed); }
+        if g.closed {
+            return Err(RcpError::Closed);
+        }
 
         match cmd.cmd_type {
             CommandType::SLEEP => {
@@ -114,7 +123,9 @@ impl Controller for PowerStateController {
         self.inner.send(cmd, timeout)
     }
 
-    fn subscribe(&self) -> Result<Subscription, RcpError> { self.inner.subscribe() }
+    fn subscribe(&self) -> Result<Subscription, RcpError> {
+        self.inner.subscribe()
+    }
 
     // fusa:req REQ-PWR-008
     fn close(&self) -> Result<(), RcpError> {
@@ -148,7 +159,11 @@ mod tests {
     // fusa:test REQ-PWR-005
     fn sleep_command_transitions_to_sleep() {
         let ps = PowerStateController::new(ctrl());
-        let cmd = Command { zone: Zone::FRONT_LEFT, cmd_type: CommandType::SLEEP, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            cmd_type: CommandType::SLEEP,
+            ..Default::default()
+        };
         let resp = ps.send(&cmd, None).unwrap();
         assert_eq!(resp.status, ResponseStatus::OK);
         assert_eq!(ps.power_state(), PowerState::Sleep);
@@ -158,10 +173,18 @@ mod tests {
     // fusa:test REQ-PWR-006
     fn commands_during_sleep_return_busy() {
         let ps = PowerStateController::new(ctrl());
-        let sleep_cmd = Command { zone: Zone::FRONT_LEFT, cmd_type: CommandType::SLEEP, ..Default::default() };
+        let sleep_cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            cmd_type: CommandType::SLEEP,
+            ..Default::default()
+        };
         ps.send(&sleep_cmd, None).unwrap();
 
-        let get_cmd = Command { zone: Zone::FRONT_LEFT, cmd_type: CommandType::GET, ..Default::default() };
+        let get_cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            cmd_type: CommandType::GET,
+            ..Default::default()
+        };
         let resp = ps.send(&get_cmd, None).unwrap();
         assert_eq!(resp.status, ResponseStatus::BUSY);
     }
@@ -170,8 +193,16 @@ mod tests {
     // fusa:test REQ-PWR-007
     fn wake_command_transitions_to_active() {
         let ps = PowerStateController::new(ctrl());
-        let sleep = Command { zone: Zone::FRONT_LEFT, cmd_type: CommandType::SLEEP, ..Default::default() };
-        let wake  = Command { zone: Zone::FRONT_LEFT, cmd_type: CommandType::WAKE,  ..Default::default() };
+        let sleep = Command {
+            zone: Zone::FRONT_LEFT,
+            cmd_type: CommandType::SLEEP,
+            ..Default::default()
+        };
+        let wake = Command {
+            zone: Zone::FRONT_LEFT,
+            cmd_type: CommandType::WAKE,
+            ..Default::default()
+        };
         ps.send(&sleep, None).unwrap();
         assert_eq!(ps.power_state(), PowerState::Sleep);
         ps.send(&wake, None).unwrap();
@@ -183,15 +214,23 @@ mod tests {
     fn send_after_close_returns_closed() {
         let ps = PowerStateController::new(ctrl());
         ps.close().unwrap();
-        let err = ps.send(&Command { zone: Zone::FRONT_LEFT, ..Default::default() }, None).unwrap_err();
+        let err = ps
+            .send(
+                &Command {
+                    zone: Zone::FRONT_LEFT,
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap_err();
         assert_eq!(err, RcpError::Closed);
     }
 
     #[test]
     // fusa:test REQ-PWR-002
     fn power_state_variants_are_distinct() {
-        assert_ne!(PowerState::Active,  PowerState::Sleep);
-        assert_ne!(PowerState::Sleep,   PowerState::Standby);
-        assert_ne!(PowerState::Active,  PowerState::Standby);
+        assert_ne!(PowerState::Active, PowerState::Sleep);
+        assert_ne!(PowerState::Sleep, PowerState::Standby);
+        assert_ne!(PowerState::Active, PowerState::Standby);
     }
 }

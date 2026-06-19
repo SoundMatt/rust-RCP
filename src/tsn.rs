@@ -24,16 +24,16 @@ pub struct TrafficClass(pub u8);
 
 impl TrafficClass {
     pub const BEST_EFFORT: TrafficClass = TrafficClass(0);
-    pub const CONTROL:     TrafficClass = TrafficClass(5);
-    pub const CRITICAL:    TrafficClass = TrafficClass(7);
+    pub const CONTROL: TrafficClass = TrafficClass(5);
+    pub const CRITICAL: TrafficClass = TrafficClass(7);
 
     /// Map an RCP [`Priority`] to the corresponding TSN traffic class.
     // fusa:req REQ-TSN-002
     pub fn from_priority(p: Priority) -> Self {
         match p {
             Priority::CRITICAL => TrafficClass::CRITICAL,
-            Priority::HIGH     => TrafficClass::CONTROL,
-            _                  => TrafficClass::BEST_EFFORT,
+            Priority::HIGH => TrafficClass::CONTROL,
+            _ => TrafficClass::BEST_EFFORT,
         }
     }
 }
@@ -55,7 +55,9 @@ impl TsnController {
 }
 
 impl Controller for TsnController {
-    fn zone(&self) -> Zone { self.inner.zone() }
+    fn zone(&self) -> Zone {
+        self.inner.zone()
+    }
 
     // fusa:req REQ-TSN-004
     fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
@@ -69,10 +71,14 @@ impl Controller for TsnController {
         self.inner.send(&tagged_cmd, timeout)
     }
 
-    fn subscribe(&self) -> Result<Subscription, RcpError> { self.inner.subscribe() }
+    fn subscribe(&self) -> Result<Subscription, RcpError> {
+        self.inner.subscribe()
+    }
 
     // fusa:req REQ-TSN-005
-    fn close(&self) -> Result<(), RcpError> { self.inner.close() }
+    fn close(&self) -> Result<(), RcpError> {
+        self.inner.close()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -88,9 +94,18 @@ mod tests {
     // fusa:test REQ-TSN-001
     // fusa:test REQ-TSN-002
     fn traffic_class_mapping() {
-        assert_eq!(TrafficClass::from_priority(Priority::NORMAL),   TrafficClass::BEST_EFFORT);
-        assert_eq!(TrafficClass::from_priority(Priority::HIGH),     TrafficClass::CONTROL);
-        assert_eq!(TrafficClass::from_priority(Priority::CRITICAL), TrafficClass::CRITICAL);
+        assert_eq!(
+            TrafficClass::from_priority(Priority::NORMAL),
+            TrafficClass::BEST_EFFORT
+        );
+        assert_eq!(
+            TrafficClass::from_priority(Priority::HIGH),
+            TrafficClass::CONTROL
+        );
+        assert_eq!(
+            TrafficClass::from_priority(Priority::CRITICAL),
+            TrafficClass::CRITICAL
+        );
     }
 
     #[test]
@@ -99,13 +114,28 @@ mod tests {
         let received = Arc::new(std::sync::Mutex::new(vec![]));
         let r2 = Arc::clone(&received);
         let h: crate::mock::Handler = Box::new(move |cmd| {
-            r2.lock().unwrap().push(cmd.payload.clone().unwrap_or_default());
-            Response { command_id: cmd.id, zone: cmd.zone, status: ResponseStatus::OK, payload: None }
+            r2.lock()
+                .unwrap()
+                .push(cmd.payload.clone().unwrap_or_default());
+            Response {
+                command_id: cmd.id,
+                zone: cmd.zone,
+                status: ResponseStatus::OK,
+                payload: None,
+            }
         });
         let inner = MockController::new(Zone::FRONT_LEFT, Some(h)) as Arc<dyn Controller>;
         let tsn = TsnController::new(inner);
 
-        tsn.send(&Command { zone: Zone::FRONT_LEFT, priority: Priority::CRITICAL, ..Default::default() }, None).unwrap();
+        tsn.send(
+            &Command {
+                zone: Zone::FRONT_LEFT,
+                priority: Priority::CRITICAL,
+                ..Default::default()
+            },
+            None,
+        )
+        .unwrap();
         let payloads = received.lock().unwrap();
         assert_eq!(payloads[0][0], TrafficClass::CRITICAL.0);
     }

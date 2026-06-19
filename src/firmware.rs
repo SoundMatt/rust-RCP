@@ -26,13 +26,21 @@ pub const MAX_CHUNK: usize = 512;
 pub struct FirmwareUpdater {
     controller: Arc<dyn Controller>,
     chunk_size: usize,
-    timeout:    Option<Duration>,
+    timeout: Option<Duration>,
 }
 
 impl FirmwareUpdater {
-    pub fn new(controller: Arc<dyn Controller>, chunk_size: usize, timeout: Option<Duration>) -> Self {
+    pub fn new(
+        controller: Arc<dyn Controller>,
+        chunk_size: usize,
+        timeout: Option<Duration>,
+    ) -> Self {
         let chunk_size = chunk_size.min(MAX_CHUNK);
-        FirmwareUpdater { controller, chunk_size, timeout }
+        FirmwareUpdater {
+            controller,
+            chunk_size,
+            timeout,
+        }
     }
 
     /// Flash `image` to the zone controller.
@@ -42,7 +50,9 @@ impl FirmwareUpdater {
     // fusa:req REQ-FW-003
     // fusa:req REQ-FW-004
     pub fn flash(&self, image: &[u8]) -> Result<usize, RcpError> {
-        if image.is_empty() { return Err(RcpError::InvalidSize); }
+        if image.is_empty() {
+            return Err(RcpError::InvalidSize);
+        }
 
         let zone = self.controller.zone();
         let chunks = image.chunks(self.chunk_size);
@@ -50,21 +60,24 @@ impl FirmwareUpdater {
 
         for (i, chunk) in image.chunks(self.chunk_size).enumerate() {
             let cmd = Command {
-                id:       (i + 1) as u32,
+                id: (i + 1) as u32,
                 zone,
                 cmd_type: CommandType::SET,
-                payload:  Some(chunk.to_vec()),
+                payload: Some(chunk.to_vec()),
                 ..Default::default()
             };
             let resp = self.controller.send(&cmd, self.timeout)?;
             if resp.status != ResponseStatus::OK {
-                return Err(RcpError::Other(format!("chunk {} rejected: {:?}", i, resp.status)));
+                return Err(RcpError::Other(format!(
+                    "chunk {} rejected: {:?}",
+                    i, resp.status
+                )));
             }
         }
 
         // Verify with a GET
         let verify_cmd = Command {
-            id:       (total + 1) as u32,
+            id: (total + 1) as u32,
             zone,
             cmd_type: CommandType::GET,
             ..Default::default()
@@ -90,8 +103,10 @@ mod tests {
 
     fn ok_ctrl() -> Arc<dyn Controller> {
         let h: crate::mock::Handler = Box::new(|cmd| Response {
-            command_id: cmd.id, zone: cmd.zone,
-            status: ResponseStatus::OK, payload: None,
+            command_id: cmd.id,
+            zone: cmd.zone,
+            status: ResponseStatus::OK,
+            payload: None,
         });
         MockController::new(Zone::FRONT_LEFT, Some(h)) as Arc<dyn Controller>
     }
@@ -135,8 +150,17 @@ mod tests {
         let c2 = Arc::clone(&call);
         let h: crate::mock::Handler = Box::new(move |cmd| {
             let n = c2.fetch_add(1, Ordering::SeqCst);
-            let status = if n == 1 { ResponseStatus::ERROR } else { ResponseStatus::OK };
-            Response { command_id: cmd.id, zone: cmd.zone, status, payload: None }
+            let status = if n == 1 {
+                ResponseStatus::ERROR
+            } else {
+                ResponseStatus::OK
+            };
+            Response {
+                command_id: cmd.id,
+                zone: cmd.zone,
+                status,
+                payload: None,
+            }
         });
         let ctrl = MockController::new(Zone::FRONT_LEFT, Some(h)) as Arc<dyn Controller>;
         let upd = FirmwareUpdater::new(ctrl, 1, None);

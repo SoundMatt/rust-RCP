@@ -23,7 +23,7 @@ use crate::{Command, Controller, Loan, LoaningController, RcpError, Response, Su
 // fusa:req REQ-LOAN-001
 pub struct LoanPool {
     state: Arc<(Mutex<Vec<Vec<u8>>>, Condvar)>,
-    size:  usize,
+    size: usize,
 }
 
 impl LoanPool {
@@ -31,7 +31,10 @@ impl LoanPool {
     // fusa:req REQ-LOAN-002
     pub fn new(count: usize, size: usize) -> Self {
         let pool: Vec<Vec<u8>> = (0..count).map(|_| vec![0u8; size]).collect();
-        LoanPool { state: Arc::new((Mutex::new(pool), Condvar::new())), size }
+        LoanPool {
+            state: Arc::new((Mutex::new(pool), Condvar::new())),
+            size,
+        }
     }
 
     /// Obtain a buffer from the pool, blocking until one is available.
@@ -42,7 +45,9 @@ impl LoanPool {
             let (lock, cvar) = &*self.state;
             let mut pool = lock.lock().unwrap();
             loop {
-                if let Some(b) = pool.pop() { break b; }
+                if let Some(b) = pool.pop() {
+                    break b;
+                }
                 pool = cvar.wait(pool).unwrap();
             }
         };
@@ -67,7 +72,9 @@ impl LoanPool {
     }
 
     /// Buffer size this pool provides.
-    pub fn buffer_size(&self) -> usize { self.size }
+    pub fn buffer_size(&self) -> usize {
+        self.size
+    }
 
     /// Number of buffers currently available.
     pub fn available(&self) -> usize {
@@ -81,7 +88,7 @@ impl LoanPool {
 // fusa:req REQ-LOAN-005
 pub struct LoanPoolController {
     inner: Arc<dyn Controller>,
-    pool:  Arc<LoanPool>,
+    pool: Arc<LoanPool>,
 }
 
 impl LoanPoolController {
@@ -91,15 +98,21 @@ impl LoanPoolController {
 }
 
 impl Controller for LoanPoolController {
-    fn zone(&self) -> Zone { self.inner.zone() }
+    fn zone(&self) -> Zone {
+        self.inner.zone()
+    }
 
     fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
         self.inner.send(cmd, timeout)
     }
 
-    fn subscribe(&self) -> Result<Subscription, RcpError> { self.inner.subscribe() }
+    fn subscribe(&self) -> Result<Subscription, RcpError> {
+        self.inner.subscribe()
+    }
 
-    fn close(&self) -> Result<(), RcpError> { self.inner.close() }
+    fn close(&self) -> Result<(), RcpError> {
+        self.inner.close()
+    }
 }
 
 impl LoaningController for LoanPoolController {
@@ -112,9 +125,12 @@ impl LoaningController for LoanPoolController {
     }
 
     // fusa:req REQ-LOAN-007
-    fn send_loaned(&self, loan: Loan, mut cmd: Command, timeout: Option<Duration>)
-        -> Result<Response, RcpError>
-    {
+    fn send_loaned(
+        &self,
+        loan: Loan,
+        mut cmd: Command,
+        timeout: Option<Duration>,
+    ) -> Result<Response, RcpError> {
         cmd.payload = Some(loan.payload.clone());
         // Buffer returned to pool on drop (loan's release fn fires).
         drop(loan);
@@ -186,9 +202,16 @@ mod tests {
         let received = Arc::new(std::sync::Mutex::new(vec![]));
         let recv2 = Arc::clone(&received);
         let h: crate::mock::Handler = Box::new(move |cmd| {
-            recv2.lock().unwrap().push(cmd.payload.clone().unwrap_or_default());
-            crate::Response { command_id: cmd.id, zone: cmd.zone,
-                status: crate::ResponseStatus::OK, payload: None }
+            recv2
+                .lock()
+                .unwrap()
+                .push(cmd.payload.clone().unwrap_or_default());
+            crate::Response {
+                command_id: cmd.id,
+                zone: cmd.zone,
+                status: crate::ResponseStatus::OK,
+                payload: None,
+            }
         });
         let inner = MockController::new(Zone::FRONT_LEFT, Some(h)) as Arc<dyn Controller>;
         let pool = Arc::new(LoanPool::new(1, 8));
@@ -196,13 +219,20 @@ mod tests {
 
         let mut loan = ctrl.loan(4).unwrap();
         loan.payload[..4].copy_from_slice(b"test");
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         ctrl.send_loaned(loan, cmd, None).unwrap();
 
         let got = received.lock().unwrap();
         assert!(got[0].starts_with(b"test"), "payload must be forwarded");
         // Buffer should now be returned (send_loaned drops the loan)
-        assert_eq!(pool.available(), 1, "buffer must be returned after send_loaned");
+        assert_eq!(
+            pool.available(),
+            1,
+            "buffer must be returned after send_loaned"
+        );
     }
 
     #[test]

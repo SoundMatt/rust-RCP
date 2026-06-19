@@ -53,7 +53,7 @@ fn encode_doip_frame(payload_type: u16, data: &[u8]) -> Vec<u8> {
 /// DoIP bridge controller.
 // fusa:req REQ-DOIP-003
 pub struct DoipBridge {
-    zone:   Zone,
+    zone: Zone,
     socket: Arc<dyn DoipSocket>,
 }
 
@@ -64,26 +64,41 @@ impl DoipBridge {
 }
 
 impl Controller for DoipBridge {
-    fn zone(&self) -> Zone { self.zone }
+    fn zone(&self) -> Zone {
+        self.zone
+    }
 
     // fusa:req REQ-DOIP-003
     fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
-        if timeout == Some(Duration::ZERO) { return Err(RcpError::Timeout); }
-        if cmd.zone != self.zone { return Err(RcpError::ZoneMismatch); }
+        if timeout == Some(Duration::ZERO) {
+            return Err(RcpError::Timeout);
+        }
+        if cmd.zone != self.zone {
+            return Err(RcpError::ZoneMismatch);
+        }
         let payload = cmd.payload.as_deref().unwrap_or(&[]);
         self.socket.send(DOIP_PAYLOAD_UDS, payload)?;
         let resp = self.socket.recv(timeout)?;
         Ok(Response {
-            command_id: cmd.id, zone: self.zone,
-            status: if resp.first() == Some(&0) { ResponseStatus::OK } else { ResponseStatus::ERROR },
+            command_id: cmd.id,
+            zone: self.zone,
+            status: if resp.first() == Some(&0) {
+                ResponseStatus::OK
+            } else {
+                ResponseStatus::ERROR
+            },
             payload: None,
         })
     }
 
-    fn subscribe(&self) -> Result<Subscription, RcpError> { Err(RcpError::NotFound) }
+    fn subscribe(&self) -> Result<Subscription, RcpError> {
+        Err(RcpError::NotFound)
+    }
 
     // fusa:req REQ-DOIP-004
-    fn close(&self) -> Result<(), RcpError> { Ok(()) }
+    fn close(&self) -> Result<(), RcpError> {
+        Ok(())
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -96,8 +111,12 @@ mod tests {
 
     struct MockDoip;
     impl DoipSocket for MockDoip {
-        fn send(&self, _: u16, _: &[u8]) -> Result<(), RcpError> { Ok(()) }
-        fn recv(&self, _: Option<Duration>) -> Result<Vec<u8>, RcpError> { Ok(vec![0u8]) }
+        fn send(&self, _: u16, _: &[u8]) -> Result<(), RcpError> {
+            Ok(())
+        }
+        fn recv(&self, _: Option<Duration>) -> Result<Vec<u8>, RcpError> {
+            Ok(vec![0u8])
+        }
     }
 
     #[test]
@@ -111,7 +130,15 @@ mod tests {
     // fusa:test REQ-DOIP-003
     fn doip_send_ok() {
         let b = DoipBridge::new(Zone::FRONT_LEFT, Arc::new(MockDoip));
-        let resp = b.send(&Command { zone: Zone::FRONT_LEFT, ..Default::default() }, None).unwrap();
+        let resp = b
+            .send(
+                &Command {
+                    zone: Zone::FRONT_LEFT,
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap();
         assert_eq!(resp.status, ResponseStatus::OK);
     }
 
@@ -119,7 +146,15 @@ mod tests {
     // fusa:test REQ-DOIP-003
     fn zone_mismatch() {
         let b = DoipBridge::new(Zone::FRONT_LEFT, Arc::new(MockDoip));
-        let err = b.send(&Command { zone: Zone::REAR_LEFT, ..Default::default() }, None).unwrap_err();
+        let err = b
+            .send(
+                &Command {
+                    zone: Zone::REAR_LEFT,
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap_err();
         assert_eq!(err, RcpError::ZoneMismatch);
     }
 

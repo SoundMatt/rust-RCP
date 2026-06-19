@@ -15,7 +15,10 @@ use std::collections::HashMap;
 // fusa:req REQ-CG-001
 #[derive(Debug, Clone, PartialEq)]
 pub enum FieldType {
-    U8, U16, U32, U64,
+    U8,
+    U16,
+    U32,
+    U64,
     Bool,
     String,
     Bytes,
@@ -24,13 +27,13 @@ pub enum FieldType {
 impl FieldType {
     pub fn rust_type(&self) -> &'static str {
         match self {
-            FieldType::U8     => "u8",
-            FieldType::U16    => "u16",
-            FieldType::U32    => "u32",
-            FieldType::U64    => "u64",
-            FieldType::Bool   => "bool",
+            FieldType::U8 => "u8",
+            FieldType::U16 => "u16",
+            FieldType::U32 => "u32",
+            FieldType::U64 => "u64",
+            FieldType::Bool => "bool",
             FieldType::String => "String",
-            FieldType::Bytes  => "Vec<u8>",
+            FieldType::Bytes => "Vec<u8>",
         }
     }
 }
@@ -39,7 +42,7 @@ impl FieldType {
 // fusa:req REQ-CG-002
 #[derive(Debug, Clone)]
 pub struct Field {
-    pub name:  String,
+    pub name: String,
     pub ftype: FieldType,
     pub optional: bool,
 }
@@ -48,7 +51,7 @@ pub struct Field {
 // fusa:req REQ-CG-002
 #[derive(Debug, Clone)]
 pub struct StructSchema {
-    pub name:   String,
+    pub name: String,
     pub fields: Vec<Field>,
 }
 
@@ -59,7 +62,10 @@ pub struct StructSchema {
 pub fn generate_structs(schemas: &[StructSchema]) -> String {
     let mut out = String::new();
     for schema in schemas {
-        out.push_str(&format!("#[derive(Debug, Clone, Default)]\npub struct {} {{\n", schema.name));
+        out.push_str(&format!(
+            "#[derive(Debug, Clone, Default)]\npub struct {} {{\n",
+            schema.name
+        ));
         for field in &schema.fields {
             let ty = field.ftype.rust_type();
             if field.optional {
@@ -85,21 +91,35 @@ pub fn parse_schema(map: &HashMap<String, HashMap<String, String>>) -> Vec<Struc
         let fields_map = &map[name];
         let mut field_names: Vec<&String> = fields_map.keys().collect();
         field_names.sort();
-        let fields = field_names.iter().map(|fname| {
-            let optional = fname.ends_with('?');
-            let clean_name = if optional { &fname[..fname.len()-1] } else { fname.as_str() };
-            let ftype = match fields_map[*fname].as_str() {
-                "u8"   => FieldType::U8,
-                "u16"  => FieldType::U16,
-                "u32"  => FieldType::U32,
-                "u64"  => FieldType::U64,
-                "bool" => FieldType::Bool,
-                "bytes"=> FieldType::Bytes,
-                _      => FieldType::String,
-            };
-            Field { name: clean_name.to_string(), ftype, optional }
-        }).collect();
-        schemas.push(StructSchema { name: name.clone(), fields });
+        let fields = field_names
+            .iter()
+            .map(|fname| {
+                let optional = fname.ends_with('?');
+                let clean_name = if optional {
+                    &fname[..fname.len() - 1]
+                } else {
+                    fname.as_str()
+                };
+                let ftype = match fields_map[*fname].as_str() {
+                    "u8" => FieldType::U8,
+                    "u16" => FieldType::U16,
+                    "u32" => FieldType::U32,
+                    "u64" => FieldType::U64,
+                    "bool" => FieldType::Bool,
+                    "bytes" => FieldType::Bytes,
+                    _ => FieldType::String,
+                };
+                Field {
+                    name: clean_name.to_string(),
+                    ftype,
+                    optional,
+                }
+            })
+            .collect();
+        schemas.push(StructSchema {
+            name: name.clone(),
+            fields,
+        });
     }
     schemas
 }
@@ -115,15 +135,18 @@ mod tests {
     #[test]
     // fusa:test REQ-CG-001
     fn field_type_rust_names() {
-        assert_eq!(FieldType::U8.rust_type(),    "u8");
-        assert_eq!(FieldType::Bool.rust_type(),  "bool");
+        assert_eq!(FieldType::U8.rust_type(), "u8");
+        assert_eq!(FieldType::Bool.rust_type(), "bool");
         assert_eq!(FieldType::Bytes.rust_type(), "Vec<u8>");
     }
 
     #[test]
     // fusa:test REQ-CG-003
     fn generate_empty_struct() {
-        let schema = StructSchema { name: "Empty".into(), fields: vec![] };
+        let schema = StructSchema {
+            name: "Empty".into(),
+            fields: vec![],
+        };
         let src = generate_structs(&[schema]);
         assert!(src.contains("pub struct Empty {"));
     }
@@ -135,8 +158,16 @@ mod tests {
         let schema = StructSchema {
             name: "Cmd".into(),
             fields: vec![
-                Field { name: "id".into(), ftype: FieldType::U32, optional: false },
-                Field { name: "payload".into(), ftype: FieldType::Bytes, optional: true },
+                Field {
+                    name: "id".into(),
+                    ftype: FieldType::U32,
+                    optional: false,
+                },
+                Field {
+                    name: "payload".into(),
+                    ftype: FieldType::Bytes,
+                    optional: true,
+                },
             ],
         };
         let src = generate_structs(&[schema]);

@@ -129,12 +129,12 @@ pub const SPEC_VERSION: &str = "1.6";
 pub struct Zone(pub u8);
 
 impl Zone {
-    pub const UNKNOWN:     Zone = Zone(0);
-    pub const FRONT_LEFT:  Zone = Zone(1);
+    pub const UNKNOWN: Zone = Zone(0);
+    pub const FRONT_LEFT: Zone = Zone(1);
     pub const FRONT_RIGHT: Zone = Zone(2);
-    pub const REAR_LEFT:   Zone = Zone(3);
-    pub const REAR_RIGHT:  Zone = Zone(4);
-    pub const CENTRAL:     Zone = Zone(5);
+    pub const REAR_LEFT: Zone = Zone(3);
+    pub const REAR_RIGHT: Zone = Zone(4);
+    pub const CENTRAL: Zone = Zone(5);
 }
 
 impl fmt::Display for Zone {
@@ -147,12 +147,12 @@ impl Zone {
     /// Canonical PascalCase name used as the RELAY message ID (spec §15.7.5).
     pub fn as_str(self) -> &'static str {
         match self {
-            Zone::FRONT_LEFT  => "FrontLeft",
+            Zone::FRONT_LEFT => "FrontLeft",
             Zone::FRONT_RIGHT => "FrontRight",
-            Zone::REAR_LEFT   => "RearLeft",
-            Zone::REAR_RIGHT  => "RearRight",
-            Zone::CENTRAL     => "Central",
-            _                 => "Unknown",
+            Zone::REAR_LEFT => "RearLeft",
+            Zone::REAR_RIGHT => "RearRight",
+            Zone::CENTRAL => "Central",
+            _ => "Unknown",
         }
     }
 }
@@ -164,11 +164,11 @@ impl Zone {
 // fusa:req REQ-MSG-002
 pub fn zone_from_str(s: &str) -> Result<Zone, RcpError> {
     match s {
-        "FrontLeft"  | "front-left"  => Ok(Zone::FRONT_LEFT),
+        "FrontLeft" | "front-left" => Ok(Zone::FRONT_LEFT),
         "FrontRight" | "front-right" => Ok(Zone::FRONT_RIGHT),
-        "RearLeft"   | "rear-left"   => Ok(Zone::REAR_LEFT),
-        "RearRight"  | "rear-right"  => Ok(Zone::REAR_RIGHT),
-        "Central"    | "central"     => Ok(Zone::CENTRAL),
+        "RearLeft" | "rear-left" => Ok(Zone::REAR_LEFT),
+        "RearRight" | "rear-right" => Ok(Zone::REAR_RIGHT),
+        "Central" | "central" => Ok(Zone::CENTRAL),
         _ => Err(RcpError::NotFound),
     }
 }
@@ -181,18 +181,18 @@ pub fn zone_from_str(s: &str) -> Result<Zone, RcpError> {
 pub struct Priority(pub u8);
 
 impl Priority {
-    pub const NORMAL:   Priority = Priority(0);
-    pub const HIGH:     Priority = Priority(1);
+    pub const NORMAL: Priority = Priority(0);
+    pub const HIGH: Priority = Priority(1);
     pub const CRITICAL: Priority = Priority(2);
 }
 
 impl fmt::Display for Priority {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {
-            Priority::NORMAL   => "normal",
-            Priority::HIGH     => "high",
+            Priority::NORMAL => "normal",
+            Priority::HIGH => "high",
             Priority::CRITICAL => "critical",
-            _                  => "unknown",
+            _ => "unknown",
         };
         f.write_str(s)
     }
@@ -206,26 +206,26 @@ impl fmt::Display for Priority {
 pub struct CommandType(pub u16);
 
 impl CommandType {
-    pub const NOOP:     CommandType = CommandType(0);
-    pub const SET:      CommandType = CommandType(1);
-    pub const GET:      CommandType = CommandType(2);
-    pub const RESET:    CommandType = CommandType(3);
+    pub const NOOP: CommandType = CommandType(0);
+    pub const SET: CommandType = CommandType(1);
+    pub const GET: CommandType = CommandType(2);
+    pub const RESET: CommandType = CommandType(3);
     pub const WATCHDOG: CommandType = CommandType(4);
-    pub const SLEEP:    CommandType = CommandType(5);
-    pub const WAKE:     CommandType = CommandType(6);
+    pub const SLEEP: CommandType = CommandType(5);
+    pub const WAKE: CommandType = CommandType(6);
 }
 
 impl fmt::Display for CommandType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {
-            CommandType::NOOP     => "noop",
-            CommandType::SET      => "set",
-            CommandType::GET      => "get",
-            CommandType::RESET    => "reset",
+            CommandType::NOOP => "noop",
+            CommandType::SET => "set",
+            CommandType::GET => "get",
+            CommandType::RESET => "reset",
             CommandType::WATCHDOG => "watchdog",
-            CommandType::SLEEP    => "sleep",
-            CommandType::WAKE     => "wake",
-            _                     => "unknown",
+            CommandType::SLEEP => "sleep",
+            CommandType::WAKE => "wake",
+            _ => "unknown",
         };
         f.write_str(s)
     }
@@ -239,21 +239,21 @@ impl fmt::Display for CommandType {
 pub struct ResponseStatus(pub u8);
 
 impl ResponseStatus {
-    pub const OK:      ResponseStatus = ResponseStatus(0);
-    pub const ERROR:   ResponseStatus = ResponseStatus(1);
+    pub const OK: ResponseStatus = ResponseStatus(0);
+    pub const ERROR: ResponseStatus = ResponseStatus(1);
     pub const TIMEOUT: ResponseStatus = ResponseStatus(2);
-    pub const BUSY:    ResponseStatus = ResponseStatus(3);
+    pub const BUSY: ResponseStatus = ResponseStatus(3);
     pub const UNKNOWN: ResponseStatus = ResponseStatus(4);
 }
 
 impl fmt::Display for ResponseStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match *self {
-            ResponseStatus::OK      => "OK",
-            ResponseStatus::ERROR   => "error",
+            ResponseStatus::OK => "OK",
+            ResponseStatus::ERROR => "error",
             ResponseStatus::TIMEOUT => "timeout",
-            ResponseStatus::BUSY    => "busy",
-            _                       => "unknown",
+            ResponseStatus::BUSY => "busy",
+            _ => "unknown",
         };
         f.write_str(s)
     }
@@ -269,11 +269,11 @@ impl fmt::Display for ResponseStatus {
 // fusa:req REQ-CMDSTRUCT-002
 #[derive(Debug, Clone, Default)]
 pub struct Command {
-    pub id:       u32,
-    pub zone:     Zone,
+    pub id: u32,
+    pub zone: Zone,
     pub cmd_type: CommandType,
     pub priority: Priority,
-    pub payload:  Option<Vec<u8>>,
+    pub payload: Option<Vec<u8>>,
 }
 
 /// Acknowledgement returned by a zone controller.
@@ -283,17 +283,17 @@ pub struct Command {
 #[derive(Debug, Clone, Default)]
 pub struct Response {
     pub command_id: u32,
-    pub zone:       Zone,
-    pub status:     ResponseStatus,
-    pub payload:    Option<Vec<u8>>,
+    pub zone: Zone,
+    pub status: ResponseStatus,
+    pub payload: Option<Vec<u8>>,
 }
 
 /// Periodic telemetry update published by a zone controller.
 // fusa:req REQ-STAT-001
 #[derive(Debug, Clone, Default)]
 pub struct Status {
-    pub zone:    Zone,
-    pub seq:     u32,
+    pub zone: Zone,
+    pub seq: u32,
     pub healthy: bool,
     pub payload: Option<Vec<u8>>,
 }
@@ -375,7 +375,10 @@ impl RcpError {
     // fusa:req REQ-ERR-018
     // fusa:req REQ-ERR-021
     pub fn is_relay_not_connected(&self) -> bool {
-        matches!(self, Self::NotConnected | Self::NotFound | Self::ZoneMismatch)
+        matches!(
+            self,
+            Self::NotConnected | Self::NotFound | Self::ZoneMismatch
+        )
     }
 
     /// True for `Timeout` and `Busy` (both wrap `relay::ErrTimeout`).
@@ -477,7 +480,10 @@ pub struct Loan {
 
 impl Loan {
     pub fn new(payload: Vec<u8>, release: impl FnOnce(Vec<u8>) + Send + 'static) -> Self {
-        Loan { payload, release: Some(Box::new(release)) }
+        Loan {
+            payload,
+            release: Some(Box::new(release)),
+        }
     }
 
     /// Return the buffer to the pool without sending.
@@ -490,7 +496,9 @@ impl Loan {
 
 impl fmt::Debug for Loan {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Loan").field("payload_len", &self.payload.len()).finish()
+        f.debug_struct("Loan")
+            .field("payload_len", &self.payload.len())
+            .finish()
     }
 }
 
@@ -499,7 +507,12 @@ pub trait LoaningController: Controller {
     fn loan(&self, size: usize) -> Result<Loan, RcpError>;
 
     /// Send `cmd` using a previously loaned payload buffer.
-    fn send_loaned(&self, loan: Loan, cmd: Command, timeout: Option<Duration>) -> Result<Response, RcpError>;
+    fn send_loaned(
+        &self,
+        loan: Loan,
+        cmd: Command,
+        timeout: Option<Duration>,
+    ) -> Result<Response, RcpError>;
 }
 
 // ── Registry trait ────────────────────────────────────────────────────────────
@@ -622,7 +635,7 @@ mod tests {
     // fusa:test REQ-ZONE-001
     fn zone_display_matches_as_str() {
         assert_eq!(format!("{}", Zone::FRONT_LEFT), "FrontLeft");
-        assert_eq!(format!("{}", Zone::CENTRAL),    "Central");
+        assert_eq!(format!("{}", Zone::CENTRAL), "Central");
     }
 
     // ── Priority constants ────────────────────────────────────────────────────
@@ -763,7 +776,7 @@ mod tests {
     // fusa:test REQ-CMDSTRUCT-001
     fn zero_command_is_safe_noop() {
         let cmd = Command::default();
-        assert_eq!(cmd.zone,     Zone::UNKNOWN);
+        assert_eq!(cmd.zone, Zone::UNKNOWN);
         assert_eq!(cmd.cmd_type, CommandType::NOOP);
         assert_eq!(cmd.priority, Priority::NORMAL);
         assert!(cmd.payload.is_none());
@@ -772,7 +785,11 @@ mod tests {
     #[test]
     // fusa:test REQ-CMDSTRUCT-002
     fn command_payload_may_be_none() {
-        let cmd = Command { zone: Zone::FRONT_LEFT, payload: None, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            payload: None,
+            ..Default::default()
+        };
         assert!(cmd.payload.is_none());
     }
 
@@ -786,7 +803,12 @@ mod tests {
     #[test]
     // fusa:test REQ-STAT-005
     fn status_payload_may_be_none() {
-        let s = Status { zone: Zone::CENTRAL, seq: 1, healthy: true, payload: None };
+        let s = Status {
+            zone: Zone::CENTRAL,
+            seq: 1,
+            healthy: true,
+            payload: None,
+        };
         assert!(s.payload.is_none());
     }
 
@@ -947,11 +969,11 @@ mod tests {
     #[test]
     // fusa:test REQ-MSG-001
     fn zone_from_str_kebab_aliases() {
-        assert_eq!(zone_from_str("front-left").unwrap(),  Zone::FRONT_LEFT);
+        assert_eq!(zone_from_str("front-left").unwrap(), Zone::FRONT_LEFT);
         assert_eq!(zone_from_str("front-right").unwrap(), Zone::FRONT_RIGHT);
-        assert_eq!(zone_from_str("rear-left").unwrap(),   Zone::REAR_LEFT);
-        assert_eq!(zone_from_str("rear-right").unwrap(),  Zone::REAR_RIGHT);
-        assert_eq!(zone_from_str("central").unwrap(),     Zone::CENTRAL);
+        assert_eq!(zone_from_str("rear-left").unwrap(), Zone::REAR_LEFT);
+        assert_eq!(zone_from_str("rear-right").unwrap(), Zone::REAR_RIGHT);
+        assert_eq!(zone_from_str("central").unwrap(), Zone::CENTRAL);
     }
 
     #[test]
@@ -971,9 +993,9 @@ mod tests {
         assert_ne!(CommandType::SLEEP, CommandType::NOOP);
         assert_ne!(CommandType::SLEEP, CommandType::WATCHDOG);
         assert_ne!(CommandType::SLEEP, CommandType::RESET);
-        assert_ne!(CommandType::WAKE,  CommandType::NOOP);
-        assert_ne!(CommandType::WAKE,  CommandType::WATCHDOG);
-        assert_ne!(CommandType::WAKE,  CommandType::RESET);
+        assert_ne!(CommandType::WAKE, CommandType::NOOP);
+        assert_ne!(CommandType::WAKE, CommandType::WATCHDOG);
+        assert_ne!(CommandType::WAKE, CommandType::RESET);
     }
 
     // ── Default Zone is UNKNOWN ───────────────────────────────────────────────

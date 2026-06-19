@@ -35,14 +35,14 @@ pub enum FaultRule {
 // fusa:req REQ-FI-001
 #[derive(Clone, Debug)]
 pub struct FaultSpec {
-    pub rule:  FaultRule,
+    pub rule: FaultRule,
     pub error: RcpError,
 }
 
 // ── FaultInjectController ─────────────────────────────────────────────────────
 
 struct Inner {
-    faults:  Vec<FaultSpec>,
+    faults: Vec<FaultSpec>,
     call_no: u64,
 }
 
@@ -58,7 +58,10 @@ impl FaultInjectController {
     pub fn new(inner: Arc<dyn Controller>) -> Self {
         FaultInjectController {
             inner,
-            state: Mutex::new(Inner { faults: Vec::new(), call_no: 0 }),
+            state: Mutex::new(Inner {
+                faults: Vec::new(),
+                call_no: 0,
+            }),
             total: AtomicU64::new(0),
         }
     }
@@ -82,7 +85,9 @@ impl FaultInjectController {
 }
 
 impl Controller for FaultInjectController {
-    fn zone(&self) -> Zone { self.inner.zone() }
+    fn zone(&self) -> Zone {
+        self.inner.zone()
+    }
 
     // fusa:req REQ-FI-006
     fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
@@ -97,11 +102,15 @@ impl Controller for FaultInjectController {
             let g = self.state.lock().unwrap();
             g.faults.iter().find_map(|spec| {
                 let triggered = match spec.rule {
-                    FaultRule::Always           => true,
-                    FaultRule::OnNthCall(n)     => call_no == n,
-                    FaultRule::AfterNthCall(n)  => call_no >= n,
+                    FaultRule::Always => true,
+                    FaultRule::OnNthCall(n) => call_no == n,
+                    FaultRule::AfterNthCall(n) => call_no >= n,
                 };
-                if triggered { Some(spec.error.clone()) } else { None }
+                if triggered {
+                    Some(spec.error.clone())
+                } else {
+                    None
+                }
             })
         };
 
@@ -112,10 +121,14 @@ impl Controller for FaultInjectController {
         self.inner.send(cmd, timeout)
     }
 
-    fn subscribe(&self) -> Result<Subscription, RcpError> { self.inner.subscribe() }
+    fn subscribe(&self) -> Result<Subscription, RcpError> {
+        self.inner.subscribe()
+    }
 
     // fusa:req REQ-FI-007
-    fn close(&self) -> Result<(), RcpError> { self.inner.close() }
+    fn close(&self) -> Result<(), RcpError> {
+        self.inner.close()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -137,7 +150,10 @@ mod tests {
     // fusa:test REQ-FI-003
     fn no_fault_passes_through() {
         let fi = fi();
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         fi.send(&cmd, None).unwrap();
     }
 
@@ -146,8 +162,14 @@ mod tests {
     // fusa:test REQ-FI-006
     fn always_fault_injects_every_call() {
         let fi = fi();
-        fi.inject(FaultSpec { rule: FaultRule::Always, error: RcpError::Timeout });
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        fi.inject(FaultSpec {
+            rule: FaultRule::Always,
+            error: RcpError::Timeout,
+        });
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         for _ in 0..3 {
             let err = fi.send(&cmd, None).unwrap_err();
             assert_eq!(err, RcpError::Timeout);
@@ -159,12 +181,18 @@ mod tests {
     // fusa:test REQ-FI-006
     fn nth_call_fault_triggers_only_on_n() {
         let fi = fi();
-        fi.inject(FaultSpec { rule: FaultRule::OnNthCall(2), error: RcpError::Busy });
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
-        fi.send(&cmd, None).unwrap();          // call 1 — ok
+        fi.inject(FaultSpec {
+            rule: FaultRule::OnNthCall(2),
+            error: RcpError::Busy,
+        });
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
+        fi.send(&cmd, None).unwrap(); // call 1 — ok
         let err = fi.send(&cmd, None).unwrap_err(); // call 2 — fault
         assert_eq!(err, RcpError::Busy);
-        fi.send(&cmd, None).unwrap();          // call 3 — ok again
+        fi.send(&cmd, None).unwrap(); // call 3 — ok again
     }
 
     #[test]
@@ -172,8 +200,14 @@ mod tests {
     // fusa:test REQ-FI-006
     fn after_nth_call_triggers_from_n_onwards() {
         let fi = fi();
-        fi.inject(FaultSpec { rule: FaultRule::AfterNthCall(3), error: RcpError::NotConnected });
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        fi.inject(FaultSpec {
+            rule: FaultRule::AfterNthCall(3),
+            error: RcpError::NotConnected,
+        });
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         fi.send(&cmd, None).unwrap(); // 1 — ok
         fi.send(&cmd, None).unwrap(); // 2 — ok
         let e = fi.send(&cmd, None).unwrap_err(); // 3 — fault
@@ -186,9 +220,18 @@ mod tests {
     // fusa:test REQ-FI-004
     fn inject_multiple_rules_first_match_wins() {
         let fi = fi();
-        fi.inject(FaultSpec { rule: FaultRule::OnNthCall(1), error: RcpError::Timeout });
-        fi.inject(FaultSpec { rule: FaultRule::Always, error: RcpError::Busy });
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        fi.inject(FaultSpec {
+            rule: FaultRule::OnNthCall(1),
+            error: RcpError::Timeout,
+        });
+        fi.inject(FaultSpec {
+            rule: FaultRule::Always,
+            error: RcpError::Busy,
+        });
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         let err = fi.send(&cmd, None).unwrap_err();
         // First matching rule wins (OnNthCall(1) matches on call 1)
         assert_eq!(err, RcpError::Timeout);
@@ -198,9 +241,15 @@ mod tests {
     // fusa:test REQ-FI-005
     fn clear_removes_all_faults() {
         let fi = fi();
-        fi.inject(FaultSpec { rule: FaultRule::Always, error: RcpError::Timeout });
+        fi.inject(FaultSpec {
+            rule: FaultRule::Always,
+            error: RcpError::Timeout,
+        });
         fi.clear();
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         fi.send(&cmd, None).unwrap();
     }
 

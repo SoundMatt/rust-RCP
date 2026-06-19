@@ -26,7 +26,7 @@ use crate::{Command, CommandType, Controller, RcpError, Zone};
 #[derive(Clone, Debug)]
 pub struct WatchdogConfig {
     /// How often to send a WATCHDOG command.
-    pub interval:    Duration,
+    pub interval: Duration,
     /// Number of consecutive missed responses before declaring unhealthy.
     pub miss_window: u32,
     /// If true, close the controller when the window is exceeded.
@@ -36,8 +36,8 @@ pub struct WatchdogConfig {
 impl Default for WatchdogConfig {
     fn default() -> Self {
         WatchdogConfig {
-            interval:      Duration::from_secs(1),
-            miss_window:   3,
+            interval: Duration::from_secs(1),
+            miss_window: 3,
             close_on_miss: false,
         }
     }
@@ -47,10 +47,10 @@ impl Default for WatchdogConfig {
 
 struct Inner {
     controller: Arc<dyn Controller>,
-    config:     WatchdogConfig,
-    misses:     AtomicU32,
-    healthy:    AtomicBool,
-    stopped:    AtomicBool,
+    config: WatchdogConfig,
+    misses: AtomicU32,
+    healthy: AtomicBool,
+    stopped: AtomicBool,
 }
 
 /// Periodic watchdog monitor for a single zone controller.
@@ -66,7 +66,7 @@ impl WatchdogMonitor {
         let inner = Arc::new(Inner {
             controller,
             config,
-            misses:  AtomicU32::new(0),
+            misses: AtomicU32::new(0),
             healthy: AtomicBool::new(true),
             stopped: AtomicBool::new(false),
         });
@@ -81,7 +81,9 @@ impl WatchdogMonitor {
     fn run(inner: Arc<Inner>) {
         while !inner.stopped.load(Ordering::Relaxed) {
             std::thread::sleep(inner.config.interval);
-            if inner.stopped.load(Ordering::Relaxed) { break; }
+            if inner.stopped.load(Ordering::Relaxed) {
+                break;
+            }
             let zone = inner.controller.zone();
             let cmd = Command {
                 zone,
@@ -143,8 +145,10 @@ mod tests {
 
     fn ok_ctrl() -> Arc<dyn Controller> {
         let h: crate::mock::Handler = Box::new(|cmd| Response {
-            command_id: cmd.id, zone: cmd.zone,
-            status: ResponseStatus::OK, payload: None,
+            command_id: cmd.id,
+            zone: cmd.zone,
+            status: ResponseStatus::OK,
+            payload: None,
         });
         MockController::new(Zone::FRONT_LEFT, Some(h)) as Arc<dyn Controller>
     }
@@ -161,7 +165,10 @@ mod tests {
     #[test]
     // fusa:test REQ-WDG-007
     fn zone_matches_controller() {
-        let cfg = WatchdogConfig { interval: Duration::from_millis(50), ..Default::default() };
+        let cfg = WatchdogConfig {
+            interval: Duration::from_millis(50),
+            ..Default::default()
+        };
         let w = WatchdogMonitor::start(ok_ctrl(), cfg);
         assert_eq!(w.zone(), Zone::FRONT_LEFT);
         w.stop();
@@ -171,7 +178,7 @@ mod tests {
     // fusa:test REQ-WDG-004
     fn healthy_with_responsive_controller() {
         let cfg = WatchdogConfig {
-            interval:    Duration::from_millis(20),
+            interval: Duration::from_millis(20),
             miss_window: 3,
             close_on_miss: false,
         };
@@ -186,7 +193,10 @@ mod tests {
     // fusa:test REQ-WDG-005
     // fusa:test REQ-WDG-008
     fn miss_count_zero_on_responsive_controller() {
-        let cfg = WatchdogConfig { interval: Duration::from_millis(20), ..Default::default() };
+        let cfg = WatchdogConfig {
+            interval: Duration::from_millis(20),
+            ..Default::default()
+        };
         let w = WatchdogMonitor::start(ok_ctrl(), cfg);
         std::thread::sleep(Duration::from_millis(60));
         assert_eq!(w.miss_count(), 0);
@@ -196,7 +206,10 @@ mod tests {
     #[test]
     // fusa:test REQ-WDG-006
     fn stop_terminates_monitor() {
-        let cfg = WatchdogConfig { interval: Duration::from_millis(10), ..Default::default() };
+        let cfg = WatchdogConfig {
+            interval: Duration::from_millis(10),
+            ..Default::default()
+        };
         let w = WatchdogMonitor::start(ok_ctrl(), cfg);
         w.stop(); // should not deadlock or panic
     }
@@ -208,13 +221,16 @@ mod tests {
         let ctrl = ok_ctrl();
         ctrl.close().unwrap();
         let cfg = WatchdogConfig {
-            interval:      Duration::from_millis(10),
-            miss_window:   5,
+            interval: Duration::from_millis(10),
+            miss_window: 5,
             close_on_miss: false,
         };
         let w = WatchdogMonitor::start(ctrl, cfg);
         std::thread::sleep(Duration::from_millis(60));
-        assert!(w.miss_count() > 0, "misses must accumulate for closed controller");
+        assert!(
+            w.miss_count() > 0,
+            "misses must accumulate for closed controller"
+        );
         assert!(!w.is_healthy(), "unhealthy after misses");
         w.stop();
     }

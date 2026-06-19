@@ -40,7 +40,7 @@ pub trait TlsStream: Send + Sync {
 /// TLS-secured RCP bridge controller.
 // fusa:req REQ-TLS-004
 pub struct TlsBridge {
-    zone:   Zone,
+    zone: Zone,
     stream: Arc<dyn TlsStream>,
 }
 
@@ -57,22 +57,32 @@ impl TlsBridge {
 }
 
 impl Controller for TlsBridge {
-    fn zone(&self) -> Zone { self.zone }
+    fn zone(&self) -> Zone {
+        self.zone
+    }
 
     // fusa:req REQ-TLS-004
     fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
-        if timeout == Some(Duration::ZERO) { return Err(RcpError::Timeout); }
-        if cmd.zone != self.zone { return Err(RcpError::ZoneMismatch); }
+        if timeout == Some(Duration::ZERO) {
+            return Err(RcpError::Timeout);
+        }
+        if cmd.zone != self.zone {
+            return Err(RcpError::ZoneMismatch);
+        }
         let frame = wire::encode_command(cmd)?;
         self.stream.write_all(&frame)?;
         let resp_frame = self.stream.read_to_vec(timeout)?;
         wire::decode_response(&resp_frame)
     }
 
-    fn subscribe(&self) -> Result<Subscription, RcpError> { Err(RcpError::NotFound) }
+    fn subscribe(&self) -> Result<Subscription, RcpError> {
+        Err(RcpError::NotFound)
+    }
 
     // fusa:req REQ-TLS-005
-    fn close(&self) -> Result<(), RcpError> { Ok(()) }
+    fn close(&self) -> Result<(), RcpError> {
+        Ok(())
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -83,15 +93,25 @@ mod tests {
     use super::*;
     use crate::{Command, Response, ResponseStatus, Zone};
 
-    struct MockTls { verified: bool }
+    struct MockTls {
+        verified: bool,
+    }
     impl TlsStream for MockTls {
-        fn write_all(&self, _: &[u8]) -> Result<(), RcpError> { Ok(()) }
+        fn write_all(&self, _: &[u8]) -> Result<(), RcpError> {
+            Ok(())
+        }
         fn read_to_vec(&self, _: Option<Duration>) -> Result<Vec<u8>, RcpError> {
-            let resp = Response { command_id: 1, zone: Zone::FRONT_LEFT,
-                status: ResponseStatus::OK, payload: None };
+            let resp = Response {
+                command_id: 1,
+                zone: Zone::FRONT_LEFT,
+                status: ResponseStatus::OK,
+                payload: None,
+            };
             wire::encode_response(&resp).map_err(|e| e)
         }
-        fn peer_verified(&self) -> bool { self.verified }
+        fn peer_verified(&self) -> bool {
+            self.verified
+        }
     }
 
     #[test]
@@ -108,7 +128,16 @@ mod tests {
     fn tls_send_ok_with_verified_peer() {
         let stream = Arc::new(MockTls { verified: true }) as Arc<dyn TlsStream>;
         let bridge = TlsBridge::new(Zone::FRONT_LEFT, stream).unwrap();
-        let resp = bridge.send(&Command { id: 1, zone: Zone::FRONT_LEFT, ..Default::default() }, None).unwrap();
+        let resp = bridge
+            .send(
+                &Command {
+                    id: 1,
+                    zone: Zone::FRONT_LEFT,
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap();
         assert_eq!(resp.status, ResponseStatus::OK);
     }
 

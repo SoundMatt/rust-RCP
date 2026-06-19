@@ -18,7 +18,7 @@ use crate::{Command, Controller, RcpError, Response, Subscription, Zone};
 /// A proxy that forwards all calls to a replaceable inner controller.
 // fusa:req REQ-PROXY-001
 pub struct ProxyController {
-    zone:  Zone,
+    zone: Zone,
     inner: RwLock<Option<Arc<dyn Controller>>>,
 }
 
@@ -27,7 +27,10 @@ impl ProxyController {
     // fusa:req REQ-PROXY-002
     pub fn new(inner: Arc<dyn Controller>) -> Self {
         let zone = inner.zone();
-        ProxyController { zone, inner: RwLock::new(Some(inner)) }
+        ProxyController {
+            zone,
+            inner: RwLock::new(Some(inner)),
+        }
     }
 
     /// Replace the inner controller atomically.
@@ -44,14 +47,16 @@ impl ProxyController {
 }
 
 impl Controller for ProxyController {
-    fn zone(&self) -> Zone { self.zone }
+    fn zone(&self) -> Zone {
+        self.zone
+    }
 
     // fusa:req REQ-PROXY-003
     fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
         let guard = self.inner.read().unwrap();
         match guard.as_ref() {
             Some(ctrl) => ctrl.send(cmd, timeout),
-            None       => Err(RcpError::NotConnected),
+            None => Err(RcpError::NotConnected),
         }
     }
 
@@ -60,7 +65,7 @@ impl Controller for ProxyController {
         let guard = self.inner.read().unwrap();
         match guard.as_ref() {
             Some(ctrl) => ctrl.subscribe(),
-            None       => Err(RcpError::NotConnected),
+            None => Err(RcpError::NotConnected),
         }
     }
 
@@ -68,7 +73,7 @@ impl Controller for ProxyController {
         let guard = self.inner.read().unwrap();
         match guard.as_ref() {
             Some(ctrl) => ctrl.close(),
-            None       => Ok(()),
+            None => Ok(()),
         }
     }
 }
@@ -84,8 +89,10 @@ mod tests {
 
     fn ok_ctrl(zone: Zone) -> Arc<dyn Controller> {
         let h: crate::mock::Handler = Box::new(move |cmd| Response {
-            command_id: cmd.id, zone: cmd.zone,
-            status: ResponseStatus::OK, payload: None,
+            command_id: cmd.id,
+            zone: cmd.zone,
+            status: ResponseStatus::OK,
+            payload: None,
         });
         MockController::new(zone, Some(h)) as Arc<dyn Controller>
     }
@@ -95,7 +102,10 @@ mod tests {
     // fusa:test REQ-PROXY-003
     fn forwards_send_to_inner() {
         let proxy = ProxyController::new(ok_ctrl(Zone::FRONT_LEFT));
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         proxy.send(&cmd, None).unwrap();
     }
 
@@ -114,7 +124,10 @@ mod tests {
         let closed = ok_ctrl(Zone::FRONT_LEFT);
         closed.close().unwrap();
         proxy.swap(Arc::clone(&closed));
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         let err = proxy.send(&cmd, None).unwrap_err();
         assert_eq!(err, RcpError::Closed);
     }
@@ -124,7 +137,15 @@ mod tests {
     fn detach_returns_not_connected() {
         let proxy = ProxyController::new(ok_ctrl(Zone::FRONT_LEFT));
         proxy.detach();
-        let err = proxy.send(&Command { zone: Zone::FRONT_LEFT, ..Default::default() }, None).unwrap_err();
+        let err = proxy
+            .send(
+                &Command {
+                    zone: Zone::FRONT_LEFT,
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap_err();
         assert_eq!(err, RcpError::NotConnected);
     }
 

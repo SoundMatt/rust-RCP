@@ -37,8 +37,8 @@ pub struct RcpConfig {
 // fusa:req REQ-CFG-002
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct ControllerConfig {
-    pub zone:             u8,
-    pub timeout_ms:       u64,
+    pub zone: u8,
+    pub timeout_ms: u64,
     pub max_payload_bytes: usize,
 }
 
@@ -47,24 +47,35 @@ pub struct ControllerConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct WatchdogConfig {
     pub interval_ms: u64,
-    pub window:      u32,
+    pub window: u32,
 }
 
 impl Default for WatchdogConfig {
-    fn default() -> Self { WatchdogConfig { interval_ms: 1000, window: 3 } }
+    fn default() -> Self {
+        WatchdogConfig {
+            interval_ms: 1000,
+            window: 3,
+        }
+    }
 }
 
 /// Rate-limit configuration (matches `ratelimit::Config` shape).
 // fusa:req REQ-CFG-004
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RateLimitConfig {
-    pub rate:             f64,
-    pub burst:            f64,
-    pub exempt_critical:  bool,
+    pub rate: f64,
+    pub burst: f64,
+    pub exempt_critical: bool,
 }
 
 impl Default for RateLimitConfig {
-    fn default() -> Self { RateLimitConfig { rate: 100.0, burst: 20.0, exempt_critical: true } }
+    fn default() -> Self {
+        RateLimitConfig {
+            rate: 100.0,
+            burst: 20.0,
+            exempt_critical: true,
+        }
+    }
 }
 
 // ── Loader ────────────────────────────────────────────────────────────────────
@@ -86,10 +97,16 @@ pub fn from_yaml(s: &str) -> Result<RcpConfig, String> {
 pub fn validate(cfg: &RcpConfig) -> Result<(), String> {
     for (name, ctrl) in &cfg.controllers {
         if ctrl.zone > 5 {
-            return Err(format!("controller '{}': zone {} out of range (0..=5)", name, ctrl.zone));
+            return Err(format!(
+                "controller '{}': zone {} out of range (0..=5)",
+                name, ctrl.zone
+            ));
         }
         if ctrl.max_payload_bytes > 65491 {
-            return Err(format!("controller '{}': max_payload_bytes exceeds protocol maximum", name));
+            return Err(format!(
+                "controller '{}': max_payload_bytes exceeds protocol maximum",
+                name
+            ));
         }
     }
     if cfg.rate_limit.rate <= 0.0 {
@@ -134,7 +151,14 @@ mod tests {
     // fusa:test REQ-CFG-006
     fn validate_bad_zone() {
         let mut cfg = RcpConfig::default();
-        cfg.controllers.insert("ctrl".into(), ControllerConfig { zone: 9, timeout_ms: 100, max_payload_bytes: 512 });
+        cfg.controllers.insert(
+            "ctrl".into(),
+            ControllerConfig {
+                zone: 9,
+                timeout_ms: 100,
+                max_payload_bytes: 512,
+            },
+        );
         assert!(validate(&cfg).is_err());
     }
 
@@ -171,7 +195,11 @@ mod tests {
     #[test]
     // fusa:test REQ-CFG-002
     fn controller_config_fields() {
-        let cc = ControllerConfig { zone: 2, timeout_ms: 500, max_payload_bytes: 1024 };
+        let cc = ControllerConfig {
+            zone: 2,
+            timeout_ms: 500,
+            max_payload_bytes: 1024,
+        };
         assert_eq!(cc.zone, 2);
         assert_eq!(cc.timeout_ms, 500);
         assert_eq!(cc.max_payload_bytes, 1024);
@@ -181,7 +209,14 @@ mod tests {
     // fusa:test REQ-CFG-006
     fn payload_exceeds_proto_max() {
         let mut cfg = RcpConfig::default();
-        cfg.controllers.insert("x".into(), ControllerConfig { zone: 1, timeout_ms: 100, max_payload_bytes: 99999 });
+        cfg.controllers.insert(
+            "x".into(),
+            ControllerConfig {
+                zone: 1,
+                timeout_ms: 100,
+                max_payload_bytes: 99999,
+            },
+        );
         assert!(validate(&cfg).is_err());
     }
 }

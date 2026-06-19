@@ -41,7 +41,7 @@ fn resp_topic(zone: Zone, id: u32) -> String {
 /// RCP-over-MQTT bridge controller.
 // fusa:req REQ-MQTT-002
 pub struct MqttBridge {
-    zone:   Zone,
+    zone: Zone,
     client: Arc<dyn MqttClient>,
 }
 
@@ -52,32 +52,51 @@ impl MqttBridge {
 }
 
 impl Controller for MqttBridge {
-    fn zone(&self) -> Zone { self.zone }
+    fn zone(&self) -> Zone {
+        self.zone
+    }
 
     // fusa:req REQ-MQTT-003
     // fusa:req REQ-MQTT-004
     fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
-        if timeout == Some(Duration::ZERO) { return Err(RcpError::Timeout); }
-        if cmd.zone != self.zone { return Err(RcpError::ZoneMismatch); }
+        if timeout == Some(Duration::ZERO) {
+            return Err(RcpError::Timeout);
+        }
+        if cmd.zone != self.zone {
+            return Err(RcpError::ZoneMismatch);
+        }
 
         let payload = cmd.payload.as_deref().unwrap_or(&[]);
         let topic = cmd_topic(self.zone, cmd.id);
         self.client.publish(&topic, payload)?;
-        self.client.subscribe_topic(&resp_topic(self.zone, cmd.id))?;
+        self.client
+            .subscribe_topic(&resp_topic(self.zone, cmd.id))?;
         let (_resp_topic, resp_payload) = self.client.recv_message(timeout)?;
 
         Ok(Response {
             command_id: cmd.id,
-            zone:       self.zone,
-            status:     if resp_payload.first() == Some(&0) { ResponseStatus::OK } else { ResponseStatus::ERROR },
-            payload:    if resp_payload.len() > 1 { Some(resp_payload[1..].to_vec()) } else { None },
+            zone: self.zone,
+            status: if resp_payload.first() == Some(&0) {
+                ResponseStatus::OK
+            } else {
+                ResponseStatus::ERROR
+            },
+            payload: if resp_payload.len() > 1 {
+                Some(resp_payload[1..].to_vec())
+            } else {
+                None
+            },
         })
     }
 
     // fusa:req REQ-MQTT-005
-    fn subscribe(&self) -> Result<Subscription, RcpError> { Err(RcpError::NotFound) }
+    fn subscribe(&self) -> Result<Subscription, RcpError> {
+        Err(RcpError::NotFound)
+    }
 
-    fn close(&self) -> Result<(), RcpError> { Ok(()) }
+    fn close(&self) -> Result<(), RcpError> {
+        Ok(())
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -89,16 +108,27 @@ mod tests {
     use crate::{Command, Zone};
     use std::sync::Mutex;
 
-    struct MockMqtt { published: Mutex<Vec<(String, Vec<u8>)>> }
+    struct MockMqtt {
+        published: Mutex<Vec<(String, Vec<u8>)>>,
+    }
     impl MockMqtt {
-        fn new() -> Arc<Self> { Arc::new(MockMqtt { published: Mutex::new(vec![]) }) }
+        fn new() -> Arc<Self> {
+            Arc::new(MockMqtt {
+                published: Mutex::new(vec![]),
+            })
+        }
     }
     impl MqttClient for MockMqtt {
         fn publish(&self, topic: &str, payload: &[u8]) -> Result<(), RcpError> {
-            self.published.lock().unwrap().push((topic.to_string(), payload.to_vec()));
+            self.published
+                .lock()
+                .unwrap()
+                .push((topic.to_string(), payload.to_vec()));
             Ok(())
         }
-        fn subscribe_topic(&self, _: &str) -> Result<(), RcpError> { Ok(()) }
+        fn subscribe_topic(&self, _: &str) -> Result<(), RcpError> {
+            Ok(())
+        }
         fn recv_message(&self, _: Option<Duration>) -> Result<(String, Vec<u8>), RcpError> {
             Ok(("resp".into(), vec![0u8])) // OK response
         }
@@ -111,7 +141,11 @@ mod tests {
     fn bridge_publishes_command() {
         let client = MockMqtt::new();
         let bridge = MqttBridge::new(Zone::FRONT_LEFT, Arc::clone(&client) as Arc<dyn MqttClient>);
-        let cmd = Command { id: 42, zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            id: 42,
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         let resp = bridge.send(&cmd, None).unwrap();
         assert_eq!(resp.status, ResponseStatus::OK);
         let pubs = client.published.lock().unwrap();
@@ -123,7 +157,15 @@ mod tests {
     fn zone_mismatch_rejected() {
         let client = MockMqtt::new();
         let bridge = MqttBridge::new(Zone::FRONT_LEFT, Arc::clone(&client) as Arc<dyn MqttClient>);
-        let err = bridge.send(&Command { zone: Zone::REAR_RIGHT, ..Default::default() }, None).unwrap_err();
+        let err = bridge
+            .send(
+                &Command {
+                    zone: Zone::REAR_RIGHT,
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap_err();
         assert_eq!(err, RcpError::ZoneMismatch);
     }
 

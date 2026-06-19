@@ -18,8 +18,8 @@ use crate::{Command, Controller, RcpError, Response, Subscription, Zone};
 #[derive(Clone, Debug)]
 pub struct Entry {
     pub timestamp: SystemTime,
-    pub command:   Command,
-    pub result:    Result<Response, RcpError>,
+    pub command: Command,
+    pub result: Result<Response, RcpError>,
 }
 
 // ── RecordController ──────────────────────────────────────────────────────────
@@ -28,12 +28,15 @@ pub struct Entry {
 // fusa:req REQ-REC-002
 pub struct RecordController {
     inner: Arc<dyn Controller>,
-    log:   Mutex<Vec<Entry>>,
+    log: Mutex<Vec<Entry>>,
 }
 
 impl RecordController {
     pub fn new(inner: Arc<dyn Controller>) -> Self {
-        RecordController { inner, log: Mutex::new(Vec::new()) }
+        RecordController {
+            inner,
+            log: Mutex::new(Vec::new()),
+        }
     }
 
     /// All recorded entries in chronological order.
@@ -50,22 +53,28 @@ impl RecordController {
 }
 
 impl Controller for RecordController {
-    fn zone(&self) -> Zone { self.inner.zone() }
+    fn zone(&self) -> Zone {
+        self.inner.zone()
+    }
 
     // fusa:req REQ-REC-005
     fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
         let result = self.inner.send(cmd, timeout);
         self.log.lock().unwrap().push(Entry {
             timestamp: SystemTime::now(),
-            command:   cmd.clone(),
-            result:    result.clone(),
+            command: cmd.clone(),
+            result: result.clone(),
         });
         result
     }
 
-    fn subscribe(&self) -> Result<Subscription, RcpError> { self.inner.subscribe() }
+    fn subscribe(&self) -> Result<Subscription, RcpError> {
+        self.inner.subscribe()
+    }
 
-    fn close(&self) -> Result<(), RcpError> { self.inner.close() }
+    fn close(&self) -> Result<(), RcpError> {
+        self.inner.close()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -88,7 +97,15 @@ mod tests {
     fn records_successful_sends() {
         let r = rec();
         for i in 1u32..=3 {
-            r.send(&Command { id: i, zone: Zone::FRONT_LEFT, ..Default::default() }, None).unwrap();
+            r.send(
+                &Command {
+                    id: i,
+                    zone: Zone::FRONT_LEFT,
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap();
         }
         let entries = r.entries();
         assert_eq!(entries.len(), 3);
@@ -101,7 +118,13 @@ mod tests {
         let inner = MockController::new(Zone::FRONT_LEFT, None) as Arc<dyn Controller>;
         inner.close().unwrap();
         let r = RecordController::new(inner);
-        let _ = r.send(&Command { zone: Zone::FRONT_LEFT, ..Default::default() }, None);
+        let _ = r.send(
+            &Command {
+                zone: Zone::FRONT_LEFT,
+                ..Default::default()
+            },
+            None,
+        );
         let entries = r.entries();
         assert_eq!(entries.len(), 1);
         assert!(entries[0].result.is_err());
@@ -111,7 +134,14 @@ mod tests {
     // fusa:test REQ-REC-004
     fn clear_empties_log() {
         let r = rec();
-        r.send(&Command { zone: Zone::FRONT_LEFT, ..Default::default() }, None).unwrap();
+        r.send(
+            &Command {
+                zone: Zone::FRONT_LEFT,
+                ..Default::default()
+            },
+            None,
+        )
+        .unwrap();
         r.clear();
         assert!(r.entries().is_empty());
     }
@@ -120,7 +150,14 @@ mod tests {
     // fusa:test REQ-REC-001
     fn entry_timestamp_is_recent() {
         let r = rec();
-        r.send(&Command { zone: Zone::FRONT_LEFT, ..Default::default() }, None).unwrap();
+        r.send(
+            &Command {
+                zone: Zone::FRONT_LEFT,
+                ..Default::default()
+            },
+            None,
+        )
+        .unwrap();
         let e = &r.entries()[0];
         let age = e.timestamp.elapsed().unwrap_or(Duration::ZERO);
         assert!(age < Duration::from_secs(5), "timestamp must be recent");
@@ -131,7 +168,15 @@ mod tests {
     fn entries_in_order() {
         let r = rec();
         for i in 1u32..=5 {
-            r.send(&Command { id: i, zone: Zone::FRONT_LEFT, ..Default::default() }, None).unwrap();
+            r.send(
+                &Command {
+                    id: i,
+                    zone: Zone::FRONT_LEFT,
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap();
         }
         let ids: Vec<u32> = r.entries().iter().map(|e| e.command.id).collect();
         assert_eq!(ids, vec![1, 2, 3, 4, 5]);

@@ -36,7 +36,7 @@ pub trait CanSocket: Send + Sync {
 /// Commands are encoded with `can_id = zone_id << 8 | cmd_type`.
 // fusa:req REQ-CANBR-003
 pub struct CanBridge {
-    zone:   Zone,
+    zone: Zone,
     socket: Arc<dyn CanSocket>,
 }
 
@@ -51,12 +51,18 @@ impl CanBridge {
 }
 
 impl Controller for CanBridge {
-    fn zone(&self) -> Zone { self.zone }
+    fn zone(&self) -> Zone {
+        self.zone
+    }
 
     // fusa:req REQ-CANBR-004
     fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
-        if timeout == Some(Duration::ZERO) { return Err(RcpError::Timeout); }
-        if cmd.zone != self.zone { return Err(RcpError::ZoneMismatch); }
+        if timeout == Some(Duration::ZERO) {
+            return Err(RcpError::Timeout);
+        }
+        if cmd.zone != self.zone {
+            return Err(RcpError::ZoneMismatch);
+        }
 
         let payload = cmd.payload.as_deref().unwrap_or(&[]);
         if payload.len() > CAN_FD_MAX_PAYLOAD {
@@ -69,20 +75,28 @@ impl Controller for CanBridge {
         let (_resp_id, resp_data) = self.socket.recv_frame(timeout)?;
         Ok(Response {
             command_id: cmd.id,
-            zone:       self.zone,
-            status:     if resp_data.first() == Some(&0) {
+            zone: self.zone,
+            status: if resp_data.first() == Some(&0) {
                 crate::ResponseStatus::OK
             } else {
                 crate::ResponseStatus::ERROR
             },
-            payload: if resp_data.len() > 1 { Some(resp_data[1..].to_vec()) } else { None },
+            payload: if resp_data.len() > 1 {
+                Some(resp_data[1..].to_vec())
+            } else {
+                None
+            },
         })
     }
 
-    fn subscribe(&self) -> Result<Subscription, RcpError> { Err(RcpError::NotFound) }
+    fn subscribe(&self) -> Result<Subscription, RcpError> {
+        Err(RcpError::NotFound)
+    }
 
     // fusa:req REQ-CANBR-005
-    fn close(&self) -> Result<(), RcpError> { Ok(()) }
+    fn close(&self) -> Result<(), RcpError> {
+        Ok(())
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -94,9 +108,15 @@ mod tests {
     use crate::{Command, ResponseStatus, Zone};
     use std::sync::Mutex;
 
-    struct MockCan { tx: Mutex<Vec<(u32, Vec<u8>)>> }
+    struct MockCan {
+        tx: Mutex<Vec<(u32, Vec<u8>)>>,
+    }
     impl MockCan {
-        fn new() -> Arc<Self> { Arc::new(MockCan { tx: Mutex::new(vec![]) }) }
+        fn new() -> Arc<Self> {
+            Arc::new(MockCan {
+                tx: Mutex::new(vec![]),
+            })
+        }
     }
     impl CanSocket for MockCan {
         fn send_frame(&self, id: u32, data: &[u8]) -> Result<(), RcpError> {
@@ -115,7 +135,10 @@ mod tests {
     fn bridge_sends_can_frame() {
         let sock = MockCan::new();
         let bridge = CanBridge::new(Zone::FRONT_LEFT, Arc::clone(&sock) as Arc<dyn CanSocket>);
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         let resp = bridge.send(&cmd, None).unwrap();
         assert_eq!(resp.status, ResponseStatus::OK);
         assert_eq!(sock.tx.lock().unwrap().len(), 1);
@@ -126,7 +149,10 @@ mod tests {
     fn zone_mismatch_rejected() {
         let sock = MockCan::new();
         let bridge = CanBridge::new(Zone::FRONT_LEFT, Arc::clone(&sock) as Arc<dyn CanSocket>);
-        let cmd = Command { zone: Zone::REAR_RIGHT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::REAR_RIGHT,
+            ..Default::default()
+        };
         let err = bridge.send(&cmd, None).unwrap_err();
         assert_eq!(err, RcpError::ZoneMismatch);
     }

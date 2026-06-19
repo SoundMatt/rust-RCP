@@ -20,7 +20,7 @@ use crate::{Command, Controller, RcpError, Response, Subscription, Zone};
 // ── RedundancyController ──────────────────────────────────────────────────────
 
 struct Inner {
-    primary:   Arc<dyn Controller>,
+    primary: Arc<dyn Controller>,
     secondary: Option<Arc<dyn Controller>>,
     failovers: u32,
 }
@@ -28,7 +28,7 @@ struct Inner {
 /// Hot-standby redundant controller.
 // fusa:req REQ-RED-001
 pub struct RedundancyController {
-    zone:  Zone,
+    zone: Zone,
     state: Mutex<Inner>,
 }
 
@@ -39,7 +39,11 @@ impl RedundancyController {
         let zone = primary.zone();
         RedundancyController {
             zone,
-            state: Mutex::new(Inner { primary, secondary: Some(secondary), failovers: 0 }),
+            state: Mutex::new(Inner {
+                primary,
+                secondary: Some(secondary),
+                failovers: 0,
+            }),
         }
     }
 
@@ -57,7 +61,9 @@ impl RedundancyController {
 }
 
 impl Controller for RedundancyController {
-    fn zone(&self) -> Zone { self.zone }
+    fn zone(&self) -> Zone {
+        self.zone
+    }
 
     // fusa:req REQ-RED-003
     // fusa:req REQ-RED-004
@@ -96,7 +102,9 @@ impl Controller for RedundancyController {
     fn close(&self) -> Result<(), RcpError> {
         let g = self.state.lock().unwrap();
         let _ = g.primary.close();
-        if let Some(ref sec) = g.secondary { let _ = sec.close(); }
+        if let Some(ref sec) = g.secondary {
+            let _ = sec.close();
+        }
         Ok(())
     }
 }
@@ -112,16 +120,20 @@ mod tests {
 
     fn ok_ctrl(zone: Zone) -> Arc<dyn Controller> {
         let h: crate::mock::Handler = Box::new(move |cmd| Response {
-            command_id: cmd.id, zone: cmd.zone,
-            status: ResponseStatus::OK, payload: None,
+            command_id: cmd.id,
+            zone: cmd.zone,
+            status: ResponseStatus::OK,
+            payload: None,
         });
         MockController::new(zone, Some(h)) as Arc<dyn Controller>
     }
 
     fn failing_ctrl(zone: Zone) -> Arc<dyn Controller> {
-        let h: crate::mock::Handler = Box::new(|_cmd| {
-            Response { command_id: 0, zone: Zone::UNKNOWN,
-                status: ResponseStatus::OK, payload: None }
+        let h: crate::mock::Handler = Box::new(|_cmd| Response {
+            command_id: 0,
+            zone: Zone::UNKNOWN,
+            status: ResponseStatus::OK,
+            payload: None,
         });
         let ctrl = MockController::new(zone, Some(h));
         ctrl.close().unwrap();
@@ -133,7 +145,10 @@ mod tests {
     // fusa:test REQ-RED-003
     fn primary_success_no_failover() {
         let r = RedundancyController::new(ok_ctrl(Zone::FRONT_LEFT), ok_ctrl(Zone::FRONT_LEFT));
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         r.send(&cmd, None).unwrap();
         assert_eq!(r.failover_count(), 0);
     }
@@ -142,8 +157,12 @@ mod tests {
     // fusa:test REQ-RED-004
     // fusa:test REQ-RED-005
     fn primary_failure_triggers_failover_to_secondary() {
-        let r = RedundancyController::new(failing_ctrl(Zone::FRONT_LEFT), ok_ctrl(Zone::FRONT_LEFT));
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let r =
+            RedundancyController::new(failing_ctrl(Zone::FRONT_LEFT), ok_ctrl(Zone::FRONT_LEFT));
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         r.send(&cmd, None).unwrap();
         assert_eq!(r.failover_count(), 1);
     }
@@ -151,8 +170,12 @@ mod tests {
     #[test]
     // fusa:test REQ-RED-006
     fn failover_count_increments() {
-        let r = RedundancyController::new(failing_ctrl(Zone::FRONT_LEFT), ok_ctrl(Zone::FRONT_LEFT));
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let r =
+            RedundancyController::new(failing_ctrl(Zone::FRONT_LEFT), ok_ctrl(Zone::FRONT_LEFT));
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         r.send(&cmd, None).unwrap(); // triggers failover
         assert_eq!(r.failover_count(), 1);
         // Secondary is now primary; no more secondary
@@ -162,9 +185,13 @@ mod tests {
     #[test]
     // fusa:test REQ-RED-007
     fn no_secondary_after_failover() {
-        let r = RedundancyController::new(failing_ctrl(Zone::FRONT_LEFT), ok_ctrl(Zone::FRONT_LEFT));
+        let r =
+            RedundancyController::new(failing_ctrl(Zone::FRONT_LEFT), ok_ctrl(Zone::FRONT_LEFT));
         assert!(r.has_secondary());
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         r.send(&cmd, None).unwrap();
         assert!(!r.has_secondary());
     }
@@ -172,8 +199,14 @@ mod tests {
     #[test]
     // fusa:test REQ-RED-005
     fn both_failed_returns_error() {
-        let r = RedundancyController::new(failing_ctrl(Zone::FRONT_LEFT), failing_ctrl(Zone::FRONT_LEFT));
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let r = RedundancyController::new(
+            failing_ctrl(Zone::FRONT_LEFT),
+            failing_ctrl(Zone::FRONT_LEFT),
+        );
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         let err = r.send(&cmd, None).unwrap_err();
         assert_eq!(err, RcpError::Closed);
     }

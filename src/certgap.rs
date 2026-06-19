@@ -36,9 +36,9 @@ impl GapReport {
 /// - `tested_reqs`: requirements traced in tests (`// fusa:test REQ-*`)
 // fusa:req REQ-GAP-002
 pub fn analyse(
-    declared_reqs:    &HashSet<String>,
+    declared_reqs: &HashSet<String>,
     implemented_reqs: &HashSet<String>,
-    tested_reqs:      &HashSet<String>,
+    tested_reqs: &HashSet<String>,
 ) -> GapReport {
     let mut report = GapReport::default();
 
@@ -66,7 +66,9 @@ pub fn analyse(
 /// Coverage ratio: 0.0 (none) to 1.0 (all).
 // fusa:req REQ-GAP-003
 pub fn coverage(declared: &HashSet<String>, covered: &HashSet<String>) -> f64 {
-    if declared.is_empty() { return 1.0; }
+    if declared.is_empty() {
+        return 1.0;
+    }
     let matched = declared.iter().filter(|r| covered.contains(*r)).count();
     matched as f64 / declared.len() as f64
 }
@@ -75,16 +77,25 @@ pub fn coverage(declared: &HashSet<String>, covered: &HashSet<String>) -> f64 {
 // fusa:req REQ-GAP-004
 pub fn coverage_by_prefix(
     declared: &HashSet<String>,
-    covered:  &HashSet<String>,
+    covered: &HashSet<String>,
 ) -> HashMap<String, f64> {
     let mut groups: HashMap<String, (usize, usize)> = HashMap::new();
     for req in declared {
-        let prefix = req.rsplitn(2, '-').last().unwrap_or(req.as_str()).to_string();
+        let prefix = req
+            .rsplitn(2, '-')
+            .last()
+            .unwrap_or(req.as_str())
+            .to_string();
         let entry = groups.entry(prefix).or_insert((0, 0));
         entry.0 += 1;
-        if covered.contains(req) { entry.1 += 1; }
+        if covered.contains(req) {
+            entry.1 += 1;
+        }
     }
-    groups.into_iter().map(|(k, (total, done))| (k, done as f64 / total as f64)).collect()
+    groups
+        .into_iter()
+        .map(|(k, (total, done))| (k, done as f64 / total as f64))
+        .collect()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -111,7 +122,7 @@ mod tests {
     // fusa:test REQ-GAP-002
     fn unimplemented_detected() {
         let reqs = set(&["REQ-A-001", "REQ-A-002"]);
-        let imp  = set(&["REQ-A-001"]);
+        let imp = set(&["REQ-A-001"]);
         let r = analyse(&reqs, &imp, &reqs);
         assert_eq!(r.unimplemented, vec!["REQ-A-002"]);
     }
@@ -153,7 +164,7 @@ mod tests {
     // fusa:test REQ-GAP-004
     fn coverage_by_prefix_groups_correctly() {
         let declared = set(&["REQ-CTRL-001", "REQ-CTRL-002", "REQ-WIRE-001"]);
-        let covered  = set(&["REQ-CTRL-001", "REQ-WIRE-001"]);
+        let covered = set(&["REQ-CTRL-001", "REQ-WIRE-001"]);
         let by_prefix = coverage_by_prefix(&declared, &covered);
         assert!((by_prefix["REQ-CTRL"] - 0.5).abs() < 1e-9);
         assert!((by_prefix["REQ-WIRE"] - 1.0).abs() < 1e-9);

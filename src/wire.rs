@@ -30,12 +30,12 @@ use crate::{Command, CommandType, Priority, RcpError, Response, ResponseStatus, 
 
 pub const MAGIC_BYTE_0: u8 = 0x52; // 'R'
 pub const MAGIC_BYTE_1: u8 = 0x43; // 'C'
-pub const PROTO_VER:    u8 = 0x01;
+pub const PROTO_VER: u8 = 0x01;
 
-pub const TYPE_COMMAND:     u8 = 0x01;
-pub const TYPE_RESPONSE:    u8 = 0x02;
-pub const TYPE_STATUS:      u8 = 0x03;
-pub const TYPE_SUBSCRIBE:   u8 = 0x04;
+pub const TYPE_COMMAND: u8 = 0x01;
+pub const TYPE_RESPONSE: u8 = 0x02;
+pub const TYPE_STATUS: u8 = 0x03;
+pub const TYPE_SUBSCRIBE: u8 = 0x04;
 pub const TYPE_UNSUBSCRIBE: u8 = 0x05;
 
 pub const HEADER_LEN: usize = 16;
@@ -65,15 +65,15 @@ pub fn validate_header(b: &[u8]) -> Result<(), RcpError> {
 // ── Encoding helpers ──────────────────────────────────────────────────────────
 
 fn put_u16_be(buf: &mut [u8], offset: usize, v: u16) {
-    buf[offset]     = (v >> 8) as u8;
+    buf[offset] = (v >> 8) as u8;
     buf[offset + 1] = v as u8;
 }
 
 fn put_u32_be(buf: &mut [u8], offset: usize, v: u32) {
-    buf[offset]     = (v >> 24) as u8;
+    buf[offset] = (v >> 24) as u8;
     buf[offset + 1] = (v >> 16) as u8;
-    buf[offset + 2] = (v >> 8)  as u8;
-    buf[offset + 3] = v         as u8;
+    buf[offset + 2] = (v >> 8) as u8;
+    buf[offset + 3] = v as u8;
 }
 
 fn get_u16_be(b: &[u8], offset: usize) -> u16 {
@@ -81,10 +81,10 @@ fn get_u16_be(b: &[u8], offset: usize) -> u16 {
 }
 
 fn get_u32_be(b: &[u8], offset: usize) -> u32 {
-    ((b[offset]     as u32) << 24)
-    | ((b[offset + 1] as u32) << 16)
-    | ((b[offset + 2] as u32) << 8)
-    | (b[offset + 3] as u32)
+    ((b[offset] as u32) << 24)
+        | ((b[offset + 1] as u32) << 16)
+        | ((b[offset + 2] as u32) << 8)
+        | (b[offset + 3] as u32)
 }
 
 fn payload_slice(cmd_payload: &Option<Vec<u8>>) -> &[u8] {
@@ -128,10 +128,10 @@ pub fn decode_command(b: &[u8]) -> Result<Command, RcpError> {
         None
     };
     Ok(Command {
-        zone:     Zone(b[4]),
+        zone: Zone(b[4]),
         cmd_type: CommandType(get_u16_be(b, 5)),
         priority: Priority(b[7]),
-        id:       get_u32_be(b, 8),
+        id: get_u32_be(b, 8),
         payload,
     })
 }
@@ -172,8 +172,8 @@ pub fn decode_response(b: &[u8]) -> Result<Response, RcpError> {
         None
     };
     Ok(Response {
-        zone:       Zone(b[4]),
-        status:     ResponseStatus(b[7]),
+        zone: Zone(b[4]),
+        status: ResponseStatus(b[7]),
         command_id: get_u32_be(b, 8),
         payload,
     })
@@ -215,9 +215,9 @@ pub fn decode_status(b: &[u8]) -> Result<Status, RcpError> {
         None
     };
     Ok(Status {
-        zone:    Zone(b[4]),
+        zone: Zone(b[4]),
         healthy: b[7] == 1,
-        seq:     get_u32_be(b, 8),
+        seq: get_u32_be(b, 8),
         payload,
     })
 }
@@ -256,7 +256,9 @@ mod tests {
     // fusa:test REQ-WIRE-002
     fn validate_header_rejects_bad_magic() {
         let mut buf = [0u8; 16];
-        buf[0] = 0xFF; buf[1] = 0xFF; buf[2] = PROTO_VER;
+        buf[0] = 0xFF;
+        buf[1] = 0xFF;
+        buf[2] = PROTO_VER;
         assert_eq!(validate_header(&buf), Err(RcpError::BadMagic));
     }
 
@@ -264,14 +266,18 @@ mod tests {
     // fusa:test REQ-WIRE-003
     fn validate_header_rejects_bad_version() {
         let mut buf = [0u8; 16];
-        buf[0] = MAGIC_BYTE_0; buf[1] = MAGIC_BYTE_1; buf[2] = 0xFF;
+        buf[0] = MAGIC_BYTE_0;
+        buf[1] = MAGIC_BYTE_1;
+        buf[2] = 0xFF;
         assert_eq!(validate_header(&buf), Err(RcpError::BadVersion));
     }
 
     #[test]
     fn validate_header_accepts_valid() {
         let mut buf = [0u8; 16];
-        buf[0] = MAGIC_BYTE_0; buf[1] = MAGIC_BYTE_1; buf[2] = PROTO_VER;
+        buf[0] = MAGIC_BYTE_0;
+        buf[1] = MAGIC_BYTE_1;
+        buf[2] = PROTO_VER;
         assert!(validate_header(&buf).is_ok());
     }
 
@@ -281,27 +287,30 @@ mod tests {
     // fusa:test REQ-WIRE-004
     fn command_round_trip_with_payload() {
         let cmd = Command {
-            id:       0x0102_0304,
-            zone:     Zone::FRONT_LEFT,
+            id: 0x0102_0304,
+            zone: Zone::FRONT_LEFT,
             cmd_type: CommandType::SET,
             priority: Priority::HIGH,
-            payload:  Some(vec![0xAA, 0xBB, 0xCC]),
+            payload: Some(vec![0xAA, 0xBB, 0xCC]),
         };
         let frame = encode_command(&cmd);
         let decoded = decode_command(&frame).unwrap();
-        assert_eq!(decoded.id,       cmd.id);
-        assert_eq!(decoded.zone,     cmd.zone);
+        assert_eq!(decoded.id, cmd.id);
+        assert_eq!(decoded.zone, cmd.zone);
         assert_eq!(decoded.cmd_type, cmd.cmd_type);
         assert_eq!(decoded.priority, cmd.priority);
-        assert_eq!(decoded.payload,  cmd.payload);
+        assert_eq!(decoded.payload, cmd.payload);
     }
 
     #[test]
     // fusa:test REQ-WIRE-004
     fn command_round_trip_empty_payload() {
         let cmd = Command {
-            id: 1, zone: Zone::CENTRAL, cmd_type: CommandType::NOOP,
-            priority: Priority::NORMAL, payload: None,
+            id: 1,
+            zone: Zone::CENTRAL,
+            cmd_type: CommandType::NOOP,
+            priority: Priority::NORMAL,
+            payload: None,
         };
         let frame = encode_command(&cmd);
         let decoded = decode_command(&frame).unwrap();
@@ -311,7 +320,10 @@ mod tests {
     #[test]
     // fusa:test REQ-WIRE-007
     fn decode_command_rejects_truncated_body() {
-        let cmd = Command { payload: Some(vec![1, 2, 3, 4, 5]), ..Default::default() };
+        let cmd = Command {
+            payload: Some(vec![1, 2, 3, 4, 5]),
+            ..Default::default()
+        };
         let mut frame = encode_command(&cmd);
         frame.truncate(HEADER_LEN + 2); // Truncate payload
         assert_eq!(decode_command(&frame), Err(RcpError::ShortFrame));
@@ -324,24 +336,26 @@ mod tests {
     fn response_round_trip_with_payload() {
         let resp = Response {
             command_id: 0xDEAD_BEEF,
-            zone:       Zone::REAR_LEFT,
-            status:     ResponseStatus::ERROR,
-            payload:    Some(vec![1, 2]),
+            zone: Zone::REAR_LEFT,
+            status: ResponseStatus::ERROR,
+            payload: Some(vec![1, 2]),
         };
         let frame = encode_response(&resp);
         let decoded = decode_response(&frame).unwrap();
         assert_eq!(decoded.command_id, resp.command_id);
-        assert_eq!(decoded.zone,       resp.zone);
-        assert_eq!(decoded.status,     resp.status);
-        assert_eq!(decoded.payload,    resp.payload);
+        assert_eq!(decoded.zone, resp.zone);
+        assert_eq!(decoded.status, resp.status);
+        assert_eq!(decoded.payload, resp.payload);
     }
 
     #[test]
     // fusa:test REQ-WIRE-005
     fn response_round_trip_empty_payload() {
         let resp = Response {
-            command_id: 1, zone: Zone::CENTRAL,
-            status: ResponseStatus::OK, payload: None,
+            command_id: 1,
+            zone: Zone::CENTRAL,
+            status: ResponseStatus::OK,
+            payload: None,
         };
         let frame = encode_response(&resp);
         let decoded = decode_response(&frame).unwrap();
@@ -351,7 +365,10 @@ mod tests {
     #[test]
     // fusa:test REQ-WIRE-007
     fn decode_response_rejects_truncated_body() {
-        let resp = Response { payload: Some(vec![0; 10]), ..Default::default() };
+        let resp = Response {
+            payload: Some(vec![0; 10]),
+            ..Default::default()
+        };
         let mut frame = encode_response(&resp);
         frame.truncate(HEADER_LEN + 3);
         assert_eq!(decode_response(&frame), Err(RcpError::ShortFrame));
@@ -363,15 +380,15 @@ mod tests {
     // fusa:test REQ-WIRE-006
     fn status_round_trip_healthy() {
         let st = Status {
-            zone:    Zone::FRONT_RIGHT,
-            seq:     42,
+            zone: Zone::FRONT_RIGHT,
+            seq: 42,
             healthy: true,
             payload: Some(vec![0xDE, 0xAD]),
         };
         let frame = encode_status(&st);
         let decoded = decode_status(&frame).unwrap();
-        assert_eq!(decoded.zone,    st.zone);
-        assert_eq!(decoded.seq,     st.seq);
+        assert_eq!(decoded.zone, st.zone);
+        assert_eq!(decoded.seq, st.seq);
         assert_eq!(decoded.healthy, st.healthy);
         assert_eq!(decoded.payload, st.payload);
     }
@@ -379,7 +396,12 @@ mod tests {
     #[test]
     // fusa:test REQ-WIRE-006
     fn status_round_trip_unhealthy() {
-        let st = Status { zone: Zone::REAR_RIGHT, seq: 99, healthy: false, payload: None };
+        let st = Status {
+            zone: Zone::REAR_RIGHT,
+            seq: 99,
+            healthy: false,
+            payload: None,
+        };
         let frame = encode_status(&st);
         let decoded = decode_status(&frame).unwrap();
         assert!(!decoded.healthy);
@@ -389,7 +411,10 @@ mod tests {
     #[test]
     // fusa:test REQ-WIRE-007
     fn decode_status_rejects_truncated_body() {
-        let st = Status { payload: Some(vec![0; 20]), ..Default::default() };
+        let st = Status {
+            payload: Some(vec![0; 20]),
+            ..Default::default()
+        };
         let mut frame = encode_status(&st);
         frame.truncate(HEADER_LEN + 1);
         assert_eq!(decode_status(&frame), Err(RcpError::ShortFrame));
@@ -422,9 +447,15 @@ mod tests {
     fn decode_functions_never_panic_on_arbitrary_input() {
         let inputs: &[&[u8]] = &[
             &[],
-            &[0x52, 0x43, 0x01, 0x01, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
+            &[
+                0x52, 0x43, 0x01, 0x01, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                0xFF, 0xFF,
+            ],
             // body_len near u32::MAX
-            &[0x52, 0x43, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF],
+            &[
+                0x52, 0x43, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF,
+                0xFF, 0xFF,
+            ],
             &[0x52, 0x43, 0x01, 0x01],
         ];
         for input in inputs {

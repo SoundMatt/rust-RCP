@@ -92,7 +92,9 @@ pub struct ReplayGuard {
 
 impl ReplayGuard {
     pub fn new() -> Self {
-        ReplayGuard { window: Mutex::new(Vec::with_capacity(REPLAY_WINDOW)) }
+        ReplayGuard {
+            window: Mutex::new(Vec::with_capacity(REPLAY_WINDOW)),
+        }
     }
 
     /// Returns `Err(RcpError::Replay)` if `seq_num` was already seen in the window.
@@ -111,7 +113,9 @@ impl ReplayGuard {
 }
 
 impl Default for ReplayGuard {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── E2E Controller ────────────────────────────────────────────────────────────
@@ -120,17 +124,22 @@ impl Default for ReplayGuard {
 // fusa:req REQ-E2E-004
 pub struct E2eController {
     inner: Arc<dyn Controller>,
-    seq:   AtomicU32,
+    seq: AtomicU32,
 }
 
 impl E2eController {
     pub fn new(inner: Arc<dyn Controller>) -> Self {
-        E2eController { inner, seq: AtomicU32::new(0) }
+        E2eController {
+            inner,
+            seq: AtomicU32::new(0),
+        }
     }
 }
 
 impl Controller for E2eController {
-    fn zone(&self) -> Zone { self.inner.zone() }
+    fn zone(&self) -> Zone {
+        self.inner.zone()
+    }
 
     fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
         let seq_num = self.seq.fetch_add(1, Ordering::SeqCst) + 1;
@@ -141,9 +150,13 @@ impl Controller for E2eController {
         self.inner.send(&wrapped_cmd, timeout)
     }
 
-    fn subscribe(&self) -> Result<Subscription, RcpError> { self.inner.subscribe() }
+    fn subscribe(&self) -> Result<Subscription, RcpError> {
+        self.inner.subscribe()
+    }
 
-    fn close(&self) -> Result<(), RcpError> { self.inner.close() }
+    fn close(&self) -> Result<(), RcpError> {
+        self.inner.close()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -299,18 +312,27 @@ mod tests {
             guard.check(i).unwrap();
         }
         // Seq 0 should be evicted
-        assert!(guard.check(0).is_ok(), "seq 0 should be accepted after eviction");
+        assert!(
+            guard.check(0).is_ok(),
+            "seq 0 should be accepted after eviction"
+        );
     }
 
     #[test]
     // fusa:test REQ-E2E-005
     fn replay_guard_concurrent_safe() {
         let guard = Arc::new(ReplayGuard::new());
-        let handles: Vec<_> = (0..16).map(|i| {
-            let g = Arc::clone(&guard);
-            std::thread::spawn(move || { let _ = g.check(i as u32); })
-        }).collect();
-        for h in handles { h.join().unwrap(); }
+        let handles: Vec<_> = (0..16)
+            .map(|i| {
+                let g = Arc::clone(&guard);
+                std::thread::spawn(move || {
+                    let _ = g.check(i as u32);
+                })
+            })
+            .collect();
+        for h in handles {
+            h.join().unwrap();
+        }
     }
 
     // ── E2E Controller ────────────────────────────────────────────────────────
@@ -323,13 +345,20 @@ mod tests {
         let h: crate::mock::Handler = Box::new(move |cmd| {
             let pl = cmd.payload.clone().unwrap_or_default();
             rp2.lock().unwrap().push(pl);
-            crate::Response { command_id: cmd.id, zone: cmd.zone,
-                status: crate::ResponseStatus::OK, payload: None }
+            crate::Response {
+                command_id: cmd.id,
+                zone: cmd.zone,
+                status: crate::ResponseStatus::OK,
+                payload: None,
+            }
         });
         let inner = MockController::new(Zone::FRONT_LEFT, Some(h)) as Arc<dyn Controller>;
         let e2e = E2eController::new(inner);
 
-        let cmd = crate::Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = crate::Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         e2e.send(&cmd, None).unwrap();
         e2e.send(&cmd, None).unwrap();
 

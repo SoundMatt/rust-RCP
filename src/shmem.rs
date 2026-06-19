@@ -35,13 +35,19 @@ pub struct InProcChannel {
 
 impl InProcChannel {
     pub fn new() -> Arc<Self> {
-        Arc::new(InProcChannel { buf: Mutex::new(std::collections::VecDeque::new()), cvar: std::sync::Condvar::new() })
+        Arc::new(InProcChannel {
+            buf: Mutex::new(std::collections::VecDeque::new()),
+            cvar: std::sync::Condvar::new(),
+        })
     }
 }
 
 impl Default for InProcChannel {
     fn default() -> Self {
-        InProcChannel { buf: Mutex::new(std::collections::VecDeque::new()), cvar: std::sync::Condvar::new() }
+        InProcChannel {
+            buf: Mutex::new(std::collections::VecDeque::new()),
+            cvar: std::sync::Condvar::new(),
+        }
     }
 }
 
@@ -55,18 +61,22 @@ impl ShmChannel for InProcChannel {
     fn read(&self, timeout: Option<Duration>) -> Result<Vec<u8>, RcpError> {
         let mut buf = self.buf.lock().unwrap();
         let result = match timeout {
-            None    => {
-                loop {
-                    if let Some(v) = buf.pop_front() { break Ok(v); }
-                    buf = self.cvar.wait(buf).unwrap();
+            None => loop {
+                if let Some(v) = buf.pop_front() {
+                    break Ok(v);
                 }
-            }
+                buf = self.cvar.wait(buf).unwrap();
+            },
             Some(d) => {
                 let deadline = std::time::Instant::now() + d;
                 loop {
-                    if let Some(v) = buf.pop_front() { break Ok(v); }
+                    if let Some(v) = buf.pop_front() {
+                        break Ok(v);
+                    }
                     let remaining = deadline.saturating_duration_since(std::time::Instant::now());
-                    if remaining.is_zero() { break Err(RcpError::Timeout); }
+                    if remaining.is_zero() {
+                        break Err(RcpError::Timeout);
+                    }
                     let (b, _) = self.cvar.wait_timeout(buf, remaining).unwrap();
                     buf = b;
                 }
@@ -84,8 +94,8 @@ impl ShmChannel for InProcChannel {
 // fusa:req REQ-SHM-003
 pub struct ShmBridge {
     zone: Zone,
-    tx:   Arc<dyn ShmChannel>,
-    rx:   Arc<dyn ShmChannel>,
+    tx: Arc<dyn ShmChannel>,
+    rx: Arc<dyn ShmChannel>,
 }
 
 impl ShmBridge {
@@ -95,25 +105,40 @@ impl ShmBridge {
 }
 
 impl Controller for ShmBridge {
-    fn zone(&self) -> Zone { self.zone }
+    fn zone(&self) -> Zone {
+        self.zone
+    }
 
     // fusa:req REQ-SHM-004
     fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
-        if timeout == Some(Duration::ZERO) { return Err(RcpError::Timeout); }
-        if cmd.zone != self.zone { return Err(RcpError::ZoneMismatch); }
+        if timeout == Some(Duration::ZERO) {
+            return Err(RcpError::Timeout);
+        }
+        if cmd.zone != self.zone {
+            return Err(RcpError::ZoneMismatch);
+        }
         self.tx.write(cmd.payload.as_deref().unwrap_or(&[]))?;
         let data = self.rx.read(timeout)?;
         Ok(Response {
-            command_id: cmd.id, zone: self.zone,
-            status: if data.first() == Some(&0) { ResponseStatus::OK } else { ResponseStatus::ERROR },
+            command_id: cmd.id,
+            zone: self.zone,
+            status: if data.first() == Some(&0) {
+                ResponseStatus::OK
+            } else {
+                ResponseStatus::ERROR
+            },
             payload: None,
         })
     }
 
-    fn subscribe(&self) -> Result<Subscription, RcpError> { Err(RcpError::NotFound) }
+    fn subscribe(&self) -> Result<Subscription, RcpError> {
+        Err(RcpError::NotFound)
+    }
 
     // fusa:req REQ-SHM-005
-    fn close(&self) -> Result<(), RcpError> { Ok(()) }
+    fn close(&self) -> Result<(), RcpError> {
+        Ok(())
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -126,7 +151,7 @@ mod tests {
 
     fn make_bridge() -> ShmBridge {
         let tx = InProcChannel::new() as Arc<dyn ShmChannel>;
-        let rx  = InProcChannel::new() as Arc<dyn ShmChannel>;
+        let rx = InProcChannel::new() as Arc<dyn ShmChannel>;
         // Prime rx with an OK response
         rx.write(&[0u8]).unwrap();
         ShmBridge::new(Zone::FRONT_LEFT, tx, rx)
@@ -137,7 +162,15 @@ mod tests {
     // fusa:test REQ-SHM-004
     fn shm_bridge_send_ok() {
         let b = make_bridge();
-        let resp = b.send(&Command { zone: Zone::FRONT_LEFT, ..Default::default() }, None).unwrap();
+        let resp = b
+            .send(
+                &Command {
+                    zone: Zone::FRONT_LEFT,
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap();
         assert_eq!(resp.status, ResponseStatus::OK);
     }
 
@@ -145,7 +178,15 @@ mod tests {
     // fusa:test REQ-SHM-004
     fn zone_mismatch_rejected() {
         let b = make_bridge();
-        let err = b.send(&Command { zone: Zone::REAR_LEFT, ..Default::default() }, None).unwrap_err();
+        let err = b
+            .send(
+                &Command {
+                    zone: Zone::REAR_LEFT,
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap_err();
         assert_eq!(err, RcpError::ZoneMismatch);
     }
 

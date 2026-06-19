@@ -20,11 +20,11 @@ use crate::{Command, Controller, RcpError, Response, ResponseStatus, Status, Sub
 // ── SimController ─────────────────────────────────────────────────────────────
 
 struct Inner {
-    commands:   Vec<Command>,
-    responses:  VecDeque<Result<Response, RcpError>>,
-    closed:     bool,
-    subs:       Vec<std::sync::mpsc::SyncSender<Arc<Status>>>,
-    seq:        u32,
+    commands: Vec<Command>,
+    responses: VecDeque<Result<Response, RcpError>>,
+    closed: bool,
+    subs: Vec<std::sync::mpsc::SyncSender<Arc<Status>>>,
+    seq: u32,
 }
 
 /// A deterministic simulation controller.
@@ -33,7 +33,7 @@ struct Inner {
 /// return `ResponseStatus::OK` with no payload.
 // fusa:req REQ-SIM-001
 pub struct SimController {
-    zone:  Zone,
+    zone: Zone,
     inner: Mutex<Inner>,
 }
 
@@ -42,11 +42,11 @@ impl SimController {
         Arc::new(SimController {
             zone,
             inner: Mutex::new(Inner {
-                commands:  Vec::new(),
+                commands: Vec::new(),
                 responses: VecDeque::new(),
-                closed:    false,
-                subs:      Vec::new(),
-                seq:       0,
+                closed: false,
+                subs: Vec::new(),
+                seq: 0,
             }),
         })
     }
@@ -73,32 +73,52 @@ impl SimController {
     pub fn publish(&self, payload: Option<Vec<u8>>) {
         let mut g = self.inner.lock().unwrap();
         g.seq += 1;
-        let status = Arc::new(Status { zone: self.zone, seq: g.seq, healthy: true, payload });
+        let status = Arc::new(Status {
+            zone: self.zone,
+            seq: g.seq,
+            healthy: true,
+            payload,
+        });
         g.subs.retain(|tx| tx.try_send(Arc::clone(&status)).is_ok());
     }
 }
 
 impl Controller for SimController {
-    fn zone(&self) -> Zone { self.zone }
+    fn zone(&self) -> Zone {
+        self.zone
+    }
 
     // fusa:req REQ-SIM-004
     // fusa:req REQ-SIM-005
     fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
         let mut g = self.inner.lock().unwrap();
-        if g.closed { return Err(RcpError::Closed); }
-        if timeout == Some(Duration::ZERO) { return Err(RcpError::Timeout); }
-        if cmd.zone != self.zone { return Err(RcpError::ZoneMismatch); }
+        if g.closed {
+            return Err(RcpError::Closed);
+        }
+        if timeout == Some(Duration::ZERO) {
+            return Err(RcpError::Timeout);
+        }
+        if cmd.zone != self.zone {
+            return Err(RcpError::ZoneMismatch);
+        }
         g.commands.push(cmd.clone());
         if let Some(queued) = g.responses.pop_front() {
             return queued;
         }
-        Ok(Response { command_id: cmd.id, zone: cmd.zone, status: ResponseStatus::OK, payload: None })
+        Ok(Response {
+            command_id: cmd.id,
+            zone: cmd.zone,
+            status: ResponseStatus::OK,
+            payload: None,
+        })
     }
 
     // fusa:req REQ-SIM-006
     fn subscribe(&self) -> Result<Subscription, RcpError> {
         let mut g = self.inner.lock().unwrap();
-        if g.closed { return Err(RcpError::Closed); }
+        if g.closed {
+            return Err(RcpError::Closed);
+        }
         let (tx, rx) = std::sync::mpsc::sync_channel(16);
         g.subs.push(tx);
         Ok(Subscription { rx })
@@ -125,7 +145,10 @@ mod tests {
     // fusa:test REQ-SIM-001
     fn new_sim_controller_accepts_commands() {
         let sim = SimController::new(Zone::FRONT_LEFT);
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         let resp = sim.send(&cmd, None).unwrap();
         assert_eq!(resp.status, ResponseStatus::OK);
     }
@@ -135,7 +158,15 @@ mod tests {
     fn records_dispatched_commands() {
         let sim = SimController::new(Zone::FRONT_LEFT);
         for i in 1u32..=3 {
-            sim.send(&Command { id: i, zone: Zone::FRONT_LEFT, ..Default::default() }, None).unwrap();
+            sim.send(
+                &Command {
+                    id: i,
+                    zone: Zone::FRONT_LEFT,
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap();
         }
         let cmds = sim.commands();
         assert_eq!(cmds.len(), 3);
@@ -147,10 +178,16 @@ mod tests {
     // fusa:test REQ-SIM-002
     fn queued_responses_delivered_in_order() {
         let sim = SimController::new(Zone::FRONT_LEFT);
-        sim.queue_response(Ok(Response { status: ResponseStatus::ERROR, ..Default::default() }));
+        sim.queue_response(Ok(Response {
+            status: ResponseStatus::ERROR,
+            ..Default::default()
+        }));
         sim.queue_response(Err(RcpError::Timeout));
 
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         let r1 = sim.send(&cmd, None).unwrap();
         assert_eq!(r1.status, ResponseStatus::ERROR);
         let r2 = sim.send(&cmd, None).unwrap_err();
@@ -161,8 +198,15 @@ mod tests {
     // fusa:test REQ-SIM-004
     fn zero_timeout_returns_timeout_error() {
         let sim = SimController::new(Zone::FRONT_LEFT);
-        let err = sim.send(&Command { zone: Zone::FRONT_LEFT, ..Default::default() },
-            Some(Duration::ZERO)).unwrap_err();
+        let err = sim
+            .send(
+                &Command {
+                    zone: Zone::FRONT_LEFT,
+                    ..Default::default()
+                },
+                Some(Duration::ZERO),
+            )
+            .unwrap_err();
         assert_eq!(err, RcpError::Timeout);
     }
 
@@ -170,7 +214,15 @@ mod tests {
     // fusa:test REQ-SIM-005
     fn zone_mismatch_returns_error() {
         let sim = SimController::new(Zone::FRONT_LEFT);
-        let err = sim.send(&Command { zone: Zone::REAR_RIGHT, ..Default::default() }, None).unwrap_err();
+        let err = sim
+            .send(
+                &Command {
+                    zone: Zone::REAR_RIGHT,
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap_err();
         assert_eq!(err, RcpError::ZoneMismatch);
     }
 
@@ -201,7 +253,15 @@ mod tests {
     fn send_after_close_returns_closed() {
         let sim = SimController::new(Zone::FRONT_LEFT);
         sim.close().unwrap();
-        let err = sim.send(&Command { zone: Zone::FRONT_LEFT, ..Default::default() }, None).unwrap_err();
+        let err = sim
+            .send(
+                &Command {
+                    zone: Zone::FRONT_LEFT,
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap_err();
         assert_eq!(err, RcpError::Closed);
     }
 }

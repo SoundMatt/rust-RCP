@@ -20,7 +20,7 @@ use crate::{Command, Controller, RcpError, Response, Subscription, Zone};
 /// Enforces a hard response deadline on every `send` call.
 // fusa:req REQ-DL-001
 pub struct DeadlineController {
-    inner:    Arc<dyn Controller>,
+    inner: Arc<dyn Controller>,
     deadline: Duration,
 }
 
@@ -36,29 +36,39 @@ impl DeadlineController {
     }
 
     /// The configured deadline.
-    pub fn deadline(&self) -> Duration { self.deadline }
+    pub fn deadline(&self) -> Duration {
+        self.deadline
+    }
 }
 
 impl Controller for DeadlineController {
-    fn zone(&self) -> Zone { self.inner.zone() }
+    fn zone(&self) -> Zone {
+        self.inner.zone()
+    }
 
     // fusa:req REQ-DL-003
     // fusa:req REQ-DL-004
     fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
-        if timeout == Some(Duration::ZERO) { return Err(RcpError::Timeout); }
+        if timeout == Some(Duration::ZERO) {
+            return Err(RcpError::Timeout);
+        }
 
         // Enforce the deadline: use the lesser of the caller timeout and our deadline.
         let effective = match timeout {
-            None    => self.deadline,
+            None => self.deadline,
             Some(t) => t.min(self.deadline),
         };
         self.inner.send(cmd, Some(effective))
     }
 
-    fn subscribe(&self) -> Result<Subscription, RcpError> { self.inner.subscribe() }
+    fn subscribe(&self) -> Result<Subscription, RcpError> {
+        self.inner.subscribe()
+    }
 
     // fusa:req REQ-DL-006
-    fn close(&self) -> Result<(), RcpError> { self.inner.close() }
+    fn close(&self) -> Result<(), RcpError> {
+        self.inner.close()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -72,8 +82,10 @@ mod tests {
 
     fn quick_controller() -> Arc<dyn Controller> {
         let h: crate::mock::Handler = Box::new(|cmd| Response {
-            command_id: cmd.id, zone: cmd.zone,
-            status: ResponseStatus::OK, payload: None,
+            command_id: cmd.id,
+            zone: cmd.zone,
+            status: ResponseStatus::OK,
+            payload: None,
         });
         MockController::new(Zone::FRONT_LEFT, Some(h)) as Arc<dyn Controller>
     }
@@ -83,7 +95,10 @@ mod tests {
     // fusa:test REQ-DL-003
     fn passes_commands_to_inner() {
         let dl = DeadlineController::new(quick_controller(), Duration::from_secs(1));
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         dl.send(&cmd, None).unwrap();
     }
 
@@ -99,8 +114,15 @@ mod tests {
     // fusa:test REQ-DL-004
     fn zero_timeout_returns_timeout_error() {
         let dl = DeadlineController::new(quick_controller(), Duration::from_secs(1));
-        let err = dl.send(&Command { zone: Zone::FRONT_LEFT, ..Default::default() },
-            Some(Duration::ZERO)).unwrap_err();
+        let err = dl
+            .send(
+                &Command {
+                    zone: Zone::FRONT_LEFT,
+                    ..Default::default()
+                },
+                Some(Duration::ZERO),
+            )
+            .unwrap_err();
         assert_eq!(err, RcpError::Timeout);
     }
 
@@ -111,7 +133,10 @@ mod tests {
         // We can't easily test "deadline wins" without real sleep; verify the
         // effective duration is the minimum of caller and deadline.
         let dl = DeadlineController::new(quick_controller(), Duration::from_secs(10));
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         // If caller timeout is shorter, that is the effective timeout
         dl.send(&cmd, Some(Duration::from_secs(5))).unwrap();
     }

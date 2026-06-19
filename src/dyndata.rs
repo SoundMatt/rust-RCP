@@ -22,7 +22,9 @@ pub struct DynStore {
 
 impl DynStore {
     pub fn new() -> Self {
-        DynStore { data: RwLock::new(HashMap::new()) }
+        DynStore {
+            data: RwLock::new(HashMap::new()),
+        }
     }
 
     /// Insert or replace a parameter.
@@ -60,7 +62,9 @@ impl DynStore {
 }
 
 impl Default for DynStore {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -17,10 +17,10 @@ use std::sync::RwLock;
 // fusa:req REQ-MDNS-001
 #[derive(Debug, Clone)]
 pub struct ServiceRecord {
-    pub host:     String,
-    pub port:     u16,
-    pub zone:     u8,
-    pub txt:      HashMap<String, String>,
+    pub host: String,
+    pub port: u16,
+    pub zone: u8,
+    pub txt: HashMap<String, String>,
 }
 
 // ── MdnsRegistry ─────────────────────────────────────────────────────────────
@@ -34,7 +34,9 @@ pub struct MdnsRegistry {
 
 impl MdnsRegistry {
     pub fn new() -> Self {
-        MdnsRegistry { records: RwLock::new(HashMap::new()) }
+        MdnsRegistry {
+            records: RwLock::new(HashMap::new()),
+        }
     }
 
     /// Announce a service (called by a controller on startup).
@@ -61,7 +63,9 @@ impl MdnsRegistry {
 }
 
 impl Default for MdnsRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -72,7 +76,12 @@ mod tests {
     use super::*;
 
     fn record(zone: u8) -> ServiceRecord {
-        ServiceRecord { host: "vehicle.local".into(), port: 9000, zone, txt: HashMap::new() }
+        ServiceRecord {
+            host: "vehicle.local".into(),
+            port: 9000,
+            zone,
+            txt: HashMap::new(),
+        }
     }
 
     #[test]
@@ -103,7 +112,12 @@ mod tests {
     #[test]
     // fusa:test REQ-MDNS-001
     fn service_record_fields() {
-        let rec = ServiceRecord { host: "h".into(), port: 80, zone: 3, txt: HashMap::new() };
+        let rec = ServiceRecord {
+            host: "h".into(),
+            port: 80,
+            zone: 3,
+            txt: HashMap::new(),
+        };
         assert_eq!(rec.zone, 3);
         assert_eq!(rec.port, 80);
     }

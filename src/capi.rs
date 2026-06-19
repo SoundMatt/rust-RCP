@@ -19,8 +19,8 @@ use crate::{Command, CommandType, Priority, Zone};
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct CCommand {
-    pub id:       u32,
-    pub zone:     u8,
+    pub id: u32,
+    pub zone: u8,
     pub cmd_type: u16,
     pub priority: u8,
 }
@@ -31,8 +31,8 @@ pub struct CCommand {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CResponse {
     pub command_id: u32,
-    pub zone:       u8,
-    pub status:     u8,
+    pub zone: u8,
+    pub status: u8,
 }
 
 // ── Conversion helpers ────────────────────────────────────────────────────────
@@ -40,15 +40,25 @@ pub struct CResponse {
 impl From<&Command> for CCommand {
     // fusa:req REQ-CAPI-003
     fn from(cmd: &Command) -> Self {
-        CCommand { id: cmd.id, zone: cmd.zone.0, cmd_type: cmd.cmd_type.0, priority: cmd.priority.0 }
+        CCommand {
+            id: cmd.id,
+            zone: cmd.zone.0,
+            cmd_type: cmd.cmd_type.0,
+            priority: cmd.priority.0,
+        }
     }
 }
 
 impl From<&CCommand> for Command {
     // fusa:req REQ-CAPI-003
     fn from(c: &CCommand) -> Self {
-        Command { id: c.id, zone: Zone(c.zone), cmd_type: CommandType(c.cmd_type),
-            priority: Priority(c.priority), payload: None }
+        Command {
+            id: c.id,
+            zone: Zone(c.zone),
+            cmd_type: CommandType(c.cmd_type),
+            priority: Priority(c.priority),
+            payload: None,
+        }
     }
 }
 
@@ -59,30 +69,30 @@ impl From<&CCommand> for Command {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CError {
-    Ok             = 0,
-    Closed         = 1,
-    NotConnected   = 2,
-    Timeout        = 3,
-    PayloadTooLarge= 4,
-    NotFound       = 5,
-    AlreadyExists  = 6,
-    Busy           = 7,
-    ZoneMismatch   = 8,
-    Other          = 99,
+    Ok = 0,
+    Closed = 1,
+    NotConnected = 2,
+    Timeout = 3,
+    PayloadTooLarge = 4,
+    NotFound = 5,
+    AlreadyExists = 6,
+    Busy = 7,
+    ZoneMismatch = 8,
+    Other = 99,
 }
 
 impl From<&crate::RcpError> for CError {
     fn from(e: &crate::RcpError) -> Self {
         match e {
-            crate::RcpError::Closed          => CError::Closed,
-            crate::RcpError::NotConnected    => CError::NotConnected,
-            crate::RcpError::Timeout         => CError::Timeout,
+            crate::RcpError::Closed => CError::Closed,
+            crate::RcpError::NotConnected => CError::NotConnected,
+            crate::RcpError::Timeout => CError::Timeout,
             crate::RcpError::PayloadTooLarge => CError::PayloadTooLarge,
-            crate::RcpError::NotFound        => CError::NotFound,
-            crate::RcpError::AlreadyExists   => CError::AlreadyExists,
-            crate::RcpError::Busy            => CError::Busy,
-            crate::RcpError::ZoneMismatch    => CError::ZoneMismatch,
-            _                                => CError::Other,
+            crate::RcpError::NotFound => CError::NotFound,
+            crate::RcpError::AlreadyExists => CError::AlreadyExists,
+            crate::RcpError::Busy => CError::Busy,
+            crate::RcpError::ZoneMismatch => CError::ZoneMismatch,
+            _ => CError::Other,
         }
     }
 }
@@ -106,8 +116,11 @@ mod tests {
     // fusa:test REQ-CAPI-003
     fn command_round_trip() {
         let cmd = Command {
-            id: 42, zone: Zone::FRONT_LEFT,
-            cmd_type: CommandType::SET, priority: Priority::HIGH, payload: None,
+            id: 42,
+            zone: Zone::FRONT_LEFT,
+            cmd_type: CommandType::SET,
+            priority: Priority::HIGH,
+            payload: None,
         };
         let c: CCommand = (&cmd).into();
         let back: Command = (&c).into();
@@ -120,16 +133,23 @@ mod tests {
     #[test]
     // fusa:test REQ-CAPI-004
     fn error_code_mapping() {
-        assert_eq!(CError::from(&crate::RcpError::Closed),    CError::Closed);
-        assert_eq!(CError::from(&crate::RcpError::Busy),      CError::Busy);
-        assert_eq!(CError::from(&crate::RcpError::Timeout),   CError::Timeout);
-        assert_eq!(CError::from(&crate::RcpError::ZoneMismatch), CError::ZoneMismatch);
+        assert_eq!(CError::from(&crate::RcpError::Closed), CError::Closed);
+        assert_eq!(CError::from(&crate::RcpError::Busy), CError::Busy);
+        assert_eq!(CError::from(&crate::RcpError::Timeout), CError::Timeout);
+        assert_eq!(
+            CError::from(&crate::RcpError::ZoneMismatch),
+            CError::ZoneMismatch
+        );
     }
 
     #[test]
     // fusa:test REQ-CAPI-002
     fn c_response_fields() {
-        let r = CResponse { command_id: 7, zone: 1, status: 0 };
+        let r = CResponse {
+            command_id: 7,
+            zone: 1,
+            status: 0,
+        };
         assert_eq!(r.zone, Zone::FRONT_LEFT.0);
     }
 }

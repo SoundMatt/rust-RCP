@@ -24,13 +24,18 @@ pub struct FederationRouter {
 
 impl FederationRouter {
     pub fn new() -> Self {
-        FederationRouter { peers: RwLock::new(HashMap::new()) }
+        FederationRouter {
+            peers: RwLock::new(HashMap::new()),
+        }
     }
 
     /// Register a remote vehicle registry under `vehicle_id`.
     // fusa:req REQ-FED-002
     pub fn add_peer(&self, vehicle_id: impl Into<String>, registry: Arc<dyn Registry>) {
-        self.peers.write().unwrap().insert(vehicle_id.into(), registry);
+        self.peers
+            .write()
+            .unwrap()
+            .insert(vehicle_id.into(), registry);
     }
 
     /// Remove a peer.
@@ -47,9 +52,11 @@ impl FederationRouter {
 
     /// Look up a zone controller in a specific peer vehicle's registry.
     // fusa:req REQ-FED-005
-    pub fn lookup_peer(&self, vehicle_id: &str, zone: Zone)
-        -> Result<Arc<dyn crate::Controller>, RcpError>
-    {
+    pub fn lookup_peer(
+        &self,
+        vehicle_id: &str,
+        zone: Zone,
+    ) -> Result<Arc<dyn crate::Controller>, RcpError> {
         let peers = self.peers.read().unwrap();
         let reg = peers.get(vehicle_id).ok_or(RcpError::NotFound)?;
         reg.lookup(zone)
@@ -57,7 +64,9 @@ impl FederationRouter {
 }
 
 impl Default for FederationRouter {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

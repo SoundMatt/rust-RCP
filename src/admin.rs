@@ -10,26 +10,26 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-use crate::{Registry, RcpError};
+use crate::{RcpError, Registry};
 
 // ── AdminServer ───────────────────────────────────────────────────────────────
 
 /// Provides administrative diagnostics for an RCP registry.
 // fusa:req REQ-ADMIN-001
 pub struct AdminServer {
-    registry:  Arc<dyn Registry>,
-    started:   SystemTime,
+    registry: Arc<dyn Registry>,
+    started: SystemTime,
     req_count: AtomicU64,
-    shutdown:  AtomicBool,
+    shutdown: AtomicBool,
 }
 
 impl AdminServer {
     pub fn new(registry: Arc<dyn Registry>) -> Self {
         AdminServer {
             registry,
-            started:   SystemTime::now(),
+            started: SystemTime::now(),
             req_count: AtomicU64::new(0),
-            shutdown:  AtomicBool::new(false),
+            shutdown: AtomicBool::new(false),
         }
     }
 
@@ -54,9 +54,14 @@ impl AdminServer {
     // fusa:req REQ-ADMIN-004
     pub fn is_healthy(&self) -> bool {
         let controllers = self.registry.controllers();
-        if controllers.is_empty() { return false; }
+        if controllers.is_empty() {
+            return false;
+        }
         controllers.iter().all(|c| {
-            let cmd = crate::Command { zone: c.zone(), ..Default::default() };
+            let cmd = crate::Command {
+                zone: c.zone(),
+                ..Default::default()
+            };
             c.send(&cmd, Some(Duration::from_millis(100))).is_ok()
         })
     }
@@ -103,7 +108,9 @@ mod tests {
     // fusa:test REQ-ADMIN-002
     fn request_count_increments() {
         let a = admin();
-        for _ in 0..5 { a.record_request(); }
+        for _ in 0..5 {
+            a.record_request();
+        }
         assert_eq!(a.request_count(), 5);
     }
 

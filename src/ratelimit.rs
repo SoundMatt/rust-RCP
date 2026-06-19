@@ -34,25 +34,29 @@ pub struct Config {
 /// Returns the default rate-limiter config: 100 cmd/s, 20-command burst, Critical exempt.
 // fusa:req REQ-RL-002
 pub fn default_config() -> Config {
-    Config { rate: 100.0, burst: 20.0, exempt_critical: true }
+    Config {
+        rate: 100.0,
+        burst: 20.0,
+        exempt_critical: true,
+    }
 }
 
 // ── Bucket ────────────────────────────────────────────────────────────────────
 
 struct Bucket {
-    tokens:   f64,
-    last:     Instant,
-    rate:     f64,
-    burst:    f64,
+    tokens: f64,
+    last: Instant,
+    rate: f64,
+    burst: f64,
 }
 
 impl Bucket {
     fn new(cfg: &Config) -> Self {
         Bucket {
             tokens: cfg.burst,
-            last:   Instant::now(),
-            rate:   cfg.rate,
-            burst:  cfg.burst,
+            last: Instant::now(),
+            rate: cfg.rate,
+            burst: cfg.burst,
         }
     }
 
@@ -78,8 +82,8 @@ impl Bucket {
 /// Rate-limiting wrapper around an inner [`Controller`].
 // fusa:req REQ-RL-003
 pub struct RateLimitController {
-    inner:           Arc<dyn Controller>,
-    bucket:          Mutex<Bucket>,
+    inner: Arc<dyn Controller>,
+    bucket: Mutex<Bucket>,
     exempt_critical: bool,
 }
 
@@ -102,7 +106,9 @@ impl RateLimitController {
 }
 
 impl Controller for RateLimitController {
-    fn zone(&self) -> Zone { self.inner.zone() }
+    fn zone(&self) -> Zone {
+        self.inner.zone()
+    }
 
     // fusa:req REQ-RL-005
     // fusa:req REQ-RL-006
@@ -120,9 +126,13 @@ impl Controller for RateLimitController {
         self.inner.send(cmd, timeout)
     }
 
-    fn subscribe(&self) -> Result<Subscription, RcpError> { self.inner.subscribe() }
+    fn subscribe(&self) -> Result<Subscription, RcpError> {
+        self.inner.subscribe()
+    }
 
-    fn close(&self) -> Result<(), RcpError> { self.inner.close() }
+    fn close(&self) -> Result<(), RcpError> {
+        self.inner.close()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -145,7 +155,11 @@ mod tests {
     }
 
     fn rl(rate: f64, burst: f64, exempt_critical: bool) -> RateLimitController {
-        let cfg = Config { rate, burst, exempt_critical };
+        let cfg = Config {
+            rate,
+            burst,
+            exempt_critical,
+        };
         RateLimitController::new(ok_controller(), cfg)
     }
 
@@ -167,7 +181,10 @@ mod tests {
     // fusa:test REQ-RL-005
     fn burst_capacity_is_honoured() {
         let rl = rl(1.0, 5.0, false); // 1 cmd/s, burst=5
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
 
         for _ in 0..5 {
             rl.send(&cmd, None).unwrap();
@@ -183,7 +200,10 @@ mod tests {
     // fusa:test REQ-RL-006
     fn bucket_exhaustion_returns_busy() {
         let rl = rl(0.0, 0.0, false); // zero tokens — always Busy
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         let err = rl.send(&cmd, None).unwrap_err();
         assert_eq!(err, RcpError::Busy);
     }
@@ -259,9 +279,12 @@ mod tests {
     // fusa:test REQ-RL-004
     fn tokens_replenish_over_time() {
         let rl = rl(1000.0, 1.0, false); // very fast replenishment, burst=1
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         rl.send(&cmd, None).unwrap(); // consume the one token
-        // Wait for replenishment
+                                      // Wait for replenishment
         std::thread::sleep(Duration::from_millis(5));
         rl.send(&cmd, None).unwrap(); // should succeed after replenishment
     }
@@ -272,7 +295,10 @@ mod tests {
     // fusa:test REQ-RL-008
     fn busy_is_relay_timeout_sentinel() {
         let err = RcpError::Busy;
-        assert!(err.is_relay_timeout(), "Busy must satisfy is_relay_timeout()");
+        assert!(
+            err.is_relay_timeout(),
+            "Busy must satisfy is_relay_timeout()"
+        );
     }
 
     // ── Close forwarded ───────────────────────────────────────────────────────

@@ -26,7 +26,7 @@ pub trait DdsParticipant: Send + Sync {
 /// RCP-over-DDS bridge controller.
 // fusa:req REQ-DDS-002
 pub struct DdsBridge {
-    zone:        Zone,
+    zone: Zone,
     participant: Arc<dyn DdsParticipant>,
 }
 
@@ -35,30 +35,50 @@ impl DdsBridge {
         DdsBridge { zone, participant }
     }
 
-    fn cmd_topic(&self) -> String { format!("rcp.zone{}.cmd", self.zone.0) }
-    fn resp_topic(&self) -> String { format!("rcp.zone{}.resp", self.zone.0) }
+    fn cmd_topic(&self) -> String {
+        format!("rcp.zone{}.cmd", self.zone.0)
+    }
+    fn resp_topic(&self) -> String {
+        format!("rcp.zone{}.resp", self.zone.0)
+    }
 }
 
 impl Controller for DdsBridge {
-    fn zone(&self) -> Zone { self.zone }
+    fn zone(&self) -> Zone {
+        self.zone
+    }
 
     // fusa:req REQ-DDS-003
     fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
-        if timeout == Some(Duration::ZERO) { return Err(RcpError::Timeout); }
-        if cmd.zone != self.zone { return Err(RcpError::ZoneMismatch); }
-        self.participant.write(&self.cmd_topic(), cmd.payload.as_deref().unwrap_or(&[]))?;
+        if timeout == Some(Duration::ZERO) {
+            return Err(RcpError::Timeout);
+        }
+        if cmd.zone != self.zone {
+            return Err(RcpError::ZoneMismatch);
+        }
+        self.participant
+            .write(&self.cmd_topic(), cmd.payload.as_deref().unwrap_or(&[]))?;
         let data = self.participant.take(&self.resp_topic(), timeout)?;
         Ok(Response {
-            command_id: cmd.id, zone: self.zone,
-            status: if data.first() == Some(&0) { ResponseStatus::OK } else { ResponseStatus::ERROR },
+            command_id: cmd.id,
+            zone: self.zone,
+            status: if data.first() == Some(&0) {
+                ResponseStatus::OK
+            } else {
+                ResponseStatus::ERROR
+            },
             payload: None,
         })
     }
 
-    fn subscribe(&self) -> Result<Subscription, RcpError> { Err(RcpError::NotFound) }
+    fn subscribe(&self) -> Result<Subscription, RcpError> {
+        Err(RcpError::NotFound)
+    }
 
     // fusa:req REQ-DDS-004
-    fn close(&self) -> Result<(), RcpError> { Ok(()) }
+    fn close(&self) -> Result<(), RcpError> {
+        Ok(())
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -71,8 +91,12 @@ mod tests {
 
     struct MockDds;
     impl DdsParticipant for MockDds {
-        fn write(&self, _: &str, _: &[u8]) -> Result<(), RcpError> { Ok(()) }
-        fn take(&self, _: &str, _: Option<Duration>) -> Result<Vec<u8>, RcpError> { Ok(vec![0]) }
+        fn write(&self, _: &str, _: &[u8]) -> Result<(), RcpError> {
+            Ok(())
+        }
+        fn take(&self, _: &str, _: Option<Duration>) -> Result<Vec<u8>, RcpError> {
+            Ok(vec![0])
+        }
     }
 
     #[test]
@@ -81,7 +105,15 @@ mod tests {
     // fusa:test REQ-DDS-003
     fn dds_send_ok() {
         let b = DdsBridge::new(Zone::FRONT_LEFT, Arc::new(MockDds));
-        let resp = b.send(&Command { zone: Zone::FRONT_LEFT, ..Default::default() }, None).unwrap();
+        let resp = b
+            .send(
+                &Command {
+                    zone: Zone::FRONT_LEFT,
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap();
         assert_eq!(resp.status, ResponseStatus::OK);
     }
 
@@ -89,7 +121,15 @@ mod tests {
     // fusa:test REQ-DDS-003
     fn zone_mismatch() {
         let b = DdsBridge::new(Zone::FRONT_LEFT, Arc::new(MockDds));
-        let err = b.send(&Command { zone: Zone::REAR_RIGHT, ..Default::default() }, None).unwrap_err();
+        let err = b
+            .send(
+                &Command {
+                    zone: Zone::REAR_RIGHT,
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap_err();
         assert_eq!(err, RcpError::ZoneMismatch);
     }
 

@@ -30,7 +30,7 @@ pub trait Adapter<M>: Send + Sync {
 /// Controller wrapper that adapts an external message type `M` to RCP.
 // fusa:req REQ-ADAPT-002
 pub struct AdaptController<M> {
-    inner:   Arc<dyn Controller>,
+    inner: Arc<dyn Controller>,
     adapter: Arc<dyn Adapter<M>>,
 }
 
@@ -55,9 +55,16 @@ impl<M: Send + Sync + 'static> AdaptController<M> {
 pub struct PassthroughAdapter;
 
 impl Adapter<Command> for PassthroughAdapter {
-    fn to_command(&self, msg: Command) -> Result<Command, RcpError> { Ok(msg) }
+    fn to_command(&self, msg: Command) -> Result<Command, RcpError> {
+        Ok(msg)
+    }
     fn to_message(&self, resp: Response) -> Result<Command, RcpError> {
-        Ok(Command { id: resp.command_id, zone: resp.zone, payload: resp.payload, ..Default::default() })
+        Ok(Command {
+            id: resp.command_id,
+            zone: resp.zone,
+            payload: resp.payload,
+            ..Default::default()
+        })
     }
 }
 
@@ -72,8 +79,10 @@ mod tests {
 
     fn ok_ctrl() -> Arc<dyn Controller> {
         let h: crate::mock::Handler = Box::new(|cmd| Response {
-            command_id: cmd.id, zone: cmd.zone,
-            status: ResponseStatus::OK, payload: cmd.payload.clone(),
+            command_id: cmd.id,
+            zone: cmd.zone,
+            status: ResponseStatus::OK,
+            payload: cmd.payload.clone(),
         });
         MockController::new(Zone::FRONT_LEFT, Some(h)) as Arc<dyn Controller>
     }
@@ -83,7 +92,12 @@ mod tests {
     // fusa:test REQ-ADAPT-004
     fn passthrough_adapter_identity() {
         let ctrl = AdaptController::new(ok_ctrl(), Arc::new(PassthroughAdapter));
-        let cmd = Command { id: 5, zone: Zone::FRONT_LEFT, payload: Some(b"hi".to_vec()), ..Default::default() };
+        let cmd = Command {
+            id: 5,
+            zone: Zone::FRONT_LEFT,
+            payload: Some(b"hi".to_vec()),
+            ..Default::default()
+        };
         let out = ctrl.send_msg(cmd.clone(), None).unwrap();
         assert_eq!(out.id, 5);
     }
@@ -101,8 +115,12 @@ mod tests {
     fn adapter_error_propagated() {
         struct FailAdapter;
         impl Adapter<Command> for FailAdapter {
-            fn to_command(&self, _: Command) -> Result<Command, RcpError> { Err(RcpError::Other("bad msg".into())) }
-            fn to_message(&self, _: Response) -> Result<Command, RcpError> { unreachable!() }
+            fn to_command(&self, _: Command) -> Result<Command, RcpError> {
+                Err(RcpError::Other("bad msg".into()))
+            }
+            fn to_message(&self, _: Response) -> Result<Command, RcpError> {
+                unreachable!()
+            }
         }
         let ctrl = AdaptController::new(ok_ctrl(), Arc::new(FailAdapter));
         let err = ctrl.send_msg(Command::default(), None).unwrap_err();
@@ -113,7 +131,11 @@ mod tests {
     // fusa:test REQ-ADAPT-005
     fn passthrough_preserves_payload() {
         let ctrl = AdaptController::new(ok_ctrl(), Arc::new(PassthroughAdapter));
-        let cmd = Command { zone: Zone::FRONT_LEFT, payload: Some(b"data".to_vec()), ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            payload: Some(b"data".to_vec()),
+            ..Default::default()
+        };
         let out = ctrl.send_msg(cmd, None).unwrap();
         assert_eq!(out.payload, Some(b"data".to_vec()));
     }

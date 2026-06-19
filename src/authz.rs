@@ -35,14 +35,24 @@ impl Policy {
     // fusa:req REQ-AUTHZ-002
     pub fn allow_all() -> Self {
         let mut set = HashSet::new();
-        for v in 0..=6u16 { set.insert(v); }
-        Policy { allowed_cmd_types: set, min_priority: 0, max_priority: 2 }
+        for v in 0..=6u16 {
+            set.insert(v);
+        }
+        Policy {
+            allowed_cmd_types: set,
+            min_priority: 0,
+            max_priority: 2,
+        }
     }
 
     /// Deny all commands (closed policy).
     // fusa:req REQ-AUTHZ-003
     pub fn deny_all() -> Self {
-        Policy { allowed_cmd_types: HashSet::new(), min_priority: 0, max_priority: 2 }
+        Policy {
+            allowed_cmd_types: HashSet::new(),
+            min_priority: 0,
+            max_priority: 2,
+        }
     }
 
     pub fn is_allowed(&self, cmd: &Command) -> bool {
@@ -57,13 +67,16 @@ impl Policy {
 /// Policy-enforcing controller wrapper.
 // fusa:req REQ-AUTHZ-004
 pub struct AuthzController {
-    inner:  Arc<dyn Controller>,
+    inner: Arc<dyn Controller>,
     policy: RwLock<Policy>,
 }
 
 impl AuthzController {
     pub fn new(inner: Arc<dyn Controller>, policy: Policy) -> Self {
-        AuthzController { inner, policy: RwLock::new(policy) }
+        AuthzController {
+            inner,
+            policy: RwLock::new(policy),
+        }
     }
 
     /// Replace the active policy atomically.
@@ -79,7 +92,9 @@ impl AuthzController {
 }
 
 impl Controller for AuthzController {
-    fn zone(&self) -> Zone { self.inner.zone() }
+    fn zone(&self) -> Zone {
+        self.inner.zone()
+    }
 
     // fusa:req REQ-AUTHZ-005
     fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
@@ -89,10 +104,14 @@ impl Controller for AuthzController {
         self.inner.send(cmd, timeout)
     }
 
-    fn subscribe(&self) -> Result<Subscription, RcpError> { self.inner.subscribe() }
+    fn subscribe(&self) -> Result<Subscription, RcpError> {
+        self.inner.subscribe()
+    }
 
     // fusa:req REQ-AUTHZ-007
-    fn close(&self) -> Result<(), RcpError> { self.inner.close() }
+    fn close(&self) -> Result<(), RcpError> {
+        self.inner.close()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -114,7 +133,11 @@ mod tests {
     // fusa:test REQ-AUTHZ-005
     fn allow_all_permits_any_command() {
         let a = AuthzController::new(inner(), Policy::allow_all());
-        let cmd = Command { zone: Zone::FRONT_LEFT, cmd_type: CommandType::SET, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            cmd_type: CommandType::SET,
+            ..Default::default()
+        };
         a.send(&cmd, None).unwrap();
     }
 
@@ -123,7 +146,11 @@ mod tests {
     // fusa:test REQ-AUTHZ-005
     fn deny_all_blocks_every_command() {
         let a = AuthzController::new(inner(), Policy::deny_all());
-        let cmd = Command { zone: Zone::FRONT_LEFT, cmd_type: CommandType::GET, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            cmd_type: CommandType::GET,
+            ..Default::default()
+        };
         let err = a.send(&cmd, None).unwrap_err();
         assert_eq!(err, RcpError::NotFound);
         assert!(err.is_relay_not_connected());
@@ -135,11 +162,23 @@ mod tests {
     fn partial_allowlist_enforced() {
         let mut set = std::collections::HashSet::new();
         set.insert(CommandType::GET.0);
-        let policy = Policy { allowed_cmd_types: set, min_priority: 0, max_priority: 2 };
+        let policy = Policy {
+            allowed_cmd_types: set,
+            min_priority: 0,
+            max_priority: 2,
+        };
         let a = AuthzController::new(inner(), policy);
 
-        let get = Command { zone: Zone::FRONT_LEFT, cmd_type: CommandType::GET, ..Default::default() };
-        let set = Command { zone: Zone::FRONT_LEFT, cmd_type: CommandType::SET, ..Default::default() };
+        let get = Command {
+            zone: Zone::FRONT_LEFT,
+            cmd_type: CommandType::GET,
+            ..Default::default()
+        };
+        let set = Command {
+            zone: Zone::FRONT_LEFT,
+            cmd_type: CommandType::SET,
+            ..Default::default()
+        };
         a.send(&get, None).unwrap();
         let err = a.send(&set, None).unwrap_err();
         assert_eq!(err, RcpError::NotFound);
@@ -149,7 +188,10 @@ mod tests {
     // fusa:test REQ-AUTHZ-006
     fn set_policy_takes_effect_immediately() {
         let a = AuthzController::new(inner(), Policy::deny_all());
-        let cmd = Command { zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         a.send(&cmd, None).unwrap_err();
         a.set_policy(Policy::allow_all());
         a.send(&cmd, None).unwrap();

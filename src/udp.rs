@@ -30,25 +30,35 @@ pub trait UdpSocket: Send + Sync {
 /// RCP-over-UDP bridge controller.
 // fusa:req REQ-UDP-002
 pub struct UdpBridge {
-    zone:   Zone,
+    zone: Zone,
     socket: Arc<dyn UdpSocket>,
     remote: SocketAddr,
 }
 
 impl UdpBridge {
     pub fn new(zone: Zone, socket: Arc<dyn UdpSocket>, remote: SocketAddr) -> Self {
-        UdpBridge { zone, socket, remote }
+        UdpBridge {
+            zone,
+            socket,
+            remote,
+        }
     }
 }
 
 impl Controller for UdpBridge {
-    fn zone(&self) -> Zone { self.zone }
+    fn zone(&self) -> Zone {
+        self.zone
+    }
 
     // fusa:req REQ-UDP-003
     // fusa:req REQ-UDP-004
     fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
-        if timeout == Some(Duration::ZERO) { return Err(RcpError::Timeout); }
-        if cmd.zone != self.zone { return Err(RcpError::ZoneMismatch); }
+        if timeout == Some(Duration::ZERO) {
+            return Err(RcpError::Timeout);
+        }
+        if cmd.zone != self.zone {
+            return Err(RcpError::ZoneMismatch);
+        }
 
         let frame = wire::encode_command(cmd)?;
         self.socket.send_to(&frame, self.remote)?;
@@ -56,10 +66,14 @@ impl Controller for UdpBridge {
         wire::decode_response(&resp_frame)
     }
 
-    fn subscribe(&self) -> Result<Subscription, RcpError> { Err(RcpError::NotFound) }
+    fn subscribe(&self) -> Result<Subscription, RcpError> {
+        Err(RcpError::NotFound)
+    }
 
     // fusa:req REQ-UDP-005
-    fn close(&self) -> Result<(), RcpError> { Ok(()) }
+    fn close(&self) -> Result<(), RcpError> {
+        Ok(())
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -72,10 +86,16 @@ mod tests {
 
     struct MockUdp;
     impl UdpSocket for MockUdp {
-        fn send_to(&self, _: &[u8], _: SocketAddr) -> Result<usize, RcpError> { Ok(0) }
+        fn send_to(&self, _: &[u8], _: SocketAddr) -> Result<usize, RcpError> {
+            Ok(0)
+        }
         fn recv_from(&self, _: Option<Duration>) -> Result<(Vec<u8>, SocketAddr), RcpError> {
-            let resp = Response { command_id: 1, zone: Zone::FRONT_LEFT,
-                status: ResponseStatus::OK, payload: None };
+            let resp = Response {
+                command_id: 1,
+                zone: Zone::FRONT_LEFT,
+                status: ResponseStatus::OK,
+                payload: None,
+            };
             let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
             Ok((wire::encode_response(&resp)?, addr))
         }
@@ -88,7 +108,11 @@ mod tests {
     fn udp_bridge_send_ok() {
         let addr: SocketAddr = "127.0.0.1:9000".parse().unwrap();
         let b = UdpBridge::new(Zone::FRONT_LEFT, Arc::new(MockUdp), addr);
-        let cmd = Command { id: 1, zone: Zone::FRONT_LEFT, ..Default::default() };
+        let cmd = Command {
+            id: 1,
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
         let resp = b.send(&cmd, None).unwrap();
         assert_eq!(resp.status, ResponseStatus::OK);
     }
@@ -98,7 +122,15 @@ mod tests {
     fn zone_mismatch_rejected() {
         let addr: SocketAddr = "127.0.0.1:9000".parse().unwrap();
         let b = UdpBridge::new(Zone::FRONT_LEFT, Arc::new(MockUdp), addr);
-        let err = b.send(&Command { zone: Zone::REAR_LEFT, ..Default::default() }, None).unwrap_err();
+        let err = b
+            .send(
+                &Command {
+                    zone: Zone::REAR_LEFT,
+                    ..Default::default()
+                },
+                None,
+            )
+            .unwrap_err();
         assert_eq!(err, RcpError::ZoneMismatch);
     }
 
