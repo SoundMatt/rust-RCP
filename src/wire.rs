@@ -273,6 +273,7 @@ mod tests {
     }
 
     #[test]
+    // fusa:test REQ-WIRE-004
     fn validate_header_accepts_valid() {
         let mut buf = [0u8; 16];
         buf[0] = MAGIC_BYTE_0;

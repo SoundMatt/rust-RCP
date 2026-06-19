@@ -72,22 +72,13 @@ jobs:
 
   # ── FuSa gap check ────────────────────────────────────────────────────────
   fusa:
-    name: FuSa gap check (rsfusa)
+    name: FuSa gap check
     needs: lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: install rsfusa
-        run: cargo install rsfusa --locked || echo "rsfusa not yet published, skipping"
       - name: run gap check
-        run: |
-          if command -v rsfusa &> /dev/null; then
-            rsfusa check --fail-on-gap
-          else
-            echo "rsfusa not available — manual check required"
-          fi
+        run: bash scripts/fusa-gap-check.sh
 
   # ── Fuzz (short) ─────────────────────────────────────────────────────────
   fuzz:
@@ -103,7 +94,7 @@ jobs:
       - name: fuzz wire decoder (30s)
         run: |
           if [ -d fuzz ]; then
-            cargo +nightly fuzz run fuzz_wire_decode -- -max_total_time=30 || true
+            cargo +nightly fuzz run fuzz_wire_decode -- -max_total_time=30
           else
             echo "fuzz targets not yet configured, skipping"
           fi
@@ -119,6 +110,28 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: bench (1 iteration)
         run: cargo bench -- --test 2>/dev/null || cargo test --release
+
+  # ── RELAY spec conformance ────────────────────────────────────────────────
+  relay-conformance:
+    name: RELAY spec v1.6 conformance
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: run RELAY conformance tests
+        run: cargo test --lib -- wire:: e2e:: --nocapture
+
+  # ── IEC 62443 cyber gap check ─────────────────────────────────────────────
+  cyber:
+    name: IEC 62443 cyber gap check
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: run cyber gap check
+        run: bash scripts/cyber-gap-check.sh
 
   # ── Security audit ────────────────────────────────────────────────────────
   audit:

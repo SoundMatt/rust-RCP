@@ -123,6 +123,7 @@ mod tests {
     }
 
     #[test]
+    // fusa:test REQ-TLS-002
     // fusa:test REQ-TLS-003
     // fusa:test REQ-TLS-004
     fn tls_send_ok_with_verified_peer() {

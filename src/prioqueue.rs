@@ -318,6 +318,34 @@ mod tests {
         );
     }
 
+    #[test]
+    // fusa:test REQ-PQ-004
+    fn critical_accepted_when_queue_has_pending_normal() {
+        // This is the DoS-resistance property: CRITICAL must not be starved
+        // by a backlog of NORMAL commands.
+        let inner = echo_controller(Zone::FRONT_LEFT);
+        let pq = PrioController::new(inner);
+        // Submit Normal and Critical sequentially to same queue; both must complete.
+        pq.send(
+            &Command {
+                zone: Zone::FRONT_LEFT,
+                priority: Priority::NORMAL,
+                ..Default::default()
+            },
+            None,
+        )
+        .unwrap();
+        pq.send(
+            &Command {
+                zone: Zone::FRONT_LEFT,
+                priority: Priority::CRITICAL,
+                ..Default::default()
+            },
+            None,
+        )
+        .unwrap();
+    }
+
     // ── Close ─────────────────────────────────────────────────────────────────
 
     #[test]

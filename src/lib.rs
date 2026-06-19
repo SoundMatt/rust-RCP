@@ -1009,6 +1009,7 @@ mod tests {
     // ── Default Zone is UNKNOWN ───────────────────────────────────────────────
 
     #[test]
+    // fusa:test REQ-CMDSTRUCT-001
     fn zone_default_is_unknown() {
         assert_eq!(Zone::default(), Zone::UNKNOWN);
     }

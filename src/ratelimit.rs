@@ -208,6 +208,21 @@ mod tests {
         assert_eq!(err, RcpError::Busy);
     }
 
+    #[test]
+    // fusa:test REQ-RL-006
+    fn burst_exhaustion_across_multiple_sends_returns_busy() {
+        let rl = rl(0.0, 3.0, false); // 3 burst, no refill
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
+        for _ in 0..3 {
+            rl.send(&cmd, None).unwrap();
+        }
+        // 4th must be rejected — bucket is empty
+        assert_eq!(rl.send(&cmd, None).unwrap_err(), RcpError::Busy);
+    }
+
     // ── Critical exempt ───────────────────────────────────────────────────────
 
     #[test]
