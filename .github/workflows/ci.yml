@@ -121,7 +121,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: run RELAY conformance tests
-        run: cargo test --lib -- wire:: e2e:: --nocapture
+        run: |
+          cargo test --lib -- 'wire::' 2>&1
+          cargo test --lib -- 'e2e::' 2>&1
 
   # ── IEC 62443 cyber gap check ─────────────────────────────────────────────
   cyber:
