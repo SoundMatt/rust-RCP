@@ -12,5 +12,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Check DCO sign-off
-        uses: dcoapp/app@main
+      - name: Check Signed-off-by or Co-Authored-By
+        run: |
+          missing=""
+          while IFS= read -r sha; do
+            body=$(git show -s --format='%B' "$sha")
+            if ! echo "$body" | grep -qE '^(Signed-off-by:|Co-Authored-By:)'; then
+              missing="$missing\n  $sha"
+            fi
+          done < <(git log --no-merges --format='%H' "origin/${{ github.base_ref }}..HEAD")
+          if [ -n "$missing" ]; then
+            echo "The following commits lack Signed-off-by or Co-Authored-By:"
+            printf "$missing\n"
+            exit 1
+          fi
+          echo "DCO OK"

@@ -1,0 +1,118 @@
+{
+  "component": "rust-RCP",
+  "spec_version": "1.10",
+  "standard": "ISO 26262 ASIL-B",
+  "created": "2026-06-19",
+  "failure_modes": [
+    {
+      "id": "FM-001",
+      "function": "Command dispatch",
+      "failure_mode": "Command sent to wrong zone controller",
+      "effect": "Vehicle subsystem receives unintended actuation",
+      "severity": "S3",
+      "cause": "Zone field corrupted in transit or mis-set by caller",
+      "detection": "Zone mismatch check in every controller send()",
+      "mitigation": "REQ-CTRL-003 zone validation + REQ-E2E-003 CRC integrity",
+      "residual_risk": "low"
+    },
+    {
+      "id": "FM-002",
+      "function": "E2E frame protection",
+      "failure_mode": "Corrupted payload accepted as valid",
+      "effect": "Incorrect actuation data applied to ECU",
+      "severity": "S3",
+      "cause": "Single or multi-bit error in payload bytes",
+      "detection": "CRC-16/CCITT-FALSE over seqNum+payload (REQ-E2E-003)",
+      "mitigation": "REQ-E2E-002 CRC covers both seq and payload bytes",
+      "residual_risk": "low"
+    },
+    {
+      "id": "FM-003",
+      "function": "Anti-replay guard",
+      "failure_mode": "Replayed command accepted after window eviction",
+      "effect": "Stale command re-executed",
+      "severity": "S2",
+      "cause": "Sliding window too small or eviction not preceding acceptance check",
+      "detection": "Evict-before-check logic in ReplayGuard::check()",
+      "mitigation": "REQ-E2E-005 32-entry window with correct eviction order",
+      "residual_risk": "low"
+    },
+    {
+      "id": "FM-004",
+      "function": "Priority queue dispatch",
+      "failure_mode": "CRITICAL command starved behind NORMAL backlog",
+      "effect": "Safety-critical command delayed in emergency scenario",
+      "severity": "S3",
+      "cause": "Priority inversion in queue implementation",
+      "detection": "PrioController dispatches Critical queue first (REQ-PQ-004)",
+      "mitigation": "Separate CRITICAL/HIGH/NORMAL queues with CRITICAL-first dispatch",
+      "residual_risk": "low"
+    },
+    {
+      "id": "FM-005",
+      "function": "Watchdog monitoring",
+      "failure_mode": "Unresponsive controller not detected",
+      "effect": "ECU failure goes undetected; vehicle subsystem silently fails",
+      "severity": "S3",
+      "cause": "Watchdog thread not running or miss counter not incrementing",
+      "detection": "WatchdogMonitor polls at configured interval; unhealthy flag set after miss_window misses",
+      "mitigation": "REQ-WDG-003 background poll thread + REQ-WDG-004 health flag",
+      "residual_risk": "low"
+    },
+    {
+      "id": "FM-006",
+      "function": "TLS mutual authentication",
+      "failure_mode": "Unverified peer accepted as TLS bridge endpoint",
+      "effect": "Man-in-the-middle can inject or observe commands",
+      "severity": "S2",
+      "cause": "REQUIRE_MUTUAL_AUTH check bypassed or constant changed to false",
+      "detection": "TlsBridge::new() rejects unverified peers with NotConnected",
+      "mitigation": "REQ-TLS-002 enforces peer_verified() at construction time",
+      "residual_risk": "low"
+    },
+    {
+      "id": "FM-007",
+      "function": "Rate limiting",
+      "failure_mode": "Exhausted bucket does not return Busy",
+      "effect": "DoS allows unlimited commands to flood a controller",
+      "severity": "S2",
+      "cause": "Token bucket logic error; tokens underflow or not checked",
+      "detection": "RateLimitController returns Err(Busy) when tokens < 1.0",
+      "mitigation": "REQ-RL-006 Busy sentinel + REQ-RL-007 CRITICAL exempt from rate limit",
+      "residual_risk": "low"
+    },
+    {
+      "id": "FM-008",
+      "function": "Buffer pool loan",
+      "failure_mode": "Loaned buffer not returned to pool on drop",
+      "effect": "Pool exhaustion; subsequent allocations fail",
+      "severity": "S1",
+      "cause": "Loan::drop() not implemented or release callback not called",
+      "detection": "impl Drop for Loan calls release() callback",
+      "mitigation": "REQ-LOAN-004 Drop impl + return_loan() both call release",
+      "residual_risk": "low"
+    },
+    {
+      "id": "FM-009",
+      "function": "Zone group broadcast",
+      "failure_mode": "Group command dispatched to members with wrong zone field",
+      "effect": "Member controllers reject command with ZoneMismatch",
+      "severity": "S2",
+      "cause": "cmd.zone not rewritten to member zone before dispatch",
+      "detection": "ZoneGroup::send() rewrites cmd.zone = m.zone() per member",
+      "mitigation": "REQ-ZG-003 per-member zone rewrite before dispatch",
+      "residual_risk": "low"
+    },
+    {
+      "id": "FM-010",
+      "function": "Wire frame decoding",
+      "failure_mode": "Malformed frame accepted and decoded",
+      "effect": "Invalid command or response processed by a controller",
+      "severity": "S2",
+      "cause": "Missing header validation, wrong magic bytes, or bad length",
+      "detection": "validate_header() checks magic, version, and length",
+      "mitigation": "REQ-WIRE-003 header validation + 30s fuzz smoke in CI",
+      "residual_risk": "low"
+    }
+  ]
+}

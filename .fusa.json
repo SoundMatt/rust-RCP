@@ -6,7 +6,7 @@
     "standard": "iso26262",
     "asil": "ASIL-B",
     "language": "rust",
-    "spec_version": "1.6",
+    "spec_version": "1.10",
     "description": "Remote Control Protocol — Rust implementation for automotive zonal architecture",
     "safety_manager": "safety@example.com",
     "security_contact": "security@example.com"
