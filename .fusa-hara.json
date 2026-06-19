@@ -1,0 +1,114 @@
+{
+  "hazards": [
+    {
+      "id": "H-001",
+      "description": "Incorrect zone routing — command dispatched to wrong vehicle zone",
+      "severity": "S2",
+      "exposure": "E4",
+      "controllability": "C2",
+      "asil": "ASIL-B",
+      "safety_goal": "SG-001"
+    },
+    {
+      "id": "H-002",
+      "description": "Lost command — zone controller does not receive a critical command",
+      "severity": "S2",
+      "exposure": "E4",
+      "controllability": "C2",
+      "asil": "ASIL-B",
+      "safety_goal": "SG-002"
+    },
+    {
+      "id": "H-003",
+      "description": "Replayed command — stale command executed out of sequence",
+      "severity": "S2",
+      "exposure": "E3",
+      "controllability": "C2",
+      "asil": "ASIL-B",
+      "safety_goal": "SG-003"
+    },
+    {
+      "id": "H-004",
+      "description": "Payload corruption — bitflip in command payload causes erroneous actuation",
+      "severity": "S3",
+      "exposure": "E4",
+      "controllability": "C1",
+      "asil": "ASIL-B",
+      "safety_goal": "SG-004"
+    },
+    {
+      "id": "H-005",
+      "description": "Zone controller lockup — watchdog not triggered, controller unresponsive",
+      "severity": "S2",
+      "exposure": "E4",
+      "controllability": "C2",
+      "asil": "ASIL-B",
+      "safety_goal": "SG-005"
+    },
+    {
+      "id": "H-006",
+      "description": "Unauthorised command — unauthenticated source sends actuation commands",
+      "severity": "S2",
+      "exposure": "E3",
+      "controllability": "C2",
+      "asil": "ASIL-B",
+      "safety_goal": "SG-006"
+    },
+    {
+      "id": "H-007",
+      "description": "Power state race — commands sent during SLEEP transition cause undefined behaviour",
+      "severity": "S1",
+      "exposure": "E3",
+      "controllability": "C3",
+      "asil": "ASIL-A",
+      "safety_goal": "SG-007"
+    },
+    {
+      "id": "H-008",
+      "description": "Overflow in payload length field enables remote code execution",
+      "severity": "S3",
+      "exposure": "E4",
+      "controllability": "C0",
+      "asil": "ASIL-B",
+      "safety_goal": "SG-008"
+    },
+    {
+      "id": "H-009",
+      "description": "Denial of service via command flooding — critical commands delayed",
+      "severity": "S2",
+      "exposure": "E4",
+      "controllability": "C2",
+      "asil": "ASIL-B",
+      "safety_goal": "SG-009"
+    },
+    {
+      "id": "H-010",
+      "description": "Registry closed while commands in flight — undefined response to caller",
+      "severity": "S1",
+      "exposure": "E4",
+      "controllability": "C3",
+      "asil": "ASIL-A",
+      "safety_goal": "SG-010"
+    }
+  ],
+  "operational_situations": [
+    { "id": "OS-001", "description": "Normal driving on public road" },
+    { "id": "OS-002", "description": "Low-speed manoeuvring in car park" },
+    { "id": "OS-003", "description": "Highway cruise-control engaged" },
+    { "id": "OS-004", "description": "ECU firmware update in service mode" },
+    { "id": "OS-005", "description": "Vehicle stationary, ignition on" },
+    { "id": "OS-006", "description": "Emergency stop / rapid deceleration" }
+  ],
+  "safety_goals": [
+    { "id": "SG-001", "description": "Commands shall only be delivered to the correct target zone", "asil": "ASIL-B", "ftti_ms": 200 },
+    { "id": "SG-002", "description": "Critical commands shall not be silently dropped", "asil": "ASIL-B", "ftti_ms": 100 },
+    { "id": "SG-003", "description": "Replayed frames shall be detected and rejected", "asil": "ASIL-B", "ftti_ms": 500 },
+    { "id": "SG-004", "description": "Payload integrity shall be verified before execution", "asil": "ASIL-B", "ftti_ms": 200 },
+    { "id": "SG-005", "description": "Unresponsive controllers shall be detected within the watchdog window", "asil": "ASIL-B", "ftti_ms": 3000 },
+    { "id": "SG-006", "description": "Only authorised senders may issue actuation commands", "asil": "ASIL-B", "ftti_ms": 0 },
+    { "id": "SG-007", "description": "Power state transitions shall be atomic with respect to concurrent commands", "asil": "ASIL-A", "ftti_ms": 500 },
+    { "id": "SG-008", "description": "Payload length fields shall be validated before memory allocation", "asil": "ASIL-B", "ftti_ms": 0 },
+    { "id": "SG-009", "description": "Critical-priority commands shall not be delayed by lower-priority flooding", "asil": "ASIL-B", "ftti_ms": 100 },
+    { "id": "SG-010", "description": "Registry close shall signal all in-flight callers with a defined error", "asil": "ASIL-A", "ftti_ms": 200 }
+  ]
+}

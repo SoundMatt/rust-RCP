@@ -1,0 +1,34 @@
+[package]
+name = "rcp"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MPL-2.0"
+description = "Remote Control Protocol for automotive zonal architecture"
+keywords = ["automotive", "rcp", "functional-safety", "iso26262"]
+categories = ["embedded", "network-programming"]
+
+[lib]
+name = "rcp"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rcp"
+path = "src/bin/rcp.rs"
+
+[dependencies]
+thiserror   = "1"
+parking_lot = "0.12"
+crc         = "3"
+serde       = { version = "1", features = ["derive"] }
+serde_json  = "1"
+serde_yaml  = "0.9"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+strip        = true
+opt-level    = "z"
+lto          = true
+codegen-units = 1

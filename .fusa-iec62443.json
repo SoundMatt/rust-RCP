@@ -1,0 +1,59 @@
+{
+  "target_sl": "SL-2",
+  "component_type": "embedded-software",
+  "incident_resp_doc": "INCIDENT-RESPONSE.md",
+  "security_level_rationale": "RCP operates in a safety-critical in-vehicle network. SL-2 provides protection against intentional violation using simple means with low motivation and resources (e.g., insider attack or opportunistic compromise of a connected ECU).",
+  "threats": [
+    {
+      "id": "T-001",
+      "category": "spoofing",
+      "description": "Attacker forges zone-controller identity to inject commands",
+      "countermeasures": ["REQ-AUTHZ-005", "REQ-TLS-002"],
+      "residual_risk": "low"
+    },
+    {
+      "id": "T-002",
+      "category": "tampering",
+      "description": "Attacker flips bits in transit to cause erroneous actuation",
+      "countermeasures": ["REQ-E2E-003", "REQ-E2E-007", "REQ-WIRE-004"],
+      "residual_risk": "low"
+    },
+    {
+      "id": "T-003",
+      "category": "replay",
+      "description": "Attacker replays captured command frames",
+      "countermeasures": ["REQ-E2E-005"],
+      "residual_risk": "low"
+    },
+    {
+      "id": "T-004",
+      "category": "denial-of-service",
+      "description": "Attacker floods RCP with low-priority commands to delay critical ones",
+      "countermeasures": ["REQ-RL-007", "REQ-PQ-004"],
+      "residual_risk": "low"
+    },
+    {
+      "id": "T-005",
+      "category": "elevation-of-privilege",
+      "description": "Attacker crafts oversized payload to overflow allocator",
+      "countermeasures": ["REQ-WIRE-007", "REQ-CANBR-004"],
+      "residual_risk": "negligible"
+    },
+    {
+      "id": "T-006",
+      "category": "information-disclosure",
+      "description": "Attacker monitors command bus to extract vehicle state",
+      "countermeasures": ["REQ-TLS-004"],
+      "residual_risk": "medium"
+    }
+  ],
+  "security_controls": [
+    { "id": "SC-001", "name": "Mutual TLS", "requirement": "REQ-TLS-002", "sl_provided": "SL-2" },
+    { "id": "SC-002", "name": "CRC-16 integrity", "requirement": "REQ-E2E-002", "sl_provided": "SL-1" },
+    { "id": "SC-003", "name": "Replay guard", "requirement": "REQ-E2E-005", "sl_provided": "SL-2" },
+    { "id": "SC-004", "name": "Command ACL", "requirement": "REQ-AUTHZ-005", "sl_provided": "SL-2" },
+    { "id": "SC-005", "name": "Rate limiting", "requirement": "REQ-RL-006", "sl_provided": "SL-1" },
+    { "id": "SC-006", "name": "Priority preemption", "requirement": "REQ-PQ-004", "sl_provided": "SL-1" },
+    { "id": "SC-007", "name": "Payload size cap", "requirement": "REQ-WIRE-007", "sl_provided": "SL-2" }
+  ]
+}

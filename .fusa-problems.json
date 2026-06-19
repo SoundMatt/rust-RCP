@@ -1,0 +1,37 @@
+{
+  "open_problems": [],
+  "resolved_problems": [
+    {
+      "id": "P-001",
+      "title": "Fan-out subscription with single-consumer mpsc::Receiver",
+      "description": "Rust's std::sync::mpsc::Receiver is single-consumer; Controller::subscribe() needs to deliver Status updates to multiple independent callers simultaneously.",
+      "resolution": "MockController maintains a Vec<SyncSender<Arc<Status>>> in Inner. On publish, all senders are attempted; failed sends (dropped Receivers) are lazily removed via retain().",
+      "status": "resolved",
+      "date": "2026-06-19"
+    },
+    {
+      "id": "P-002",
+      "title": "Go errors.Is() chain vs Rust error handling",
+      "description": "Go's errors.Is(ErrBusy, ErrTimeout) returns true because ErrBusy wraps ErrTimeout. The Rust Error::source() chain could replicate this but is non-idiomatic.",
+      "resolution": "Implemented is_relay_*() helper methods on RcpError using matches!() macro. ErrBusy.is_relay_timeout() returns true by pattern matching both Timeout and Busy variants. More explicit and zero cost.",
+      "status": "resolved",
+      "date": "2026-06-19"
+    },
+    {
+      "id": "P-003",
+      "title": "Zero-copy loan with RAII release",
+      "description": "LoaningController requires zero-copy buffer return. Go uses GC; Rust needs explicit return.",
+      "resolution": "Loan struct holds Option<Box<dyn FnOnce(Vec<u8>) + Send>>. Calling return_loan() takes the release function; Drop does nothing (caller must explicitly return or use send_loaned). LoanPool uses Condvar-based blocking acquire.",
+      "status": "resolved",
+      "date": "2026-06-19"
+    },
+    {
+      "id": "P-004",
+      "title": "Priority queue dispatch thread lifetime",
+      "description": "PrioController's dispatch thread must outlive the controller but not leak.",
+      "resolution": "Thread holds Arc<(Mutex<Queues>, Condvar)>. When PrioController is dropped, Queues is closed and Condvar is notified; dispatch thread sees closed=true with empty queues and exits.",
+      "status": "resolved",
+      "date": "2026-06-19"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+# Default owners for all files
+* @SoundMatt/rcp-maintainers
+
+# Safety-critical files require Safety Manager review
+SAFETY_PLAN.md @SoundMatt/safety-team
+HARA.md        @SoundMatt/safety-team
+.fusa*.json    @SoundMatt/safety-team
+
+# Security files require Security team review
+SECURITY.md           @SoundMatt/security-team
+INCIDENT-RESPONSE.md  @SoundMatt/security-team
+.fusa-iec62443.json   @SoundMatt/security-team
+
+# CI configuration
+.github/ @SoundMatt/devops-team

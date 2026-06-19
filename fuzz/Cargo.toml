@@ -1,0 +1,30 @@
+[package]
+name = "rcp-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+rcp = { path = ".." }
+
+[[bin]]
+name = "fuzz_wire_decode"
+path = "fuzz_targets/fuzz_wire_decode.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_e2e_unwrap"
+path = "fuzz_targets/fuzz_e2e_unwrap.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_config_parse"
+path = "fuzz_targets/fuzz_config_parse.rs"
+test = false
+doc = false
