@@ -73,7 +73,7 @@ impl Controller for UdsBridge {
         let sid = cmd_to_uds_sid(cmd.cmd_type);
         let data = cmd.payload.as_deref().unwrap_or(&[]);
         let resp_data = self.transport.request(sid, data, timeout)?;
-        let pos_resp = (sid | 0x40) as u8; // UDS positive response SID
+        let pos_resp = sid | 0x40; // UDS positive response SID
         let status = if resp_data.first() == Some(&pos_resp) {
             ResponseStatus::OK
         } else {

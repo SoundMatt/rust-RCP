@@ -80,7 +80,7 @@ impl Controller for RestBridge {
         let body = cmd_to_json(cmd);
         let (status_code, _body) = self.client.post(&self.endpoint(), &body, timeout)?;
         let status = match status_code {
-            200 | 201 | 202 => ResponseStatus::OK,
+            200..=202 => ResponseStatus::OK,
             408 | 504 => ResponseStatus::TIMEOUT,
             429 => ResponseStatus::BUSY,
             _ => ResponseStatus::ERROR,

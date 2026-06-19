@@ -116,7 +116,7 @@ impl MockController {
         let seq = self.seq.fetch_add(1, Ordering::SeqCst) + 1;
         // Copy payload so caller mutation after publish cannot affect delivered Status.
         // fusa:req REQ-CTRL-027
-        let p = payload.as_ref().map(|v| v.clone());
+        let p = payload.clone();
         let st = Arc::new(Status {
             zone: self.zone,
             seq,
@@ -150,7 +150,7 @@ impl Controller for MockController {
         }
         // fusa:req REQ-CTRL-026: copy payload before handler
         let mut safe = cmd.clone();
-        safe.payload = cmd.payload.as_ref().map(|v| v.clone());
+        safe.payload = cmd.payload.clone();
 
         if let Some(h) = &self.handler {
             // fusa:req REQ-CTRL-002 / REQ-CTRL-016

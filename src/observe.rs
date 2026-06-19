@@ -37,12 +37,7 @@ impl Metrics {
 
     /// Mean latency in microseconds (0 if no calls).
     pub fn mean_latency_us(&self) -> u64 {
-        let calls = self.calls();
-        if calls == 0 {
-            0
-        } else {
-            self.latency_us() / calls
-        }
+        self.latency_us().checked_div(self.calls()).unwrap_or(0)
     }
 }
 
