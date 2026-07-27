@@ -1,6 +1,6 @@
 {
   "component": "rust-RCP",
-  "spec_version": "1.10",
+  "spec_version": "1.11",
   "standard": "ISO 26262 ASIL-B",
   "created": "2026-06-19",
   "failure_modes": [

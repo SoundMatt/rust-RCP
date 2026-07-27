@@ -1,6 +1,6 @@
 # rust-RCP Roadmap
 
-## v0.1 — Initial Release (current)
+## v0.1 — Initial Release
 
 - All 42 protocol modules implemented and unit-tested
 - Wire format encoder/decoder with magic-byte and CRC validation
@@ -21,11 +21,23 @@
 - IEC 62443 SL-2 cybersecurity artifacts
 - CI: lint, cross-platform tests, coverage ≥90%, fuzz, benchmark, audit
 
-## v0.2 — Hardening
+## v0.2 / v0.3 — Hardening + RELAY §10.3 conformance (current)
 
+- [x] RELAY `Adapt()` implemented: `rcp::adapt(ctrl)` wraps a `Controller` as
+      an async `relay::Caller`/`relay::Node` (§10.3), backed by
+      `to_message()`/`from_message()` (§15.7.5) and a vendored `relay`
+      module (§18.3)
+- [x] `RELAY_SPEC_VERSION` exported from the crate root; canonical types
+      derive `serde::Serialize`/`Deserialize` (§18.3)
+- [x] Full `rsfusa` (rust-FuSa) CI lifecycle gate + TARA (ISO/SAE 21434,
+      `tara.json`) (§20.1.2, §20.4)
+- [x] CLI binary renamed `rcp` → `rust-rcp` per §13.2
+- [x] `tokio`-based async boundary: delivered as the `relay::Node`/`Caller`
+      adapter (`adapt()`) rather than a wrapper over the whole
+      `Controller`/`Registry` API — see issue #7 for why the core API
+      remains synchronous pending spec guidance on a `no_std`/embedded profile
 - [ ] Real mDNS-SD backend (using `mdns-sd` crate) as optional feature
 - [ ] AUTOSAR-CP transport backend (optional feature)
-- [ ] `async-controller` feature: tokio-based async wrappers around blocking API
 - [ ] Persistent audit log module (`auditlog`) for forensic traceability
 - [ ] Formal property test suite using `proptest`
 - [ ] Codec registry for pluggable serialization (CBOR, Protobuf, Cap'n Proto)

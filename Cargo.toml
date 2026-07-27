@@ -1,6 +1,6 @@
 [package]
 name = "rcp"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.75"
 license = "MPL-2.0"
@@ -13,7 +13,7 @@ name = "rcp"
 path = "src/lib.rs"
 
 [[bin]]
-name = "rcp"
+name = "rust-rcp"
 path = "src/bin/rcp.rs"
 
 [dependencies]
@@ -22,9 +22,14 @@ parking_lot = "0.12"
 serde       = { version = "1", features = ["derive"] }
 serde_json  = "1"
 serde_yaml  = "0.9"
+base64      = "0.22"
+chrono      = { version = "0.4", features = ["serde"] }
+tokio       = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time", "macros"] }
+async-trait = "0.1"
 
 [dev-dependencies]
-tempfile = "3"
+tempfile   = "3"
+tokio-test = "0.4"
 
 [profile.release]
 strip        = true

@@ -69,6 +69,7 @@
 pub mod adapt;
 pub mod admin;
 pub mod authz;
+pub(crate) mod base64_serde;
 pub mod canbr;
 pub mod capi;
 pub mod certgap;
@@ -97,6 +98,7 @@ pub mod proxy;
 pub mod ratelimit;
 pub mod record;
 pub mod redundancy;
+pub mod relay;
 pub mod restbridge;
 pub mod shmem;
 pub mod sim;
@@ -109,15 +111,24 @@ pub mod watchdog;
 pub mod wire;
 pub mod zonegroup;
 
+pub use adapt::{adapt, from_message, to_message};
+
 use std::fmt;
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
+
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 // ── Spec version ────────────────────────────────────────────────────────────
 
 /// RELAY specification version this crate implements.
 // fusa:req REQ-SPEC-001
-pub const SPEC_VERSION: &str = "1.10";
+pub const SPEC_VERSION: &str = "1.11";
+
+/// Alias for [`SPEC_VERSION`], exported from the crate root per RELAY spec
+/// §18.3 ("`RELAY_SPEC_VERSION` MUST be exported from the crate root").
+// fusa:req REQ-SPEC-001
+pub const RELAY_SPEC_VERSION: &str = SPEC_VERSION;
 
 // ── Zone ────────────────────────────────────────────────────────────────────
 
@@ -140,6 +151,22 @@ impl Zone {
 impl fmt::Display for Zone {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
+    }
+}
+
+// Numeric serde per RELAY spec §15.5 (`Zone uint8` — a bare integer in JSON,
+// not `#[derive(Serialize)]`'s default newtype-as-array encoding).
+// fusa:req REQ-RELAY-010
+impl Serialize for Zone {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_u8(self.0)
+    }
+}
+
+// fusa:req REQ-RELAY-010
+impl<'de> Deserialize<'de> for Zone {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        Ok(Zone(u8::deserialize(d)?))
     }
 }
 
@@ -198,6 +225,20 @@ impl fmt::Display for Priority {
     }
 }
 
+// fusa:req REQ-RELAY-010
+impl Serialize for Priority {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_u8(self.0)
+    }
+}
+
+// fusa:req REQ-RELAY-010
+impl<'de> Deserialize<'de> for Priority {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        Ok(Priority(u8::deserialize(d)?))
+    }
+}
+
 // ── CommandType ──────────────────────────────────────────────────────────────
 
 /// Intent of a command dispatched to a zone controller.
@@ -231,6 +272,20 @@ impl fmt::Display for CommandType {
     }
 }
 
+// fusa:req REQ-RELAY-010
+impl Serialize for CommandType {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_u16(self.0)
+    }
+}
+
+// fusa:req REQ-RELAY-010
+impl<'de> Deserialize<'de> for CommandType {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        Ok(CommandType(u16::deserialize(d)?))
+    }
+}
+
 // ── ResponseStatus ────────────────────────────────────────────────────────────
 
 /// Outcome of a command execution reported by a zone controller.
@@ -259,6 +314,20 @@ impl fmt::Display for ResponseStatus {
     }
 }
 
+// fusa:req REQ-RELAY-010
+impl Serialize for ResponseStatus {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_u8(self.0)
+    }
+}
+
+// fusa:req REQ-RELAY-010
+impl<'de> Deserialize<'de> for ResponseStatus {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        Ok(ResponseStatus(u8::deserialize(d)?))
+    }
+}
+
 // ── Structs ───────────────────────────────────────────────────────────────────
 
 /// Control message dispatched to a zone controller.
@@ -267,12 +336,19 @@ impl fmt::Display for ResponseStatus {
 /// `Zone::UNKNOWN`, `CommandType::NOOP`, `Priority::NORMAL`, payload `None`.
 // fusa:req REQ-CMDSTRUCT-001
 // fusa:req REQ-CMDSTRUCT-002
-#[derive(Debug, Clone, Default, PartialEq)]
+// fusa:req REQ-RELAY-011
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Command {
     pub id: u32,
     pub zone: Zone,
+    #[serde(rename = "type")]
     pub cmd_type: CommandType,
     pub priority: Priority,
+    #[serde(
+        default,
+        skip_serializing_if = "base64_serde::opt::is_none",
+        with = "base64_serde::opt"
+    )]
     pub payload: Option<Vec<u8>>,
 }
 
@@ -280,21 +356,33 @@ pub struct Command {
 ///
 /// A zero-value `Response` has `status == ResponseStatus::OK`.
 // fusa:req REQ-RESP-003
-#[derive(Debug, Clone, Default, PartialEq)]
+// fusa:req REQ-RELAY-011
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Response {
     pub command_id: u32,
     pub zone: Zone,
     pub status: ResponseStatus,
+    #[serde(
+        default,
+        skip_serializing_if = "base64_serde::opt::is_none",
+        with = "base64_serde::opt"
+    )]
     pub payload: Option<Vec<u8>>,
 }
 
 /// Periodic telemetry update published by a zone controller.
 // fusa:req REQ-STAT-001
-#[derive(Debug, Clone, Default, PartialEq)]
+// fusa:req REQ-RELAY-011
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Status {
     pub zone: Zone,
     pub seq: u32,
     pub healthy: bool,
+    #[serde(
+        default,
+        skip_serializing_if = "base64_serde::opt::is_none",
+        with = "base64_serde::opt"
+    )]
     pub payload: Option<Vec<u8>>,
 }
 
@@ -1012,5 +1100,84 @@ mod tests {
     // fusa:test REQ-CMDSTRUCT-001
     fn zone_default_is_unknown() {
         assert_eq!(Zone::default(), Zone::UNKNOWN);
+    }
+
+    // ── RELAY serde (§18.3 / §15.5) ───────────────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-RELAY-010
+    fn zone_serializes_as_bare_integer() {
+        let json = serde_json::to_string(&Zone::FRONT_LEFT).unwrap();
+        assert_eq!(json, "1");
+        let back: Zone = serde_json::from_str("1").unwrap();
+        assert_eq!(back, Zone::FRONT_LEFT);
+    }
+
+    #[test]
+    // fusa:test REQ-RELAY-010
+    fn priority_cmdtype_responsestatus_serialize_as_bare_integers() {
+        assert_eq!(serde_json::to_string(&Priority::HIGH).unwrap(), "1");
+        assert_eq!(serde_json::to_string(&CommandType::RESET).unwrap(), "3");
+        assert_eq!(serde_json::to_string(&ResponseStatus::ERROR).unwrap(), "1");
+    }
+
+    #[test]
+    // fusa:test REQ-RELAY-011
+    fn command_serializes_with_spec_field_names() {
+        let cmd = Command {
+            id: 7,
+            zone: Zone::CENTRAL,
+            cmd_type: CommandType::SET,
+            priority: Priority::HIGH,
+            payload: Some(vec![0xAA]),
+        };
+        let v: serde_json::Value = serde_json::to_value(&cmd).unwrap();
+        assert_eq!(v["id"], 7);
+        assert_eq!(v["zone"], 5);
+        assert_eq!(v["type"], 1);
+        assert_eq!(v["priority"], 1);
+        assert_eq!(v["payload"], "qg==");
+    }
+
+    #[test]
+    // fusa:test REQ-RELAY-011
+    fn command_payload_omitted_when_none() {
+        let cmd = Command {
+            zone: Zone::FRONT_LEFT,
+            ..Default::default()
+        };
+        let v: serde_json::Value = serde_json::to_value(&cmd).unwrap();
+        assert!(v.get("payload").is_none());
+    }
+
+    #[test]
+    // fusa:test REQ-RELAY-011
+    fn response_and_status_round_trip_serde() {
+        let resp = Response {
+            command_id: 1,
+            zone: Zone::REAR_LEFT,
+            status: ResponseStatus::OK,
+            payload: None,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let back: Response = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, resp);
+
+        let st = Status {
+            zone: Zone::REAR_RIGHT,
+            seq: 4,
+            healthy: true,
+            payload: Some(vec![1]),
+        };
+        let json = serde_json::to_string(&st).unwrap();
+        let back: Status = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, st);
+    }
+
+    #[test]
+    // fusa:test REQ-SPEC-001
+    fn relay_spec_version_is_exported_and_matches_spec_version() {
+        assert!(!RELAY_SPEC_VERSION.is_empty());
+        assert_eq!(RELAY_SPEC_VERSION, SPEC_VERSION);
     }
 }

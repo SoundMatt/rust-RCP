@@ -1,15 +1,24 @@
 {
   "version": "1",
+  "standard": "iso26262",
   "project": {
     "name": "rust-RCP",
     "module": "github.com/SoundMatt/rust-RCP",
     "standard": "iso26262",
     "asil": "ASIL-B",
     "language": "rust",
-    "spec_version": "1.10",
+    "spec_version": "1.11",
     "description": "Remote Control Protocol — Rust implementation for automotive zonal architecture",
     "safety_manager": "safety@example.com",
     "security_contact": "security@example.com"
+  },
+  "rules": {
+    "exclude": [],
+    "severity": {}
+  },
+  "report": {
+    "format": "json",
+    "output": "check-report.json"
   },
   "tools": {
     "annotation": "fusa:req / fusa:test inline comments",
@@ -23,6 +32,7 @@
     "problems": ".fusa-problems.json",
     "safety_plan": "SAFETY_PLAN.md",
     "hara_doc": "HARA.md",
+    "tara": "tara.json",
     "security_doc": "SECURITY.md",
     "incident_response": "INCIDENT-RESPONSE.md"
   }

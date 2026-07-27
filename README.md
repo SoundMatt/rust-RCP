@@ -4,18 +4,18 @@
 [![ASIL-B](https://img.shields.io/badge/ISO%2026262-ASIL--B-orange)](SAFETY_PLAN.md)
 [![IEC 62443](https://img.shields.io/badge/IEC%2062443-SL--2-blue)](SECURITY.md)
 
-Rust implementation of the **Remote Control Protocol (RCP)** for automotive zonal architecture, compliant with the **RELAY specification v1.6**.
+Rust implementation of the **Remote Control Protocol (RCP)** for automotive zonal architecture, compliant with the **RELAY specification v1.11**.
 
 RCP is used by a central HPC to dispatch `Command`s to zone controllers (front-left, front-right, rear-left, rear-right, central) and receive `Response`s and periodic `Status` telemetry.
 
 ## Features
 
-- Full RELAY spec v1.10 compliance
-- **ASIL-B** (ISO 26262:2018) with full FuSa artifact set
+- Full RELAY spec v1.11 compliance, including the `Adapt()` RELAY adapter (§10.3) — `rcp::adapt(ctrl)` wraps a `Controller` as a `relay::Caller`
+- **ASIL-B** (ISO 26262:2018) with full FuSa artifact set, including a TARA (ISO/SAE 21434, see [tara.json](tara.json))
 - **IEC 62443 SL-2** cybersecurity controls
 - `#![forbid(unsafe_code)]` — 100% safe Rust
-- Blocking synchronous API (`no_std`-compatible core, no tokio required)
-- 42 modules covering core protocol, bridges, safety, and observability
+- Core `Controller`/`Registry` API is a plain blocking `fn` interface; the RELAY-facing `relay::Node`/`Caller` adapter is `async fn` per §18.3 and runs on `tokio`
+- 44 modules covering core protocol, bridges, safety, and observability
 
 ## Quick Start
 
@@ -93,12 +93,15 @@ assert_eq!(resp.zone, Zone::FRONT_LEFT);
 | `udsbr` | UDS (ISO 14229) bridge |
 | `doipbr` | DoIP (ISO 13400-2) bridge |
 | `capi` | C FFI types and error codes |
-| `adapt` | External message format adapter |
+| `adapt` | External message format adapter, and the RELAY `Adapt()`/`to_message()`/`from_message()` entry point (§10.3, §15.7.5) |
+| `relay` | Vendored RELAY protocol types — `Message`, `Node`, `Caller`, error sentinels (§18.3) |
+| `base64_serde` | Base64 serde helpers for `Message`/`Command`/`Response`/`Status` payload fields |
 
 ## Safety & Security
 
 - [SAFETY_PLAN.md](SAFETY_PLAN.md) — ISO 26262 safety plan
 - [HARA.md](HARA.md) — Hazard analysis
+- [tara.json](tara.json) — Threat analysis and risk assessment (ISO/SAE 21434)
 - [SECURITY.md](SECURITY.md) — Security policy and controls
 - [INCIDENT-RESPONSE.md](INCIDENT-RESPONSE.md) — Incident response plan
 - [.fusa.json](.fusa.json) — FuSa project manifest

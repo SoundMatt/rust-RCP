@@ -1,0 +1,310 @@
+{
+  "project": "rust-RCP",
+  "standard": "ISO/SAE 21434:2021",
+  "createdAt": "2026-07-27T00:00:00Z",
+  "scope": "rust-RCP is a software library component used in road-vehicle zonal-architecture ECUs. This TARA covers cybersecurity threats arising from rust-RCP's Command/Response/Status control-plane surface (wire framing, E2E CRC/replay protection, authorization policy, rate limiting, priority scheduling, and the UDP/TLS transport bridges) when integrated into a central HPC or zone controller that exchanges RCP frames over an in-vehicle network. System-level CAL may differ after architectural decomposition per ISO/SAE 21434 clause 15.",
+
+  "assets": [
+    {
+      "id": "A-001",
+      "name": "Wire frame structural integrity",
+      "description": "Correctness of the 16-byte wire header (magic, protocol version, message type, zone, ID/seq, payload length) as decoded by wire::validate_header() and the UDP/TLS bridges",
+      "cybersecurityProperty": "Integrity"
+    },
+    {
+      "id": "A-002",
+      "name": "E2E-protected command/response/status authenticity",
+      "description": "Guarantee that a Command/Response/Status accepted via e2e::unwrap() originates from a genuine, non-replayed sender with correct sequence and payload",
+      "cybersecurityProperty": "Integrity"
+    },
+    {
+      "id": "A-003",
+      "name": "Zone controller command-execution availability",
+      "description": "Timely dispatch of Watchdog/Reset/Sleep/Wake commands to the correct zone controller; a delayed or suppressed safety-relevant command can mask a real failure condition",
+      "cybersecurityProperty": "Availability"
+    },
+    {
+      "id": "A-004",
+      "name": "Authorization policy enforcement",
+      "description": "authz::Policy allowlist correctly restricts which CommandTypes and priorities a caller may dispatch to a given zone controller",
+      "cybersecurityProperty": "Integrity"
+    },
+    {
+      "id": "A-005",
+      "name": "Rate-limiter and priority-queue availability",
+      "description": "ratelimit::TokenBucket and prioqueue::PrioController remain responsive to Critical-priority commands under load from lower-priority traffic",
+      "cybersecurityProperty": "Availability"
+    },
+    {
+      "id": "A-006",
+      "name": "Transport confidentiality/authenticity (TLS bridge)",
+      "description": "tlstransport::TlsBridge enforces TLS 1.2+ and mutual authentication so that wire frames are not exposed to, or accepted from, an unauthenticated peer",
+      "cybersecurityProperty": "Confidentiality"
+    }
+  ],
+
+  "threatScenarios": [
+    {
+      "id": "T-RCP-01",
+      "title": "Frame injection — bad magic, version, or truncated header",
+      "asset": "A-001",
+      "property": "Integrity",
+      "stride": "Tampering",
+      "description": "An attacker on the RCP transport (UDP or an unauthenticated TLS peer) sends malformed wire frames — truncated below the 16-byte header, wrong magic bytes, or an unsupported protocol version — attempting to desynchronize the receiver or trigger undefined decode behaviour.",
+      "attackPath": "Attacker gains network access to the UDP/TLS transport; crafts a raw byte sequence shorter than HEADER_LEN, or with magic bytes other than 'RC', or ProtoVer != 0x01; sends it before any application-level filtering.",
+      "impact": {
+        "safety": "Moderate",
+        "financial": "Negligible",
+        "operational": "Major",
+        "privacy": "Negligible"
+      },
+      "impactRating": 2,
+      "attackFeasibility": {
+        "elapsedTime": "< 1 day",
+        "expertise": "Proficient",
+        "knowledgeOfItem": "Public",
+        "windowOfOpportunity": "Easy",
+        "equipment": "Standard"
+      },
+      "feasibilityRating": "High",
+      "cal": "CAL-2",
+      "cybersecurityGoal": "CSG-RCP-01",
+      "mitigations": ["REQ-WIRE-001", "REQ-WIRE-002", "REQ-WIRE-008", "REQ-WIRE-009"],
+      "residualRisk": "Low — validate_header() is the mandatory gate before any frame is decoded; ShortFrame/BadMagic/BadVersion are returned instead of panicking"
+    },
+    {
+      "id": "T-RCP-02",
+      "title": "Payload tampering over unauthenticated UDP transport",
+      "asset": "A-002",
+      "property": "Integrity",
+      "stride": "Tampering",
+      "description": "UDP provides no authentication or encryption. An attacker on the same network segment intercepts a wire frame in transit and modifies the payload bytes (e.g. a Set command's actuation value) before it reaches the zone controller.",
+      "attackPath": "Attacker performs ARP spoofing or otherwise gains a man-in-the-middle position on the CAN-to-Ethernet gateway segment carrying RCP-over-UDP; captures a frame; edits payload bytes; re-computes/forges the E2E CRC (see T-RCP-07); re-injects.",
+      "impact": {
+        "safety": "Severe",
+        "financial": "Moderate",
+        "operational": "Major",
+        "privacy": "Negligible"
+      },
+      "impactRating": 3,
+      "attackFeasibility": {
+        "elapsedTime": "< 1 week",
+        "expertise": "Proficient",
+        "knowledgeOfItem": "Restricted",
+        "windowOfOpportunity": "Moderate",
+        "equipment": "Specialized"
+      },
+      "feasibilityRating": "Medium",
+      "cal": "CAL-3",
+      "cybersecurityGoal": "CSG-RCP-02",
+      "mitigations": ["REQ-TLS-001", "REQ-TLS-002", "REQ-E2E-003"],
+      "residualRisk": "Medium on plain UDP — deployments carrying safety-relevant commands MUST use the TLS bridge (mutual auth, TLS >= 1.2); UDP-only deployments rely solely on the non-cryptographic E2E CRC"
+    },
+    {
+      "id": "T-RCP-03",
+      "title": "Replayed command re-injection",
+      "asset": "A-002",
+      "property": "Integrity",
+      "stride": "Spoofing",
+      "description": "An attacker records a previously valid, E2E-wrapped Command frame (e.g. Wake or Reset) and re-transmits it later to re-trigger the action outside its intended context.",
+      "attackPath": "Attacker passively captures a genuine wire frame from the transport; re-sends the identical bytes at a time of their choosing.",
+      "impact": {
+        "safety": "Severe",
+        "financial": "Low",
+        "operational": "Major",
+        "privacy": "Negligible"
+      },
+      "impactRating": 3,
+      "attackFeasibility": {
+        "elapsedTime": "< 1 day",
+        "expertise": "Layman",
+        "knowledgeOfItem": "Public",
+        "windowOfOpportunity": "Easy",
+        "equipment": "Standard"
+      },
+      "feasibilityRating": "High",
+      "cal": "CAL-3",
+      "cybersecurityGoal": "CSG-RCP-02",
+      "mitigations": ["REQ-E2E-004", "REQ-E2E-005"],
+      "residualRisk": "Low — ReplayGuard rejects any seqNum already observed within the replay window (REQ-E2E-005); window eviction is bounded (REPLAY_WINDOW = 32)"
+    },
+    {
+      "id": "T-RCP-04",
+      "title": "Command flooding — priority-inversion denial of service",
+      "asset": "A-005",
+      "property": "Availability",
+      "stride": "Denial of Service",
+      "description": "An attacker (or a malfunctioning peer) floods a zone controller with a high volume of Normal/High-priority commands, attempting to starve or delay Critical-priority commands such as Watchdog or Reset.",
+      "attackPath": "Attacker gains send access to a zone controller's transport; issues Set/Get commands as fast as the transport allows, with no rate limiting in front of the controller.",
+      "impact": {
+        "safety": "Severe",
+        "financial": "Negligible",
+        "operational": "Major",
+        "privacy": "Negligible"
+      },
+      "impactRating": 3,
+      "attackFeasibility": {
+        "elapsedTime": "< 1 day",
+        "expertise": "Layman",
+        "knowledgeOfItem": "Public",
+        "windowOfOpportunity": "Easy",
+        "equipment": "Standard"
+      },
+      "feasibilityRating": "High",
+      "cal": "CAL-3",
+      "cybersecurityGoal": "CSG-RCP-03",
+      "mitigations": ["REQ-RL-006", "REQ-RL-007", "REQ-PQ-004"],
+      "residualRisk": "Low when both controllers are composed — ratelimit::TokenBucket exempts Critical priority from the bucket (REQ-RL-007) and prioqueue::PrioController always dispatches Critical before High/Normal (REQ-PQ-004); a deployment that omits either wrapper remains exposed"
+    },
+    {
+      "id": "T-RCP-05",
+      "title": "Unauthorized safety-relevant command execution",
+      "asset": "A-004",
+      "property": "Integrity",
+      "stride": "Elevation of Privilege",
+      "description": "A caller without the intended authority sends a Reset, Sleep, or Wake command to a zone controller that should only accept Get/Set from that caller, attempting to force an unintended power-state transition.",
+      "attackPath": "Attacker (or a compromised, lower-trust peer) obtains network access to a zone controller that is composed without an authz::AuthzController wrapper, or whose Policy allowlist was misconfigured to allow_all(); sends a Reset/Sleep/Wake Command directly.",
+      "impact": {
+        "safety": "Severe",
+        "financial": "Moderate",
+        "operational": "Major",
+        "privacy": "Negligible"
+      },
+      "impactRating": 3,
+      "attackFeasibility": {
+        "elapsedTime": "< 1 week",
+        "expertise": "Proficient",
+        "knowledgeOfItem": "Restricted",
+        "windowOfOpportunity": "Moderate",
+        "equipment": "Standard"
+      },
+      "feasibilityRating": "Medium",
+      "cal": "CAL-3",
+      "cybersecurityGoal": "CSG-RCP-04",
+      "mitigations": ["REQ-AUTHZ-001", "REQ-AUTHZ-005", "REQ-AUTHZ-006"],
+      "residualRisk": "Residual risk depends on deployment: the ACL is enforced only when the integrator wraps every externally reachable Controller in an AuthzController with a least-privilege Policy; rust-RCP cannot force composition at the library level"
+    },
+    {
+      "id": "T-RCP-06",
+      "title": "TLS downgrade or missing peer authentication",
+      "asset": "A-006",
+      "property": "Confidentiality",
+      "stride": "Spoofing",
+      "description": "An attacker forces (or a misconfigured deployment permits) a TLS session below TLSv1.2, or a peer without a valid client certificate, allowing eavesdropping or impersonation of a zone controller/HPC endpoint.",
+      "attackPath": "Attacker performs a protocol-downgrade attack against the TLS handshake, or connects to a TlsBridge whose injected TlsStream implementation does not actually enforce mutual authentication despite REQUIRE_MUTUAL_AUTH being declared true.",
+      "impact": {
+        "safety": "Moderate",
+        "financial": "Moderate",
+        "operational": "Major",
+        "privacy": "Moderate"
+      },
+      "impactRating": 2,
+      "attackFeasibility": {
+        "elapsedTime": "< 1 month",
+        "expertise": "Expert",
+        "knowledgeOfItem": "Confidential",
+        "windowOfOpportunity": "Difficult",
+        "equipment": "Specialized"
+      },
+      "feasibilityRating": "Low",
+      "cal": "CAL-2",
+      "cybersecurityGoal": "CSG-RCP-05",
+      "mitigations": ["REQ-TLS-001", "REQ-TLS-002"],
+      "residualRisk": "Low in-library — MIN_TLS_VERSION/REQUIRE_MUTUAL_AUTH are the declared policy constants; actual enforcement depends on the concrete TlsStream implementation the integrator injects, which rust-RCP does not itself provide or audit"
+    },
+    {
+      "id": "T-RCP-07",
+      "title": "E2E CRC forgery — active tampering by a capable attacker",
+      "asset": "A-002",
+      "property": "Integrity",
+      "stride": "Tampering",
+      "description": "The E2E header uses CRC-16/CCITT-FALSE, which is a safety control against random bit errors, not a keyed cryptographic MAC. An attacker who can modify a frame in transit can recompute a valid CRC-16 over the tampered seqNum+payload, defeating the check.",
+      "attackPath": "Attacker intercepts a wire frame (see T-RCP-02); modifies the payload; recomputes CRC-16/CCITT-FALSE over the new seqNum+payload bytes (no key material required — the algorithm and polynomial are public); re-injects the forged frame.",
+      "impact": {
+        "safety": "Severe",
+        "financial": "Moderate",
+        "operational": "Major",
+        "privacy": "Negligible"
+      },
+      "impactRating": 3,
+      "attackFeasibility": {
+        "elapsedTime": "< 1 day",
+        "expertise": "Proficient",
+        "knowledgeOfItem": "Public",
+        "windowOfOpportunity": "Easy",
+        "equipment": "Standard"
+      },
+      "feasibilityRating": "High",
+      "cal": "CAL-3",
+      "cybersecurityGoal": "CSG-RCP-02",
+      "mitigations": ["REQ-TLS-001", "REQ-TLS-002"],
+      "residualRisk": "Medium-High without transport-layer authentication — e2e::wrap/unwrap MUST be documented as a safety control (random error detection) only, not a security control; deployments exposed to an adversarial network MUST run RCP over the TLS bridge (mutually authenticated) rather than relying on CRC-16 alone"
+    },
+    {
+      "id": "T-RCP-08",
+      "title": "Watchdog suppression masking loss of supervision",
+      "asset": "A-003",
+      "property": "Availability",
+      "stride": "Denial of Service",
+      "description": "An attacker selectively drops or delays Watchdog commands/responses on the transport so that watchdog::WatchdogController never observes enough misses to flag a zone as unhealthy, masking a real failure or an ongoing attack on that zone.",
+      "attackPath": "Attacker with transport-level interception capability (see T-RCP-02) selectively filters Watchdog-type frames while allowing other traffic through, keeping miss_count below WatchdogConfig's unhealthy threshold.",
+      "impact": {
+        "safety": "Severe",
+        "financial": "Low",
+        "operational": "Major",
+        "privacy": "Negligible"
+      },
+      "impactRating": 3,
+      "attackFeasibility": {
+        "elapsedTime": "< 1 week",
+        "expertise": "Expert",
+        "knowledgeOfItem": "Restricted",
+        "windowOfOpportunity": "Moderate",
+        "equipment": "Specialized"
+      },
+      "feasibilityRating": "Medium",
+      "cal": "CAL-3",
+      "cybersecurityGoal": "CSG-RCP-04",
+      "mitigations": ["REQ-WDG-002", "REQ-WDG-008", "REQ-TLS-001"],
+      "residualRisk": "Medium — selective frame dropping is a transport-layer attack outside rust-RCP's own visibility; running the watchdog path over an authenticated, integrity-protected transport (TLS bridge) is the primary mitigation, since the library cannot itself detect absence of traffic caused by a third party"
+    }
+  ],
+
+  "cybersecurityGoals": [
+    {
+      "id": "CSG-RCP-01",
+      "description": "rust-RCP shall reject all wire frames with a structurally invalid header (short, bad magic, or unsupported protocol version) before any field is interpreted.",
+      "cal": "CAL-2",
+      "threats": ["T-RCP-01"],
+      "requirements": ["REQ-WIRE-001", "REQ-WIRE-002", "REQ-WIRE-008", "REQ-WIRE-009"]
+    },
+    {
+      "id": "CSG-RCP-02",
+      "description": "rust-RCP shall provide mechanisms to detect replayed or corrupted Command/Response/Status frames, and shall document that cryptographic integrity/authenticity against an active attacker requires running RCP over the mutually authenticated TLS bridge rather than the CRC-16 E2E header alone.",
+      "cal": "CAL-3",
+      "threats": ["T-RCP-02", "T-RCP-03", "T-RCP-07"],
+      "requirements": ["REQ-E2E-003", "REQ-E2E-004", "REQ-E2E-005", "REQ-TLS-001", "REQ-TLS-002"]
+    },
+    {
+      "id": "CSG-RCP-03",
+      "description": "rust-RCP shall resist priority-inversion denial-of-service by exempting Critical-priority commands from rate limiting and always dispatching them ahead of lower-priority traffic when both wrappers are composed.",
+      "cal": "CAL-3",
+      "threats": ["T-RCP-04"],
+      "requirements": ["REQ-RL-006", "REQ-RL-007", "REQ-PQ-004"]
+    },
+    {
+      "id": "CSG-RCP-04",
+      "description": "rust-RCP shall provide an authorization allowlist that integrators can compose in front of any Controller to restrict which command types a caller may dispatch, and a watchdog mechanism whose miss-count threshold is independently verifiable.",
+      "cal": "CAL-3",
+      "threats": ["T-RCP-05", "T-RCP-08"],
+      "requirements": ["REQ-AUTHZ-001", "REQ-AUTHZ-005", "REQ-AUTHZ-006", "REQ-WDG-002", "REQ-WDG-008"]
+    },
+    {
+      "id": "CSG-RCP-05",
+      "description": "rust-RCP's TLS bridge shall declare and enforce a minimum TLS version of 1.2 and mandatory mutual authentication for any transport carrying safety-relevant commands.",
+      "cal": "CAL-2",
+      "threats": ["T-RCP-06"],
+      "requirements": ["REQ-TLS-001", "REQ-TLS-002"]
+    }
+  ]
+}
