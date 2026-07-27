@@ -18,7 +18,11 @@ import sys, json, re, pathlib, textwrap
 reqs_file = pathlib.Path(sys.argv[1])
 src_dir   = pathlib.Path(sys.argv[2])
 
-declared  = {r["id"] for r in json.loads(reqs_file.read_text())}
+reqs_data = json.loads(reqs_file.read_text())
+# .fusa-reqs.json schema 1.0: {"schemaVersion": "1.0", "requirements": [...]}.
+# Older files were a bare array; accept both for robustness.
+reqs_list = reqs_data["requirements"] if isinstance(reqs_data, dict) else reqs_data
+declared  = {r["id"] for r in reqs_list}
 
 src_text  = "\n".join(p.read_text() for p in src_dir.rglob("*.rs"))
 in_src    = set(re.findall(r"//\s*fusa:req\s+(REQ-[\w-]+)", src_text))

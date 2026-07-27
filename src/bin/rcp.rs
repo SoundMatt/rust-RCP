@@ -11,12 +11,12 @@
 //! RCP command-line interface — RELAY spec §12 conformant.
 //!
 //! Usage:
-//!   rcp version [--format json]
-//!   rcp capabilities
-//!   rcp status [--format json]
-//!   rcp convert --protocol RCP [--format json]
-//!   rcp send  --zone <zone> --type <cmd_type> [--priority <p>] [--payload <hex>]
-//!   rcp zones
+//!   rust-rcp version [--format json]
+//!   rust-rcp capabilities
+//!   rust-rcp status [--format json]
+//!   rust-rcp convert --protocol RCP [--format json]
+//!   rust-rcp send  --zone <zone> --type <cmd_type> [--priority <p>] [--payload <hex>]
+//!   rust-rcp zones
 
 use std::io::Read;
 use std::process;
@@ -24,7 +24,7 @@ use std::time::Duration;
 
 use rcp::Registry;
 
-const TOOL: &str = "rcp";
+const TOOL: &str = "rust-rcp";
 const PROTOCOL: &str = "RCP";
 const PROTOCOL_INT: u8 = 5;
 
@@ -32,7 +32,7 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
 
     if args.len() < 2 {
-        eprintln!("Usage: rcp <command> [options]");
+        eprintln!("Usage: rust-rcp <command> [options]");
         eprintln!("Commands: version, capabilities, status, convert, send, zones");
         process::exit(1);
     }
@@ -91,7 +91,7 @@ fn main() {
                     "    \"transports\": [],\n",
                     "    \"features\": [\"loaning\"],\n",
                     "    \"interfaces\": [\"Controller\",\"Registry\"],\n",
-                    "    \"optional_interfaces\": [],\n",
+                    "    \"optional_interfaces\": [\"LoaningController\"],\n",
                     "    \"adapt\": true\n",
                     "}}"
                 ),
@@ -387,8 +387,14 @@ mod tests {
 
     #[test]
     // fusa:test REQ-CLI-006
-    fn spec_version_is_relay_1_10() {
-        assert_eq!(rcp::SPEC_VERSION, "1.10", "must track RELAY spec v1.10");
+    fn spec_version_is_relay_1_11() {
+        assert_eq!(rcp::SPEC_VERSION, "1.11", "must track RELAY spec v1.11");
+    }
+
+    #[test]
+    // fusa:test REQ-SPEC-001
+    fn relay_spec_version_alias_matches_spec_version() {
+        assert_eq!(rcp::RELAY_SPEC_VERSION, rcp::SPEC_VERSION);
     }
 
     #[test]
