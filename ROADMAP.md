@@ -108,8 +108,23 @@ shared request-descriptor header that carries all per-message addressing.
       Principle 5, for reconciliation against the OPEN Alliance TC18 Remote
       Control Protocol Specification's behavior before being relied on for
       interop.
-- [ ] TSCF header encode/decode (`avtp_timestamp`, `stream_data_length`) —
-      client-to-server only
+- [x] TSCF header encode/decode (`avtp_timestamp`, `stream_data_length`) —
+      client-to-server only. Done (v0.4.0-dev): `src/avtpdu.rs` adds
+      `TscfHeader { sequence_num, avtp_timestamp, stream_data_length,
+      stream_id }` with `encode_tscf_header`/`decode_tscf_header`,
+      round-tripping and never panicking on truncated/arbitrary input,
+      mirroring the NTSCF work above. `encode_tscf_header` exists for
+      symmetry/testing; per the module's doc comment, an RC Server's own
+      send path has no occasion to call it, since TSCF is a client-to-server
+      header. This is additive alongside `NtscfHeader` — no existing caller
+      is cut over, and `stream_id` construction/parsing and full timestamp
+      semantics (`message_timestamp`, invalid-timestamp fallback) remain
+      separate, later checklist items. The specific byte offsets/bit widths
+      are, like the NTSCF header's, this crate's own working interpretation
+      of IEEE 1722 AVTPDU control-format framing, flagged per Guiding
+      Principle 5 for reconciliation against the OPEN Alliance TC18 Remote
+      Control Protocol Specification's behavior before being relied on for
+      interop.
 - [ ] Header-variant selection/rejection rules: drop TSCF-headed AVTPDUs
       outright at a server with no time-sync support
 

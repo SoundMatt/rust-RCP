@@ -4,17 +4,36 @@
 // fusa:req REQ-NTSCF-004
 // fusa:req REQ-NTSCF-005
 // fusa:req REQ-NTSCF-006
+// fusa:req REQ-TSCF-001
+// fusa:req REQ-TSCF-002
+// fusa:req REQ-TSCF-003
+// fusa:req REQ-TSCF-004
+// fusa:req REQ-TSCF-005
+// fusa:req REQ-TSCF-006
 
 //! IEEE 1722 AVTPDU framing — TC18 wire format core (`ROADMAP.md` Milestone 1).
 //!
 //! This module begins the replacement of the legacy 16-byte frame in
 //! [`crate::wire`] with the real OPEN Alliance TC18 Remote Control Protocol
-//! wire format. For now it models only the **NTSCF** AVTPDU header — per
-//! this crate's own spec-extraction notes, the only header variant an RC
-//! Server ever sends. The TSCF header variant, the two ACF message types,
-//! `stream_id` construction/parsing (as opposed to carrying it as an opaque
-//! field, which this module does), and timestamp semantics are separate,
-//! later items on the same Milestone 1 checklist and are intentionally not
+//! wire format. It models the two AVTPDU header variants named on the
+//! Milestone 1 checklist:
+//!
+//! - **NTSCF** — per this crate's own spec-extraction notes, the only header
+//!   variant an RC Server ever sends.
+//! - **TSCF** — the client-to-server counterpart, carrying an additional
+//!   `avtp_timestamp` field. Per the same notes, a client is the only side
+//!   that ever needs to *encode* one; [`encode_tscf_header`] is provided
+//!   for symmetry (and so the round-trip tests below can exercise it) but
+//!   an RC Server's own send path has no occasion to call it. Nothing in
+//!   this module enforces that direction at the type level — it is a
+//!   protocol-level convention, documented here rather than compiled in.
+//!
+//! The two ACF message types, `stream_id` construction/parsing (as opposed
+//! to carrying it as an opaque field, which this module does), the
+//! header-variant selection/rejection rule (dropping TSCF-headed AVTPDUs at
+//! a server with no time-sync support), and full timestamp semantics
+//! (`message_timestamp`, invalid-timestamp fallback) are separate, later
+//! items on the same Milestone 1 checklist and are intentionally not
 //! implemented here.
 //!
 //! Nothing else in the crate depends on this module yet: it coexists with
@@ -23,15 +42,18 @@
 //!
 //! ## Provenance note
 //!
-//! Field names (`ntscf_data_length`, `sequence_num`) are taken from this
-//! crate's `ROADMAP.md`, which itself cites the OPEN Alliance TC18 Remote
-//! Control Protocol Specification v0.5.1_RC by section number only. The
-//! specific byte offsets and bit widths implemented below are this crate's
-//! own working interpretation of IEEE 1722 AVTPDU control-format framing,
-//! not a transcription of that (confidential, OPEN-Members-only) document's
-//! text. Per Guiding Principle 5, this is flagged for reconciliation against
-//! the specification's behavior (never its prose) before being relied on for
-//! interop with a real TC18 RC Server.
+//! Field names (`ntscf_data_length`, `sequence_num`, `avtp_timestamp`,
+//! `stream_data_length`) are taken from this crate's `ROADMAP.md`, which
+//! itself cites the OPEN Alliance TC18 Remote Control Protocol
+//! Specification v0.5.1_RC by section number only. The specific byte
+//! offsets and bit widths implemented below are this crate's own working
+//! interpretation of IEEE 1722 AVTPDU control-format framing, not a
+//! transcription of that (confidential, OPEN-Members-only) document's text.
+//! Per Guiding Principle 5, this is flagged for reconciliation against the
+//! specification's behavior (never its prose) before being relied on for
+//! interop with a real TC18 RC Server. In particular, `TSCF_SUBTYPE`
+//! (`0x83`) and the header's total length are this crate's own placeholder
+//! values pending that reconciliation.
 
 use crate::RcpError;
 
@@ -137,6 +159,109 @@ pub fn decode_ntscf_header(b: &[u8]) -> Result<NtscfHeader, RcpError> {
     Ok(NtscfHeader {
         sequence_num,
         ntscf_data_length,
+        stream_id,
+    })
+}
+
+// ── TscfHeader ────────────────────────────────────────────────────────────────
+
+/// AVTPDU `subtype` value identifying a TSCF-headed PDU.
+pub const TSCF_SUBTYPE: u8 = 0x83;
+
+/// Total TSCF header length in bytes (up to, but not including, the first
+/// ACF message). Wider than [`NTSCF_HEADER_LEN`] to carry `avtp_timestamp`.
+pub const TSCF_HEADER_LEN: usize = 24;
+
+/// `stream_data_length` is an 11-bit field; this is its maximum
+/// representable value.
+pub const TSCF_DATA_LENGTH_MAX: u16 = 0x07FF;
+
+/// Decoded TSCF AVTPDU header.
+///
+/// TSCF is the client-to-server counterpart of [`NtscfHeader`]: per this
+/// module's doc comment, an RC Server never needs to *encode* one, though
+/// it must be able to decode one (an RC Client uses TSCF when it has
+/// time-synchronized data to send). `stream_id` is carried here as an
+/// opaque 64-bit value only, same as [`NtscfHeader::stream_id`] — see that
+/// field's doc comment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+// fusa:req REQ-TSCF-001
+pub struct TscfHeader {
+    /// Per-stream sequence number, incremented once per TSCF AVTPDU sent.
+    pub sequence_num: u8,
+    /// 32-bit AVTP presentation timestamp. TSCF-only — see
+    /// `ROADMAP.md`'s "Timestamp Semantics" item for how this differs from
+    /// ACF_GBB's 64-bit `message_timestamp`, which this module does not yet
+    /// model.
+    pub avtp_timestamp: u32,
+    /// Length, in bytes, of the ACF message(s) carried after this header.
+    /// Valid range is `0..=TSCF_DATA_LENGTH_MAX` (11 bits).
+    pub stream_data_length: u16,
+    /// Opaque AVTP `stream_id`. See [`NtscfHeader::stream_id`].
+    pub stream_id: u64,
+}
+
+/// Encode a [`TscfHeader`] to its 24-byte wire representation.
+///
+/// Returns `Err(RcpError::InvalidSize)` if `stream_data_length` exceeds the
+/// 11-bit field width.
+// fusa:req REQ-TSCF-002
+pub fn encode_tscf_header(hdr: &TscfHeader) -> Result<[u8; TSCF_HEADER_LEN], RcpError> {
+    if hdr.stream_data_length > TSCF_DATA_LENGTH_MAX {
+        return Err(RcpError::InvalidSize);
+    }
+
+    let mut buf = [0u8; TSCF_HEADER_LEN];
+    buf[0] = TSCF_SUBTYPE;
+    buf[1] = 0x80; // sv=1 (stream_id valid), version=000, reserved=0000
+    buf[2] = hdr.sequence_num;
+    // stream_data_length (11 bits) = byte[3] (high 8 bits) + top 3 bits of byte[4].
+    buf[3] = (hdr.stream_data_length >> 3) as u8;
+    buf[4] = ((hdr.stream_data_length & 0x07) as u8) << 5;
+    // bytes[5..8] reserved, left zeroed.
+    put_u64_be(&mut buf, 8, hdr.stream_id);
+    buf[16..20].copy_from_slice(&hdr.avtp_timestamp.to_be_bytes());
+    // bytes[20..24] reserved, left zeroed.
+    Ok(buf)
+}
+
+/// Decode a [`TscfHeader`] from a byte slice.
+///
+/// Never panics on short, truncated, or arbitrary input — always returns
+/// `Err` instead.
+// fusa:req REQ-TSCF-003
+// fusa:req REQ-TSCF-004
+// fusa:req REQ-TSCF-006
+pub fn decode_tscf_header(b: &[u8]) -> Result<TscfHeader, RcpError> {
+    if b.len() < TSCF_HEADER_LEN {
+        return Err(RcpError::ShortFrame);
+    }
+    if b[0] != TSCF_SUBTYPE {
+        return Err(RcpError::Other(format!(
+            "tscf: expected subtype 0x{:02X}, got 0x{:02X}",
+            TSCF_SUBTYPE, b[0]
+        )));
+    }
+    let sv = (b[1] >> 7) & 0x1;
+    if sv != 1 {
+        return Err(RcpError::Other(
+            "tscf: sv bit must be 1 (stream_id always valid for TSCF)".into(),
+        ));
+    }
+
+    let sequence_num = b[2];
+    let len_hi = u16::from(b[3]);
+    let len_lo = u16::from(b[4] >> 5);
+    let stream_data_length = (len_hi << 3) | len_lo;
+    let stream_id = get_u64_be(&b[8..16]);
+    let mut ts_bytes = [0u8; 4];
+    ts_bytes.copy_from_slice(&b[16..20]);
+    let avtp_timestamp = u32::from_be_bytes(ts_bytes);
+
+    Ok(TscfHeader {
+        sequence_num,
+        avtp_timestamp,
+        stream_data_length,
         stream_id,
     })
 }
@@ -302,6 +427,181 @@ mod tests {
         for len in 0..40 {
             let buf: Vec<u8> = (0..len).map(|_| (next() & 0xFF) as u8).collect();
             let _ = decode_ntscf_header(&buf);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  TscfHeader
+    // ═══════════════════════════════════════════════════════════════════
+
+    // ── Round-trip ─────────────────────────────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-TSCF-001
+    // fusa:test REQ-TSCF-002
+    // fusa:test REQ-TSCF-003
+    fn tscf_header_round_trip() {
+        let hdr = TscfHeader {
+            sequence_num: 0x42,
+            avtp_timestamp: 0x1122_3344,
+            stream_data_length: 0x0355,
+            stream_id: 0x0011_2233_4455_6677,
+        };
+        let frame = encode_tscf_header(&hdr).unwrap();
+        assert_eq!(frame.len(), TSCF_HEADER_LEN);
+        let decoded = decode_tscf_header(&frame).unwrap();
+        assert_eq!(decoded, hdr);
+    }
+
+    #[test]
+    // fusa:test REQ-TSCF-002
+    fn tscf_header_round_trip_zero_values() {
+        let hdr = TscfHeader {
+            sequence_num: 0,
+            avtp_timestamp: 0,
+            stream_data_length: 0,
+            stream_id: 0,
+        };
+        let frame = encode_tscf_header(&hdr).unwrap();
+        let decoded = decode_tscf_header(&frame).unwrap();
+        assert_eq!(decoded, hdr);
+    }
+
+    #[test]
+    // fusa:test REQ-TSCF-002
+    fn tscf_header_round_trip_max_values() {
+        let hdr = TscfHeader {
+            sequence_num: 0xFF,
+            avtp_timestamp: u32::MAX,
+            stream_data_length: TSCF_DATA_LENGTH_MAX,
+            stream_id: u64::MAX,
+        };
+        let frame = encode_tscf_header(&hdr).unwrap();
+        let decoded = decode_tscf_header(&frame).unwrap();
+        assert_eq!(decoded, hdr);
+    }
+
+    #[test]
+    // fusa:test REQ-TSCF-002
+    fn tscf_encode_rejects_oversized_data_length() {
+        let hdr = TscfHeader {
+            stream_data_length: TSCF_DATA_LENGTH_MAX + 1,
+            ..Default::default()
+        };
+        assert_eq!(encode_tscf_header(&hdr), Err(RcpError::InvalidSize));
+    }
+
+    #[test]
+    // fusa:test REQ-TSCF-002
+    fn tscf_encoded_header_has_expected_subtype_and_sv_bit() {
+        let frame = encode_tscf_header(&TscfHeader::default()).unwrap();
+        assert_eq!(frame[0], TSCF_SUBTYPE);
+        assert_eq!(frame[1] & 0x80, 0x80, "sv bit must be set for TSCF");
+    }
+
+    #[test]
+    // fusa:test REQ-TSCF-002
+    fn tscf_and_ntscf_headers_use_distinct_subtypes() {
+        assert_ne!(TSCF_SUBTYPE, NTSCF_SUBTYPE);
+    }
+
+    // ── Decode rejection ──────────────────────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-TSCF-004
+    fn tscf_decode_rejects_short_input() {
+        for len in 0..TSCF_HEADER_LEN {
+            let buf = vec![0u8; len];
+            assert_eq!(decode_tscf_header(&buf), Err(RcpError::ShortFrame));
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-TSCF-004
+    fn tscf_decode_rejects_wrong_subtype() {
+        let mut frame = encode_tscf_header(&TscfHeader::default()).unwrap();
+        frame[0] = NTSCF_SUBTYPE; // NTSCF subtype, not TSCF
+        assert!(matches!(
+            decode_tscf_header(&frame),
+            Err(RcpError::Other(_))
+        ));
+    }
+
+    #[test]
+    // fusa:test REQ-TSCF-004
+    fn tscf_decode_rejects_sv_bit_unset() {
+        let mut frame = encode_tscf_header(&TscfHeader::default()).unwrap();
+        frame[1] &= 0x7F; // clear sv
+        assert!(matches!(
+            decode_tscf_header(&frame),
+            Err(RcpError::Other(_))
+        ));
+    }
+
+    #[test]
+    // fusa:test REQ-TSCF-004
+    fn tscf_decode_ignores_reserved_bits() {
+        let hdr = TscfHeader {
+            sequence_num: 7,
+            avtp_timestamp: 0xDEAD_BEEF,
+            stream_data_length: 0x123,
+            stream_id: 0xABCD,
+        };
+        let mut frame = encode_tscf_header(&hdr).unwrap();
+        // Scribble over version/reserved bits and the reserved bytes;
+        // decode must still succeed and recover the same named fields.
+        frame[1] |= 0x7F; // set everything but sv
+        frame[4] |= 0x1F; // set the 5 reserved low bits of byte 4
+        frame[5] = 0xFF;
+        frame[6] = 0xFF;
+        frame[7] = 0xFF;
+        frame[20] = 0xFF;
+        frame[21] = 0xFF;
+        frame[22] = 0xFF;
+        frame[23] = 0xFF;
+        let decoded = decode_tscf_header(&frame).unwrap();
+        assert_eq!(decoded, hdr);
+    }
+
+    // ── Fuzz-style: arbitrary bytes never panic ───────────────────────────
+
+    #[test]
+    // fusa:test REQ-TSCF-005
+    // fusa:test REQ-TSCF-006
+    fn tscf_decode_never_panics_on_arbitrary_input() {
+        let inputs: &[&[u8]] = &[
+            &[],
+            &[0x83],
+            &[0x83, 0x80],
+            &[0xFF; 24],
+            &[0x00; 24],
+            &[
+                0x83, 0x80, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            ],
+            &[0x83; 40],
+        ];
+        for input in inputs {
+            let _ = decode_tscf_header(input);
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-TSCF-006
+    fn tscf_decode_never_panics_on_random_lengths() {
+        // Deterministic pseudo-random coverage across many lengths/contents,
+        // matching wire.rs's fuzz-style discipline without adding a
+        // dedicated cargo-fuzz target for this early a milestone item.
+        let mut state: u32 = 0x8765_4321;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            state
+        };
+        for len in 0..60 {
+            let buf: Vec<u8> = (0..len).map(|_| (next() & 0xFF) as u8).collect();
+            let _ = decode_tscf_header(&buf);
         }
     }
 }

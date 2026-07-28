@@ -3267,6 +3267,60 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-TSCF-001",
+      "title": "TscfHeader field model",
+      "text": "TscfHeader models sequence_num, avtp_timestamp, stream_data_length, and stream_id for the TSCF AVTPDU header variant",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-TSCF-002",
+      "title": "TSCF header encode/decode round-trip",
+      "text": "encode_tscf_header(hdr) followed by decode_tscf_header() recovers the original header, and out-of-range stream_data_length is rejected with InvalidSize",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-TSCF-003",
+      "title": "TSCF subtype and sv bit",
+      "text": "Encoded TSCF headers carry subtype 0x83 and set the sv bit, identifying the AVTPDU as TSCF with a valid stream_id, distinct from the NTSCF subtype",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-TSCF-004",
+      "title": "TSCF decode rejects malformed input",
+      "text": "decode_tscf_header rejects frames shorter than 24 bytes, wrong subtype, or an unset sv bit",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-TSCF-005",
+      "title": "TSCF decode never panics",
+      "text": "decode_tscf_header never panics on arbitrary or truncated input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-TSCF-006",
+      "title": "TSCF decode robust across input lengths",
+      "text": "decode_tscf_header never panics across a swept range of arbitrary input lengths and contents",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
