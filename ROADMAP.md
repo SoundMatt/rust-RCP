@@ -144,14 +144,43 @@ shared request-descriptor header that carries all per-message addressing.
 
 ### ACF Messages
 
-- [ ] ACF_ABB (`acf_msg_type = 0x0E`) encode/decode — no timestamp field at
-      all, not just a zeroed one
-- [ ] ACF_GBB (`acf_msg_type = 0x0D`) encode/decode — carries the 64-bit
-      `message_timestamp`
-- [ ] Shared `byte_message_info` header: `acf_msg_length`, `pad`, `mtv`,
+- [x] ACF_ABB (`acf_msg_type = 0x0E`) encode/decode — no timestamp field at
+      all, not just a zeroed one. Done (v0.4.0-dev): `src/acf.rs` adds
+      `AcfAbbMessage { info: ByteMessageInfo, payload }` with
+      `encode_acf_abb`/`decode_acf_abb`, round-tripping and never panicking
+      on truncated/arbitrary input. `ACF_ABB_HEADER_LEN` (9 bytes: the
+      discriminant plus `byte_message_info`) is structurally 8 bytes
+      narrower than `ACF_GBB_HEADER_LEN` — there is no reserved gap sized
+      for a timestamp, not merely a zeroed one.
+- [x] ACF_GBB (`acf_msg_type = 0x0D`) encode/decode — carries the 64-bit
+      `message_timestamp`. Done (v0.4.0-dev): `src/acf.rs` adds
+      `AcfGbbMessage { info: ByteMessageInfo, message_timestamp: u64,
+      payload }` with `encode_acf_gbb`/`decode_acf_gbb`, round-tripping the
+      full `u64` range (including the all-zero and all-`0xFF` extremes) and
+      never panicking on truncated/arbitrary input. `message_timestamp` is
+      carried as a raw passthrough value only — its width/rollover
+      semantics remain the separate "Timestamp Semantics" item below.
+- [x] Shared `byte_message_info` header: `acf_msg_length`, `pad`, `mtv`,
       11-bit `byte_bus_id`, 4-bit `evt` (ack flag + 3-bit sub-opcode), `hs`,
       `cs`, `transaction_num`, `op`, `rsp`, `err`, `ms`, and the dual-purpose
-      `read_size`/`segment_num` field
+      `read_size`/`segment_num` field. Done (v0.4.0-dev): `src/acf.rs` adds
+      `ByteMessageInfo` with all of the above fields, shared by both
+      `AcfAbbMessage` and `AcfGbbMessage`, plus `encode_byte_message_info`/
+      `decode_byte_message_info`. Per Guiding Principle 5, the
+      `read_size`/`segment_num` ambiguity is resolved with an explicit,
+      documented convention rather than a single ambiguous field:
+      `ReadSizeOrSegmentNum` models the field as one raw byte with two
+      same-bit accessor views (`as_read_size`/`as_segment_num`), since this
+      crate has not reconciled which bit(s), if any, would select one
+      interpretation over the other. All byte offsets/bit widths beyond the
+      three the roadmap states explicitly (the 11-bit `acf_msg_length`,
+      11-bit `byte_bus_id`, 4-bit `evt`) are this crate's own working
+      interpretation, flagged in `src/acf.rs`'s provenance note for
+      reconciliation against the OPEN Alliance TC18 Remote Control Protocol
+      Specification's behavior before being relied on for interop. This is
+      additive alongside `avtpdu.rs` and does not yet wire either ACF
+      message type into an AVTPDU decoder or cut over any caller of
+      `src/wire.rs` — that composition and cutover remain later work.
 
 ### Addressing
 
