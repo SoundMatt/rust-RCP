@@ -3609,6 +3609,60 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-TS-001",
+      "title": "AvtpTimestamp/MessageTimestamp are distinct types",
+      "text": "AvtpTimestamp (wrapping TscfHeader::avtp_timestamp's raw u32) and MessageTimestamp (wrapping AcfGbbMessage::message_timestamp's raw u64) are modeled as two distinct newtypes with no shared trait or cross-type comparison, so the two fields' distinct widths and distinct rollover periods can never be confused with one another",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-TS-002",
+      "title": "AvtpTimestamp wraparound-aware comparison",
+      "text": "AvtpTimestamp::wrapping_delta/is_after compare two 32-bit timestamps correctly across their rollover boundary, reporting a small delta when one value has just wrapped past the other rather than a large one",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-TS-003",
+      "title": "MessageTimestamp wraparound-aware comparison",
+      "text": "MessageTimestamp::wrapping_delta/is_after compare two 64-bit timestamps correctly across their own, independent rollover boundary, using the same wraparound convention as AvtpTimestamp but over a distinct, much longer period",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-TS-004",
+      "title": "Invalid/uncertain timestamp fallback rule",
+      "text": "AvtpTimestamp::semantics/is_untimed and MessageTimestamp::semantics/is_untimed fold an exact all-zero raw value down to TimestampMeaning::Untimed and treat every other raw value, including the widest representable one, as TimestampMeaning::Timed",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-TS-005",
+      "title": "Round trip / interop with the raw wire fields",
+      "text": "AvtpTimestamp/MessageTimestamp round-trip through their raw u32/u64 values (including via From/Into) and interoperate with values sourced from TscfHeader::avtp_timestamp and AcfGbbMessage::message_timestamp without either header/message struct's field type changing",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-TS-006",
+      "title": "Timestamp semantics never panic",
+      "text": "AvtpTimestamp and MessageTimestamp's semantics/is_untimed/wrapping_delta/is_after never panic for any combination of raw input values, across a swept range including the all-zero, all-1s, and half-rollover-period extremes",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

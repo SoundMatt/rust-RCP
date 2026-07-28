@@ -264,10 +264,41 @@ shared request-descriptor header that carries all per-message addressing.
 
 ### Timestamp Semantics
 
-- [ ] `avtp_timestamp` (32-bit, TSCF-only) vs `message_timestamp` (64-bit,
-      ACF_GBB-only) — distinct widths, distinct rollover periods
-- [ ] Invalid/uncertain timestamp fallback: an all-zero timestamp region
-      folds down to "treat as untimed," matching the spec's stated leniency
+- [x] `avtp_timestamp` (32-bit, TSCF-only) vs `message_timestamp` (64-bit,
+      ACF_GBB-only) — distinct widths, distinct rollover periods. Done
+      (v0.4.0-dev): new module `src/timestamp.rs` adds `AvtpTimestamp`
+      (wrapping the raw `u32`) and `MessageTimestamp` (wrapping the raw
+      `u64`) as two distinct newtypes with no shared trait or cross-type
+      comparison between them, so the two can never be confused with one
+      another. Each carries its own `ROLLOVER_PERIOD` constant (2^32 vs
+      2^64 raw ticks) and its own wraparound-aware `wrapping_delta`/
+      `is_after` comparison pair, covering the operational half of "distinct
+      rollover periods" — comparing two timestamps correctly across a
+      rollover — not just the field-width half. Covered by round-trip,
+      non-wraparound-delta, wraparound-boundary, and exactly-half-period
+      tests for both types.
+- [x] Invalid/uncertain timestamp fallback: an all-zero timestamp region
+      folds down to "treat as untimed," matching the spec's stated
+      leniency. Done (v0.4.0-dev): `AvtpTimestamp::semantics`/`is_untimed`
+      and `MessageTimestamp::semantics`/`is_untimed` fold an exact all-zero
+      raw value down to the new `TimestampMeaning::Untimed`, and every
+      other raw value (including the widest representable one) to
+      `TimestampMeaning::Timed`. Per Guiding Principle 5, both the exact
+      fallback trigger condition (all-zero only, not a wider sentinel band)
+      and the two rollover-period lengths (each field's full bit width, in
+      raw ticks — not a real-world time unit) are flagged in the module's
+      provenance note as this crate's own working interpretation, since the
+      roadmap states them by rule only and the underlying OPEN Alliance
+      TC18 Remote Control Protocol Specification v0.5.1_RC is cited by
+      section number only, pending reconciliation before real interop.
+      Covered by round-trip, zero/non-zero, and never-panics-on-
+      arbitrary-input tests. This is additive, matching every other
+      Milestone 1 entry: `TscfHeader::avtp_timestamp` and
+      `AcfGbbMessage::message_timestamp` keep their raw `u32`/`u64` field
+      types unchanged — `AvtpTimestamp`/`MessageTimestamp` consume those
+      raw values as conversion inputs/outputs only and are not wired into
+      either type's encode/decode path or any other existing caller. This
+      closes out the "Timestamp Semantics" subsection.
 
 ### Validation
 
