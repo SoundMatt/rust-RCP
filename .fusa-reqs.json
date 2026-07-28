@@ -3870,6 +3870,60 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-001",
+      "title": "EndpointType numeric encoding and reserved-type flag",
+      "text": "EndpointType enumerates the thirteen ep_type codes 0x01-0x0D named in ROADMAP.md Milestones 4 and 7, to_u8/from_u8 round-trip every defined code with no two codes colliding, and is_reserved returns true only for EndpointType::Dac",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-002",
+      "title": "EndpointType::from_u8 rejects unrecognized bytes",
+      "text": "EndpointType::from_u8 returns Err(RcpError::Other) for every byte outside 0x01..=0x0D, without panicking",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-003",
+      "title": "Three-layer taxonomy structural tagging",
+      "text": "PerEpConfigBlock always belongs to ConfigLayer::Generic, CommonFunctionalConfig always belongs to ConfigLayer::CommonFunctional, and PerEpTypeFunctionalConfig::layer() reports ConfigLayer::PerTypeFunctional tagged with its own EndpointType, for every defined EndpointType",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-004",
+      "title": "Cross-layer ep_type match invariant",
+      "text": "functional_config_matches_ep_type returns true iff a PerEpConfigBlock and a PerEpTypeFunctionalConfig carry the same EndpointType, and check_functional_config_matches_ep_type returns Ok(()) in exactly that case and Err(RcpError::EndpointTypeMismatch) otherwise, for every EndpointType pair",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-005",
+      "title": "Provisional ConfigLayer to RegisterCategory mapping",
+      "text": "register_category maps ConfigLayer::Generic to RegisterCategory::HwConfig, and both ConfigLayer::CommonFunctional and every ConfigLayer::PerTypeFunctional(EndpointType) variant to RegisterCategory::RcpConfig, agreeing with each other across every defined EndpointType",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-006",
+      "title": "Register map taxonomy operations never panic",
+      "text": "EndpointType::from_u8 never panics across the full 0..=255 byte range, and functional_config_matches_ep_type/check_functional_config_matches_ep_type/layer()/register_category never panic for any EndpointType pair",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

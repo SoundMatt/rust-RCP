@@ -522,9 +522,34 @@ lifecycle machine and the register-map configuration model, replacing the
 
 ### Register Map
 
-- [ ] Generic (server-owned) per-EP config block vs. common functional-config
+- [x] Generic (server-owned) per-EP config block vs. common functional-config
       block vs. per-EP-type functional config — three distinct layers, not
-      the old crate's single flat `ep_type`-less model
+      the old crate's single flat `ep_type`-less model. Done (v0.5.0-dev):
+      `src/register_map.rs` adds `EndpointType` (the thirteen `ep_type`
+      codes `0x01`-`0x0D` named in Milestones 4 and 7, with
+      `to_u8`/`from_u8` and `is_reserved` for `Dac`), `PerEpConfigBlock`
+      (the generic per-EP layer, tagged by `ep_type`), `CommonFunctionalConfig`
+      (an empty placeholder for the layer shared across every `EndpointType`),
+      and `PerEpTypeFunctionalConfig` (an `EndpointType`-tagged placeholder
+      for the third, per-type layer), plus `functional_config_matches_ep_type`/
+      `check_functional_config_matches_ep_type` as the one cross-layer rule
+      the three already have to each other. No concrete field beyond the
+      `ep_type` tag is invented — that is this same subsection's next two
+      bullets' job. `ConfigLayer`/`register_category` give this crate's own
+      flagged, provisional mapping from a taxonomy layer to
+      `lifecycle::RegisterCategory`, reconciling the two without asserting
+      one replaces the other; see the module doc comment's "Relationship to
+      `crate::lifecycle::RegisterCategory`" section for the two different
+      confidence levels behind that mapping's branches. `EndpointType`
+      deliberately has no EP0 variant — see the module doc comment's
+      "Relationship to `crate::ep0`" section for how this crate reconciles
+      this subsection's "thirteen" (numeric `ep_type` codes `0x01`-`0x0D`)
+      against Milestone 7's own differently-scoped "thirteen defined
+      endpoint types (EP0 + Wakeup + eleven device-facing types)" headcount.
+      This is additive: like every prior Milestone 1/2 entry, nothing here
+      is wired into `crate::ep0`, `crate::lifecycle`, or any other existing
+      caller. New `REQ-RMAP-001`..`REQ-RMAP-006` added to `.fusa-reqs.json`,
+      each with a `// fusa:req`/`// fusa:test` pair in `src/register_map.rs`.
 - [ ] General register-map fields: `svr_oa_tc18_magic_nr`, `svr_version`,
       `svr_vendor_id`, `svr_device_id`, `svr_ep_count`,
       `svr_implemented_options`, and the rest of §3.6's table
