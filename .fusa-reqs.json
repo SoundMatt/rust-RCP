@@ -3321,6 +3321,51 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-HVSEL-001",
+      "title": "TimeSyncCapability / HeaderVariant model",
+      "text": "TimeSyncCapability models a receiving server's time-synchronization capability (Capable/Incapable) and HeaderVariant tags a decoded header as Ntscf or Tscf",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-HVSEL-002",
+      "title": "TSCF dropped at a time-sync-incapable server",
+      "text": "select_header_variant rejects a TSCF-subtyped AVTPDU with RcpError::TimeSyncUnsupported when the receiving server has no time-synchronization support, without decoding the remainder of the header",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-HVSEL-003",
+      "title": "TSCF accepted at a time-sync-capable server",
+      "text": "select_header_variant decodes a TSCF-subtyped AVTPDU into HeaderVariant::Tscf when the receiving server supports time synchronization, delegating to decode_tscf_header for the header body",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-HVSEL-004",
+      "title": "NTSCF always accepted regardless of time-sync capability",
+      "text": "select_header_variant decodes an NTSCF-subtyped AVTPDU into HeaderVariant::Ntscf regardless of the receiving server's time-synchronization capability",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-HVSEL-005",
+      "title": "select_header_variant never panics on malformed input",
+      "text": "select_header_variant never panics on empty, truncated, or unrecognized-subtype input, returning ShortFrame or Other instead",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

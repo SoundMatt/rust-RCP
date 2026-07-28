@@ -439,6 +439,9 @@ pub enum RcpError {
     #[error("rcp/e2e: replayed sequence number")]
     Replay,
 
+    #[error("rcp/avtpdu: TSCF header requires server time-sync support")]
+    TimeSyncUnsupported,
+
     // ── General errors ───────────────────────────────────────────────────
     #[error("rcp: invalid size")]
     InvalidSize,

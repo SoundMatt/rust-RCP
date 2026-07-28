@@ -10,6 +10,11 @@
 // fusa:req REQ-TSCF-004
 // fusa:req REQ-TSCF-005
 // fusa:req REQ-TSCF-006
+// fusa:req REQ-HVSEL-001
+// fusa:req REQ-HVSEL-002
+// fusa:req REQ-HVSEL-003
+// fusa:req REQ-HVSEL-004
+// fusa:req REQ-HVSEL-005
 
 //! IEEE 1722 AVTPDU framing — TC18 wire format core (`ROADMAP.md` Milestone 1).
 //!
@@ -28,13 +33,20 @@
 //!   this module enforces that direction at the type level — it is a
 //!   protocol-level convention, documented here rather than compiled in.
 //!
+//! [`select_header_variant`] layers the Milestone 1 "header-variant
+//! selection/rejection rule" on top of the two decoders above: a receiving
+//! server's [`TimeSyncCapability`] gates whether a TSCF-subtyped AVTPDU is
+//! decoded at all. NTSCF carries no timing assumption and is accepted
+//! unconditionally; TSCF's `avtp_timestamp` is only meaningful to a server
+//! that participates in time synchronization, so a time-sync-incapable
+//! server drops it outright rather than decoding the remainder of the
+//! header.
+//!
 //! The two ACF message types, `stream_id` construction/parsing (as opposed
-//! to carrying it as an opaque field, which this module does), the
-//! header-variant selection/rejection rule (dropping TSCF-headed AVTPDUs at
-//! a server with no time-sync support), and full timestamp semantics
-//! (`message_timestamp`, invalid-timestamp fallback) are separate, later
-//! items on the same Milestone 1 checklist and are intentionally not
-//! implemented here.
+//! to carrying it as an opaque field, which this module does), and full
+//! timestamp semantics (`message_timestamp`, invalid-timestamp fallback)
+//! are separate, later items on the same Milestone 1 checklist and are
+//! intentionally not implemented here.
 //!
 //! Nothing else in the crate depends on this module yet: it coexists with
 //! [`crate::wire`] rather than replacing it, so existing callers of the
@@ -264,6 +276,85 @@ pub fn decode_tscf_header(b: &[u8]) -> Result<TscfHeader, RcpError> {
         stream_data_length,
         stream_id,
     })
+}
+
+// ── Header-variant selection/rejection ───────────────────────────────────────
+
+/// A receiving RC Server's time-synchronization capability.
+///
+/// TSCF's `avtp_timestamp` only carries meaning for a server that
+/// participates in network time synchronization (e.g. gPTP/802.1AS). This
+/// crate does not yet model *how* a server learns whether it has that
+/// capability (that belongs to a later milestone's server-lifecycle work);
+/// this type exists purely to make the header-variant selection rule below
+/// testable against both outcomes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// fusa:req REQ-HVSEL-001
+pub enum TimeSyncCapability {
+    /// The server participates in time synchronization; TSCF-headed
+    /// AVTPDUs may be decoded.
+    Capable,
+    /// The server has no time-synchronization support; TSCF-headed AVTPDUs
+    /// must be dropped outright, per this module's selection/rejection
+    /// rule.
+    Incapable,
+}
+
+impl TimeSyncCapability {
+    fn accepts_tscf(self) -> bool {
+        matches!(self, Self::Capable)
+    }
+}
+
+/// A decoded AVTPDU header, tagged by which Milestone 1 header variant
+/// produced it. Returned by [`select_header_variant`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// fusa:req REQ-HVSEL-001
+pub enum HeaderVariant {
+    /// Decoded via [`decode_ntscf_header`].
+    Ntscf(NtscfHeader),
+    /// Decoded via [`decode_tscf_header`].
+    Tscf(TscfHeader),
+}
+
+/// Decode an AVTPDU header, applying the Milestone 1 header-variant
+/// selection/rejection rule.
+///
+/// NTSCF-subtyped input is always decoded, regardless of `time_sync`. A
+/// TSCF-subtyped input is decoded only when `time_sync` is
+/// [`TimeSyncCapability::Capable`]; when the server is
+/// [`TimeSyncCapability::Incapable`], the AVTPDU is dropped outright and
+/// `Err(RcpError::TimeSyncUnsupported)` is returned without attempting to
+/// decode the rest of the header — a time-sync-incapable server has no
+/// meaningful use for `avtp_timestamp`, so there is nothing to gain by
+/// reading further.
+///
+/// Never panics: returns `Err(RcpError::ShortFrame)` for input too short to
+/// contain even the leading subtype byte, and `Err(RcpError::Other(_))` for
+/// a subtype that is neither [`NTSCF_SUBTYPE`] nor [`TSCF_SUBTYPE`]. All
+/// other decode-rejection paths (short frame past the subtype byte, sv bit,
+/// ...) are delegated to [`decode_ntscf_header`]/[`decode_tscf_header`].
+// fusa:req REQ-HVSEL-002
+// fusa:req REQ-HVSEL-003
+// fusa:req REQ-HVSEL-004
+// fusa:req REQ-HVSEL-005
+pub fn select_header_variant(
+    b: &[u8],
+    time_sync: TimeSyncCapability,
+) -> Result<HeaderVariant, RcpError> {
+    let subtype = *b.first().ok_or(RcpError::ShortFrame)?;
+    match subtype {
+        NTSCF_SUBTYPE => decode_ntscf_header(b).map(HeaderVariant::Ntscf),
+        TSCF_SUBTYPE => {
+            if !time_sync.accepts_tscf() {
+                return Err(RcpError::TimeSyncUnsupported);
+            }
+            decode_tscf_header(b).map(HeaderVariant::Tscf)
+        }
+        other => Err(RcpError::Other(format!(
+            "avtpdu: unrecognized subtype 0x{other:02X} (expected NTSCF 0x{NTSCF_SUBTYPE:02X} or TSCF 0x{TSCF_SUBTYPE:02X})"
+        ))),
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -602,6 +693,148 @@ mod tests {
         for len in 0..60 {
             let buf: Vec<u8> = (0..len).map(|_| (next() & 0xFF) as u8).collect();
             let _ = decode_tscf_header(&buf);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Header-variant selection/rejection
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    // fusa:test REQ-HVSEL-001
+    fn time_sync_capability_accepts_tscf_only_when_capable() {
+        assert!(TimeSyncCapability::Capable.accepts_tscf());
+        assert!(!TimeSyncCapability::Incapable.accepts_tscf());
+    }
+
+    #[test]
+    // fusa:test REQ-HVSEL-004
+    fn select_header_variant_accepts_ntscf_when_time_sync_capable() {
+        let hdr = NtscfHeader {
+            sequence_num: 3,
+            ntscf_data_length: 12,
+            stream_id: 0xAABB_CCDD,
+        };
+        let frame = encode_ntscf_header(&hdr).unwrap();
+        let decoded = select_header_variant(&frame, TimeSyncCapability::Capable).unwrap();
+        assert_eq!(decoded, HeaderVariant::Ntscf(hdr));
+    }
+
+    #[test]
+    // fusa:test REQ-HVSEL-004
+    fn select_header_variant_accepts_ntscf_when_time_sync_incapable() {
+        // NTSCF carries no timing assumption: it is accepted regardless of
+        // the receiving server's time-sync capability.
+        let hdr = NtscfHeader {
+            sequence_num: 3,
+            ntscf_data_length: 12,
+            stream_id: 0xAABB_CCDD,
+        };
+        let frame = encode_ntscf_header(&hdr).unwrap();
+        let decoded = select_header_variant(&frame, TimeSyncCapability::Incapable).unwrap();
+        assert_eq!(decoded, HeaderVariant::Ntscf(hdr));
+    }
+
+    #[test]
+    // fusa:test REQ-HVSEL-003
+    fn select_header_variant_accepts_tscf_when_time_sync_capable() {
+        let hdr = TscfHeader {
+            sequence_num: 9,
+            avtp_timestamp: 0x1234_5678,
+            stream_data_length: 40,
+            stream_id: 0x0011_2233_4455_6677,
+        };
+        let frame = encode_tscf_header(&hdr).unwrap();
+        let decoded = select_header_variant(&frame, TimeSyncCapability::Capable).unwrap();
+        assert_eq!(decoded, HeaderVariant::Tscf(hdr));
+    }
+
+    #[test]
+    // fusa:test REQ-HVSEL-002
+    fn select_header_variant_drops_tscf_when_time_sync_incapable() {
+        let hdr = TscfHeader {
+            sequence_num: 9,
+            avtp_timestamp: 0x1234_5678,
+            stream_data_length: 40,
+            stream_id: 0x0011_2233_4455_6677,
+        };
+        let frame = encode_tscf_header(&hdr).unwrap();
+        assert_eq!(
+            select_header_variant(&frame, TimeSyncCapability::Incapable),
+            Err(RcpError::TimeSyncUnsupported)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-HVSEL-002
+    fn select_header_variant_drops_tscf_before_decoding_body() {
+        // Even a TSCF frame that would otherwise fail to decode (too short
+        // past the subtype byte) must still be reported as the time-sync
+        // rejection, not a short-frame/decode error, confirming the
+        // rejection happens before the header body is inspected.
+        let short_tscf_looking = [TSCF_SUBTYPE, 0x80];
+        assert_eq!(
+            select_header_variant(&short_tscf_looking, TimeSyncCapability::Incapable),
+            Err(RcpError::TimeSyncUnsupported)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-HVSEL-005
+    fn select_header_variant_rejects_empty_input() {
+        assert_eq!(
+            select_header_variant(&[], TimeSyncCapability::Capable),
+            Err(RcpError::ShortFrame)
+        );
+        assert_eq!(
+            select_header_variant(&[], TimeSyncCapability::Incapable),
+            Err(RcpError::ShortFrame)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-HVSEL-005
+    fn select_header_variant_rejects_unrecognized_subtype() {
+        let frame = [0x01u8; TSCF_HEADER_LEN];
+        assert!(matches!(
+            select_header_variant(&frame, TimeSyncCapability::Capable),
+            Err(RcpError::Other(_))
+        ));
+    }
+
+    #[test]
+    // fusa:test REQ-HVSEL-002
+    // fusa:test REQ-HVSEL-003
+    fn select_header_variant_propagates_tscf_decode_errors_when_capable() {
+        // Wrong subtype byte inside an otherwise TSCF-length frame should
+        // still surface as a genuine decode error (not the time-sync
+        // rejection) once the server is time-sync capable — the peeked
+        // dispatch byte and the header's internal subtype check are
+        // consistent with each other.
+        let hdr = TscfHeader::default();
+        let mut frame = encode_tscf_header(&hdr).unwrap();
+        frame[0] = TSCF_SUBTYPE;
+        frame[1] &= 0x7F; // clear sv, forcing decode_tscf_header to reject
+        assert!(matches!(
+            select_header_variant(&frame, TimeSyncCapability::Capable),
+            Err(RcpError::Other(_))
+        ));
+    }
+
+    #[test]
+    // fusa:test REQ-HVSEL-005
+    fn select_header_variant_never_panics_on_arbitrary_input() {
+        let mut state: u32 = 0x2468_ACE0;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            state
+        };
+        for len in 0..40 {
+            let buf: Vec<u8> = (0..len).map(|_| (next() & 0xFF) as u8).collect();
+            let _ = select_header_variant(&buf, TimeSyncCapability::Capable);
+            let _ = select_header_variant(&buf, TimeSyncCapability::Incapable);
         }
     }
 }

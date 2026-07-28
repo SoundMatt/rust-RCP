@@ -125,8 +125,22 @@ shared request-descriptor header that carries all per-message addressing.
       Principle 5 for reconciliation against the OPEN Alliance TC18 Remote
       Control Protocol Specification's behavior before being relied on for
       interop.
-- [ ] Header-variant selection/rejection rules: drop TSCF-headed AVTPDUs
-      outright at a server with no time-sync support
+- [x] Header-variant selection/rejection rules: drop TSCF-headed AVTPDUs
+      outright at a server with no time-sync support. Done (v0.4.0-dev):
+      `src/avtpdu.rs` adds `TimeSyncCapability { Capable, Incapable }` and
+      `HeaderVariant { Ntscf(NtscfHeader), Tscf(TscfHeader) }`, plus
+      `select_header_variant(bytes, TimeSyncCapability) ->
+      Result<HeaderVariant, RcpError>`, which peeks the leading subtype
+      byte and dispatches to `decode_ntscf_header`/`decode_tscf_header`
+      accordingly. NTSCF is always accepted; TSCF is decoded only when the
+      server is `Capable`, and rejected outright — before any attempt to
+      decode the rest of the header — with the new `RcpError::
+      TimeSyncUnsupported` sentinel when `Incapable`. This crate does not
+      yet model how a server learns its own time-sync capability (that is
+      later server-lifecycle work); `TimeSyncCapability` exists here solely
+      to make this selection rule callable and testable against both
+      outcomes now. Additive alongside the existing NTSCF/TSCF decoders —
+      no existing caller is cut over.
 
 ### ACF Messages
 
