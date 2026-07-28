@@ -9,10 +9,11 @@
 // fusa:req REQ-LIFE-009
 // fusa:req REQ-LIFE-010
 // fusa:req REQ-LIFE-011
+// fusa:req REQ-LIFE-012
 
 //! RC Server lifecycle state machine — TC18 register-map model
-//! (`ROADMAP.md` Milestone 2, "Lifecycle State Machine" subsection, first
-//! three checklist items).
+//! (`ROADMAP.md` Milestone 2, "Lifecycle State Machine" subsection, now in
+//! full).
 //!
 //! This module begins Milestone 2, which replaces the legacy
 //! `Zone`/`Controller`/`Registry` abstraction with a first-class RC Server
@@ -27,9 +28,8 @@
 //! second: which moves between states are even structurally allowed, and
 //! under what caller-supplied consistency guard.
 //!
-//! This module now covers the *first three* of four "Lifecycle State
-//! Machine" checklist items and stops well short of the remaining one,
-//! which is separate, later work:
+//! This module now covers all four "Lifecycle State Machine" checklist
+//! items, including the last of them:
 //!
 //! - **Register-locking-by-state**, including the `W`/`W*` distinction
 //!   (permanently locked once `RCP_CONFIGURED`). [`is_register_reachable`]
@@ -42,14 +42,19 @@
 //!   reports reachable in a given state may still be write-locked by this
 //!   rule.
 //! - The **demotion path** from `HW_CONFIGURED` back to `HW_UNCONFIGURED`.
-//!   [`RcServerState::try_transition`] deliberately implements only the two
-//!   *forward* transitions (`HW_UNCONFIGURED` -> `HW_CONFIGURED` and
-//!   `HW_CONFIGURED` -> `RCP_CONFIGURED`); every other `(from, to)` pair —
-//!   including this demotion path, any full rollback to `HW_UNCONFIGURED`,
-//!   skipping `HW_CONFIGURED` entirely, or staying in the same state — is
-//!   rejected with `RcpError::InvalidLifecycleTransition` because it is
-//!   not yet implemented here, not because this module has evaluated it
-//!   and found it illegal. The later demotion-path item may relax that.
+//!   [`RcServerState::try_transition`] now implements this transition in
+//!   addition to the two *forward* transitions (`HW_UNCONFIGURED` ->
+//!   `HW_CONFIGURED` and `HW_CONFIGURED` -> `RCP_CONFIGURED`), for exactly
+//!   the single hop named by the roadmap checklist's own wording —
+//!   `HW_CONFIGURED` -> `HW_UNCONFIGURED`, not `RCP_CONFIGURED` ->
+//!   anything. Every other `(from, to)` pair — any full rollback from
+//!   `RCP_CONFIGURED`, skipping `HW_CONFIGURED` entirely, or staying in
+//!   the same state — remains rejected with
+//!   `RcpError::InvalidLifecycleTransition`. See the Provenance note below
+//!   for the judgment calls this item made explicit rather than guessed
+//!   at silently: whether the demotion needs a guard (it does not), and
+//!   why demoting out of `RCP_CONFIGURED` is treated as a distinct,
+//!   still-unbuilt concern rather than assumed to be in scope here.
 //!
 //! Also out of scope, as later subsections of the same milestone: EP0 (the
 //! RC-Server-as-endpoint whole-register-map read/write path) and the
@@ -124,29 +129,57 @@
 //!
 //! - That exactly the *two forward* transitions named by the two guards
 //!   (`HW_UNCONFIGURED` -> `HW_CONFIGURED`, `HW_CONFIGURED` ->
-//!   `RCP_CONFIGURED`) are structurally legal, and every other `(from,
+//!   `RCP_CONFIGURED`) plus the one demotion transition named by this
+//!   milestone's fourth checklist item (`HW_CONFIGURED` ->
+//!   `HW_UNCONFIGURED`) are structurally legal, and every other `(from,
 //!   to)` pair is rejected outright, is inferred from the roadmap
-//!   checklist ordering the two guard names alongside exactly those two
-//!   transitions and calling out the demotion path as a distinct, later
-//!   item — read together, that is this crate's evidence that no other
-//!   transition (including staying put) is meant to succeed via this
-//!   function.
-//! - Neither guard's actual pass/fail criterion is defined anywhere in
-//!   this crate yet — no register-map fields exist to validate hardware or
-//!   RCP-level configuration against, since the Register Map subsection is
-//!   later work in this same milestone. `try_transition` therefore takes
-//!   the consistency check as a caller-supplied `is_consistent: impl
-//!   FnOnce() -> bool` closure rather than evaluating anything itself; the
-//!   two new `RcpError` sentinels it can return
+//!   checklist naming exactly those three `(from, to)` pairs across its
+//!   four "Lifecycle State Machine" bullets and no others — read together,
+//!   that is this crate's evidence that no other transition (including
+//!   staying put, or any move originating at `RCP_CONFIGURED`) is meant to
+//!   succeed via this function.
+//! - Neither forward guard's actual pass/fail criterion is defined
+//!   anywhere in this crate yet — no register-map fields exist to validate
+//!   hardware or RCP-level configuration against, since the Register Map
+//!   subsection is later work in this same milestone. `try_transition`
+//!   therefore takes the consistency check as a caller-supplied
+//!   `is_consistent: impl FnOnce() -> bool` closure rather than evaluating
+//!   anything itself; the two new `RcpError` sentinels it can return
 //!   (`RcpError::HwCfgInconsistent`, `RcpError::RcpCfgInconsistent`) are
 //!   named after the guards for traceability but, like
 //!   `RcpError::RegisterUnreachable` before them, are this crate's own
 //!   provisional names pending the milestone's later "Error Model" item.
 //!   `RcpError::InvalidLifecycleTransition` (for any `(from, to)` pair
-//!   outside the two defined transitions) is the same kind of provisional
-//!   sentinel.
+//!   outside the three defined transitions) is the same kind of
+//!   provisional sentinel.
+//! - The demotion transition (`HW_CONFIGURED` -> `HW_UNCONFIGURED`) is
+//!   modeled as **unconditional**: `is_consistent` is accepted by
+//!   `try_transition`'s signature (so callers passing the same closure
+//!   shape for every transition attempt still compile) but is never
+//!   actually invoked for this `(from, to)` pair, and the transition
+//!   always succeeds. This is this crate's own judgment call, not a
+//!   transcription of specified behavior: unlike the two forward
+//!   transitions, the roadmap checklist names no
+//!   `..._INCONSISTENT`-style guard for the demotion path at all, and
+//!   there is no register-map state yet for a demotion-time guard to
+//!   plausibly validate *against* — demoting away from `HW_CONFIGURED`
+//!   discards configuration rather than admitting new configuration that
+//!   could be found inconsistent. Per Guiding Principle 5 this is flagged
+//!   as a working assumption, not a specified fact.
+//! - Only the single `HW_CONFIGURED` -> `HW_UNCONFIGURED` hop is
+//!   implemented, matching the checklist bullet's own literal wording.
+//!   `RCP_CONFIGURED` -> `HW_UNCONFIGURED` (a full rollback) and
+//!   `RCP_CONFIGURED` -> `HW_CONFIGURED` (a lesser demotion) are
+//!   deliberately left undefined by this item rather than silently folded
+//!   in: the checklist bullet names only the `HW_CONFIGURED`-originating
+//!   hop, and per Guiding Principle 5 this crate does not assume a wider
+//!   scope than what was actually named. Whether demoting out of
+//!   `RCP_CONFIGURED` is ever wanted, and if so what it should mean for
+//!   the `RcpConfig` category's already-applied functional configuration,
+//!   is left as an explicit open question for a later item rather than
+//!   guessed at here.
 //!
-//! Both points are flagged per Guiding Principle 5 as this crate's own
+//! All four points are flagged per Guiding Principle 5 as this crate's own
 //! working interpretation, pending reconciliation against the
 //! specification's actual behavior (never its prose) before being relied
 //! on for interop with a real TC18 RC Server.
@@ -199,9 +232,10 @@ use crate::RcpError;
 /// Milestone 2.
 ///
 /// See this module's doc comment for the numeric encodings' provenance and
-/// for the register-locking distinction and demotion path this type
-/// deliberately does *not* yet model. See [`RcServerState::try_transition`]
-/// for the guarded transitions this type *does* model.
+/// for the register-locking distinction this type does not itself model
+/// (see [`LockPolicy`] instead). See [`RcServerState::try_transition`] for
+/// the guarded and unconditional transitions this type *does* model,
+/// including the `HW_CONFIGURED` -> `HW_UNCONFIGURED` demotion path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 // fusa:req REQ-LIFE-001
@@ -358,11 +392,19 @@ pub enum LockPolicy {
     /// `W*` — write access is available whenever the category is otherwise
     /// reachable, up to and including `HW_CONFIGURED`, but becomes
     /// permanently locked the moment the RC Server reaches
-    /// `RCP_CONFIGURED`. No transition [`RcServerState::try_transition`]
-    /// currently implements moves a server back out of `RCP_CONFIGURED`,
-    /// so today this lock is permanent for the remaining lifetime of the
-    /// in-memory state; the still-unbuilt demotion path is this rule's
-    /// stated escape hatch, not a loophole this module implements.
+    /// `RCP_CONFIGURED`. [`RcServerState::try_transition`] now implements a
+    /// demotion path, but only for the single `HW_CONFIGURED` ->
+    /// `HW_UNCONFIGURED` hop the roadmap checklist names — a category
+    /// locked by this rule only ever becomes locked upon reaching
+    /// `RCP_CONFIGURED` in the first place, and no transition this crate
+    /// implements moves a server *out of* `RCP_CONFIGURED` (backward or
+    /// otherwise), so that hop can never actually run while this lock is
+    /// engaged. This rule's stated escape hatch therefore remains a
+    /// still-unbuilt, separate concern — a demotion path originating at
+    /// `RCP_CONFIGURED` itself — not something this item's narrower,
+    /// literally-scoped hop resolves; see this module's Provenance note
+    /// for why that scoping was a deliberate choice rather than an
+    /// oversight.
     WStar,
 }
 
@@ -434,25 +476,27 @@ pub fn check_register_writable(
 
 // ── Lifecycle transitions ────────────────────────────────────────────────────
 
-/// Is `(from, to)` one of the two forward transitions this crate currently
-/// implements a guard for?
+/// Is `(from, to)` one of the three transitions this crate currently
+/// implements — the two guarded forward transitions, or the one
+/// unconditional demotion?
 ///
 /// This is the coarse, state-shape check [`RcServerState::try_transition`]
 /// performs before it ever considers a caller-supplied consistency
 /// predicate — it says nothing about whether the hardware or RCP-level
 /// configuration being applied is actually consistent, only whether
 /// `(from, to)` is a transition shape this crate implements at all. Every
-/// pair other than the two named here is `false`, including staying in the
-/// same state, moving backward, skipping `HW_CONFIGURED` entirely, or the
-/// `HW_CONFIGURED` -> `HW_UNCONFIGURED` demotion path (a separate, later
-/// roadmap item — see this module's doc comment). Never panics for any
-/// input.
+/// pair other than the three named here is `false`, including staying in
+/// the same state, any move originating at `RCP_CONFIGURED` (backward or
+/// otherwise), and skipping `HW_CONFIGURED` entirely on the way up. Never
+/// panics for any input.
 // fusa:req REQ-LIFE-006
+// fusa:req REQ-LIFE-012
 pub fn is_transition_defined(from: RcServerState, to: RcServerState) -> bool {
     matches!(
         (from, to),
         (RcServerState::HwUnconfigured, RcServerState::HwConfigured)
             | (RcServerState::HwConfigured, RcServerState::RcpConfigured)
+            | (RcServerState::HwConfigured, RcServerState::HwUnconfigured)
     )
 }
 
@@ -460,27 +504,31 @@ impl RcServerState {
     /// Attempt to move this RC Server from its current state (`self`) to
     /// `target`.
     ///
-    /// Only the two forward transitions named by `ROADMAP.md`'s
-    /// `HW_CFG_INCONSISTENT`/`RCP_CFG_INCONSISTENT` guards are implemented:
+    /// Three transitions are implemented:
     ///
     /// - `HW_UNCONFIGURED` -> `HW_CONFIGURED`, guarded by the
     ///   `HW_CFG_INCONSISTENT` check
     /// - `HW_CONFIGURED` -> `RCP_CONFIGURED`, guarded by the
     ///   `RCP_CFG_INCONSISTENT` check
+    /// - `HW_CONFIGURED` -> `HW_UNCONFIGURED` (the demotion path), which is
+    ///   unconditional — see this module's doc comment Provenance note for
+    ///   why no guard applies here
     ///
-    /// For either of those two shapes, `is_consistent` is invoked exactly
-    /// once: if it returns `true`, the transition succeeds and `Ok(target)`
-    /// is returned; if it returns `false`, the matching guard sentinel
-    /// (`RcpError::HwCfgInconsistent` or `RcpError::RcpCfgInconsistent`)
-    /// is returned and `self` is left unchanged (this method takes `self`
-    /// by value and returns the *new* state on success — it does not
-    /// mutate anything in place).
+    /// For either of the two guarded shapes, `is_consistent` is invoked
+    /// exactly once: if it returns `true`, the transition succeeds and
+    /// `Ok(target)` is returned; if it returns `false`, the matching guard
+    /// sentinel (`RcpError::HwCfgInconsistent` or
+    /// `RcpError::RcpCfgInconsistent`) is returned and `self` is left
+    /// unchanged (this method takes `self` by value and returns the *new*
+    /// state on success — it does not mutate anything in place).
+    ///
+    /// For the demotion shape, `is_consistent` is *not* invoked at all —
+    /// the transition always succeeds with `Ok(target)` regardless of what
+    /// the closure would have returned.
     ///
     /// For every other `(self, target)` pair — see [`is_transition_defined`]
     /// for the exact rule — `is_consistent` is never invoked at all, and
-    /// `Err(RcpError::InvalidLifecycleTransition)` is returned instead, per
-    /// this module's doc comment on why that includes the demotion path
-    /// rather than that path being evaluated and rejected on its merits.
+    /// `Err(RcpError::InvalidLifecycleTransition)` is returned instead.
     ///
     /// This crate has no register map yet to derive a real consistency
     /// check from (see this module's doc comment's Provenance note), so
@@ -490,6 +538,7 @@ impl RcServerState {
     // fusa:req REQ-LIFE-006
     // fusa:req REQ-LIFE-007
     // fusa:req REQ-LIFE-008
+    // fusa:req REQ-LIFE-012
     pub fn try_transition(
         self,
         target: Self,
@@ -510,6 +559,14 @@ impl RcServerState {
                     Err(RcpError::RcpCfgInconsistent)
                 }
             }
+            // Demotion path: unconditional per this module's doc comment
+            // Provenance note. No `..._INCONSISTENT`-style guard is named
+            // for this transition anywhere in `ROADMAP.md`, and there is no
+            // newly-admitted configuration here for a guard to plausibly
+            // validate -- demoting discards configuration rather than
+            // accepting it, so `is_consistent` is deliberately left
+            // uninvoked.
+            (Self::HwConfigured, Self::HwUnconfigured) => Ok(target),
             _ => Err(RcpError::InvalidLifecycleTransition),
         }
     }
@@ -758,7 +815,8 @@ mod tests {
 
     #[test]
     // fusa:test REQ-LIFE-006
-    fn is_transition_defined_true_only_for_the_two_forward_transitions() {
+    // fusa:test REQ-LIFE-012
+    fn is_transition_defined_true_only_for_the_three_implemented_transitions() {
         for from in ALL_STATES {
             for to in ALL_STATES {
                 let defined = is_transition_defined(from, to);
@@ -766,6 +824,7 @@ mod tests {
                     (from, to),
                     (RcServerState::HwUnconfigured, RcServerState::HwConfigured)
                         | (RcServerState::HwConfigured, RcServerState::RcpConfigured)
+                        | (RcServerState::HwConfigured, RcServerState::HwUnconfigured)
                 );
                 assert_eq!(defined, expected, "{from:?} -> {to:?}");
             }
@@ -784,7 +843,7 @@ mod tests {
         }
     }
 
-    // ── Transition guard: round-trip on the two defined transitions ──────
+    // ── Transition guard: round-trip on the two guarded transitions ──────
 
     #[test]
     // fusa:test REQ-LIFE-007
@@ -818,20 +877,55 @@ mod tests {
         assert_eq!(result, Err(RcpError::RcpCfgInconsistent));
     }
 
+    // ── Transition guard: round-trip on the demotion path ────────────────
+
+    #[test]
+    // fusa:test REQ-LIFE-012
+    fn hw_configured_to_hw_unconfigured_succeeds_regardless_of_guard_result() {
+        // Unconditional: the demotion path is not gated by any consistency
+        // guard (see this module's doc comment Provenance note), so it
+        // succeeds identically whether the supplied closure would have
+        // returned true or false.
+        let succeeded =
+            RcServerState::HwConfigured.try_transition(RcServerState::HwUnconfigured, || true);
+        assert_eq!(succeeded, Ok(RcServerState::HwUnconfigured));
+
+        let also_succeeded =
+            RcServerState::HwConfigured.try_transition(RcServerState::HwUnconfigured, || false);
+        assert_eq!(also_succeeded, Ok(RcServerState::HwUnconfigured));
+    }
+
+    #[test]
+    // fusa:test REQ-LIFE-012
+    fn hw_configured_to_hw_unconfigured_never_consults_the_guard() {
+        let mut guard_called = false;
+        let result =
+            RcServerState::HwConfigured.try_transition(RcServerState::HwUnconfigured, || {
+                guard_called = true;
+                true
+            });
+        assert_eq!(result, Ok(RcServerState::HwUnconfigured));
+        assert!(
+            !guard_called,
+            "the unconditional demotion path should never invoke is_consistent"
+        );
+    }
+
     // ── Transition guard: rejection of every undefined transition ────────
 
     #[test]
     // fusa:test REQ-LIFE-008
     fn undefined_transitions_are_rejected_without_consulting_the_guard() {
         let undefined_pairs = [
-            // Full rollback in one step.
+            // Full rollback in one step -- out of scope for this item, which
+            // implements only the single HW_CONFIGURED -> HW_UNCONFIGURED
+            // hop the roadmap checklist names (see this module's doc
+            // comment Provenance note).
             (RcServerState::RcpConfigured, RcServerState::HwUnconfigured),
             // Skipping HW_CONFIGURED entirely.
             (RcServerState::HwUnconfigured, RcServerState::RcpConfigured),
-            // The demotion path — a separate, later roadmap item, not
-            // implemented by this function (see this module's doc comment).
-            (RcServerState::HwConfigured, RcServerState::HwUnconfigured),
-            // A single-step backward move.
+            // A lesser demotion out of RCP_CONFIGURED -- also out of scope
+            // for the same reason as the full rollback above.
             (RcServerState::RcpConfigured, RcServerState::HwConfigured),
             // Staying in the same state, for all three states.
             (RcServerState::HwUnconfigured, RcServerState::HwUnconfigured),
@@ -860,6 +954,7 @@ mod tests {
 
     #[test]
     // fusa:test REQ-LIFE-008
+    // fusa:test REQ-LIFE-012
     fn try_transition_never_panics_for_any_state_pair_or_guard_result() {
         for from in ALL_STATES {
             for to in ALL_STATES {
