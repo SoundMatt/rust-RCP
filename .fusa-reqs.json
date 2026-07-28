@@ -4806,6 +4806,96 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ADC-001",
+      "title": "AdcResolutionBits round-trips through new/to_u8 for the full 1..=16 bit-width range",
+      "text": "AdcResolutionBits::new/AdcResolutionBits::to_u8 round-trip every bit-width value from 1 to 16, modeling the roadmap's <=16-bit resolution upper bound as an explicit validated range rather than a fixed 16-bit width",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ADC-002",
+      "title": "AdcResolutionBits::new rejects zero and any bit width above 16, and never panics",
+      "text": "AdcResolutionBits::new returns Err(RcpError::InvalidParameter) for 0 and for any value above 16, and never panics for any sampled u8 input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ADC-003",
+      "title": "AdcResolutionBits::max_raw_value computes 2^bits - 1, and default() resolves to 16 bits",
+      "text": "AdcResolutionBits::max_raw_value returns 2^bits - 1 for every valid bit width including the u16::MAX boundary at 16 bits, and AdcResolutionBits::default resolves to the widest modeled resolution, 16 bits, as this crate's own unconfirmed-default placeholder",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ADC-004",
+      "title": "AdcSampleValue round-trips through encode/decode within its resolution and rejects raw values wider than that resolution, and never panics",
+      "text": "AdcSampleValue::new/AdcSampleValue::decode/AdcSampleValue::encode round-trip any raw value within AdcResolutionBits::max_raw_value as a 2-byte big-endian wire form, reject any raw value exceeding that maximum with RcpError::InvalidParameter, and decode never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ADC-005",
+      "title": "AdcFunctionalConfig defaults to the default AdcResolutionBits and a zeroed AdcAveragingConfig",
+      "text": "AdcFunctionalConfig::default carries AdcResolutionBits::default (16 bits) and a zero-valued AdcAveragingConfig (adc_sample_interval, adc_avg_intervals_per_request, and adc_combine_avg_values all zero)",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ADC-006",
+      "title": "AdcFunctionalConfig's layer tag matches crate::regmap's EndpointType::Adc cross-layer rule",
+      "text": "AdcFunctionalConfig::layer_tag produces a crate::regmap::PerEpTypeFunctionalConfig tagged EndpointType::Adc that satisfies crate::regmap::check_functional_config_matches_ep_type against a generic PerEpConfigBlock of the same ep_type, and is rejected by functional_config_matches_ep_type against a mismatched ep_type",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ADC-007",
+      "title": "resolve_adc_sample_window_ticks chains adc_sample_interval, adc_avg_intervals_per_request, and adc_combine_avg_values into a total elapsed tick count, and never panics",
+      "text": "resolve_adc_sample_window_ticks multiplies adc_avg_intervals_per_request by adc_combine_avg_values by adc_sample_interval to produce the total elapsed tick count one combined result takes to produce, using checked (never-wrapping, never-panicking) arithmetic throughout including at the all-MAX field-width boundary, and never panics for any sampled AdcAveragingConfig",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ADC-008",
+      "title": "resolve_adc_averaged_value computes the two-level averaging pipeline over raw samples",
+      "text": "resolve_adc_averaged_value groups raw_samples into adc_avg_intervals_per_request-sized groups, averages each group (level one), then averages the first adc_combine_avg_values group averages into the returned combined result (level two), ignoring any trailing raw samples beyond what the pipeline consumes",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ADC-009",
+      "title": "resolve_adc_averaged_value rejects a malformed averaging pipeline configuration, and never panics",
+      "text": "resolve_adc_averaged_value returns Err(RcpError::InvalidParameter) when adc_avg_intervals_per_request or adc_combine_avg_values is zero, when raw_samples carries fewer raw samples than the pipeline requires (including at the u16::MAX/u16::MAX field-width boundary), or defensively if their product would overflow usize, and never panics for any sampled AdcAveragingConfig/raw_samples combination",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ADC-010",
+      "title": "validate_adc_sample_request accepts AdcSamplingMode::RequestDriven and rejects AdcSamplingMode::Continuous with RcpError::UnsupportedCmd",
+      "text": "validate_adc_sample_request returns Ok(()) for AdcSamplingMode::RequestDriven (also AdcSamplingMode's default) and Err(RcpError::UnsupportedCmd) for AdcSamplingMode::Continuous, enforcing the roadmap's request-driven-sampling-only rule since no free-running/continuous sampling mode is permitted",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

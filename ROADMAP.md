@@ -986,9 +986,50 @@ functional config) before tackling bus-protocol endpoints.
       is wired into an actual decoder or dispatch loop. New
       `REQ-UART-001`..`REQ-UART-010` added to `.fusa-reqs.json`, each with a
       `// fusa:req`/`// fusa:test` pair in `src/uart.rs`.
-- [ ] **ADC** (`ep_type 0x09`): ≤16-bit resolution; three-level averaging
+- [x] **ADC** (`ep_type 0x09`): ≤16-bit resolution; three-level averaging
       model (`adc_sample_interval` → `adc_avg_intervals_per_request` →
-      `adc_combine_avg_values`); request-driven sampling only
+      `adc_combine_avg_values`); request-driven sampling only. Done
+      (v0.7.0-dev): new `src/adc.rs` adds [`AdcResolutionBits`] (an explicit,
+      validated `1..=16` bit-width type rather than this crate silently
+      assuming every ADC sample is a full 16-bit value) and
+      [`AdcSampleValue`] (a raw reading paired with the resolution it was
+      taken at, refusing any raw value wider than that resolution allows);
+      [`AdcAveragingConfig`] plus [`resolve_adc_sample_window_ticks`] and
+      [`resolve_adc_averaged_value`] turning the three-level averaging
+      model's stated field order into two pure, testable functions — one
+      chaining `adc_sample_interval` into the total elapsed tick count a
+      combined result takes to produce, the other reducing raw samples
+      through both averaging levels to that combined result — mirroring
+      `uart::resolve_uart_read_completion`'s and
+      `spi::truncate_spi_status_for_compound_wait`'s own prose-rule-to-
+      function discipline; and [`AdcSamplingMode`]/
+      [`validate_adc_sample_request`] enforcing the request-driven-sampling-
+      only rule by rejecting a continuous/free-running mode, mirroring
+      `uart::validate_uart_read_request`'s payload-less-read-only refusal
+      path. `AdcFunctionalConfig::layer_tag` composes against
+      `regmap::check_functional_config_matches_ep_type`'s existing
+      cross-layer rule unchanged, matching every prior Milestone 4 entry's
+      own precedent. Three points flagged per Guiding Principle 5 rather
+      than silently resolved: (1) neither `adc_sample_interval`'s nor
+      `adc_avg_intervals_per_request`'s/`adc_combine_avg_values`'s wire
+      width or units are stated by the checklist text, so `AdcAveragingConfig`
+      carries them as this crate's own unconfirmed-width/units placeholders
+      (`u32`/`u16`/`u16`), mirroring `uart::UartRxQueueConfig::uart_timeout`'s
+      own treatment; (2) unlike UART's checklist bullet, which named its
+      violation's error code explicitly (`UNKNOWN_CMD`), this checklist
+      bullet names no error code for a rejected continuous-sampling request
+      at all — `validate_adc_sample_request` returns the already-defined
+      `RcpError::UnsupportedCmd` by the same "closest existing match"
+      reasoning `uart::validate_uart_read_request`'s own provenance note
+      gives, not a confirmed spec-named code; (3) `AdcResolutionBits::default`
+      resolves to the widest modeled width, 16 bits, this crate's own
+      reasonable placeholder for an unconfirmed power-on default, mirroring
+      `i2c::I2cSpeedMode::default`'s own explicitly-flagged choice. Like
+      every prior Milestone 1-4 entry, this remains additive standalone
+      plumbing only — nothing here is wired into an actual decoder, dispatch
+      loop, or sampling engine. New `REQ-ADC-001`..`REQ-ADC-010` added to
+      `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair in
+      `src/adc.rs`.
 - [ ] **PWM_OUT / PWM_IN** (`ep_type 0x07`/`0x08`): shared
       period+active-duration pair shape; PWM_IN's `PWM_IN_NO_SIGNAL` timeout
       instead of hanging or returning stale data
