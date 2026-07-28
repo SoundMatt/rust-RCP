@@ -81,6 +81,7 @@
 
 pub mod acf;
 pub mod adapt;
+pub mod adc;
 pub mod addressing;
 pub mod admin;
 pub mod authz;
