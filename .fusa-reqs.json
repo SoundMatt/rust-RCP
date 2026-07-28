@@ -3708,6 +3708,33 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-LIFE-006",
+      "title": "Transition guard defines exactly the two forward transitions",
+      "text": "is_transition_defined returns true only for (HwUnconfigured, HwConfigured) and (HwConfigured, RcpConfigured), and false for every other RcServerState pair; RcServerState::try_transition succeeds (subject to the consistency guard) exactly on those same two pairs",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-LIFE-007",
+      "title": "try_transition enforces the caller-supplied consistency guard",
+      "text": "RcServerState::try_transition returns Ok(target) when the is_consistent closure returns true for one of the two defined transitions, and returns Err(RcpError::HwCfgInconsistent) or Err(RcpError::RcpCfgInconsistent) (matching the attempted transition) when is_consistent returns false",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-LIFE-008",
+      "title": "try_transition rejects undefined transitions without invoking the guard, and never panics",
+      "text": "RcServerState::try_transition returns Err(RcpError::InvalidLifecycleTransition) without calling is_consistent for every (from, to) pair other than the two defined forward transitions (including identity, backward, skip, and the HW_CONFIGURED -> HW_UNCONFIGURED demotion path), and never panics for any (from, to) pair or guard result",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

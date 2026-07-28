@@ -455,6 +455,15 @@ pub enum RcpError {
     #[error("rcp/lifecycle: register category is not reachable in the RC Server's current lifecycle state")]
     RegisterUnreachable,
 
+    #[error("rcp/lifecycle: hardware configuration guard rejected the HW_UNCONFIGURED -> HW_CONFIGURED transition (HW_CFG_INCONSISTENT)")]
+    HwCfgInconsistent,
+
+    #[error("rcp/lifecycle: RCP-level configuration guard rejected the HW_CONFIGURED -> RCP_CONFIGURED transition (RCP_CFG_INCONSISTENT)")]
+    RcpCfgInconsistent,
+
+    #[error("rcp/lifecycle: requested state transition is not one of the guarded transitions this crate currently implements")]
+    InvalidLifecycleTransition,
+
     // ── General errors ───────────────────────────────────────────────────
     #[error("rcp: invalid size")]
     InvalidSize,

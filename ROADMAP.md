@@ -369,8 +369,32 @@ lifecycle machine and the register-map configuration model, replacing the
       `RcpError::RegisterUnreachable` sentinel added, following the
       existing "Wire / E2E errors" grouping convention, as a provisional
       name pending this milestone's later "Error Model" item.
-- [ ] Transition guard checks: `HW_CFG_INCONSISTENT` (HW→HW_CONFIGURED),
-      `RCP_CFG_INCONSISTENT` (HW_CONFIGURED→RCP_CONFIGURED)
+- [x] Transition guard checks: `HW_CFG_INCONSISTENT` (HW→HW_CONFIGURED),
+      `RCP_CFG_INCONSISTENT` (HW_CONFIGURED→RCP_CONFIGURED). Done
+      (v0.5.0-dev): `src/lifecycle.rs` adds `RcServerState::try_transition`
+      (a `self`-consuming, never-panicking method returning
+      `Result<RcServerState, RcpError>`) plus a free-function counterpart
+      `is_transition_defined`, mirroring the existing
+      `is_register_reachable`/`check_register_reachable` peek-vs-validate
+      pairing. Only the two forward transitions the two guards are named
+      for — `HW_UNCONFIGURED`→`HW_CONFIGURED` and
+      `HW_CONFIGURED`→`RCP_CONFIGURED` — are structurally defined; every
+      other `(from, to)` pair (identity, backward, skip, and the
+      `HW_CONFIGURED`→`HW_UNCONFIGURED` demotion path from the next
+      checklist item) is rejected with the new
+      `RcpError::InvalidLifecycleTransition` sentinel without the guard
+      ever being consulted. Since this crate has no register map yet to
+      derive a real `HW_CFG_INCONSISTENT`/`RCP_CFG_INCONSISTENT` pass/fail
+      criterion from, `try_transition` takes the consistency check as a
+      caller-supplied `is_consistent: impl FnOnce() -> bool` closure
+      (mirroring `formal::Invariant`'s predicate shape) rather than
+      inventing one; on failure it returns one of two new guard-named
+      sentinels, `RcpError::HwCfgInconsistent` /
+      `RcpError::RcpCfgInconsistent`, both provisional pending this
+      milestone's later "Error Model" item, same as
+      `RcpError::RegisterUnreachable` before them. Deliberately does not
+      implement register-locking-by-state or the demotion path — see the
+      module doc comment for the explicit boundary.
 - [ ] Register-locking-by-state, including the `W` vs `W*` (permanently
       locked once `RCP_CONFIGURED`) distinction
 - [ ] Demotion path from `HW_CONFIGURED` back to `HW_UNCONFIGURED`
