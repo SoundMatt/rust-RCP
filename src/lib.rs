@@ -468,6 +468,9 @@ pub enum RcpError {
     #[error("rcp/lifecycle: register category is reachable but locked against writes in the RC Server's current lifecycle state")]
     RegisterLocked,
 
+    #[error("rcp/ep0: EP0 whole-register-map write access is restricted to the RC Server's designated root-client stream")]
+    RootClientRequired,
+
     // ── General errors ───────────────────────────────────────────────────
     #[error("rcp: invalid size")]
     InvalidSize,

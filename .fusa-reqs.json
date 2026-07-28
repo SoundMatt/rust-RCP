@@ -3825,6 +3825,51 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-EP0-007",
+      "title": "Root-client identity check",
+      "text": "is_root_client(root_client, stream) returns true iff root_client is Some(stream), and false when root_client is None or Some of a different stream",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-EP0-008",
+      "title": "Root-client-aware EP0 reads are unaffected by root-client status",
+      "text": "check_ep0_access_for_stream with an info whose op is false returns the same result as check_ep0_access for the same (state, category) pair, regardless of whether requesting_stream is the designated root_client, is a different stream, or root_client is None",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-EP0-009",
+      "title": "Root-client EP0 writes compose with the existing lifecycle-gated write check",
+      "text": "check_ep0_access_for_stream with an info whose op is true, where requesting_stream equals root_client, returns the same result as check_ep0_access for the same (state, category) pair, for every RcServerState/RegisterCategory combination",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-EP0-010",
+      "title": "Non-root EP0 writes are rejected with RootClientRequired",
+      "text": "check_ep0_access_for_stream with an info whose op is true returns Err(RcpError::RootClientRequired) whenever requesting_stream does not equal root_client (including when root_client is None), for every RcServerState/RegisterCategory combination, without bypassing lifecycle-state gating when requesting_stream does equal root_client",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-EP0-011",
+      "title": "Root-client-aware EP0 access check never panics",
+      "text": "check_ep0_access_for_stream never panics for any RcServerState/RegisterCategory/op/requesting_stream/root_client combination",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
