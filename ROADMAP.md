@@ -550,9 +550,39 @@ lifecycle machine and the register-map configuration model, replacing the
       is wired into `crate::ep0`, `crate::lifecycle`, or any other existing
       caller. New `REQ-RMAP-001`..`REQ-RMAP-006` added to `.fusa-reqs.json`,
       each with a `// fusa:req`/`// fusa:test` pair in `src/register_map.rs`.
-- [ ] General register-map fields: `svr_oa_tc18_magic_nr`, `svr_version`,
+- [x] General register-map fields: `svr_oa_tc18_magic_nr`, `svr_version`,
       `svr_vendor_id`, `svr_device_id`, `svr_ep_count`,
-      `svr_implemented_options`, and the rest of §3.6's table
+      `svr_implemented_options`, and the rest of §3.6's table. Done
+      (v0.5.0-dev): `src/register_map.rs` adds `GeneralRegisters` — one
+      field per row of this crate's own §3.6 general register-map table
+      extraction, in table order, typed by each row's declared bit width
+      (`u8`/`u16`/`u32`), starting with the six fields this bullet names
+      verbatim. `TableDescriptor` (`ptr`/`capacity`) gives the recurring
+      child-config-table-pointer shape (HW pin-mapping, request-stream
+      config, response/ack queue config, the common per-EP config block,
+      the EP/`byte_bus_id` mapping table, plus three product-specific
+      blocks) a single reusable type instead of nine separate ones; two
+      pointer-only rows with no paired capacity field
+      (`svr_ep_functional_cfg_ptr`, `svr_sequencer_state_ptr`) are left as
+      plain `u16`s rather than forced into that shape.
+      `GeneralRegisters`/`TableDescriptor` each get never-panicking
+      `encode`/`decode` to/from a fixed-length, big-endian byte block
+      (matching `src/wire.rs`'s own big-endian convention), rejecting
+      undersized input with the existing `RcpError::ShortFrame` rather than
+      a new variant. Two inferences beyond the table extraction — the
+      sequential no-padding byte packing `encode`/`decode` assume, and
+      leaving `svr_implemented_options` an undecomposed raw bitmask because
+      no bit-position assignment was recorded for its five named option
+      bundles — are flagged per Guiding Principle 5 in the module doc
+      comment's provenance note rather than presented as spec-cited fact.
+      `GeneralRegisters::CATEGORY` records the corresponding
+      `lifecycle::RegisterCategory::General` mapping as a documentation
+      cross-reference only. This is additive: like every prior Milestone
+      1/2 entry, nothing here is wired into `crate::ep0`'s dispatch path,
+      `crate::lifecycle`'s reachability checks, or any other existing
+      caller. New `REQ-RMAP-007`..`REQ-RMAP-011` added to
+      `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair in
+      `src/register_map.rs`.
 - [ ] Config tables: HW pin-mapping (§3.7), request-stream config (§3.8),
       EP-ID/`byte_bus_id` mapping (§3.9 — client-side ordering
       responsibility, no server-side safety net per spec), response/ack
