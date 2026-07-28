@@ -98,6 +98,13 @@ jobs:
           else
             echo "fuzz targets not yet configured, skipping"
           fi
+      - name: fuzz AVTPDU/ACF decoders (30s)
+        run: |
+          if [ -d fuzz ]; then
+            cargo +nightly fuzz run fuzz_avtpdu_acf_decode -- -max_total_time=30
+          else
+            echo "fuzz targets not yet configured, skipping"
+          fi
 
   # ── Benchmark smoke ───────────────────────────────────────────────────────
   bench-smoke:

@@ -302,8 +302,29 @@ shared request-descriptor header that carries all per-message addressing.
 
 ### Validation
 
-- [ ] Decode functions never panic on arbitrary/truncated input (carry
-      forward the existing fuzz-style discipline from `wire.rs`)
+- [x] Decode functions never panic on arbitrary/truncated input (carry
+      forward the existing fuzz-style discipline from `wire.rs`). Done
+      (v0.4.0-dev): new `fuzz/fuzz_targets/fuzz_avtpdu_acf_decode.rs`
+      libFuzzer target, registered in `fuzz/Cargo.toml`, mirroring
+      `fuzz_wire_decode.rs`'s existing structure and CI wiring. It feeds the
+      same arbitrary/truncated `data: &[u8]` slice through every
+      byte-slice-accepting decode function this milestone added:
+      `avtpdu::decode_ntscf_header`, `avtpdu::decode_tscf_header`,
+      `avtpdu::select_header_variant` (under both `TimeSyncCapability`
+      outcomes), `acf::decode_byte_message_info`, `acf::decode_acf_abb`, and
+      `acf::decode_acf_gbb`, plus `avtpdu::StreamId::from_u64` for
+      belt-and-suspenders coverage even though it takes a plain `u64` rather
+      than a byte slice and so has no truncated-input shape to panic on.
+      Every call is `let _ = ...;`, matching `fuzz_wire_decode.rs`'s
+      discipline exactly: the only failure mode under test is a panic inside
+      the crate's own decode logic. `.github/workflows/ci.yml`'s existing
+      `fuzz` job runs it for a 30s smoke test alongside `fuzz_wire_decode`,
+      same as the pre-existing target. This is distinct from (and in
+      addition to) the unit-test-level "never panics on arbitrary input"
+      coverage each decoder's own `Done` note above already claims — this
+      item specifically closes the gap between that unit-test claim and a
+      genuine fuzz harness. This closes out the "Validation" subsection and
+      Milestone 1 as a whole.
 
 Success Criteria:
 A conformant AVTPDU can be built, parsed, and round-tripped for both header
