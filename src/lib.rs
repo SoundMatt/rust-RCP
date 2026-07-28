@@ -42,6 +42,19 @@
 // fusa:req REQ-ERR-019
 // fusa:req REQ-ERR-020
 // fusa:req REQ-ERR-021
+// fusa:req REQ-ERRM-001
+// fusa:req REQ-ERRM-002
+// fusa:req REQ-ERRM-003
+// fusa:req REQ-ERRM-004
+// fusa:req REQ-ERRM-005
+// fusa:req REQ-ERRM-006
+// fusa:req REQ-ERRM-007
+// fusa:req REQ-ERRM-008
+// fusa:req REQ-ERRM-009
+// fusa:req REQ-ERRM-010
+// fusa:req REQ-ERRM-011
+// fusa:req REQ-ERRM-012
+// fusa:req REQ-ERRM-013
 // fusa:req REQ-CMDSTRUCT-001
 // fusa:req REQ-CMDSTRUCT-002
 // fusa:req REQ-RESP-001
@@ -401,6 +414,80 @@ pub struct Status {
 /// - `NotFound`     → `is_not_connected()` (wraps `NotConnected`)
 /// - `ZoneMismatch` → `is_not_connected()` (wraps `NotConnected`)
 /// - `Busy`         → `is_timeout()` (wraps `Timeout`)
+///
+/// ## TC18 spec error codes (`ROADMAP.md` Milestone 2, "Error Model")
+///
+/// The "TC18 RCP spec error codes" group below gives this crate the eleven
+/// named error codes enumerated by that checklist item —
+/// [`UnsupportedCmd`](Self::UnsupportedCmd) through
+/// [`InvalidParameter`](Self::InvalidParameter), Rust-cased equivalents of
+/// the specification's own `UPPER_SNAKE_CASE` names (cited here as the OPEN
+/// Alliance TC18 Remote Control Protocol Specification v0.5.1_RC, by name
+/// only, per Guiding Principle 4). The timing- and CRC-specific codes this
+/// checklist item explicitly defers are not added here; they remain the
+/// later milestones' job (Milestone 6, per that milestone's own `CRC_ERROR`
+/// error-path bullet).
+///
+/// Every module built earlier in this milestone (`lifecycle`, `ep0`,
+/// `register_map`, `addressing`, `avtpdu`) had already introduced its own
+/// provisional `RcpError` sentinel for its guard/check functions, each
+/// explicitly documented at the time as a placeholder pending this exact
+/// item (see each module's own doc comment history). This item retires
+/// every one of those provisional names in favor of the spec-named variant
+/// group, per the following mapping — this crate's own working
+/// interpretation of which provisional sentinel corresponds to which named
+/// code, flagged per Guiding Principle 5 pending reconciliation against the
+/// specification's actual behavior (never its prose):
+///
+/// - `TimeSyncUnsupported` (`avtpdu`: TSCF header requires server
+///   time-sync support the server doesn't have) → `UnsupportedCmd`. The
+///   requested feature is not one this RC Server supports.
+/// - `RegisterUnreachable` (`lifecycle`/`ep0`: register category not
+///   reachable in the RC Server's current lifecycle state) and
+///   `RootClientRequired` (`ep0`: EP0 write attempted by a non-root-client
+///   stream) both → `UnauthorizedAccess`. Both represent the same shape of
+///   failure — the requesting context (lifecycle state, or requesting
+///   stream identity) does not authorize the attempted access — just
+///   gated on two different axes, so both collapse onto the same code
+///   rather than inventing a code-level distinction the checklist's own
+///   eleven names do not draw.
+/// - `RegisterLocked` (`lifecycle`/`ep0`: register category reachable but
+///   write-locked) → `LockedMemAccess`. A direct name correspondence.
+/// - `HwCfgInconsistent`/`RcpCfgInconsistent` (`lifecycle`:
+///   `HW_CFG_INCONSISTENT`/`RCP_CFG_INCONSISTENT` transition-guard
+///   rejections) and `EndpointTypeMismatch` (`register_map`: functional
+///   config's `EndpointType` does not match the owning endpoint's
+///   `ep_type`) all three → `InvalidParameter`. Each represents caller-
+///   supplied configuration data failing a consistency/shape check, which
+///   this crate reads as the same "invalid parameter" failure mode at
+///   three different call sites rather than three distinct spec codes —
+///   the checklist's own list has no more specific code for any of them.
+/// - `InvalidLifecycleTransition` (`lifecycle`: `(from, to)` pair outside
+///   the three implemented transitions) → `RequestRejected`. The request
+///   names a structurally undefined operation for this RC Server, as
+///   opposed to `UnsupportedCmd`'s "this feature isn't supported at all" —
+///   the distinction this crate draws between the two is that
+///   `UnsupportedCmd` is capability-based (would fail identically no
+///   matter the RC Server's current state) while `RequestRejected` here is
+///   state/shape-based (fails because of *which* transition was named, not
+///   because transitions in general are unsupported).
+/// - `EndpointAlreadyRegistered` (`addressing`: `(stream_id, byte_bus_id)`
+///   pair already registered) and `EchoBackMismatch` (`acf`: response
+///   `byte_bus_id` does not match the echo-back rule) both → `EpError`.
+///   Both are endpoint-addressing-level failures with no more specific
+///   named code in the checklist's list; `EpError` is this crate's reading
+///   of the intentionally generic catch-all the checklist provides for
+///   exactly that case, distinct from the specific `EpNotFound`.
+///
+/// `SequencerNotKnown`, `RequestCanceled`, `RequestNotFound`, `EpNotFound`,
+/// and `ReqStorageOvfl` are added per the checklist's own naming but are
+/// not yet constructed anywhere in this crate — no sequencer-lookup,
+/// cancelable-request, or endpoint-lookup path exists yet to return them
+/// from. They are reserved for the later milestones (sequencer state,
+/// conditional/safety requests, concrete endpoint dispatch) that introduce
+/// those concepts, matching this same milestone's own practice of adding a
+/// named placeholder ahead of the code that will use it (e.g.
+/// `RegisterCategory` ahead of the concrete Register Map).
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum RcpError {
     // ── Mandatory RELAY sentinels ─────────────────────────────────────────
@@ -416,7 +503,14 @@ pub enum RcpError {
     #[error("rcp: payload too large")]
     PayloadTooLarge,
 
-    // ── Protocol-specific sentinels ──────────────────────────────────────
+    // ── Legacy Zone/Controller/Registry sentinels ──────────────────────────
+    // Pending removal alongside the rest of the legacy `Zone`/`Controller`/
+    // `Registry` surface (`ROADMAP.md` Milestone 9's satellite-package
+    // migration and Milestone 10's core-surface cutover) — kept unchanged
+    // by this item since dozens of still-live satellite packages (`mock`,
+    // `capi`, `canbr`, `linbr`, `udp`, and others) construct and match on
+    // them today. Out of scope for the "Error Model" checklist item, which
+    // names only the TC18 spec's own error codes below.
     #[error("rcp: zone not found")]
     NotFound,
 
@@ -430,6 +524,15 @@ pub enum RcpError {
     ZoneMismatch,
 
     // ── Wire / E2E errors ────────────────────────────────────────────────
+    // `BadMagic`/`BadVersion`/`CrcMismatch`/`Replay` are likewise legacy
+    // 16-byte-frame-specific (see `wire`/`e2e`'s own REPLACE disposition in
+    // `ROADMAP.md`'s satellite table) and kept unchanged for the same
+    // reason. `ShortFrame` is not legacy-only — every TC18 AVTPDU/ACF
+    // decoder added in Milestone 1 (`avtpdu`, `acf`) and the Register Map
+    // config-table decoders added earlier in this milestone
+    // (`register_map`) also return it for undersized input, so it stays as
+    // a general-purpose, non-spec-code sentinel rather than being folded
+    // into the TC18 error-code group below.
     #[error("rcp/wire: frame too short")]
     ShortFrame,
 
@@ -445,36 +548,50 @@ pub enum RcpError {
     #[error("rcp/e2e: replayed sequence number")]
     Replay,
 
-    #[error("rcp/avtpdu: TSCF header requires server time-sync support")]
-    TimeSyncUnsupported,
+    // ── TC18 RCP spec error codes ───────────────────────────────────────
+    // See this enum's own doc comment for the full provenance/mapping
+    // note. Message text follows this item's own `"rcp/error: <CODE> —
+    // ..."` convention rather than the per-module prefixes above, since
+    // these variants are shared across every module that can construct
+    // them rather than owned by any one of them.
+    #[error(
+        "rcp/error: UNSUPPORTED_CMD — command or protocol feature not supported by this RC Server"
+    )]
+    UnsupportedCmd,
 
-    #[error("rcp/addressing: (stream_id, byte_bus_id) pair already registered")]
-    EndpointAlreadyRegistered,
+    #[error(
+        "rcp/error: SEQUENCER_NOT_KNOWN — referenced sequencer is not known to this RC Server"
+    )]
+    SequencerNotKnown,
 
-    #[error("rcp/addressing: response byte_bus_id does not match the byte_bus_id it was received under (echo-back rule)")]
-    EchoBackMismatch,
+    #[error("rcp/error: UNAUTHORIZED_ACCESS — access not authorized by the RC Server's current lifecycle state or the requesting stream's privileges")]
+    UnauthorizedAccess,
 
-    #[error("rcp/lifecycle: register category is not reachable in the RC Server's current lifecycle state")]
-    RegisterUnreachable,
+    #[error(
+        "rcp/error: LOCKED_MEM_ACCESS — target register is reachable but locked against writes"
+    )]
+    LockedMemAccess,
 
-    #[error("rcp/lifecycle: hardware configuration guard rejected the HW_UNCONFIGURED -> HW_CONFIGURED transition (HW_CFG_INCONSISTENT)")]
-    HwCfgInconsistent,
+    #[error("rcp/error: REQUEST_CANCELED — request was canceled before completion")]
+    RequestCanceled,
 
-    #[error("rcp/lifecycle: RCP-level configuration guard rejected the HW_CONFIGURED -> RCP_CONFIGURED transition (RCP_CFG_INCONSISTENT)")]
-    RcpCfgInconsistent,
+    #[error("rcp/error: REQUEST_NOT_FOUND — referenced request id is not known to this RC Server")]
+    RequestNotFound,
 
-    #[error("rcp/lifecycle: requested state transition is not one of the guarded transitions this crate currently implements")]
-    InvalidLifecycleTransition,
+    #[error("rcp/error: EP_ERROR — endpoint-level error")]
+    EpError,
 
-    #[error("rcp/lifecycle: register category is reachable but locked against writes in the RC Server's current lifecycle state")]
-    RegisterLocked,
+    #[error("rcp/error: EP_NOT_FOUND — referenced endpoint is not known to this RC Server")]
+    EpNotFound,
 
-    #[error("rcp/ep0: EP0 whole-register-map write access is restricted to the RC Server's designated root-client stream")]
-    RootClientRequired,
+    #[error("rcp/error: REQ_STORAGE_OVFL — request storage capacity exceeded")]
+    ReqStorageOvfl,
 
-    // ── Register map errors ──────────────────────────────────────────────
-    #[error("rcp/register_map: per-EP-type functional config's EndpointType does not match the owning endpoint's declared ep_type")]
-    EndpointTypeMismatch,
+    #[error("rcp/error: REQUEST_REJECTED — request rejected")]
+    RequestRejected,
+
+    #[error("rcp/error: INVALID_PARAMETER — one or more supplied parameter values is invalid")]
+    InvalidParameter,
 
     // ── General errors ───────────────────────────────────────────────────
     #[error("rcp: invalid size")]
@@ -533,6 +650,30 @@ impl RcpError {
     // fusa:req REQ-ERR-011
     pub fn is_zone_mismatch(&self) -> bool {
         matches!(self, Self::ZoneMismatch)
+    }
+
+    /// True for any of the eleven TC18 RCP spec error codes this crate
+    /// added per `ROADMAP.md` Milestone 2's "Error Model" checklist item
+    /// (`UnsupportedCmd` through `InvalidParameter`), as opposed to the
+    /// RELAY-sentinel, legacy Zone/Controller/Registry, or wire/E2E
+    /// variants above. See this enum's own doc comment for the full list
+    /// and provenance/mapping note.
+    // fusa:req REQ-ERRM-012
+    pub fn is_tc18_error_code(&self) -> bool {
+        matches!(
+            self,
+            Self::UnsupportedCmd
+                | Self::SequencerNotKnown
+                | Self::UnauthorizedAccess
+                | Self::LockedMemAccess
+                | Self::RequestCanceled
+                | Self::RequestNotFound
+                | Self::EpError
+                | Self::EpNotFound
+                | Self::ReqStorageOvfl
+                | Self::RequestRejected
+                | Self::InvalidParameter
+        )
     }
 }
 
@@ -1071,6 +1212,138 @@ mod tests {
     // fusa:test REQ-ERR-016
     fn err_timeout_is_relay_timeout() {
         assert!(RcpError::Timeout.is_relay_timeout());
+    }
+
+    // ── TC18 RCP spec error codes (Milestone 2 "Error Model") ────────────────
+
+    #[test]
+    // fusa:test REQ-ERRM-001
+    fn err_unsupported_cmd_is_tc18_error_code() {
+        assert!(RcpError::UnsupportedCmd.is_tc18_error_code());
+    }
+
+    #[test]
+    // fusa:test REQ-ERRM-002
+    fn err_sequencer_not_known_is_tc18_error_code() {
+        assert!(RcpError::SequencerNotKnown.is_tc18_error_code());
+    }
+
+    #[test]
+    // fusa:test REQ-ERRM-003
+    fn err_unauthorized_access_is_tc18_error_code() {
+        assert!(RcpError::UnauthorizedAccess.is_tc18_error_code());
+    }
+
+    #[test]
+    // fusa:test REQ-ERRM-004
+    fn err_locked_mem_access_is_tc18_error_code() {
+        assert!(RcpError::LockedMemAccess.is_tc18_error_code());
+    }
+
+    #[test]
+    // fusa:test REQ-ERRM-005
+    fn err_request_canceled_is_tc18_error_code() {
+        assert!(RcpError::RequestCanceled.is_tc18_error_code());
+    }
+
+    #[test]
+    // fusa:test REQ-ERRM-006
+    fn err_request_not_found_is_tc18_error_code() {
+        assert!(RcpError::RequestNotFound.is_tc18_error_code());
+    }
+
+    #[test]
+    // fusa:test REQ-ERRM-007
+    fn err_ep_error_is_tc18_error_code() {
+        assert!(RcpError::EpError.is_tc18_error_code());
+    }
+
+    #[test]
+    // fusa:test REQ-ERRM-008
+    fn err_ep_not_found_is_tc18_error_code() {
+        assert!(RcpError::EpNotFound.is_tc18_error_code());
+    }
+
+    #[test]
+    // fusa:test REQ-ERRM-009
+    fn err_req_storage_ovfl_is_tc18_error_code() {
+        assert!(RcpError::ReqStorageOvfl.is_tc18_error_code());
+    }
+
+    #[test]
+    // fusa:test REQ-ERRM-010
+    fn err_request_rejected_is_tc18_error_code() {
+        assert!(RcpError::RequestRejected.is_tc18_error_code());
+    }
+
+    #[test]
+    // fusa:test REQ-ERRM-011
+    fn err_invalid_parameter_is_tc18_error_code() {
+        assert!(RcpError::InvalidParameter.is_tc18_error_code());
+    }
+
+    #[test]
+    // fusa:test REQ-ERRM-012
+    fn tc18_error_codes_are_mutually_distinct_and_exclusive() {
+        let codes = [
+            RcpError::UnsupportedCmd,
+            RcpError::SequencerNotKnown,
+            RcpError::UnauthorizedAccess,
+            RcpError::LockedMemAccess,
+            RcpError::RequestCanceled,
+            RcpError::RequestNotFound,
+            RcpError::EpError,
+            RcpError::EpNotFound,
+            RcpError::ReqStorageOvfl,
+            RcpError::RequestRejected,
+            RcpError::InvalidParameter,
+        ];
+        for i in 0..codes.len() {
+            assert!(codes[i].is_tc18_error_code());
+            for j in (i + 1)..codes.len() {
+                assert_ne!(codes[i], codes[j], "TC18 error codes must be distinct");
+            }
+        }
+        // None of the legacy/RELAY/wire sentinels are TC18 error codes.
+        assert!(!RcpError::Closed.is_tc18_error_code());
+        assert!(!RcpError::NotFound.is_tc18_error_code());
+        assert!(!RcpError::ShortFrame.is_tc18_error_code());
+        assert!(!RcpError::InvalidSize.is_tc18_error_code());
+        assert!(!RcpError::Other("x".into()).is_tc18_error_code());
+    }
+
+    #[test]
+    // fusa:test REQ-ERRM-013
+    fn tc18_error_code_messages_carry_spec_name() {
+        assert!(RcpError::UnsupportedCmd
+            .to_string()
+            .contains("UNSUPPORTED_CMD"));
+        assert!(RcpError::SequencerNotKnown
+            .to_string()
+            .contains("SEQUENCER_NOT_KNOWN"));
+        assert!(RcpError::UnauthorizedAccess
+            .to_string()
+            .contains("UNAUTHORIZED_ACCESS"));
+        assert!(RcpError::LockedMemAccess
+            .to_string()
+            .contains("LOCKED_MEM_ACCESS"));
+        assert!(RcpError::RequestCanceled
+            .to_string()
+            .contains("REQUEST_CANCELED"));
+        assert!(RcpError::RequestNotFound
+            .to_string()
+            .contains("REQUEST_NOT_FOUND"));
+        assert!(RcpError::EpError.to_string().contains("EP_ERROR"));
+        assert!(RcpError::EpNotFound.to_string().contains("EP_NOT_FOUND"));
+        assert!(RcpError::ReqStorageOvfl
+            .to_string()
+            .contains("REQ_STORAGE_OVFL"));
+        assert!(RcpError::RequestRejected
+            .to_string()
+            .contains("REQUEST_REJECTED"));
+        assert!(RcpError::InvalidParameter
+            .to_string()
+            .contains("INVALID_PARAMETER"));
     }
 
     // ── Spec version ──────────────────────────────────────────────────────────

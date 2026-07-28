@@ -622,12 +622,59 @@ lifecycle machine and the register-map configuration model, replacing the
 
 ### Error Model
 
-- [ ] Replace `RcpError`'s variant set with the spec's own error codes:
+- [x] Replace `RcpError`'s variant set with the spec's own error codes:
       `UNSUPPORTED_CMD`, `SEQUENCER_NOT_KNOWN`, `UNAUTHORIZED_ACCESS`,
       `LOCKED_MEM_ACCESS`, `REQUEST_CANCELED`, `REQUEST_NOT_FOUND`,
       `EP_ERROR`, `EP_NOT_FOUND`, `REQ_STORAGE_OVFL`, `REQUEST_REJECTED`,
       `INVALID_PARAMETER`, plus the timing- and CRC-specific codes wired in
-      by later milestones
+      by later milestones. Done (v0.5.0-dev): `src/lib.rs`'s `RcpError` adds
+      all eleven Rust-cased variants this bullet names verbatim
+      (`UnsupportedCmd` through `InvalidParameter`), each with an
+      `"rcp/error: <CODE> — ..."` message following this crate's existing
+      per-module message-prefix convention, plus a new
+      `RcpError::is_tc18_error_code()` membership predicate mirroring the
+      existing `is_relay_*`/`is_already_exists`/`is_zone_mismatch` query
+      style. The timing- and CRC-specific codes this bullet itself defers
+      are deliberately not added — that remains later milestones' (6+) job.
+      Every provisional sentinel Milestones 1-2 minted ahead of this item
+      (`TimeSyncUnsupported`, `EndpointAlreadyRegistered`,
+      `EchoBackMismatch`, `RegisterUnreachable`, `HwCfgInconsistent`,
+      `RcpCfgInconsistent`, `InvalidLifecycleTransition`, `RegisterLocked`,
+      `RootClientRequired`, `EndpointTypeMismatch`) is retired: `lifecycle`,
+      `ep0`, `register_map`, `addressing`, `avtpdu`, and `acf`'s call sites
+      are all repointed at the new spec-named variants directly (a true
+      rename, not an added indirection layer), since none of those ten
+      sentinels had any caller outside this same set of Milestone 1/2
+      modules. Several provisional sentinels collapse onto the same spec
+      code where this crate reads them as the same underlying failure mode
+      — `RegisterUnreachable`/`RootClientRequired` both →
+      `UnauthorizedAccess`; `HwCfgInconsistent`/`RcpCfgInconsistent`/
+      `EndpointTypeMismatch` all → `InvalidParameter`;
+      `EndpointAlreadyRegistered`/`EchoBackMismatch` both → `EpError` —
+      while `RegisterLocked` → `LockedMemAccess` and
+      `InvalidLifecycleTransition` → `RequestRejected` stay 1:1. Every
+      mapping decision, and the reasoning behind each collapse, is flagged
+      per Guiding Principle 5 as this crate's own working interpretation in
+      `RcpError`'s own doc comment (the single source of truth for the
+      mapping) rather than presented as spec-cited fact; the five checklist
+      names with no current caller (`SequencerNotKnown`, `RequestCanceled`,
+      `RequestNotFound`, `EpNotFound`, `ReqStorageOvfl`) are added as named
+      placeholders, reserved for the later milestones that introduce the
+      concepts they describe. The `Closed`/`NotConnected`/`Timeout`/
+      `PayloadTooLarge` mandatory RELAY sentinels and the legacy
+      `NotFound`/`AlreadyExists`/`Busy`/`ZoneMismatch`/`ShortFrame`/
+      `BadMagic`/`BadVersion`/`CrcMismatch`/`Replay`/`InvalidSize`/`Other`
+      variants are explicitly kept unchanged and out of scope for this
+      item — the legacy Zone/Controller/Registry surface they still serve
+      remains live (dozens of still-unmigrated satellite packages construct
+      and match on them today) and is this repo's own call, not a spec
+      question; their removal is Milestone 9/10's job, not this one's.
+      `.fusa-reqs.json` gains `REQ-ERRM-001`..`REQ-ERRM-013`, each with a
+      `// fusa:req`/`// fusa:test` pair in `src/lib.rs`; the pre-existing
+      `REQ-LIFE-004/007/008/010/012`, `REQ-EP0-005/010`, and `REQ-RMAP-004`
+      requirement texts are updated in place (same IDs, same behavior) to
+      name the new variants their already-passing tests now exercise. This
+      closes out Milestone 2 as a whole.
 
 Success Criteria:
 An RC Server can be constructed in-memory, walked through all three

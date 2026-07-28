@@ -360,7 +360,7 @@ pub enum HeaderVariant {
 /// TSCF-subtyped input is decoded only when `time_sync` is
 /// [`TimeSyncCapability::Capable`]; when the server is
 /// [`TimeSyncCapability::Incapable`], the AVTPDU is dropped outright and
-/// `Err(RcpError::TimeSyncUnsupported)` is returned without attempting to
+/// `Err(RcpError::UnsupportedCmd)` is returned without attempting to
 /// decode the rest of the header — a time-sync-incapable server has no
 /// meaningful use for `avtp_timestamp`, so there is nothing to gain by
 /// reading further.
@@ -383,7 +383,7 @@ pub fn select_header_variant(
         NTSCF_SUBTYPE => decode_ntscf_header(b).map(HeaderVariant::Ntscf),
         TSCF_SUBTYPE => {
             if !time_sync.accepts_tscf() {
-                return Err(RcpError::TimeSyncUnsupported);
+                return Err(RcpError::UnsupportedCmd);
             }
             decode_tscf_header(b).map(HeaderVariant::Tscf)
         }
@@ -897,7 +897,7 @@ mod tests {
         let frame = encode_tscf_header(&hdr).unwrap();
         assert_eq!(
             select_header_variant(&frame, TimeSyncCapability::Incapable),
-            Err(RcpError::TimeSyncUnsupported)
+            Err(RcpError::UnsupportedCmd)
         );
     }
 
@@ -911,7 +911,7 @@ mod tests {
         let short_tscf_looking = [TSCF_SUBTYPE, 0x80];
         assert_eq!(
             select_header_variant(&short_tscf_looking, TimeSyncCapability::Incapable),
-            Err(RcpError::TimeSyncUnsupported)
+            Err(RcpError::UnsupportedCmd)
         );
     }
 

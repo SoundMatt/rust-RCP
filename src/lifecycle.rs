@@ -49,10 +49,10 @@
 //!   `HW_CONFIGURED` -> `HW_UNCONFIGURED`, not `RCP_CONFIGURED` ->
 //!   anything. Every other `(from, to)` pair — any full rollback from
 //!   `RCP_CONFIGURED`, skipping `HW_CONFIGURED` entirely, or staying in
-//!   the same state — remains rejected with
-//!   `RcpError::InvalidLifecycleTransition`. See the Provenance note below
-//!   for the judgment calls this item made explicit rather than guessed
-//!   at silently: whether the demotion needs a guard (it does not), and
+//!   the same state — remains rejected with `RcpError::RequestRejected`.
+//!   See the Provenance note below for the judgment calls this item made
+//!   explicit rather than guessed at silently: whether the demotion needs
+//!   a guard (it does not), and
 //!   why demoting out of `RCP_CONFIGURED` is treated as a distinct,
 //!   still-unbuilt concern rather than assumed to be in scope here.
 //!
@@ -144,14 +144,17 @@
 //!   subsection is later work in this same milestone. `try_transition`
 //!   therefore takes the consistency check as a caller-supplied
 //!   `is_consistent: impl FnOnce() -> bool` closure rather than evaluating
-//!   anything itself; the two new `RcpError` sentinels it can return
-//!   (`RcpError::HwCfgInconsistent`, `RcpError::RcpCfgInconsistent`) are
-//!   named after the guards for traceability but, like
-//!   `RcpError::RegisterUnreachable` before them, are this crate's own
-//!   provisional names pending the milestone's later "Error Model" item.
-//!   `RcpError::InvalidLifecycleTransition` (for any `(from, to)` pair
-//!   outside the three defined transitions) is the same kind of
-//!   provisional sentinel.
+//!   anything itself; on failure it returns
+//!   [`RcpError::InvalidParameter`] for *either* guard — this module
+//!   originally minted two distinct guard-named sentinels
+//!   (`HW_CFG_INCONSISTENT`/`RCP_CFG_INCONSISTENT`) here, but Milestone 2's
+//!   "Error Model" item (see [`crate::RcpError`]'s own doc comment for the
+//!   full mapping) folded both onto the same TC18 spec code, reading both
+//!   as the same "caller-supplied configuration failed a consistency
+//!   check" failure mode. `RcpError::RequestRejected` (for any `(from,
+//!   to)` pair outside the three defined transitions) is that same later
+//!   item's mapping for what this module used to call
+//!   `InvalidLifecycleTransition`.
 //! - The demotion transition (`HW_CONFIGURED` -> `HW_UNCONFIGURED`) is
 //!   modeled as **unconditional**: `is_consistent` is accepted by
 //!   `try_transition`'s signature (so callers passing the same closure
@@ -348,17 +351,14 @@ pub fn is_register_reachable(state: RcServerState, category: RegisterCategory) -
 /// Validating counterpart to [`is_register_reachable`].
 ///
 /// Returns `Ok(())` if `category` is reachable while the RC Server is in
-/// `state`, `Err(RcpError::RegisterUnreachable)` otherwise. Never panics
+/// `state`, `Err(RcpError::UnauthorizedAccess)` otherwise. Never panics
 /// for any input.
 ///
-/// The error variant is this crate's own provisional name, matching the
-/// pre-Error-Model-item style already used by
-/// [`RcpError::TimeSyncUnsupported`]/[`RcpError::EndpointAlreadyRegistered`]/
-/// [`RcpError::EchoBackMismatch`]. `ROADMAP.md` Milestone 2's separate
-/// "Error Model" checklist item will eventually replace `RcpError`'s whole
-/// variant set with the specification's own error codes (`UNAUTHORIZED_ACCESS`,
-/// `LOCKED_MEM_ACCESS`, etc.); which of those this variant ultimately maps
-/// to is that later item's call to make, not this one's.
+/// `RcpError::UnauthorizedAccess` is Milestone 2's "Error Model" item's TC18
+/// spec error code for this check — this function originally returned a
+/// crate-invented `RegisterUnreachable` sentinel, since remapped; see
+/// [`crate::RcpError`]'s own doc comment for the full provenance/mapping
+/// note.
 // fusa:req REQ-LIFE-004
 pub fn check_register_reachable(
     state: RcServerState,
@@ -367,7 +367,7 @@ pub fn check_register_reachable(
     if is_register_reachable(state, category) {
         Ok(())
     } else {
-        Err(RcpError::RegisterUnreachable)
+        Err(RcpError::UnauthorizedAccess)
     }
 }
 
@@ -449,28 +449,27 @@ pub fn is_register_writable(state: RcServerState, category: RegisterCategory) ->
 ///
 /// Returns `Ok(())` if `category` is writable while the RC Server is in
 /// `state`. Otherwise distinguishes *why* the write is rejected —
-/// `Err(RcpError::RegisterUnreachable)` if `category` is not reachable at
+/// `Err(RcpError::UnauthorizedAccess)` if `category` is not reachable at
 /// all in `state` (mirroring [`check_register_reachable`]), or
-/// `Err(RcpError::RegisterLocked)` if it is reachable but write-locked by
+/// `Err(RcpError::LockedMemAccess)` if it is reachable but write-locked by
 /// [`lock_policy`]'s rule. Never panics for any input.
 ///
-/// `RcpError::RegisterLocked` is this crate's own provisional name, matching
-/// the pre-Error-Model-item style already used by
-/// `RcpError::RegisterUnreachable` and the lifecycle guard sentinels before
-/// it; which of the specification's own error codes it ultimately maps to
-/// is this milestone's later "Error Model" item's call to make, not this
-/// one's.
+/// `RcpError::LockedMemAccess` is Milestone 2's "Error Model" item's TC18
+/// spec error code for this check — a direct name correspondence with what
+/// this function originally called `RegisterLocked`; see
+/// [`crate::RcpError`]'s own doc comment for the full provenance/mapping
+/// note.
 // fusa:req REQ-LIFE-010
 pub fn check_register_writable(
     state: RcServerState,
     category: RegisterCategory,
 ) -> Result<(), RcpError> {
     if !is_register_reachable(state, category) {
-        Err(RcpError::RegisterUnreachable)
+        Err(RcpError::UnauthorizedAccess)
     } else if is_register_writable(state, category) {
         Ok(())
     } else {
-        Err(RcpError::RegisterLocked)
+        Err(RcpError::LockedMemAccess)
     }
 }
 
@@ -517,8 +516,8 @@ impl RcServerState {
     /// For either of the two guarded shapes, `is_consistent` is invoked
     /// exactly once: if it returns `true`, the transition succeeds and
     /// `Ok(target)` is returned; if it returns `false`, the matching guard
-    /// sentinel (`RcpError::HwCfgInconsistent` or
-    /// `RcpError::RcpCfgInconsistent`) is returned and `self` is left
+    /// sentinel (`RcpError::InvalidParameter` or
+    /// `RcpError::InvalidParameter`) is returned and `self` is left
     /// unchanged (this method takes `self` by value and returns the *new*
     /// state on success — it does not mutate anything in place).
     ///
@@ -528,7 +527,7 @@ impl RcServerState {
     ///
     /// For every other `(self, target)` pair — see [`is_transition_defined`]
     /// for the exact rule — `is_consistent` is never invoked at all, and
-    /// `Err(RcpError::InvalidLifecycleTransition)` is returned instead.
+    /// `Err(RcpError::RequestRejected)` is returned instead.
     ///
     /// This crate has no register map yet to derive a real consistency
     /// check from (see this module's doc comment's Provenance note), so
@@ -549,14 +548,14 @@ impl RcServerState {
                 if is_consistent() {
                     Ok(target)
                 } else {
-                    Err(RcpError::HwCfgInconsistent)
+                    Err(RcpError::InvalidParameter)
                 }
             }
             (Self::HwConfigured, Self::RcpConfigured) => {
                 if is_consistent() {
                     Ok(target)
                 } else {
-                    Err(RcpError::RcpCfgInconsistent)
+                    Err(RcpError::InvalidParameter)
                 }
             }
             // Demotion path: unconditional per this module's doc comment
@@ -567,7 +566,7 @@ impl RcServerState {
             // accepting it, so `is_consistent` is deliberately left
             // uninvoked.
             (Self::HwConfigured, Self::HwUnconfigured) => Ok(target),
-            _ => Err(RcpError::InvalidLifecycleTransition),
+            _ => Err(RcpError::RequestRejected),
         }
     }
 }
@@ -675,7 +674,7 @@ mod tests {
                 let checked = check_register_reachable(state, category);
                 assert_eq!(checked.is_ok(), reachable);
                 if !reachable {
-                    assert_eq!(checked, Err(RcpError::RegisterUnreachable));
+                    assert_eq!(checked, Err(RcpError::UnauthorizedAccess));
                 }
             }
         }
@@ -789,9 +788,9 @@ mod tests {
                 assert_eq!(checked.is_ok(), writable, "{state:?} {category:?}");
                 if !writable {
                     let expected = if !is_register_reachable(state, category) {
-                        RcpError::RegisterUnreachable
+                        RcpError::UnauthorizedAccess
                     } else {
-                        RcpError::RegisterLocked
+                        RcpError::LockedMemAccess
                     };
                     assert_eq!(checked, Err(expected), "{state:?} {category:?}");
                 }
@@ -858,7 +857,7 @@ mod tests {
     fn hw_unconfigured_to_hw_configured_rejected_when_guard_fails() {
         let result =
             RcServerState::HwUnconfigured.try_transition(RcServerState::HwConfigured, || false);
-        assert_eq!(result, Err(RcpError::HwCfgInconsistent));
+        assert_eq!(result, Err(RcpError::InvalidParameter));
     }
 
     #[test]
@@ -874,7 +873,7 @@ mod tests {
     fn hw_configured_to_rcp_configured_rejected_when_guard_fails() {
         let result =
             RcServerState::HwConfigured.try_transition(RcServerState::RcpConfigured, || false);
-        assert_eq!(result, Err(RcpError::RcpCfgInconsistent));
+        assert_eq!(result, Err(RcpError::InvalidParameter));
     }
 
     // ── Transition guard: round-trip on the demotion path ────────────────
@@ -938,11 +937,7 @@ mod tests {
                 guard_called = true;
                 true
             });
-            assert_eq!(
-                result,
-                Err(RcpError::InvalidLifecycleTransition),
-                "{from:?} -> {to:?}"
-            );
+            assert_eq!(result, Err(RcpError::RequestRejected), "{from:?} -> {to:?}");
             assert!(
                 !guard_called,
                 "guard should not be consulted for undefined transition {from:?} -> {to:?}"
