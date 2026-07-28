@@ -4,16 +4,34 @@
 // fusa:req REQ-EP0-004
 // fusa:req REQ-EP0-005
 // fusa:req REQ-EP0-006
+// fusa:req REQ-EP0-007
+// fusa:req REQ-EP0-008
+// fusa:req REQ-EP0-009
+// fusa:req REQ-EP0-010
+// fusa:req REQ-EP0-011
 
-//! EP0 (RC-Server-as-endpoint) whole-register-map read/write addressing —
+//! EP0 (RC-Server-as-endpoint) whole-register-map read/write addressing,
+//! plus the root-client access-control axis layered on top of it —
 //! TC18 register-map model (`ROADMAP.md` Milestone 2, "EP0
-//! (RC-Server-as-Endpoint)" subsection, first bullet only).
+//! (RC-Server-as-Endpoint)" subsection, now in full).
 //!
-//! This module is the first item of Milestone 2's "EP0" subsection, the
+//! This module covers both items of Milestone 2's "EP0" subsection, the
 //! next subsection in document order after "Lifecycle State Machine" (see
 //! [`crate::lifecycle`], which this module composes with rather than
 //! duplicates). Per that module's own doc comment, EP0 was explicitly
 //! named as out of scope there and left for this item.
+//!
+//! - The first bullet, whole-register-map read/write addressing, is
+//!   unchanged from its original shape: [`EP0_BYTE_BUS_ID`]/
+//!   [`is_ep0_address`], [`RequestRoute`]/[`route_byte_bus_id`],
+//!   [`Ep0AccessKind`]/[`access_kind`], and [`check_ep0_access`].
+//! - The second bullet, the **root-client** concept
+//!   (`svr_root_client_index`), is new: [`is_root_client`] and
+//!   [`check_ep0_access_for_stream`] add a distinct, orthogonal
+//!   access-control axis — *which stream is asking* — layered on top of
+//!   (not replacing) [`check_ep0_access`]'s lifecycle-state gating. See the
+//!   "Root client" section below and this module's Provenance note for how
+//!   that axis was scoped.
 //!
 //! `byte_bus_id 0` is reserved: it addresses the RC Server acting as a
 //! pseudo-endpoint over its own whole register map, not any device-facing
@@ -57,18 +75,44 @@
 //! demonstration that an EP0-addressed request/response pair round-trips
 //! through the existing echo-back rule unchanged.
 //!
+//! ## Root client
+//!
+//! [`is_root_client`]/[`check_ep0_access_for_stream`] add the second "EP0"
+//! checklist bullet: a distinct, orthogonal access-control axis over *which
+//! stream is asking*, layered on top of (not replacing)
+//! [`check_ep0_access`]'s lifecycle-state gating.
+//!
+//! - The RC Server designates at most one [`crate::avtpdu::StreamId`] as its
+//!   root client at any time, represented here as a plain `Option<StreamId>`
+//!   — see the Provenance note below for why no dedicated wrapper type was
+//!   introduced for it.
+//! - [`check_ep0_access_for_stream`] leaves EP0 *reads* exactly as
+//!   [`check_ep0_access`] already decided them, for root and non-root
+//!   streams alike — root-client status only ever gates *writes*, matching
+//!   this checklist bullet's own wording ("full-server **write** access for
+//!   exactly one stream").
+//! - For an EP0 *write*, [`check_ep0_access_for_stream`] first checks
+//!   [`is_root_client`] for the requesting stream: if it is the designated
+//!   root client, the write proceeds exactly as [`check_ep0_access`] would
+//!   decide it (i.e. still subject to lifecycle-state reachability/locking);
+//!   if it is not, the write is rejected with
+//!   [`crate::RcpError::RootClientRequired`] without even consulting
+//!   [`check_ep0_access`] — a non-root stream's EP0 write is refused
+//!   regardless of what lifecycle state would otherwise have permitted.
+//! - No root client at all (`root_client == None`) behaves like every
+//!   stream being non-root: every EP0 write is rejected with
+//!   `RootClientRequired` until some stream is designated.
+//!
+//! This module still performs no register I/O and does not decide what a
+//! non-root stream's *per-endpoint* (device-endpoint, non-EP0) write access
+//! looks like — routing a non-EP0-addressed request to a device endpoint at
+//! all is [`route_byte_bus_id`]'s job, unaffected by this section, and
+//! validating what a device endpoint permits once routed there is
+//! necessarily downstream of Milestone 4's endpoint work, not this item's.
+//!
 //! Deliberately out of scope for this item (separate, later checklist
 //! bullets):
 //!
-//! - The **root-client** concept (`svr_root_client_index`): full-server
-//!   write access for exactly one stream, per-endpoint-restricted access
-//!   for everyone else. That is Milestone 2's *second* "EP0" checklist
-//!   bullet, a distinct access-control axis layered on top of (not
-//!   replacing) the lifecycle-state gating this item composes with. This
-//!   module does not implement, and [`check_ep0_access`] does not enforce,
-//!   any per-stream/per-client restriction — every caller is currently
-//!   treated as equally privileged, matching how [`crate::lifecycle`]
-//!   itself has no notion of *which* client is asking.
 //! - The concrete Register Map subsection's field layout
 //!   (`svr_oa_tc18_magic_nr`, HW pin-mapping tables, register addresses,
 //!   etc.) — [`crate::lifecycle::RegisterCategory`] remains the same
@@ -81,10 +125,16 @@
 //!   from, [`check_ep0_access`]'s general category-reachability composition
 //!   — reconciling the two (if they need reconciling at all) is left to
 //!   whichever item builds discovery, not guessed at here.
-//! - Wiring [`route_byte_bus_id`]/[`check_ep0_access`] into an actual
-//!   decoder, dispatch loop, or [`crate::addressing::EndpointTable`] caller
-//!   — this module is additive standalone plumbing only, matching the
-//!   discipline every prior Milestone 1/2 entry already established.
+//! - Wiring [`route_byte_bus_id`]/[`check_ep0_access`]/
+//!   [`check_ep0_access_for_stream`] into an actual decoder, dispatch loop,
+//!   or [`crate::addressing::EndpointTable`] caller — this module remains
+//!   additive standalone plumbing only, matching the discipline every prior
+//!   Milestone 1/2 entry already established. Nothing here designates a
+//!   root client against a real RC Server instance either — this module
+//!   defines only the *check*, taking `root_client` as a caller-supplied
+//!   value, mirroring how [`crate::lifecycle::RcServerState::try_transition`]
+//!   takes its consistency guard as a caller-supplied closure rather than
+//!   owning any server state itself.
 //!   [`crate::addressing::EndpointTable::register`] is deliberately left
 //!   unchanged: it still structurally permits registering a device endpoint
 //!   at `byte_bus_id 0` (nothing in `crate::addressing` special-cases it),
@@ -125,8 +175,48 @@
 //! as the coarser gate, writability as the finer one layered on top), only
 //! now selected by [`access_kind`] instead of being the caller's job to
 //! choose between explicitly.
+//!
+//! The root-client section goes a step further than `ROADMAP.md`'s own
+//! wording and is this crate's own working interpretation, flagged per
+//! Guiding Principle 5, pending reconciliation against the specification's
+//! actual behavior (never its prose) before being relied on for interop
+//! with a real TC18 RC Server:
+//!
+//! - `svr_root_client_index` is the roadmap checklist's name for the
+//!   backing register, but the concrete Register Map subsection that would
+//!   define such a field is still unbuilt (see the out-of-scope list
+//!   above). Rather than invent a placeholder register type the way
+//!   [`crate::lifecycle::RegisterCategory`] stands in for the whole
+//!   register map, this item represents "which stream (if any) currently
+//!   holds the index" directly as `Option<`[`crate::avtpdu::StreamId`]`>` —
+//!   the natural in-memory shape of "at most one designated stream" — and
+//!   leaves the eventual `svr_root_client_index` register's own encoding
+//!   (whatever wire representation of a stream identity it turns out to be)
+//!   to whichever later item builds the concrete Register Map.
+//! - That root-client status gates EP0 *writes* only, leaving EP0 *reads*
+//!   identical to [`check_ep0_access`] for every stream regardless of
+//!   root-client status, is inferred from the checklist bullet's own
+//!   wording naming "full-server **write** access" for the root client and
+//!   only "per-endpoint-restricted access" — not "read-restricted access"
+//!   — for everyone else. Nothing in the checklist bullet's text suggests
+//!   non-root streams lose EP0 *read* visibility, only that they cannot
+//!   exercise the root client's whole-server *write* privilege.
+//! - `RcpError::RootClientRequired` is this crate's own provisional error
+//!   name, matching the pre-Error-Model-item style already used by
+//!   `RcpError::RegisterUnreachable`/`RcpError::RegisterLocked` before it;
+//!   which of the specification's own error codes (e.g. a candidate like
+//!   `UNAUTHORIZED_ACCESS`) it ultimately maps to is this milestone's later
+//!   "Error Model" item's call to make, not this one's.
+//! - An absent root client (`root_client == None`) rejecting every EP0
+//!   write with `RootClientRequired` — rather than, say, treating "no root
+//!   client designated" as "anyone may write" — is this crate's own
+//!   conservative default: the checklist bullet describes root-client
+//!   write access as a privilege belonging to "exactly one stream", which
+//!   this crate reads as implying no stream holds that privilege before one
+//!   has been designated, not that the privilege is open to all until then.
 
 use crate::acf::ByteMessageInfo;
+use crate::avtpdu::StreamId;
 use crate::lifecycle::{
     check_register_reachable, check_register_writable, RcServerState, RegisterCategory,
 };
@@ -247,6 +337,63 @@ pub fn check_ep0_access(
     match access_kind(info) {
         Ep0AccessKind::Read => check_register_reachable(state, category),
         Ep0AccessKind::Write => check_register_writable(state, category),
+    }
+}
+
+// ── Root client ───────────────────────────────────────────────────────────────
+
+/// Is `stream` the RC Server's currently designated root client?
+///
+/// `root_client` is this crate's own in-memory working representation of
+/// the roadmap's `svr_root_client_index` register field — see this
+/// module's Provenance note. `None` means no stream currently holds
+/// root-client status, in which case this always answers `false`. Never
+/// panics for any input.
+// fusa:req REQ-EP0-007
+pub fn is_root_client(root_client: Option<StreamId>, stream: StreamId) -> bool {
+    root_client == Some(stream)
+}
+
+/// Root-client-aware counterpart to [`check_ep0_access`].
+///
+/// Reads ([`Ep0AccessKind::Read`]) are decided identically to
+/// [`check_ep0_access`], for `requesting_stream` regardless of whether it
+/// is the root client — see this module's "Root client" section for why
+/// root-client status gates writes only.
+///
+/// Writes ([`Ep0AccessKind::Write`]) additionally require
+/// `requesting_stream` to be the designated `root_client`
+/// ([`is_root_client`]): if it is, the write is decided exactly as
+/// [`check_ep0_access`] would decide it (still subject to lifecycle-state
+/// reachability/locking); if it is not — including when `root_client` is
+/// `None` — the write is rejected with `Err(RcpError::RootClientRequired)`
+/// without consulting [`check_ep0_access`] at all, so a non-root stream's
+/// EP0 write is refused regardless of what lifecycle state would otherwise
+/// have permitted.
+///
+/// Like [`check_ep0_access`], this function performs no register I/O and
+/// does not itself verify that `info`'s `byte_bus_id` is actually
+/// [`EP0_BYTE_BUS_ID`]. Never panics for any input.
+// fusa:req REQ-EP0-008
+// fusa:req REQ-EP0-009
+// fusa:req REQ-EP0-010
+// fusa:req REQ-EP0-011
+pub fn check_ep0_access_for_stream(
+    state: RcServerState,
+    category: RegisterCategory,
+    info: &ByteMessageInfo,
+    requesting_stream: StreamId,
+    root_client: Option<StreamId>,
+) -> Result<(), RcpError> {
+    match access_kind(info) {
+        Ep0AccessKind::Read => check_ep0_access(state, category, info),
+        Ep0AccessKind::Write => {
+            if is_root_client(root_client, requesting_stream) {
+                check_ep0_access(state, category, info)
+            } else {
+                Err(RcpError::RootClientRequired)
+            }
+        }
     }
 }
 
@@ -453,5 +600,137 @@ mod tests {
         let response = crate::acf::build_response_info(&request, ByteMessageInfo::default());
         assert_eq!(response.byte_bus_id, EP0_BYTE_BUS_ID);
         assert_eq!(crate::acf::verify_echo_back(&request, &response), Ok(()));
+    }
+
+    // ── Root client ───────────────────────────────────────────────────────
+
+    fn stream(unique_id: u16) -> StreamId {
+        StreamId::new([0x02, 0x11, 0x22, 0x33, 0x44, 0x55], unique_id)
+    }
+
+    #[test]
+    // fusa:test REQ-EP0-007
+    fn is_root_client_true_only_for_the_designated_stream() {
+        let root = stream(1);
+        let other = stream(2);
+        assert!(is_root_client(Some(root), root));
+        assert!(!is_root_client(Some(root), other));
+        assert!(!is_root_client(None, root));
+        assert!(!is_root_client(None, other));
+    }
+
+    #[test]
+    // fusa:test REQ-EP0-008
+    fn root_client_read_agrees_with_check_ep0_access_regardless_of_root_status() {
+        let root = stream(1);
+        let non_root = stream(2);
+        for state in ALL_STATES {
+            for category in ALL_CATEGORIES {
+                let info = info_with_op(false);
+                let plain = check_ep0_access(state, category, &info);
+                assert_eq!(
+                    check_ep0_access_for_stream(state, category, &info, root, Some(root)),
+                    plain,
+                    "root reader, {state:?} {category:?}"
+                );
+                assert_eq!(
+                    check_ep0_access_for_stream(state, category, &info, non_root, Some(root)),
+                    plain,
+                    "non-root reader, {state:?} {category:?}"
+                );
+                assert_eq!(
+                    check_ep0_access_for_stream(state, category, &info, non_root, None),
+                    plain,
+                    "reader with no root client designated, {state:?} {category:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-EP0-009
+    fn root_client_write_agrees_with_check_ep0_access_for_the_root_stream() {
+        let root = stream(1);
+        for state in ALL_STATES {
+            for category in ALL_CATEGORIES {
+                let info = info_with_op(true);
+                assert_eq!(
+                    check_ep0_access_for_stream(state, category, &info, root, Some(root)),
+                    check_ep0_access(state, category, &info),
+                    "{state:?} {category:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-EP0-010
+    fn non_root_write_is_always_rejected_with_root_client_required() {
+        let root = stream(1);
+        let non_root = stream(2);
+        for state in ALL_STATES {
+            for category in ALL_CATEGORIES {
+                let info = info_with_op(true);
+                assert_eq!(
+                    check_ep0_access_for_stream(state, category, &info, non_root, Some(root)),
+                    Err(RcpError::RootClientRequired),
+                    "non-root writer, {state:?} {category:?}"
+                );
+                assert_eq!(
+                    check_ep0_access_for_stream(state, category, &info, non_root, None),
+                    Err(RcpError::RootClientRequired),
+                    "writer with no root client designated, {state:?} {category:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-EP0-010
+    fn root_client_write_can_still_be_rejected_by_lifecycle_state() {
+        // Root-client status only clears the root-client gate -- it does
+        // not bypass the lifecycle-state gating check_ep0_access already
+        // enforces. RcpConfig is unreachable while HwUnconfigured even for
+        // the root client.
+        let root = stream(1);
+        let info = info_with_op(true);
+        assert_eq!(
+            check_ep0_access_for_stream(
+                RcServerState::HwUnconfigured,
+                RegisterCategory::RcpConfig,
+                &info,
+                root,
+                Some(root),
+            ),
+            Err(RcpError::RegisterUnreachable)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-EP0-011
+    fn check_ep0_access_for_stream_never_panics_for_any_combination() {
+        let root = stream(1);
+        let non_root = stream(2);
+        for state in ALL_STATES {
+            for category in ALL_CATEGORIES {
+                for op in [false, true] {
+                    let info = info_with_op(op);
+                    for (requesting_stream, root_client) in [
+                        (root, Some(root)),
+                        (non_root, Some(root)),
+                        (non_root, None),
+                        (root, None),
+                    ] {
+                        let _ = check_ep0_access_for_stream(
+                            state,
+                            category,
+                            &info,
+                            requesting_stream,
+                            root_client,
+                        );
+                    }
+                }
+            }
+        }
     }
 }

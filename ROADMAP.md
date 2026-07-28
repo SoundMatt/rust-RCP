@@ -488,9 +488,37 @@ lifecycle machine and the register-map configuration model, replacing the
       `route_byte_bus_id`'s routing decision either way). New
       `REQ-EP0-001`..`REQ-EP0-006` added to `.fusa-reqs.json`, each with a
       `// fusa:req`/`// fusa:test` pair in `src/ep0.rs`.
-- [ ] Root-client concept (`svr_root_client_index`): full-server write
+- [x] Root-client concept (`svr_root_client_index`): full-server write
       access for exactly one stream, per-endpoint-restricted access for
-      everyone else
+      everyone else. Done (v0.5.0-dev): `src/ep0.rs` adds `is_root_client`
+      and `check_ep0_access_for_stream`, a second, orthogonal
+      access-control axis layered on top of (not replacing)
+      `check_ep0_access`'s lifecycle-state gating from the first bullet.
+      `check_ep0_access_for_stream` leaves EP0 reads identical to
+      `check_ep0_access` for every stream regardless of root-client status
+      — root-client status gates *writes* only, per this bullet's own
+      "full-server **write** access" wording. For a write, the requesting
+      stream must equal the designated root client
+      (`is_root_client(root_client, stream)`); if it does, the write is
+      decided exactly as `check_ep0_access` would (still subject to
+      lifecycle-state reachability/locking); if it does not — including
+      when no root client is designated at all — the write is rejected
+      with new `RcpError::RootClientRequired` without even consulting
+      `check_ep0_access`. Since the concrete Register Map subsection that
+      would define a real `svr_root_client_index` field is still unbuilt,
+      the root client is represented as a plain
+      `Option<avtpdu::StreamId>` caller-supplied value rather than a
+      dedicated register type — this crate's own working interpretation,
+      flagged per Guiding Principle 5 in the module doc comment's
+      Provenance note, along with the read/write scoping call and the
+      "no root client designated rejects every write" default. This is
+      additive: like the first EP0 bullet, `check_ep0_access_for_stream`
+      is not wired into any decoder, dispatch loop, or existing caller,
+      and nothing here designates a root client against a real RC Server
+      instance — it takes `root_client` as a caller-supplied value.
+      New `REQ-EP0-007`..`REQ-EP0-011` added to `.fusa-reqs.json`, each
+      with a `// fusa:req`/`// fusa:test` pair in `src/ep0.rs`. This
+      closes out the "EP0 (RC-Server-as-Endpoint)" subsection.
 
 ### Register Map
 
