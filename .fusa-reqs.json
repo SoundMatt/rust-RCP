@@ -4662,6 +4662,60 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-I2C-001",
+      "title": "I2cSpeedMode round-trips through to_u8/from_u8 for all five values",
+      "text": "I2cSpeedMode::to_u8/I2cSpeedMode::from_u8 round-trip every one of the five i2c_mode speed presets (Standard, Fast, FastPlus, HighSpeedRowA, HighSpeedRowB), covering the full 0..=4 wire-value range this crate assigns them",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-I2C-002",
+      "title": "I2cSpeedMode::from_u8 rejects values outside the 0..=4 i2c_mode range",
+      "text": "I2cSpeedMode::from_u8 returns Err(RcpError::InvalidParameter) rather than panicking for any raw byte greater than 4",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-I2C-003",
+      "title": "I2cSpeedMode::is_ambiguous_high_speed_row flags exactly the two unresolved high-speed rows",
+      "text": "I2cSpeedMode::is_ambiguous_high_speed_row returns true only for HighSpeedRowA/HighSpeedRowB, the two adjacent high-speed i2c_mode rows this crate's spec-extraction pass flags as unresolved pending errata rather than silently assigning either a specific named speed, and false for the three unambiguous presets (Standard/Fast/FastPlus); I2cSpeedMode::default() resolves to Standard, which is not an ambiguous row",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-I2C-004",
+      "title": "I2cFunctionalConfig's layer tag matches crate::regmap's EndpointType::I2c cross-layer rule",
+      "text": "I2cFunctionalConfig::layer_tag produces a crate::regmap::PerEpTypeFunctionalConfig tagged EndpointType::I2c that satisfies crate::regmap::check_functional_config_matches_ep_type against a generic PerEpConfigBlock of the same ep_type, and is rejected by functional_config_matches_ep_type against a mismatched ep_type; I2cFunctionalConfig::default uses I2cSpeedMode::default",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-I2C-005",
+      "title": "I2cByteTransfer round-trips raw bytes, including address bytes, through encode/decode and never panics",
+      "text": "I2cByteTransfer::encode/I2cByteTransfer::decode round-trip any byte sequence, including an empty one, as the raw controller-to-bus byte stream (address byte(s) included, unparsed) without interpreting its contents, and decode never panics for any input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-I2C-006",
+      "title": "I2cByteTransferResult round-trips raw bytes through encode/decode and never panics",
+      "text": "I2cByteTransferResult::encode/I2cByteTransferResult::decode round-trip any byte sequence, including an empty one, as the raw bus-to-controller byte stream without interpreting its contents, and decode never panics for any input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
