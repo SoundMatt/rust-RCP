@@ -691,9 +691,42 @@ the *mandatory* discovery path (mDNS may continue to exist as a
 complementary network-rendezvous helper — see the satellite disposition
 table — but it is not a substitute for this).
 
-- [ ] Discovery request/response: broadcastable ACF_ABB read addressed to
+- [x] Discovery request/response: broadcastable ACF_ABB read addressed to
       `byte_bus_id 0`, register address 0, answerable in **any** lifecycle
-      state
+      state. Done (v0.6.0-dev): new, additive `src/discovery.rs` adds
+      `build_discovery_request`/`is_discovery_request` (a read-direction
+      `AcfAbbMessage` addressed to `ep0::EP0_BYTE_BUS_ID`, reusing
+      `ep0::route_byte_bus_id`/`ep0::access_kind` rather than re-deriving
+      them) and `build_discovery_response` (composes explicitly with
+      `lifecycle::check_register_reachable(state, RegisterCategory::General)`
+      for every `RcServerState`, demonstrating/testing the "answerable in
+      any lifecycle state" requirement against the real gate rather than
+      only asserting its always-true outcome; the response payload is
+      `register_map::GeneralRegisters::encode()` verbatim, register address
+      0's field content, and its header echoes the request's `byte_bus_id`
+      per the existing echo-back rule). Two working interpretations this
+      item introduces are flagged per Guiding Principle 5 in the module's
+      own provenance note rather than presented as spec-cited fact: (1)
+      "broadcastable" addressing, since `avtpdu::StreamId` has no
+      broadcast/multicast concept of its own — this crate reuses the
+      reserved IEEE 802.3 all-ones Ethernet broadcast MAC paired with
+      `unique_id 0` as a sentinel `DISCOVERY_BROADCAST_STREAM_ID`, checked
+      by `is_discovery_broadcast_stream_id`; (2) "register address 0" on
+      the wire, since `acf::ByteMessageInfo` has no dedicated
+      register-address field — this crate carries it as a big-endian `u16`
+      prefix of `AcfAbbMessage::payload`. This module replaces `mdns.rs` as
+      the mandatory discovery path per this subsection's own Goal text;
+      `mdns.rs` itself is untouched (its `Zone`/host/port/txt-record model
+      shares nothing with this mechanism) and remains available only as the
+      complementary network-rendezvous helper the satellite disposition
+      table already calls it. Like every prior Milestone 1/2 entry, this is
+      additive standalone plumbing only — nothing here is wired into an
+      actual decoder, dispatch loop, or `avtpdu`/`acf` caller, and
+      discovery-stream claiming, multi-client coexistence, and the
+      client-side cache (this subsection's remaining three checklist
+      bullets) are untouched, separate, later work. New `REQ-DISC-001`..
+      `REQ-DISC-005` added to `.fusa-reqs.json`, each with a
+      `// fusa:req`/`// fusa:test` pair in `src/discovery.rs`.
 - [ ] Discovery-stream claiming: first-claimant rule, `Discovery_TimeOut`
       (~20 ms default) lapse-and-reopen behavior
 - [ ] Multi-client coexistence: other clients may still read via discovery
