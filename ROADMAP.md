@@ -852,9 +852,36 @@ Implement the simplest request/response endpoint types first, proving out
 the generic per-endpoint mechanics (`evt` sub-opcode conventions, common
 functional config) before tackling bus-protocol endpoints.
 
-- [ ] **GPIO** (`ep_type 0x02`): 4-byte bitmask read/write; the eight
+- [x] **GPIO** (`ep_type 0x02`): 4-byte bitmask read/write; the eight
       write-semantics (replace/OR/AND/XOR/add/subtract-with-saturation/
-      reconfigure); per-pin change/rising/falling trigger signals
+      reconfigure); per-pin change/rising/falling trigger signals. Done
+      (v0.7.0-dev): new `src/gpio.rs` adds [`GpioBitmask`] (the 4-byte
+      read/write bitmask, encode/decode, big-endian, never-panicking),
+      [`GpioWriteSemantics`] (an explicit 8-variant enum covering all eight
+      write-semantics) with [`apply_gpio_write`] giving each one a pure,
+      never-panicking `(current, operand) -> new_value` function, and
+      [`GpioTriggerConfig`]/[`GpioTriggerSignals`]/[`evaluate_gpio_triggers`]
+      modeling per-pin change/rising/falling trigger arming and edge
+      detection between a before/after bitmask pair. `GpioFunctionalConfig`
+      gives GPIO's own functional-config content a dedicated type rather
+      than expanding `regmap::PerEpTypeFunctionalConfig` on the strength of
+      one endpoint type alone, with `GpioFunctionalConfig::layer_tag`
+      composing against `regmap::check_functional_config_matches_ep_type`'s
+      existing cross-layer rule unchanged. Two spec ambiguities are flagged
+      per Guiding Principle 5 rather than silently resolved: (1) the
+      roadmap text itself names only seven of the "eight write-semantics"
+      — `GpioWriteSemantics::Unnamed8th` occupies the eighth `evt.sub_opcode`
+      value and `apply_gpio_write` refuses it (`UnsupportedCmd`) rather than
+      inventing a behavior; (2) write-semantics selection is modeled via the
+      already-generic 3-bit `acf::Evt::sub_opcode` field (its `0..=7` range
+      exactly spans eight values) as this crate's own working
+      interpretation, not a confirmed instance of this milestone's
+      still-unbuilt "Groups A/B/C" convention (this item's last checklist
+      bullet). Like every prior Milestone 1-3 entry, this remains additive
+      standalone plumbing only — nothing here is wired into an actual
+      decoder or dispatch loop. New `REQ-GPIO-001`..`REQ-GPIO-016` added to
+      `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair in
+      `src/gpio.rs`.
 - [ ] **SPI** (`ep_type 0x03`): up to 6 pre-configured channel configs
       selected via `evt[2:0]`; raw PICO/POCI byte transfer; compound-wait's
       4-of-20-byte status truncation rule
