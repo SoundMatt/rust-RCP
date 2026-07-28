@@ -4810,7 +4810,12 @@
     {
       "id": "REQ-ADC-001",
       "title": "AdcResolutionBits round-trips through new/to_u8 for the full 1..=16 bit-width range",
-      "text": "AdcResolutionBits::new/AdcResolutionBits::to_u8 round-trip every bit-width value from 1 to 16, modeling the roadmap's <=16-bit resolution upper bound as an explicit validated range rather than a fixed 16-bit width",
+      "text": "AdcResolutionBits::new/AdcResolutionBits::to_u8 round-trip every bit-width value from 1 to 16, modeling the roadmap's <=16-bit resolution upper bound as an explicit validated range rather than a fixed 16-bit width"
+    },
+    {
+      "id": "REQ-PWM-001",
+      "title": "PwmDurationPair holds independent period/active_duration fields and defaults to a zeroed pair",
+      "text": "PwmDurationPair's period and active_duration fields are independently settable u32 values, and PwmDurationPair::default() yields period == 0 and active_duration == 0",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -4819,7 +4824,12 @@
     {
       "id": "REQ-ADC-002",
       "title": "AdcResolutionBits::new rejects zero and any bit width above 16, and never panics",
-      "text": "AdcResolutionBits::new returns Err(RcpError::InvalidParameter) for 0 and for any value above 16, and never panics for any sampled u8 input",
+      "text": "AdcResolutionBits::new returns Err(RcpError::InvalidParameter) for 0 and for any value above 16, and never panics for any sampled u8 input"
+    },
+    {
+      "id": "REQ-PWM-002",
+      "title": "PwmOutFunctionalConfig defaults to a zeroed target PwmDurationPair",
+      "text": "PwmOutFunctionalConfig::default().target equals PwmDurationPair::default()",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -4828,7 +4838,12 @@
     {
       "id": "REQ-ADC-003",
       "title": "AdcResolutionBits::max_raw_value computes 2^bits - 1, and default() resolves to 16 bits",
-      "text": "AdcResolutionBits::max_raw_value returns 2^bits - 1 for every valid bit width including the u16::MAX boundary at 16 bits, and AdcResolutionBits::default resolves to the widest modeled resolution, 16 bits, as this crate's own unconfirmed-default placeholder",
+      "text": "AdcResolutionBits::max_raw_value returns 2^bits - 1 for every valid bit width including the u16::MAX boundary at 16 bits, and AdcResolutionBits::default resolves to the widest modeled resolution, 16 bits, as this crate's own unconfirmed-default placeholder"
+    },
+    {
+      "id": "REQ-PWM-003",
+      "title": "PwmOutFunctionalConfig::layer_tag matches EndpointType::PwmOut and rejects EndpointType::PwmIn",
+      "text": "PwmOutFunctionalConfig::layer_tag returns a PerEpTypeFunctionalConfig tagged EndpointType::PwmOut that satisfies regmap::functional_config_matches_ep_type/check_functional_config_matches_ep_type against a PerEpConfigBlock also tagged EndpointType::PwmOut, and does not satisfy it against a PerEpConfigBlock tagged EndpointType::PwmIn",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -4837,7 +4852,12 @@
     {
       "id": "REQ-ADC-004",
       "title": "AdcSampleValue round-trips through encode/decode within its resolution and rejects raw values wider than that resolution, and never panics",
-      "text": "AdcSampleValue::new/AdcSampleValue::decode/AdcSampleValue::encode round-trip any raw value within AdcResolutionBits::max_raw_value as a 2-byte big-endian wire form, reject any raw value exceeding that maximum with RcpError::InvalidParameter, and decode never panics for any sampled input",
+      "text": "AdcSampleValue::new/AdcSampleValue::decode/AdcSampleValue::encode round-trip any raw value within AdcResolutionBits::max_raw_value as a 2-byte big-endian wire form, reject any raw value exceeding that maximum with RcpError::InvalidParameter, and decode never panics for any sampled input"
+    },
+    {
+      "id": "REQ-PWM-004",
+      "title": "PwmInFunctionalConfig defaults to a zero no_signal_timeout",
+      "text": "PwmInFunctionalConfig::default().no_signal_timeout equals 0",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -4846,7 +4866,12 @@
     {
       "id": "REQ-ADC-005",
       "title": "AdcFunctionalConfig defaults to the default AdcResolutionBits and a zeroed AdcAveragingConfig",
-      "text": "AdcFunctionalConfig::default carries AdcResolutionBits::default (16 bits) and a zero-valued AdcAveragingConfig (adc_sample_interval, adc_avg_intervals_per_request, and adc_combine_avg_values all zero)",
+      "text": "AdcFunctionalConfig::default carries AdcResolutionBits::default (16 bits) and a zero-valued AdcAveragingConfig (adc_sample_interval, adc_avg_intervals_per_request, and adc_combine_avg_values all zero)"
+    },
+    {
+      "id": "REQ-PWM-005",
+      "title": "PwmInFunctionalConfig::layer_tag matches EndpointType::PwmIn and rejects EndpointType::PwmOut",
+      "text": "PwmInFunctionalConfig::layer_tag returns a PerEpTypeFunctionalConfig tagged EndpointType::PwmIn that satisfies regmap::functional_config_matches_ep_type/check_functional_config_matches_ep_type against a PerEpConfigBlock also tagged EndpointType::PwmIn, and does not satisfy it against a PerEpConfigBlock tagged EndpointType::PwmOut",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -4855,7 +4880,12 @@
     {
       "id": "REQ-ADC-006",
       "title": "AdcFunctionalConfig's layer tag matches crate::regmap's EndpointType::Adc cross-layer rule",
-      "text": "AdcFunctionalConfig::layer_tag produces a crate::regmap::PerEpTypeFunctionalConfig tagged EndpointType::Adc that satisfies crate::regmap::check_functional_config_matches_ep_type against a generic PerEpConfigBlock of the same ep_type, and is rejected by functional_config_matches_ep_type against a mismatched ep_type",
+      "text": "AdcFunctionalConfig::layer_tag produces a crate::regmap::PerEpTypeFunctionalConfig tagged EndpointType::Adc that satisfies crate::regmap::check_functional_config_matches_ep_type against a generic PerEpConfigBlock of the same ep_type, and is rejected by functional_config_matches_ep_type against a mismatched ep_type"
+    },
+    {
+      "id": "REQ-PWM-006",
+      "title": "resolve_pwm_in_read reports Measured(pair) whenever elapsed_since_last_edge is below no_signal_timeout and a measurement exists",
+      "text": "resolve_pwm_in_read returns Some(PwmInReadResolution::Measured(pair)) whenever last_measured is Some(pair) and elapsed_since_last_edge is strictly less than config.no_signal_timeout",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -4864,7 +4894,12 @@
     {
       "id": "REQ-ADC-007",
       "title": "resolve_adc_sample_window_ticks chains adc_sample_interval, adc_avg_intervals_per_request, and adc_combine_avg_values into a total elapsed tick count, and never panics",
-      "text": "resolve_adc_sample_window_ticks multiplies adc_avg_intervals_per_request by adc_combine_avg_values by adc_sample_interval to produce the total elapsed tick count one combined result takes to produce, using checked (never-wrapping, never-panicking) arithmetic throughout including at the all-MAX field-width boundary, and never panics for any sampled AdcAveragingConfig",
+      "text": "resolve_adc_sample_window_ticks multiplies adc_avg_intervals_per_request by adc_combine_avg_values by adc_sample_interval to produce the total elapsed tick count one combined result takes to produce, using checked (never-wrapping, never-panicking) arithmetic throughout including at the all-MAX field-width boundary, and never panics for any sampled AdcAveragingConfig"
+    },
+    {
+      "id": "REQ-PWM-007",
+      "title": "resolve_pwm_in_read reports NoSignal once the timeout elapses, never re-reporting a stale prior measurement",
+      "text": "resolve_pwm_in_read returns Some(PwmInReadResolution::NoSignal) whenever elapsed_since_last_edge is greater than or equal to config.no_signal_timeout, regardless of whether last_measured carries a prior value, and a zero-valued no_signal_timeout is not treated as a disabled sentinel",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -4873,7 +4908,12 @@
     {
       "id": "REQ-ADC-008",
       "title": "resolve_adc_averaged_value computes the two-level averaging pipeline over raw samples",
-      "text": "resolve_adc_averaged_value groups raw_samples into adc_avg_intervals_per_request-sized groups, averages each group (level one), then averages the first adc_combine_avg_values group averages into the returned combined result (level two), ignoring any trailing raw samples beyond what the pipeline consumes",
+      "text": "resolve_adc_averaged_value groups raw_samples into adc_avg_intervals_per_request-sized groups, averages each group (level one), then averages the first adc_combine_avg_values group averages into the returned combined result (level two), ignoring any trailing raw samples beyond what the pipeline consumes"
+    },
+    {
+      "id": "REQ-PWM-008",
+      "title": "resolve_pwm_in_read returns None while genuinely awaiting a first edge before the timeout elapses, rather than hanging",
+      "text": "resolve_pwm_in_read returns None when last_measured is None and elapsed_since_last_edge is strictly less than config.no_signal_timeout, letting a polling caller retry instead of this function blocking",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -4891,7 +4931,12 @@
     {
       "id": "REQ-ADC-010",
       "title": "validate_adc_sample_request accepts AdcSamplingMode::RequestDriven and rejects AdcSamplingMode::Continuous with RcpError::UnsupportedCmd",
-      "text": "validate_adc_sample_request returns Ok(()) for AdcSamplingMode::RequestDriven (also AdcSamplingMode's default) and Err(RcpError::UnsupportedCmd) for AdcSamplingMode::Continuous, enforcing the roadmap's request-driven-sampling-only rule since no free-running/continuous sampling mode is permitted",
+      "text": "validate_adc_sample_request returns Ok(()) for AdcSamplingMode::RequestDriven (also AdcSamplingMode's default) and Err(RcpError::UnsupportedCmd) for AdcSamplingMode::Continuous, enforcing the roadmap's request-driven-sampling-only rule since no free-running/continuous sampling mode is permitted"
+    },
+    {
+      "id": "REQ-PWM-009",
+      "title": "resolve_pwm_in_read never panics for any sampled combination of config, last_measured, and elapsed inputs",
+      "text": "resolve_pwm_in_read does not panic across sampled boundary combinations of no_signal_timeout (including 0 and u32::MAX), last_measured (None, a zeroed pair, and a maximal pair), and elapsed_since_last_edge (including 0 and u32::MAX)",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
