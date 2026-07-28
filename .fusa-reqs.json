@@ -4716,6 +4716,96 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-UART-001",
+      "title": "UartTxQueue round-trips arbitrary bytes through encode/decode and never panics",
+      "text": "UartTxQueue::encode/UartTxQueue::decode round-trip any byte sequence, including an empty one, as the raw TX-queue byte stream without interpreting its contents, and decode never panics for any input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-UART-002",
+      "title": "UartRxQueue round-trips arbitrary bytes through encode/decode and never panics",
+      "text": "UartRxQueue::encode/UartRxQueue::decode round-trip any byte sequence, including an empty one, as the raw RX-queue byte stream without interpreting its contents, and decode never panics for any input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-UART-003",
+      "title": "UartTxQueueConfig and UartRxQueueConfig default independently within UartFunctionalConfig",
+      "text": "UartFunctionalConfig::default carries a default UartTxQueueConfig and a default UartRxQueueConfig, with UartRxQueueConfig's read_size/uart_timeout fields each defaulting to zero, modeling the TX and RX queues' config content as independent even though it is carried in one shared block",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-UART-004",
+      "title": "UartFunctionalConfig's layer tag matches crate::regmap's EndpointType::Uart cross-layer rule",
+      "text": "UartFunctionalConfig::layer_tag produces a crate::regmap::PerEpTypeFunctionalConfig tagged EndpointType::Uart that satisfies crate::regmap::check_functional_config_matches_ep_type against a generic PerEpConfigBlock of the same ep_type, and is rejected by functional_config_matches_ep_type against a mismatched ep_type",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-UART-005",
+      "title": "resolve_uart_read_completion reports ReadSizeReached when only the read_size threshold is met",
+      "text": "resolve_uart_read_completion returns Some(UartReadCompletionReason::ReadSizeReached) when bytes_collected has reached read_size but elapsed has not yet reached uart_timeout",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-UART-006",
+      "title": "resolve_uart_read_completion reports TimedOut when only the uart_timeout threshold is met",
+      "text": "resolve_uart_read_completion returns Some(UartReadCompletionReason::TimedOut) when elapsed has reached uart_timeout but bytes_collected has not yet reached read_size",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-UART-007",
+      "title": "resolve_uart_read_completion reports Both, rather than silently preferring one condition, when read_size and uart_timeout are met simultaneously",
+      "text": "resolve_uart_read_completion returns Some(UartReadCompletionReason::Both), including for a zeroed UartRxQueueConfig's default thresholds, when both bytes_collected has reached read_size and elapsed has reached uart_timeout at the same evaluation, rather than this crate silently picking ReadSizeReached or TimedOut as the winner of the race the roadmap does not itself resolve",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-UART-008",
+      "title": "resolve_uart_read_completion returns None before either threshold is met, and never panics",
+      "text": "resolve_uart_read_completion returns None when neither bytes_collected has reached read_size nor elapsed has reached uart_timeout, and never panics for any sampled combination of UartRxQueueConfig, bytes_collected, and elapsed values, including boundary values",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-UART-009",
+      "title": "validate_uart_read_request accepts a payload-less UART read request",
+      "text": "validate_uart_read_request returns Ok(()) when the supplied read-request payload is empty, per the payload-less-read-only rule",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-UART-010",
+      "title": "validate_uart_read_request rejects any non-empty payload on a UART read request with RcpError::UnsupportedCmd, and never panics",
+      "text": "validate_uart_read_request returns Err(RcpError::UnsupportedCmd) for any non-empty read-request payload, reflecting this crate's reading of the roadmap's UNKNOWN_CMD wording onto the already-defined UnsupportedCmd/UNSUPPORTED_CMD variant, and never panics for any sampled input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

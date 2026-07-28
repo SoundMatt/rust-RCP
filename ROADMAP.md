@@ -947,9 +947,45 @@ functional config) before tackling bus-protocol endpoints.
       only — nothing here is wired into an actual decoder or dispatch loop.
       New `REQ-I2C-001`..`REQ-I2C-006` added to `.fusa-reqs.json`, each with
       a `// fusa:req`/`// fusa:test` pair in `src/i2c.rs`.
-- [ ] **UART** (`ep_type 0x05`): independent TX/RX queues sharing one
+- [x] **UART** (`ep_type 0x05`): independent TX/RX queues sharing one
       functional-config block; `read_size`-or-`uart_timeout` read
-      completion; payload-less-read-only rule (`UNKNOWN_CMD` if violated)
+      completion; payload-less-read-only rule (`UNKNOWN_CMD` if violated).
+      Done (v0.7.0-dev): new `src/uart.rs` adds
+      [`UartTxQueue`]/[`UartRxQueue`] modeling the independent TX/RX byte
+      queues as unstructured, never-panicking byte-stream shapes, mirroring
+      `i2c::I2cByteTransfer`'s own discipline; and
+      [`UartReadCompletionReason`]/[`resolve_uart_read_completion`] turning
+      the `read_size`-or-`uart_timeout` completion rule into a pure function
+      over both thresholds, mirroring `spi::truncate_spi_status_for_compound_wait`'s
+      and `i2c::I2cSpeedMode`'s own prose-rule-to-function discipline;
+      and [`validate_uart_read_request`] enforcing the payload-less-read-only
+      rule. `UartFunctionalConfig` is the first Milestone 4 functional config
+      with an internal direction split — one type, one `layer_tag` composing
+      against `regmap::check_functional_config_matches_ep_type`'s existing
+      cross-layer rule unchanged, but carrying independent `tx`/`rx` fields
+      rather than `GpioFunctionalConfig`'s/`SpiFunctionalConfig`'s/
+      `I2cFunctionalConfig`'s single-queue shape. Three points flagged per
+      Guiding Principle 5 rather than silently resolved: (1) when
+      `read_size` and `uart_timeout` are met at the same evaluation, this
+      crate does not silently prefer one — `UartReadCompletionReason::Both`
+      is an explicit third outcome, mirroring
+      `GpioWriteSemantics::Unnamed8th`'s and `I2cSpeedMode::HighSpeedRowA`/
+      `HighSpeedRowB`'s own treatment of unresolved enum slots, and a zero
+      threshold is not treated as a "disabled" sentinel (so a default,
+      zeroed config resolves every read as immediately complete via
+      `Both`); (2) `read_size` reuses the already-existing
+      `acf::ReadSizeOrSegmentNum` field rather than a UART-private type,
+      while `uart_timeout` (no existing crate-level counterpart) is carried
+      as an unconfirmed-width/units `u32`; (3) the roadmap's literal
+      `UNKNOWN_CMD` text has no matching variant among Milestone 2's Error
+      Model's eleven spec-named `RcpError` variants — this crate reads it as
+      informal phrasing for the already-defined `RcpError::UnsupportedCmd`
+      (`UNSUPPORTED_CMD`) rather than adding a new variant on the strength
+      of one checklist bullet's wording. Like every prior Milestone 1-4
+      entry, this remains additive standalone plumbing only — nothing here
+      is wired into an actual decoder or dispatch loop. New
+      `REQ-UART-001`..`REQ-UART-010` added to `.fusa-reqs.json`, each with a
+      `// fusa:req`/`// fusa:test` pair in `src/uart.rs`.
 - [ ] **ADC** (`ep_type 0x09`): ≤16-bit resolution; three-level averaging
       model (`adc_sample_interval` → `adc_avg_intervals_per_request` →
       `adc_combine_avg_values`); request-driven sampling only
