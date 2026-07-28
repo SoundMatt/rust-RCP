@@ -12,6 +12,10 @@
 // fusa:req REQ-GBB-003
 // fusa:req REQ-GBB-004
 // fusa:req REQ-GBB-005
+// fusa:req REQ-ECHO-001
+// fusa:req REQ-ECHO-002
+// fusa:req REQ-ECHO-003
+// fusa:req REQ-ECHO-004
 
 //! ACF (AVTP Control Format) messages — TC18 wire format core (`ROADMAP.md`
 //! Milestone 1, "ACF Messages" subsection).
@@ -47,12 +51,24 @@
 //!   how this module resolves the `read_size`/`segment_num` dual-purpose
 //!   field, per Guiding Principle 5.
 //!
+//! This module also implements one further item from the separate
+//! "Addressing" subsection: the **echo-back rule** — [`build_response_info`]
+//! / [`verify_echo_back`]. That rule (a response/ack must carry the same
+//! `byte_bus_id` it was received under) is stated purely in terms of
+//! `byte_bus_id`, which already lives on [`ByteMessageInfo`] here, so this
+//! module is that rule's natural home even though the rest of "Addressing"
+//! (`stream_id` and `(stream_id, byte_bus_id)` endpoint lookup) lives in
+//! [`crate::addressing`]. See "Provenance note" below for what this module
+//! does and does not claim about *when* in a request/response lifecycle the
+//! rule is enforced.
+//!
 //! Deliberately out of scope for this module (separate, later Milestone 1
 //! bullets, or later milestones entirely):
 //!
 //! - `stream_id` construction/parsing and `(stream_id, byte_bus_id)`
-//!   addressing (the "Addressing" subsection) — `byte_bus_id` is carried
-//!   here as an opaque 11-bit value only.
+//!   endpoint lookup (the rest of the "Addressing" subsection, in
+//!   [`crate::addressing`]) — `byte_bus_id` is carried here as an opaque
+//!   11-bit value only.
 //! - `avtp_timestamp`/`message_timestamp` width/rollover semantics and the
 //!   all-zero-timestamp fallback rule (the "Timestamp Semantics"
 //!   subsection) — moot for ACF_ABB, since it has no timestamp field to
@@ -101,6 +117,18 @@
 //!   IEEE 1722 ACF common-header framing is understood to do) is a
 //!   scope-narrowing simplification carried forward from this module's
 //!   first ACF_ABB-only draft, not a claim about the real wire layout.
+//! - This crate's `ROADMAP.md` states the echo-back rule itself (a
+//!   response/ack must carry the same `byte_bus_id` it was received under)
+//!   but not the mechanics of *when* it is checked against a live request/
+//!   response exchange. [`build_response_info`]/[`verify_echo_back`] are
+//!   deliberately plain functions over already-decoded [`ByteMessageInfo`]
+//!   values, with no opinion on whether the real enforcement point ends up
+//!   being at encode time (reject building a malformed response), at decode
+//!   time (reject an inbound response that fails to echo), or purely as an
+//!   application-level helper a later milestone's request/response dispatch
+//!   calls explicitly. Wiring either function into an encoder, a decoder,
+//!   or a dispatch loop is out of scope here and left to whichever later
+//!   milestone actually builds that request/response lifecycle.
 
 use crate::RcpError;
 
@@ -475,6 +503,58 @@ fn wrong_discriminant_error(
     RcpError::Other(format!(
         "{context}: expected acf_msg_type 0x{expected:02X}, got 0x{got:02X}{hint}"
     ))
+}
+
+// ── Echo-back rule ────────────────────────────────────────────────────────────
+
+/// Build a response/ack `byte_message_info` header that echoes `request`'s
+/// `byte_bus_id`, per Milestone 1's "Addressing" echo-back rule.
+///
+/// `response` is a caller-populated header for the outgoing response/ack —
+/// every field except `byte_bus_id` and `rsp` passes through unchanged. This
+/// overwrites `response.byte_bus_id` with `request.byte_bus_id` and forces
+/// `response.rsp = true` (a response/ack is, definitionally, a response),
+/// then returns the result.
+///
+/// This does not validate field widths — that remains
+/// [`encode_byte_message_info`]'s job at encode time — and does not encode
+/// anything itself; it operates purely on already-decoded [`ByteMessageInfo`]
+/// values. It also does not inspect `request.rsp`, so it is safe to call
+/// even if `request` is itself already a decoded response; rejecting that
+/// shape, if ever needed, is a separate concern for whichever later
+/// milestone builds the full request/response dispatch.
+// fusa:req REQ-ECHO-001
+// fusa:req REQ-ECHO-002
+pub fn build_response_info(
+    request: &ByteMessageInfo,
+    mut response: ByteMessageInfo,
+) -> ByteMessageInfo {
+    response.byte_bus_id = request.byte_bus_id;
+    response.rsp = true;
+    response
+}
+
+/// Verify that an already-built response/ack `byte_message_info` header
+/// echoes the `byte_bus_id` it was received under, per Milestone 1's
+/// "Addressing" echo-back rule.
+///
+/// Returns `Err(RcpError::EchoBackMismatch)` if `response.byte_bus_id !=
+/// request.byte_bus_id`. Deliberately checks nothing else about either
+/// header — in particular, it does not require `response.rsp` to be set,
+/// since that is a separate concern from the byte_bus_id-echoing rule this
+/// function checks. Never panics: both inputs are already-decoded values,
+/// not raw bytes, so there is no truncated-input shape to reject.
+// fusa:req REQ-ECHO-001
+// fusa:req REQ-ECHO-003
+// fusa:req REQ-ECHO-004
+pub fn verify_echo_back(
+    request: &ByteMessageInfo,
+    response: &ByteMessageInfo,
+) -> Result<(), RcpError> {
+    if response.byte_bus_id != request.byte_bus_id {
+        return Err(RcpError::EchoBackMismatch);
+    }
+    Ok(())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -896,6 +976,121 @@ mod tests {
         for len in 0..64 {
             let buf: Vec<u8> = (0..len).map(|_| (next() & 0xFF) as u8).collect();
             let _ = decode_acf_gbb(&buf);
+        }
+    }
+
+    // ── Echo-back rule ──────────────────────────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-ECHO-001
+    // fusa:test REQ-ECHO-002
+    fn build_response_info_echoes_request_byte_bus_id_and_sets_rsp() {
+        let request = ByteMessageInfo {
+            byte_bus_id: 0x0123,
+            rsp: false,
+            ..sample_info()
+        };
+        let response_template = ByteMessageInfo {
+            byte_bus_id: 0x0000,
+            rsp: false,
+            transaction_num: 0x77,
+            ..Default::default()
+        };
+        let response = build_response_info(&request, response_template);
+        assert_eq!(response.byte_bus_id, request.byte_bus_id);
+        assert!(response.rsp);
+        // Fields other than byte_bus_id/rsp pass through from the caller's
+        // template unchanged.
+        assert_eq!(response.transaction_num, 0x77);
+    }
+
+    #[test]
+    // fusa:test REQ-ECHO-002
+    // fusa:test REQ-ECHO-003
+    fn build_response_info_output_passes_verify_echo_back() {
+        let request = sample_info();
+        let response = build_response_info(&request, ByteMessageInfo::default());
+        assert_eq!(verify_echo_back(&request, &response), Ok(()));
+    }
+
+    #[test]
+    // fusa:test REQ-ECHO-003
+    fn verify_echo_back_accepts_matching_byte_bus_id() {
+        let request = ByteMessageInfo {
+            byte_bus_id: 0x0456,
+            ..sample_info()
+        };
+        let response = ByteMessageInfo {
+            byte_bus_id: 0x0456,
+            rsp: true,
+            ..ByteMessageInfo::default()
+        };
+        assert_eq!(verify_echo_back(&request, &response), Ok(()));
+    }
+
+    #[test]
+    // fusa:test REQ-ECHO-003
+    fn verify_echo_back_rejects_mismatched_byte_bus_id() {
+        let request = ByteMessageInfo {
+            byte_bus_id: 0x0001,
+            ..sample_info()
+        };
+        let response = ByteMessageInfo {
+            byte_bus_id: 0x0002,
+            rsp: true,
+            ..ByteMessageInfo::default()
+        };
+        assert_eq!(
+            verify_echo_back(&request, &response),
+            Err(RcpError::EchoBackMismatch)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-ECHO-003
+    fn verify_echo_back_ignores_rsp_flag() {
+        // The echo-back rule this function checks is scoped to byte_bus_id
+        // only; it deliberately does not require response.rsp to be set.
+        let request = ByteMessageInfo {
+            byte_bus_id: 0x0007,
+            ..sample_info()
+        };
+        let response = ByteMessageInfo {
+            byte_bus_id: 0x0007,
+            rsp: false,
+            ..ByteMessageInfo::default()
+        };
+        assert_eq!(verify_echo_back(&request, &response), Ok(()));
+    }
+
+    #[test]
+    // fusa:test REQ-ECHO-004
+    fn echo_back_never_panics_across_arbitrary_field_combinations() {
+        let mut state: u32 = 0xECC0_BACC;
+        let mut next_u16 = || {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            (state & 0xFFFF) as u16
+        };
+        for _ in 0..64 {
+            let request = ByteMessageInfo {
+                byte_bus_id: next_u16(),
+                ..ByteMessageInfo::default()
+            };
+            let response_template = ByteMessageInfo {
+                byte_bus_id: next_u16(),
+                ..ByteMessageInfo::default()
+            };
+            let response = build_response_info(&request, response_template);
+            let _ = verify_echo_back(&request, &response);
+            let _ = verify_echo_back(
+                &request,
+                &ByteMessageInfo {
+                    byte_bus_id: next_u16(),
+                    ..ByteMessageInfo::default()
+                },
+            );
         }
     }
 }

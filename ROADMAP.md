@@ -206,8 +206,7 @@ shared request-descriptor header that carries all per-message addressing.
       provenance note for reconciliation before being relied on for
       interop. The other two Addressing bullets below —
       `(stream_id, byte_bus_id)` endpoint lookup and the echo-back rule —
-      remain separate items; the former is now also done (see below), the
-      echo-back rule remains unimplemented.
+      remain separate items; both are now also done (see below).
 - [x] `(stream_id, byte_bus_id)` → endpoint lookup, with the stream-relative
       (not global) uniqueness of `byte_bus_id` modeled explicitly. Done
       (v0.4.0-dev): new module `src/addressing.rs` adds `EndpointTable`, a
@@ -231,9 +230,37 @@ shared request-descriptor header that carries all per-message addressing.
       `StreamId` (`src/avtpdu.rs`) and `byte_bus_id` (`src/acf.rs`) as
       inputs only, does not change either type's shape, and is not yet
       wired into any AVTPDU/ACF decoder or existing caller. The echo-back
-      rule below remains a separate, unimplemented item.
-- [ ] Echo-back rule: a response/ack must carry the same `byte_bus_id` it
-      was received under
+      rule below is a separate item, now also done (see below).
+- [x] Echo-back rule: a response/ack must carry the same `byte_bus_id` it
+      was received under. Done (v0.4.0-dev): `src/acf.rs` adds
+      `build_response_info`/`verify_echo_back`, a construction/validation
+      pair operating on `ByteMessageInfo` alone rather than on
+      `src/addressing.rs`'s `StreamId`/`EndpointTable` machinery, since the
+      rule itself is stated purely in terms of `byte_bus_id`.
+      `build_response_info` takes a caller-populated response
+      `ByteMessageInfo` plus the `request` it answers, and returns the
+      response with `byte_bus_id` copied from `request` and `rsp` forced
+      `true`, leaving every other field as the caller set it.
+      `verify_echo_back` checks an already-built response against its
+      `request` and rejects a mismatched `byte_bus_id` with the new
+      `RcpError::EchoBackMismatch` sentinel, without requiring
+      `response.rsp` to be set (a separate concern from the byte_bus_id
+      rule itself) and without inspecting field widths (already
+      `encode_byte_message_info`'s job at encode time). Both functions
+      operate on already-decoded `ByteMessageInfo` values only, so neither
+      can panic on malformed input the way a byte-slice decoder could.
+      This Milestone 1 item is scoped to the byte_bus_id-echoing rule
+      itself, not to *when* in a request/response lifecycle it gets
+      enforced — encode time, decode time, or purely as an
+      application-level helper are all left open, and which one is correct
+      is this crate's own interpretation per Guiding Principle 5, since the
+      specification's own text is cited by section number only. Covered by
+      round-trip (`build_response_info` output passes
+      `verify_echo_back`), match/mismatch, rsp-flag-independence, and
+      never-panics-on-arbitrary-field-value tests. This is additive: like
+      every other Milestone 1 entry, neither function is wired into any
+      AVTPDU/ACF decoder, `src/addressing.rs`'s `EndpointTable`, or any
+      existing caller. This closes out the "Addressing" subsection.
 
 ### Timestamp Semantics
 

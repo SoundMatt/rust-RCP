@@ -447,6 +447,9 @@ pub enum RcpError {
     #[error("rcp/addressing: (stream_id, byte_bus_id) pair already registered")]
     EndpointAlreadyRegistered,
 
+    #[error("rcp/addressing: response byte_bus_id does not match the byte_bus_id it was received under (echo-back rule)")]
+    EchoBackMismatch,
+
     // ── General errors ───────────────────────────────────────────────────
     #[error("rcp: invalid size")]
     InvalidSize,

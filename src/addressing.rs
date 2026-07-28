@@ -33,13 +33,17 @@
 //! does it need to model, what an endpoint actually *is* — only that a
 //! `(stream_id, byte_bus_id)` pair resolves to at most one of them.
 //!
-//! Deliberately out of scope for this module (a separate, still-unimplemented
-//! "Addressing" checklist item, in the roadmap's own stated order):
+//! Deliberately out of scope for this module (a separate "Addressing"
+//! checklist item):
 //!
 //! - The echo-back rule (a response/ack must carry the same `byte_bus_id` it
-//!   was received under). That is a rule about constructing outgoing
-//!   messages, not about this table's lookup mechanics, and is not
-//!   implemented here.
+//!   was received under). That is a rule about constructing/validating
+//!   outgoing response messages, not about this table's lookup mechanics,
+//!   and is not implemented here — it now lives in
+//!   [`crate::acf::build_response_info`]/[`crate::acf::verify_echo_back`]
+//!   instead, since it is stated purely in terms of `byte_bus_id`, which
+//!   already lives on [`crate::acf::ByteMessageInfo`] with no dependency on
+//!   this module's `StreamId`/`EndpointTable` machinery.
 //!
 //! This module does not wire itself into [`crate::avtpdu`] or [`crate::acf`]
 //! decoding, and does not cut over any existing caller — it is additive,
