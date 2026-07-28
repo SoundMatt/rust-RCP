@@ -7,10 +7,10 @@
 //! (`ROADMAP.md` Milestone 1, "Addressing" subsection).
 //!
 //! This module is the second "Addressing" checklist item, picking up right
-//! after [`crate::avtpdu`]'s `stream_id` construction/parsing work. Both
+//! after [`crate::avtp`]'s `stream_id` construction/parsing work. Both
 //! addressing primitives it builds on already exist:
 //!
-//! - [`crate::avtpdu::StreamId`] — a decomposed AVTP `stream_id`.
+//! - [`crate::avtp::StreamId`] — a decomposed AVTP `stream_id`.
 //! - [`crate::acf::ByteMessageInfo::byte_bus_id`] — an ACF message's
 //!   bus-relative endpoint id, whose own doc comment already calls out that
 //!   it is stream-relative, not global, and defers the lookup mechanics to
@@ -45,7 +45,7 @@
 //!   already lives on [`crate::acf::ByteMessageInfo`] with no dependency on
 //!   this module's `StreamId`/`EndpointTable` machinery.
 //!
-//! This module does not wire itself into [`crate::avtpdu`] or [`crate::acf`]
+//! This module does not wire itself into [`crate::avtp`] or [`crate::acf`]
 //! decoding, and does not cut over any existing caller — it is additive,
 //! standalone plumbing, matching the discipline of every prior Milestone 1
 //! entry.
@@ -62,7 +62,7 @@
 //! own doc comment.
 
 use crate::acf::BYTE_MESSAGE_INFO_11BIT_MAX;
-use crate::avtpdu::StreamId;
+use crate::avtp::StreamId;
 use crate::RcpError;
 use std::collections::HashMap;
 

@@ -12,7 +12,7 @@
 //! [`crate::acf`] finished "ACF Messages". Two raw timestamp fields already
 //! exist on opposite sides of the wire format:
 //!
-//! - [`crate::avtpdu::TscfHeader::avtp_timestamp`] — a 32-bit value,
+//! - [`crate::avtp::TscfHeader::avtp_timestamp`] — a 32-bit value,
 //!   TSCF-only (NTSCF carries no timestamp at all).
 //! - [`crate::acf::AcfGbbMessage::message_timestamp`] — a 64-bit value,
 //!   ACF_GBB-only (ACF_ABB carries no timestamp at all).
@@ -54,7 +54,7 @@
 //!
 //! Deliberately out of scope for this module:
 //!
-//! - Changing [`crate::avtpdu::TscfHeader::avtp_timestamp`]'s or
+//! - Changing [`crate::avtp::TscfHeader::avtp_timestamp`]'s or
 //!   [`crate::acf::AcfGbbMessage::message_timestamp`]'s field type to
 //!   [`AvtpTimestamp`]/[`MessageTimestamp`], or wiring this module into
 //!   either header/message's encode/decode path. Matching every other
@@ -114,7 +114,7 @@ pub enum TimestampMeaning {
 // ── AvtpTimestamp ─────────────────────────────────────────────────────────────
 
 /// The 32-bit AVTP presentation timestamp carried by
-/// [`crate::avtpdu::TscfHeader::avtp_timestamp`], TSCF-only.
+/// [`crate::avtp::TscfHeader::avtp_timestamp`], TSCF-only.
 ///
 /// A distinct type from [`MessageTimestamp`] by design — see the module doc
 /// comment's "Distinct widths, distinct rollover periods" section.
@@ -129,13 +129,13 @@ impl AvtpTimestamp {
     pub const ROLLOVER_PERIOD: u64 = 1u64 << 32;
 
     /// Wrap a raw `u32` value (e.g. from
-    /// [`crate::avtpdu::TscfHeader::avtp_timestamp`]).
+    /// [`crate::avtp::TscfHeader::avtp_timestamp`]).
     pub fn new(raw: u32) -> Self {
         Self(raw)
     }
 
     /// The raw `u32` value, for round-tripping back through
-    /// [`crate::avtpdu::TscfHeader::avtp_timestamp`].
+    /// [`crate::avtp::TscfHeader::avtp_timestamp`].
     pub fn to_u32(self) -> u32 {
         self.0
     }
@@ -284,7 +284,7 @@ impl From<MessageTimestamp> for u64 {
 mod tests {
     use super::*;
     use crate::acf::{AcfGbbMessage, ByteMessageInfo};
-    use crate::avtpdu::TscfHeader;
+    use crate::avtp::TscfHeader;
 
     // ═══════════════════════════════════════════════════════════════════
     //  Distinct types / distinct widths

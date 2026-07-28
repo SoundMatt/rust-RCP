@@ -454,7 +454,7 @@ impl EndpointType {
             0x0C => Ok(Self::Iseled),
             0x0D => Ok(Self::Mdio),
             other => Err(RcpError::Other(format!(
-                "register_map: unrecognized ep_type byte 0x{other:02X} (expected 0x01..=0x0D)"
+                "regmap: unrecognized ep_type byte 0x{other:02X} (expected 0x01..=0x0D)"
             ))),
         }
     }

@@ -82,7 +82,7 @@
 //! stream is asking*, layered on top of (not replacing)
 //! [`check_ep0_access`]'s lifecycle-state gating.
 //!
-//! - The RC Server designates at most one [`crate::avtpdu::StreamId`] as its
+//! - The RC Server designates at most one [`crate::avtp::StreamId`] as its
 //!   root client at any time, represented here as a plain `Option<StreamId>`
 //!   — see the Provenance note below for why no dedicated wrapper type was
 //!   introduced for it.
@@ -188,7 +188,7 @@
 //!   above). Rather than invent a placeholder register type the way
 //!   [`crate::lifecycle::RegisterCategory`] stands in for the whole
 //!   register map, this item represents "which stream (if any) currently
-//!   holds the index" directly as `Option<`[`crate::avtpdu::StreamId`]`>` —
+//!   holds the index" directly as `Option<`[`crate::avtp::StreamId`]`>` —
 //!   the natural in-memory shape of "at most one designated stream" — and
 //!   leaves the eventual `svr_root_client_index` register's own encoding
 //!   (whatever wire representation of a stream identity it turns out to be)
@@ -218,7 +218,7 @@
 //!   has been designated, not that the privilege is open to all until then.
 
 use crate::acf::ByteMessageInfo;
-use crate::avtpdu::StreamId;
+use crate::avtp::StreamId;
 use crate::lifecycle::{
     check_register_reachable, check_register_writable, RcServerState, RegisterCategory,
 };
@@ -461,7 +461,7 @@ mod tests {
     // fusa:test REQ-EP0-002
     fn ep0_route_is_decided_before_and_independent_of_endpoint_table_contents() {
         use crate::addressing::{EndpointId, EndpointTable};
-        use crate::avtpdu::StreamId;
+        use crate::avtp::StreamId;
 
         let mut table = EndpointTable::new();
         let sid = StreamId::new([0x02, 0x11, 0x22, 0x33, 0x44, 0x55], 1);

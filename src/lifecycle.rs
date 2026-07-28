@@ -275,7 +275,7 @@ impl RcServerState {
     ///
     /// Returns `Err(RcpError::Other(_))` for any byte other than the three
     /// defined encodings, mirroring
-    /// [`crate::avtpdu::select_header_variant`]'s handling of an
+    /// [`crate::avtp::select_header_variant`]'s handling of an
     /// unrecognized subtype byte. Never panics for any input.
     // fusa:req REQ-LIFE-002
     pub fn from_u8(raw: u8) -> Result<Self, RcpError> {

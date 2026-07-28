@@ -84,7 +84,7 @@ pub mod adapt;
 pub mod addressing;
 pub mod admin;
 pub mod authz;
-pub mod avtpdu;
+pub mod avtp;
 pub(crate) mod base64_serde;
 pub mod canbr;
 pub mod capi;
@@ -117,7 +117,7 @@ pub mod proxy;
 pub mod ratelimit;
 pub mod record;
 pub mod redundancy;
-pub mod register_map;
+pub mod regmap;
 pub mod relay;
 pub mod restbridge;
 pub mod shmem;
@@ -430,7 +430,7 @@ pub struct Status {
 /// error-path bullet).
 ///
 /// Every module built earlier in this milestone (`lifecycle`, `ep0`,
-/// `register_map`, `addressing`, `avtpdu`) had already introduced its own
+/// `regmap`, `addressing`, `avtp`) had already introduced its own
 /// provisional `RcpError` sentinel for its guard/check functions, each
 /// explicitly documented at the time as a placeholder pending this exact
 /// item (see each module's own doc comment history). This item retires
@@ -440,7 +440,7 @@ pub struct Status {
 /// code, flagged per Guiding Principle 5 pending reconciliation against the
 /// specification's actual behavior (never its prose):
 ///
-/// - `TimeSyncUnsupported` (`avtpdu`: TSCF header requires server
+/// - `TimeSyncUnsupported` (`avtp`: TSCF header requires server
 ///   time-sync support the server doesn't have) → `UnsupportedCmd`. The
 ///   requested feature is not one this RC Server supports.
 /// - `RegisterUnreachable` (`lifecycle`/`ep0`: register category not
@@ -456,7 +456,7 @@ pub struct Status {
 ///   write-locked) → `LockedMemAccess`. A direct name correspondence.
 /// - `HwCfgInconsistent`/`RcpCfgInconsistent` (`lifecycle`:
 ///   `HW_CFG_INCONSISTENT`/`RCP_CFG_INCONSISTENT` transition-guard
-///   rejections) and `EndpointTypeMismatch` (`register_map`: functional
+///   rejections) and `EndpointTypeMismatch` (`regmap`: functional
 ///   config's `EndpointType` does not match the owning endpoint's
 ///   `ep_type`) all three → `InvalidParameter`. Each represents caller-
 ///   supplied configuration data failing a consistency/shape check, which
@@ -529,9 +529,9 @@ pub enum RcpError {
     // 16-byte-frame-specific (see `wire`/`e2e`'s own REPLACE disposition in
     // `ROADMAP.md`'s satellite table) and kept unchanged for the same
     // reason. `ShortFrame` is not legacy-only — every TC18 AVTPDU/ACF
-    // decoder added in Milestone 1 (`avtpdu`, `acf`) and the Register Map
+    // decoder added in Milestone 1 (`avtp`, `acf`) and the Register Map
     // config-table decoders added earlier in this milestone
-    // (`register_map`) also return it for undersized input, so it stays as
+    // (`regmap`) also return it for undersized input, so it stays as
     // a general-purpose, non-spec-code sentinel rather than being folded
     // into the TC18 error-code group below.
     #[error("rcp/wire: frame too short")]

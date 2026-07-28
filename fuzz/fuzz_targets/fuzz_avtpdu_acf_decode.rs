@@ -11,17 +11,17 @@ use libfuzzer_sys::fuzz_target;
 fuzz_target!(|data: &[u8]| {
     // fusa:req REQ-NTSCF-005
     // fusa:req REQ-NTSCF-006
-    let _ = rcp::avtpdu::decode_ntscf_header(data);
+    let _ = rcp::avtp::decode_ntscf_header(data);
 
     // fusa:req REQ-TSCF-005
     // fusa:req REQ-TSCF-006
-    let _ = rcp::avtpdu::decode_tscf_header(data);
+    let _ = rcp::avtp::decode_tscf_header(data);
 
     // fusa:req REQ-HVSEL-005
     // select_header_variant is exercised under both TimeSyncCapability
     // outcomes, since the rule branches on it before decoding the body.
-    let _ = rcp::avtpdu::select_header_variant(data, rcp::avtpdu::TimeSyncCapability::Capable);
-    let _ = rcp::avtpdu::select_header_variant(data, rcp::avtpdu::TimeSyncCapability::Incapable);
+    let _ = rcp::avtp::select_header_variant(data, rcp::avtp::TimeSyncCapability::Capable);
+    let _ = rcp::avtp::select_header_variant(data, rcp::avtp::TimeSyncCapability::Incapable);
 
     // fusa:req REQ-BMI-004
     let _ = rcp::acf::decode_byte_message_info(data);
@@ -34,13 +34,13 @@ fuzz_target!(|data: &[u8]| {
 
     // Belt-and-suspenders: parse_stream_id/StreamId::from_u64 take a plain
     // u64 rather than a byte slice, so they have no truncated-input shape to
-    // panic on the way the decoders above do (see avtpdu.rs's own
+    // panic on the way the decoders above do (see avtp.rs's own
     // never-panics test for that argument in full). Deriving a u64 from the
     // leading fuzz bytes still gives them a pass through this harness at
     // negligible cost.
     if data.len() >= 8 {
         let mut raw = [0u8; 8];
         raw.copy_from_slice(&data[..8]);
-        let _ = rcp::avtpdu::StreamId::from_u64(u64::from_be_bytes(raw));
+        let _ = rcp::avtp::StreamId::from_u64(u64::from_be_bytes(raw));
     }
 });

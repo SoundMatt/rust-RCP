@@ -21,11 +21,11 @@
 //! Milestone 1, "ACF Messages" subsection).
 //!
 //! This module is the second Milestone 1 subsection, picking up right after
-//! [`crate::avtpdu`] finished "AVTPDU Framing". An ACF message is carried
+//! [`crate::avtp`] finished "AVTPDU Framing". An ACF message is carried
 //! inside the body of an NTSCF- or TSCF-headed AVTPDU (see
-//! [`crate::avtpdu::NtscfHeader`]/[`crate::avtpdu::TscfHeader`]); this
+//! [`crate::avtp::NtscfHeader`]/[`crate::avtp::TscfHeader`]); this
 //! module does not itself frame that outer AVTPDU, and nothing here is
-//! wired into [`crate::avtpdu`]'s decoders yet — that composition is later
+//! wired into [`crate::avtp`]'s decoders yet — that composition is later
 //! work.
 //!
 //! Three items are named on the Milestone 1 "ACF Messages" checklist, all
@@ -78,9 +78,9 @@
 //!   no timestamp field to apply that rule to; for ACF_GBB,
 //!   `message_timestamp` is carried as a raw `u64` only, not wired into
 //!   [`crate::timestamp::MessageTimestamp`] at encode/decode time.
-//! - Wiring either message type into [`crate::avtpdu`]'s AVTPDU decoders,
+//! - Wiring either message type into [`crate::avtp`]'s AVTPDU decoders,
 //!   or cutting over any caller of [`crate::wire`] — this module is
-//!   additive only, matching the pattern [`crate::avtpdu`] itself
+//!   additive only, matching the pattern [`crate::avtp`] itself
 //!   established for NTSCF/TSCF.
 //!
 //! ## Provenance note
