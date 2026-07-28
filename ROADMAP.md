@@ -763,8 +763,40 @@ table — but it is not a substitute for this).
       are untouched, separate, later work. New `REQ-DISC-006`..
       `REQ-DISC-010` added to `.fusa-reqs.json`, each with a
       `// fusa:req`/`// fusa:test` pair in `src/discovery.rs`.
-- [ ] Multi-client coexistence: other clients may still read via discovery
-      while a stream is claimed; only the claimant may configure
+- [x] Multi-client coexistence: other clients may still read via discovery
+      while a stream is claimed; only the claimant may configure. Done
+      (v0.6.0-dev): `src/discovery.rs` extends its existing additive-only
+      discipline with `DiscoveryAccessKind { Read, Configure }` and
+      `check_discovery_access` (a pure function, mirroring how
+      `ep0::Ep0AccessKind`/`ep0::check_ep0_access_for_stream` layer a
+      root-client access axis on top of `ep0::check_ep0_access`).
+      `DiscoveryAccessKind::Read` always succeeds regardless of claim state,
+      matching `build_discovery_response`'s existing "answerable in any
+      lifecycle state" unconditional behavior; `DiscoveryAccessKind::Configure`
+      is gated by a `claim_permits` rule shared with (factored out of)
+      `try_claim_discovery_stream`'s own first-claimant grant logic — an
+      unclaimed stream, the live claimant itself, or any requester once the
+      existing claim has lapsed, may configure, while a different live
+      claimant is rejected with `RcpError::UnauthorizedAccess`. The
+      broadcast sentinel is always rejected as a `Configure` requester with
+      `RcpError::InvalidParameter`, mirroring `try_claim_discovery_stream`'s
+      own rejection of it as a claimant. Both rejected-access codes reuse
+      existing spec-named `RcpError` variants per this crate's Milestone 2
+      "Error Model" precedent rather than inventing new provisional
+      sentinels. Since this crate's Milestone 1 wire framing has no
+      dedicated field for "configuring the discovery stream" as distinct
+      from an ordinary read, `DiscoveryAccessKind` is a caller-supplied
+      value rather than one derived from a decoded message — flagged per
+      Guiding Principle 5 in the module's own provenance note, alongside the
+      `RcpError` mapping choice, for reconciliation against the OPEN
+      Alliance TC18 Remote Control Protocol Specification v0.5.1_RC's actual
+      behavior before being relied on for interop. Like the prior two
+      checklist bullets, this remains additive standalone plumbing only —
+      nothing here is wired into an actual decoder or dispatch loop, and the
+      client-side cache (this subsection's one remaining checklist bullet)
+      is untouched, separate, later work. New `REQ-DISC-011`..`REQ-DISC-015`
+      added to `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test`
+      pair in `src/discovery.rs`.
 - [ ] Client-side discovery cache so re-discovery isn't mandatory on every
       power cycle for already-known topology
 
