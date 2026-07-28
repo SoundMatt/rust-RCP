@@ -4275,6 +4275,51 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-DISC-006",
+      "title": "Discovery claim lapse boundary semantics",
+      "text": "DiscoveryClaim::has_lapsed returns false while elapsed time since claimed_at is strictly less than timeout, true once elapsed time reaches or exceeds timeout (inclusive boundary), and uses saturating_duration_since so that a now earlier than claimed_at reads as zero elapsed time rather than panicking or wrapping",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-DISC-007",
+      "title": "Discovery-stream first-claimant rule and Discovery_TimeOut lapse-and-reopen",
+      "text": "try_claim_discovery_stream grants a claim timestamped now when current is None, grants and re-timestamps a claim when current already belongs to the same claimant (refresh), and grants a new claim to any claimant once the existing claim's has_lapsed is true as of now under timeout (Discovery_TimeOut lapse-and-reopen), with DISCOVERY_TIME_OUT defaulting to 20ms",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-DISC-008",
+      "title": "Discovery-stream claim rejects a second live claimant",
+      "text": "try_claim_discovery_stream returns Err(RcpError::RequestRejected) when current holds a live (not lapsed) claim for a claimant different from the requested claimant, leaving the caller's own copy of the existing claim unaffected by the rejected attempt",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-DISC-009",
+      "title": "Discovery-stream claim rejects the broadcast sentinel as claimant",
+      "text": "try_claim_discovery_stream returns Err(RcpError::InvalidParameter) whenever the requested claimant equals DISCOVERY_BROADCAST_STREAM_ID, regardless of whether current is None, holds a live claim, or holds a lapsed claim",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-DISC-010",
+      "title": "Discovery-stream claiming helpers never panic",
+      "text": "try_claim_discovery_stream never panics for any sampled combination of current claim state, claimant (including the broadcast sentinel), now, and timeout",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

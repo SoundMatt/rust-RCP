@@ -727,8 +727,42 @@ table — but it is not a substitute for this).
       bullets) are untouched, separate, later work. New `REQ-DISC-001`..
       `REQ-DISC-005` added to `.fusa-reqs.json`, each with a
       `// fusa:req`/`// fusa:test` pair in `src/discovery.rs`.
-- [ ] Discovery-stream claiming: first-claimant rule, `Discovery_TimeOut`
-      (~20 ms default) lapse-and-reopen behavior
+- [x] Discovery-stream claiming: first-claimant rule, `Discovery_TimeOut`
+      (~20 ms default) lapse-and-reopen behavior. Done (v0.6.0-dev):
+      `src/discovery.rs` extends its existing additive-only discipline with
+      `DiscoveryClaim` (plain data: a claimant `avtpdu::StreamId` plus the
+      instant it was claimed/refreshed) and `try_claim_discovery_stream`
+      (a pure function threading `Option<DiscoveryClaim>` state through
+      explicitly — no timer thread, lock, or real-clock read of its own,
+      mirroring how `build_discovery_response` takes `state`/`general` as
+      caller-supplied values). First-claimant rule: a claim for an
+      unclaimed stream, or one the same claimant already holds, always
+      succeeds (the latter is a refresh, re-timestamping the claim rather
+      than being treated as a second claimant); a different claimant is
+      rejected with `RcpError::RequestRejected` while the existing claim is
+      live. `Discovery_TimeOut` lapse-and-reopen: `DISCOVERY_TIME_OUT`
+      defaults to 20ms per the roadmap's own stated default, and
+      `DiscoveryClaim::has_lapsed` (inclusive at the boundary, using
+      `Instant::saturating_duration_since` so it never panics or wraps on
+      an out-of-order `now`) gates whether an existing claim still blocks a
+      different claimant; once lapsed, any claimant — including a new one
+      — may claim it. Two working interpretations this item introduces are
+      flagged per Guiding Principle 5 in the module's own provenance note:
+      (1) claim identity is modeled as `avtpdu::StreamId` (the same type
+      the broadcast-addressing sentinel already uses), with the sentinel
+      `DISCOVERY_BROADCAST_STREAM_ID` itself always rejected as a claimant
+      (`RcpError::InvalidParameter`) since a broadcast address names no
+      single real client; (2) a claimant re-claiming its own still-live
+      claim succeeds as a refresh rather than being rejected, since
+      rejecting a claimant's own repeat request would make an
+      idle-but-still-interested claimant indistinguishable from one that
+      never claimed at all. Like the prior checklist bullet, this remains
+      additive standalone plumbing only — nothing here is wired into an
+      actual decoder or dispatch loop, and multi-client coexistence and the
+      client-side cache (this subsection's remaining two checklist bullets)
+      are untouched, separate, later work. New `REQ-DISC-006`..
+      `REQ-DISC-010` added to `.fusa-reqs.json`, each with a
+      `// fusa:req`/`// fusa:test` pair in `src/discovery.rs`.
 - [ ] Multi-client coexistence: other clients may still read via discovery
       while a stream is claimed; only the claimant may configure
 - [ ] Client-side discovery cache so re-discovery isn't mandatory on every
