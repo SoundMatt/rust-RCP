@@ -4410,6 +4410,150 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GPIO-001",
+      "title": "GpioBitmask round-trips through encode/decode as a 4-byte big-endian bitmask",
+      "text": "GpioBitmask::encode/GpioBitmask::decode round-trip any u32 value through the GPIO endpoint's 4-byte read/write bitmask shape, encoded big-endian, matching the byte order convention every other Milestone 1-3 wire type already uses",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GPIO-002",
+      "title": "GpioBitmask decode never panics on short or truncated input",
+      "text": "GpioBitmask::decode returns Err(RcpError::ShortFrame) for any input shorter than GPIO_BITMASK_LEN instead of panicking, and ignores any trailing bytes beyond the first four",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GPIO-003",
+      "title": "GpioWriteSemantics round-trips through evt.sub_opcode for all eight values",
+      "text": "GpioWriteSemantics::to_sub_opcode/GpioWriteSemantics::from_sub_opcode round-trip every one of the eight write-semantics variants across the full 0..=7 range of the 3-bit evt.sub_opcode field, with no value left unmapped",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GPIO-004",
+      "title": "GpioWriteSemantics::from_sub_opcode rejects values outside the 3-bit sub_opcode range",
+      "text": "GpioWriteSemantics::from_sub_opcode returns Err(RcpError::InvalidParameter) for any raw byte greater than EVT_SUB_OPCODE_MAX (0x07), never panicking",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GPIO-005",
+      "title": "apply_gpio_write implements Replace/Or/And/Xor as their named bitwise operations",
+      "text": "apply_gpio_write computes Replace as the operand overwriting current, and Or/And/Xor as the corresponding bitwise combination of current and operand",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GPIO-006",
+      "title": "apply_gpio_write's Add semantics wraps rather than panics on u32 overflow",
+      "text": "apply_gpio_write computes GpioWriteSemantics::Add as current.wrapping_add(operand), so a current/operand pair that would overflow u32 wraps around to a defined value instead of panicking",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GPIO-007",
+      "title": "apply_gpio_write's SubtractSaturating semantics clamps at zero at the underflow boundary",
+      "text": "apply_gpio_write computes GpioWriteSemantics::SubtractSaturating as current.saturating_sub(operand), clamping to zero (inclusive at the exact-equal boundary) rather than wrapping/underflowing when operand exceeds current",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GPIO-008",
+      "title": "apply_gpio_write's Reconfigure semantics matches Replace at the bitmask-value level",
+      "text": "apply_gpio_write computes GpioWriteSemantics::Reconfigure identically to GpioWriteSemantics::Replace (the operand becomes the new bitmask value), per this module's flagged working interpretation of the roadmap-named but underspecified reconfigure semantics",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GPIO-009",
+      "title": "The unnamed eighth write semantics is refused rather than guessed",
+      "text": "GpioWriteSemantics::is_named is true for every variant except Unnamed8th, and apply_gpio_write returns Err(RcpError::UnsupportedCmd) for GpioWriteSemantics::Unnamed8th rather than inventing a behavior for the roadmap's uncounted eighth write semantics",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GPIO-010",
+      "title": "apply_gpio_write never panics for any sampled semantics/current/operand combination",
+      "text": "apply_gpio_write never panics across every GpioWriteSemantics variant combined with a representative sweep of u32 current/operand values including 0, 1, and the u32 boundary values",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GPIO-011",
+      "title": "GpioTriggerConfig round-trips through encode/decode with change/rising/falling field order",
+      "text": "GpioTriggerConfig::encode/GpioTriggerConfig::decode round-trip the three per-pin enable masks (change_enable, rising_enable, falling_enable) through a fixed 12-byte big-endian layout in that field order",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GPIO-012",
+      "title": "GpioTriggerConfig decode never panics on short or truncated input",
+      "text": "GpioTriggerConfig::decode returns Err(RcpError::ShortFrame) for any input shorter than GPIO_TRIGGER_CONFIG_LEN instead of panicking",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GPIO-013",
+      "title": "evaluate_gpio_triggers detects rising/falling/change edges between a before/after bitmask pair",
+      "text": "evaluate_gpio_triggers reports a pin as risen when it transitions 0->1 with rising_enable armed, fallen when it transitions 1->0 with falling_enable armed, and changed when it differs at all with change_enable armed, with no signal reported when the value is unchanged",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GPIO-014",
+      "title": "evaluate_gpio_triggers masks out disarmed pins independently per trigger kind",
+      "text": "evaluate_gpio_triggers suppresses a pin's changed/rising/falling signal when that pin's corresponding enable bit is clear in GpioTriggerConfig, and each of the three trigger kinds is evaluated independently per pin so one kind's arming does not affect another's",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GPIO-015",
+      "title": "evaluate_gpio_triggers never panics for any sampled before/after bitmask pair",
+      "text": "evaluate_gpio_triggers never panics across a representative sweep of previous/current u32 bitmask value pairs, including all-zero, all-one, and alternating-bit patterns, under a fixed non-trivial GpioTriggerConfig",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GPIO-016",
+      "title": "GpioFunctionalConfig's layer tag matches crate::regmap's EndpointType::Gpio cross-layer rule",
+      "text": "GpioFunctionalConfig::layer_tag returns a crate::regmap::PerEpTypeFunctionalConfig tagged EndpointType::Gpio that crate::regmap::functional_config_matches_ep_type/check_functional_config_matches_ep_type accept against a PerEpConfigBlock tagged EndpointType::Gpio, and reject against any other EndpointType, composing with the existing Milestone 2 cross-layer rule without crate::regmap needing to model GPIO's own content",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

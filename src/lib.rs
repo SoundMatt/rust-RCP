@@ -102,6 +102,7 @@ pub mod faultinject;
 pub mod federation;
 pub mod firmware;
 pub mod formal;
+pub mod gpio;
 pub mod grpcbridge;
 pub mod iso21434;
 pub mod lifecycle;
