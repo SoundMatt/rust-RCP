@@ -124,6 +124,7 @@ pub mod restbridge;
 pub mod shmem;
 pub mod sim;
 pub mod someip;
+pub mod spi;
 pub mod timestamp;
 pub mod tlstransport;
 pub mod tsn;

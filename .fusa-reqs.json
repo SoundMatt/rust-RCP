@@ -4554,6 +4554,114 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SPI-001",
+      "title": "SpiChannelSelect round-trips through evt.sub_opcode for all eight values",
+      "text": "SpiChannelSelect::to_sub_opcode/SpiChannelSelect::from_sub_opcode round-trip every value of the 3-bit evt.sub_opcode field (0..=7), covering both the six named channel selections and the two explicit spare variants",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SPI-002",
+      "title": "SpiChannelSelect::from_sub_opcode rejects values outside the 3-bit sub_opcode range",
+      "text": "SpiChannelSelect::from_sub_opcode returns Err(RcpError::InvalidParameter) rather than panicking for any raw byte greater than EVT_SUB_OPCODE_MAX",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SPI-003",
+      "title": "SpiChannelSelect::is_named is true only for the six named channel selections",
+      "text": "SpiChannelSelect::is_named returns true for Channel0..Channel5 and false for the two spare evt.sub_opcode values (Spare6/Spare7) that SPI's up-to-6 channel selection does not use",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SPI-004",
+      "title": "resolve_spi_channel_index maps named channels to 0..=5 and refuses the two spare values",
+      "text": "resolve_spi_channel_index maps SpiChannelSelect::Channel0..Channel5 to indices 0..=5 and returns Err(RcpError::UnsupportedCmd) rather than guessing an index for the two spare sub_opcode values",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SPI-005",
+      "title": "SpiFunctionalConfig holds exactly SPI_CHANNEL_COUNT (6) pre-configured channel slots",
+      "text": "SpiFunctionalConfig::channels has exactly SPI_CHANNEL_COUNT (6) SpiChannelConfigSlot entries, matching the roadmap's up-to-6 pre-configured channel config wording",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SPI-006",
+      "title": "select_spi_channel_config resolves named channel selections and refuses spare selections",
+      "text": "select_spi_channel_config returns Ok with the addressed SpiChannelConfigSlot for each of the six named SpiChannelSelect variants and Err(RcpError::UnsupportedCmd) for the two spare variants, via resolve_spi_channel_index",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SPI-007",
+      "title": "SpiFunctionalConfig's layer tag matches crate::regmap's EndpointType::Spi cross-layer rule",
+      "text": "SpiFunctionalConfig::layer_tag produces a crate::regmap::PerEpTypeFunctionalConfig tagged EndpointType::Spi that satisfies crate::regmap::check_functional_config_matches_ep_type against a generic PerEpConfigBlock of the same ep_type, and is rejected by functional_config_matches_ep_type against a mismatched ep_type",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SPI-008",
+      "title": "SpiByteTransfer (PICO) round-trips raw bytes through encode/decode and never panics",
+      "text": "SpiByteTransfer::encode/SpiByteTransfer::decode round-trip any byte sequence, including an empty one, as the raw PICO (controller-to-peripheral) byte stream without interpreting its contents, and decode never panics for any input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SPI-009",
+      "title": "SpiByteTransferResult (POCI) round-trips raw bytes through encode/decode and never panics",
+      "text": "SpiByteTransferResult::encode/SpiByteTransferResult::decode round-trip any byte sequence, including an empty one, as the raw POCI (peripheral-to-controller) byte stream without interpreting its contents, and decode never panics for any input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SPI-010",
+      "title": "SpiStatus round-trips through encode/decode as a fixed 20-byte status and never panics on short input",
+      "text": "SpiStatus::encode/SpiStatus::decode round-trip the SPI endpoint's full 20-byte status; decode returns Err(RcpError::ShortFrame) rather than panicking for input shorter than SPI_STATUS_LEN and ignores trailing bytes beyond the first 20",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SPI-011",
+      "title": "SpiCompoundWaitStatus round-trips through encode/decode as a fixed 4-byte status and never panics on short input",
+      "text": "SpiCompoundWaitStatus::encode/SpiCompoundWaitStatus::decode round-trip the compound-wait-truncated 4-byte SPI status shape; decode returns Err(RcpError::ShortFrame) rather than panicking for input shorter than SPI_COMPOUND_WAIT_STATUS_LEN",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SPI-012",
+      "title": "truncate_spi_status_for_compound_wait extracts exactly the leading 4 of 20 status bytes",
+      "text": "truncate_spi_status_for_compound_wait produces an SpiCompoundWaitStatus equal to the leading four bytes of the source SpiStatus's 20-byte form, implementing the roadmap's 4-of-20-byte status truncation rule as standalone plumbing not wired into any compound-wait dispatch; never panics for any input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
