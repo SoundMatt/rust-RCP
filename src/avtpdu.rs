@@ -15,6 +15,11 @@
 // fusa:req REQ-HVSEL-003
 // fusa:req REQ-HVSEL-004
 // fusa:req REQ-HVSEL-005
+// fusa:req REQ-SID-001
+// fusa:req REQ-SID-002
+// fusa:req REQ-SID-003
+// fusa:req REQ-SID-004
+// fusa:req REQ-SID-005
 
 //! IEEE 1722 AVTPDU framing — TC18 wire format core (`ROADMAP.md` Milestone 1).
 //!
@@ -42,11 +47,25 @@
 //! server drops it outright rather than decoding the remainder of the
 //! header.
 //!
-//! The two ACF message types, `stream_id` construction/parsing (as opposed
-//! to carrying it as an opaque field, which this module does), and full
-//! timestamp semantics (`message_timestamp`, invalid-timestamp fallback)
-//! are separate, later items on the same Milestone 1 checklist and are
-//! intentionally not implemented here.
+//! The two ACF message types (implemented separately in [`crate::acf`]) and
+//! full timestamp semantics (`message_timestamp`, invalid-timestamp
+//! fallback) remain separate, later items on the same Milestone 1 checklist
+//! and are intentionally not implemented here.
+//!
+//! `stream_id` construction/parsing — the first "Addressing" checklist
+//! item — *is* implemented in this module: [`StreamId`] decomposes/composes
+//! the opaque 64-bit value carried by [`NtscfHeader::stream_id`] and
+//! [`TscfHeader::stream_id`] into a sender MAC address and a
+//! locally-assigned unique-id suffix, via [`build_stream_id`]/
+//! [`parse_stream_id`] (or the [`StreamId::to_u64`]/[`StreamId::from_u64`]
+//! wrappers around them). This is additive, matching the discipline used by
+//! every prior Milestone 1 entry: [`NtscfHeader::stream_id`] and
+//! [`TscfHeader::stream_id`] remain plain `u64` fields rather than being cut
+//! over to [`StreamId`] itself, so no existing caller of either header type
+//! changes shape. The remaining two "Addressing" checklist items —
+//! `(stream_id, byte_bus_id)` endpoint lookup (with `byte_bus_id`'s
+//! stream-relative, not global, uniqueness) and the echo-back rule for
+//! responses/acks — are still separate, later work.
 //!
 //! Nothing else in the crate depends on this module yet: it coexists with
 //! [`crate::wire`] rather than replacing it, so existing callers of the
@@ -66,6 +85,15 @@
 //! interop with a real TC18 RC Server. In particular, `TSCF_SUBTYPE`
 //! (`0x83`) and the header's total length are this crate's own placeholder
 //! values pending that reconciliation.
+//!
+//! [`StreamId`]'s split — sender MAC in the upper 48 bits, locally-assigned
+//! unique-id suffix in the lower 16 bits — follows the widely used IEEE
+//! 1722 AVTP convention of that name (talker MAC high, per-talker stream
+//! discriminant low). It has not been independently reconciled against the
+//! OPEN Alliance TC18 Remote Control Protocol Specification's own
+//! `stream_id` construction rule, and per Guiding Principle 5 is flagged
+//! here as this crate's own working interpretation, not a spec-confirmed
+//! fact, pending that reconciliation.
 
 use crate::RcpError;
 
@@ -86,10 +114,11 @@ pub const NTSCF_DATA_LENGTH_MAX: u16 = 0x07FF;
 
 /// Decoded NTSCF AVTPDU header.
 ///
-/// `stream_id` is carried here as an opaque 64-bit value only — this module
-/// does not construct or interpret its sender-MAC/unique-id-suffix internal
-/// structure. That is the separate "Addressing" item on the Milestone 1
-/// checklist.
+/// `stream_id` is carried here as a plain 64-bit field — this struct itself
+/// does not decompose it. Use [`StreamId::from_u64`]/[`StreamId::to_u64`]
+/// (or the [`parse_stream_id`]/[`build_stream_id`] functions they wrap) to
+/// interpret or construct its sender-MAC/unique-id-suffix structure; see
+/// this module's doc comment for why the field remains untyped here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 // fusa:req REQ-NTSCF-001
 pub struct NtscfHeader {
@@ -98,7 +127,8 @@ pub struct NtscfHeader {
     /// Length, in bytes, of the ACF message(s) carried after this header.
     /// Valid range is `0..=NTSCF_DATA_LENGTH_MAX` (11 bits).
     pub ntscf_data_length: u16,
-    /// Opaque AVTP `stream_id`. See the struct-level doc comment.
+    /// AVTP `stream_id`, carried as a plain `u64`. See [`StreamId`] to
+    /// decompose/compose its sender-MAC/unique-id-suffix structure.
     pub stream_id: u64,
 }
 
@@ -193,9 +223,9 @@ pub const TSCF_DATA_LENGTH_MAX: u16 = 0x07FF;
 /// TSCF is the client-to-server counterpart of [`NtscfHeader`]: per this
 /// module's doc comment, an RC Server never needs to *encode* one, though
 /// it must be able to decode one (an RC Client uses TSCF when it has
-/// time-synchronized data to send). `stream_id` is carried here as an
-/// opaque 64-bit value only, same as [`NtscfHeader::stream_id`] — see that
-/// field's doc comment.
+/// time-synchronized data to send). `stream_id` is carried here as a plain
+/// 64-bit value, same as [`NtscfHeader::stream_id`] — see that field's doc
+/// comment for how to decompose/compose it via [`StreamId`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 // fusa:req REQ-TSCF-001
 pub struct TscfHeader {
@@ -209,7 +239,8 @@ pub struct TscfHeader {
     /// Length, in bytes, of the ACF message(s) carried after this header.
     /// Valid range is `0..=TSCF_DATA_LENGTH_MAX` (11 bits).
     pub stream_data_length: u16,
-    /// Opaque AVTP `stream_id`. See [`NtscfHeader::stream_id`].
+    /// AVTP `stream_id`, carried as a plain `u64`. See
+    /// [`NtscfHeader::stream_id`].
     pub stream_id: u64,
 }
 
@@ -355,6 +386,106 @@ pub fn select_header_variant(
             "avtpdu: unrecognized subtype 0x{other:02X} (expected NTSCF 0x{NTSCF_SUBTYPE:02X} or TSCF 0x{TSCF_SUBTYPE:02X})"
         ))),
     }
+}
+
+// ── Addressing: stream_id construction/parsing ───────────────────────────────
+
+/// A decomposed AVTP `stream_id`: a sender MAC address plus a
+/// locally-assigned unique-id suffix.
+///
+/// [`NtscfHeader::stream_id`] and [`TscfHeader::stream_id`] both carry
+/// `stream_id` as a plain opaque `u64` — this type is the typed view onto
+/// that same 64 bits, produced by [`StreamId::from_u64`]/[`parse_stream_id`]
+/// and turned back into the wire value by [`StreamId::to_u64`]/
+/// [`build_stream_id`]. See the module's provenance note for the bit-layout
+/// caveat that applies to both directions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
+// fusa:req REQ-SID-001
+pub struct StreamId {
+    /// The stream's sender's 48-bit MAC address, occupying the upper 48
+    /// bits of the wire `stream_id` (see the module's provenance note).
+    pub sender_mac: [u8; 6],
+    /// A suffix the sender assigns locally to distinguish multiple
+    /// concurrent streams it originates, occupying the lower 16 bits of the
+    /// wire `stream_id`.
+    pub unique_id: u16,
+}
+
+impl StreamId {
+    /// Compose a [`StreamId`] from its sender-MAC and unique-id parts.
+    // fusa:req REQ-SID-001
+    pub fn new(sender_mac: [u8; 6], unique_id: u16) -> Self {
+        Self {
+            sender_mac,
+            unique_id,
+        }
+    }
+
+    /// Compose the opaque 64-bit wire `stream_id` value from this
+    /// [`StreamId`]'s parts. Equivalent to [`build_stream_id`].
+    // fusa:req REQ-SID-001
+    pub fn to_u64(self) -> u64 {
+        build_stream_id(self.sender_mac, self.unique_id)
+    }
+
+    /// Decompose an opaque 64-bit wire `stream_id` value into a
+    /// [`StreamId`]. Equivalent to [`parse_stream_id`]. Infallible: every
+    /// `u64` value — including all-zero and all-`0xFF` — maps to exactly
+    /// one [`StreamId`].
+    // fusa:req REQ-SID-001
+    pub fn from_u64(raw: u64) -> Self {
+        let (sender_mac, unique_id) = parse_stream_id(raw);
+        Self::new(sender_mac, unique_id)
+    }
+}
+
+impl From<StreamId> for u64 {
+    fn from(id: StreamId) -> u64 {
+        id.to_u64()
+    }
+}
+
+impl From<u64> for StreamId {
+    fn from(raw: u64) -> StreamId {
+        StreamId::from_u64(raw)
+    }
+}
+
+/// Compose an opaque 64-bit AVTP `stream_id` from a sender MAC address and a
+/// locally-assigned unique-id suffix, per this module's stream_id bit-layout
+/// convention (see the provenance note above): `sender_mac` occupies the
+/// upper 48 bits, `unique_id` the lower 16.
+///
+/// Infallible — every `([u8; 6], u16)` pair maps to exactly one `u64`.
+// fusa:req REQ-SID-001
+pub fn build_stream_id(sender_mac: [u8; 6], unique_id: u16) -> u64 {
+    let mac_bits = (u64::from(sender_mac[0]) << 56)
+        | (u64::from(sender_mac[1]) << 48)
+        | (u64::from(sender_mac[2]) << 40)
+        | (u64::from(sender_mac[3]) << 32)
+        | (u64::from(sender_mac[4]) << 24)
+        | (u64::from(sender_mac[5]) << 16);
+    mac_bits | u64::from(unique_id)
+}
+
+/// Decompose an opaque 64-bit AVTP `stream_id` into a sender MAC address and
+/// a locally-assigned unique-id suffix — the inverse of [`build_stream_id`].
+///
+/// Never panics: a `u64` always carries exactly the 64 bits this function
+/// reads, so there is no truncated-input case to reject the way the header
+/// decoders above do.
+// fusa:req REQ-SID-001
+pub fn parse_stream_id(raw: u64) -> ([u8; 6], u16) {
+    let sender_mac = [
+        (raw >> 56) as u8,
+        (raw >> 48) as u8,
+        (raw >> 40) as u8,
+        (raw >> 32) as u8,
+        (raw >> 24) as u8,
+        (raw >> 16) as u8,
+    ];
+    let unique_id = raw as u16;
+    (sender_mac, unique_id)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -836,5 +967,126 @@ mod tests {
             let _ = select_header_variant(&buf, TimeSyncCapability::Capable);
             let _ = select_header_variant(&buf, TimeSyncCapability::Incapable);
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Addressing: stream_id construction/parsing
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    // fusa:test REQ-SID-002
+    fn stream_id_round_trip() {
+        let mac = [0x00, 0x11, 0x22, 0x33, 0x44, 0x55];
+        let unique_id = 0xBEEF;
+        let raw = build_stream_id(mac, unique_id);
+        let (parsed_mac, parsed_unique_id) = parse_stream_id(raw);
+        assert_eq!(parsed_mac, mac);
+        assert_eq!(parsed_unique_id, unique_id);
+    }
+
+    #[test]
+    // fusa:test REQ-SID-002
+    fn stream_id_round_trip_zero_values() {
+        let raw = build_stream_id([0; 6], 0);
+        assert_eq!(raw, 0);
+        assert_eq!(parse_stream_id(raw), ([0u8; 6], 0));
+    }
+
+    #[test]
+    // fusa:test REQ-SID-002
+    fn stream_id_round_trip_max_values() {
+        let raw = build_stream_id([0xFF; 6], u16::MAX);
+        assert_eq!(raw, u64::MAX);
+        assert_eq!(parse_stream_id(raw), ([0xFF; 6], u16::MAX));
+    }
+
+    #[test]
+    // fusa:test REQ-SID-001
+    // fusa:test REQ-SID-002
+    fn stream_id_type_round_trips_through_new_to_u64_from_u64() {
+        let id = StreamId::new([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF], 0x1234);
+        let raw = id.to_u64();
+        assert_eq!(StreamId::from_u64(raw), id);
+        // `From`/`Into` conversions must agree with the named methods.
+        assert_eq!(u64::from(id), raw);
+        assert_eq!(StreamId::from(raw), id);
+    }
+
+    #[test]
+    // fusa:test REQ-SID-003
+    fn stream_id_places_sender_mac_in_upper_48_bits() {
+        // Each MAC octet must land at a distinct, predictable byte position
+        // (upper 48 bits, most-significant octet first), independent of
+        // unique_id, so a single non-zero octet is recoverable in isolation.
+        for (i, shift) in [56u32, 48, 40, 32, 24, 16].into_iter().enumerate() {
+            let mut mac = [0u8; 6];
+            mac[i] = 0xAB;
+            let raw = build_stream_id(mac, 0);
+            assert_eq!(
+                raw,
+                0xABu64 << shift,
+                "octet {i} did not land at bit shift {shift}"
+            );
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-SID-003
+    fn stream_id_places_unique_id_in_lower_16_bits() {
+        let raw = build_stream_id([0; 6], 0x1234);
+        assert_eq!(raw, 0x0000_0000_0000_1234);
+    }
+
+    #[test]
+    // fusa:test REQ-SID-004
+    fn parse_stream_id_never_panics_across_arbitrary_u64_values() {
+        // parse_stream_id/build_stream_id operate on fixed-width integers
+        // and fixed-size arrays only, so there is no truncated/malformed
+        // input shape to panic on — this sweeps a deterministic spread of
+        // values (including the extremes) to document and enforce that.
+        let mut state: u64 = 0x1234_5678_9ABC_DEF0;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        let mut values = vec![0u64, u64::MAX, 1, u64::MAX - 1];
+        for _ in 0..64 {
+            values.push(next());
+        }
+        for raw in values {
+            let (mac, unique_id) = parse_stream_id(raw);
+            assert_eq!(build_stream_id(mac, unique_id), raw);
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-SID-005
+    fn stream_id_interoperates_with_ntscf_header_opaque_field() {
+        let id = StreamId::new([0x02, 0x42, 0xAC, 0x11, 0x00, 0x02], 0x0007);
+        let hdr = NtscfHeader {
+            sequence_num: 1,
+            ntscf_data_length: 0,
+            stream_id: id.to_u64(),
+        };
+        let frame = encode_ntscf_header(&hdr).unwrap();
+        let decoded = decode_ntscf_header(&frame).unwrap();
+        assert_eq!(StreamId::from_u64(decoded.stream_id), id);
+    }
+
+    #[test]
+    // fusa:test REQ-SID-005
+    fn stream_id_interoperates_with_tscf_header_opaque_field() {
+        let id = StreamId::new([0x02, 0x42, 0xAC, 0x11, 0x00, 0x03], 0x0008);
+        let hdr = TscfHeader {
+            sequence_num: 1,
+            avtp_timestamp: 0,
+            stream_data_length: 0,
+            stream_id: id.to_u64(),
+        };
+        let frame = encode_tscf_header(&hdr).unwrap();
+        let decoded = decode_tscf_header(&frame).unwrap();
+        assert_eq!(StreamId::from_u64(decoded.stream_id), id);
     }
 }

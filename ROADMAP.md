@@ -184,8 +184,29 @@ shared request-descriptor header that carries all per-message addressing.
 
 ### Addressing
 
-- [ ] `stream_id` construction/parsing (sender MAC + locally-assigned
-      unique-id suffix)
+- [x] `stream_id` construction/parsing (sender MAC + locally-assigned
+      unique-id suffix). Done (v0.4.0-dev): `src/avtpdu.rs` adds
+      `StreamId { sender_mac: [u8; 6], unique_id: u16 }` plus the
+      `build_stream_id`/`parse_stream_id` free-function pair it wraps
+      (`StreamId::to_u64`/`StreamId::from_u64`, and `From`/`Into`
+      conversions both ways), decomposing/composing the opaque 64-bit value
+      already carried by `NtscfHeader::stream_id`/`TscfHeader::stream_id`
+      into a sender MAC address (upper 48 bits) and a locally-assigned
+      unique-id suffix (lower 16 bits), round-tripping across zero/max
+      values and never panicking (`parse_stream_id` takes a plain `u64`, so
+      there is no truncated-input shape to reject). This is additive:
+      `NtscfHeader`/`TscfHeader`'s `stream_id` fields remain plain `u64` —
+      no existing caller is cut over — and interop between `StreamId` and
+      both header types' opaque field is covered by round-trip tests. Per
+      Guiding Principle 5, the sender-MAC-high/unique-id-low bit-layout
+      split is this crate's own working interpretation of the common IEEE
+      1722 AVTP stream_id convention, not a transcription of or confirmed
+      match against the OPEN Alliance TC18 Remote Control Protocol
+      Specification's own construction rule, and is flagged in the module's
+      provenance note for reconciliation before being relied on for
+      interop. The other two Addressing bullets below —
+      `(stream_id, byte_bus_id)` endpoint lookup and the echo-back rule —
+      remain separate, unimplemented items.
 - [ ] `(stream_id, byte_bus_id)` → endpoint lookup, with the stream-relative
       (not global) uniqueness of `byte_bus_id` modeled explicitly
 - [ ] Echo-back rule: a response/ack must carry the same `byte_bus_id` it
