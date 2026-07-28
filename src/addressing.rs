@@ -97,11 +97,11 @@ impl EndpointTable {
     /// Returns `Err(RcpError::InvalidSize)` if `byte_bus_id` exceeds the
     /// 11-bit field width also enforced by
     /// [`crate::acf::encode_byte_message_info`]. Returns
-    /// `Err(RcpError::EndpointAlreadyRegistered)` — without modifying the
-    /// table — if `(stream_id, byte_bus_id)` is already registered; this
-    /// pair is never silently overwritten. The same `byte_bus_id` may be
-    /// registered independently under any number of *different*
-    /// `stream_id`s, since uniqueness here is stream-relative, not global.
+    /// `Err(RcpError::EpError)` — without modifying the table — if
+    /// `(stream_id, byte_bus_id)` is already registered; this pair is never
+    /// silently overwritten. The same `byte_bus_id` may be registered
+    /// independently under any number of *different* `stream_id`s, since
+    /// uniqueness here is stream-relative, not global.
     // fusa:req REQ-EPLK-002
     pub fn register(
         &mut self,
@@ -114,7 +114,7 @@ impl EndpointTable {
         }
         let bus_table = self.streams.entry(stream_id).or_default();
         if bus_table.contains_key(&byte_bus_id) {
-            return Err(RcpError::EndpointAlreadyRegistered);
+            return Err(RcpError::EpError);
         }
         bus_table.insert(byte_bus_id, endpoint);
         Ok(())
@@ -208,7 +208,7 @@ mod tests {
         let sid = stream(1);
         table.register(sid, 5, EndpointId(1)).unwrap();
         let result = table.register(sid, 5, EndpointId(2));
-        assert_eq!(result, Err(RcpError::EndpointAlreadyRegistered));
+        assert_eq!(result, Err(RcpError::EpError));
         // The original registration must survive the rejected attempt.
         assert_eq!(table.lookup(sid, 5), Some(EndpointId(1)));
     }

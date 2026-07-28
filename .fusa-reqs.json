@@ -497,6 +497,123 @@
       "verificationMethod": "test"
     },
     {
+      "id": "REQ-ERRM-001",
+      "title": "UnsupportedCmd is a TC18 error code",
+      "text": "RcpError::UnsupportedCmd must be a distinct variant and report true for is_tc18_error_code()",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ERRM-002",
+      "title": "SequencerNotKnown is a TC18 error code",
+      "text": "RcpError::SequencerNotKnown must be a distinct variant and report true for is_tc18_error_code()",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ERRM-003",
+      "title": "UnauthorizedAccess is a TC18 error code",
+      "text": "RcpError::UnauthorizedAccess must be a distinct variant and report true for is_tc18_error_code()",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ERRM-004",
+      "title": "LockedMemAccess is a TC18 error code",
+      "text": "RcpError::LockedMemAccess must be a distinct variant and report true for is_tc18_error_code()",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ERRM-005",
+      "title": "RequestCanceled is a TC18 error code",
+      "text": "RcpError::RequestCanceled must be a distinct variant and report true for is_tc18_error_code()",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ERRM-006",
+      "title": "RequestNotFound is a TC18 error code",
+      "text": "RcpError::RequestNotFound must be a distinct variant and report true for is_tc18_error_code()",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ERRM-007",
+      "title": "EpError is a TC18 error code",
+      "text": "RcpError::EpError must be a distinct variant and report true for is_tc18_error_code()",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ERRM-008",
+      "title": "EpNotFound is a TC18 error code",
+      "text": "RcpError::EpNotFound must be a distinct variant and report true for is_tc18_error_code()",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ERRM-009",
+      "title": "ReqStorageOvfl is a TC18 error code",
+      "text": "RcpError::ReqStorageOvfl must be a distinct variant and report true for is_tc18_error_code()",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ERRM-010",
+      "title": "RequestRejected is a TC18 error code",
+      "text": "RcpError::RequestRejected must be a distinct variant and report true for is_tc18_error_code()",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ERRM-011",
+      "title": "InvalidParameter is a TC18 error code",
+      "text": "RcpError::InvalidParameter must be a distinct variant and report true for is_tc18_error_code()",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ERRM-012",
+      "title": "TC18 error codes are mutually distinct and exclusive",
+      "text": "The eleven TC18 RCP spec error code variants (UnsupportedCmd..InvalidParameter) must be pairwise distinct, each report true for is_tc18_error_code(), and every RELAY-sentinel/legacy/wire/general RcpError variant must report false for is_tc18_error_code()",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ERRM-013",
+      "title": "TC18 error code Display messages carry the spec name",
+      "text": "Each of the eleven TC18 RCP spec error code variants' Display/thiserror message must contain its UPPER_SNAKE_CASE spec name (e.g. UNSUPPORTED_CMD)",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
       "id": "REQ-MSG-001",
       "title": "zone_from_str PascalCase and kebab-case",
       "text": "zone_from_str accepts both PascalCase and kebab-case zone names",
@@ -3694,7 +3811,7 @@
     {
       "id": "REQ-LIFE-004",
       "title": "check_register_reachable enforces the reachability rule",
-      "text": "check_register_reachable returns Ok(()) exactly when is_register_reachable would return true for the same (state, category) pair, and Err(RcpError::RegisterUnreachable) otherwise",
+      "text": "check_register_reachable returns Ok(()) exactly when is_register_reachable would return true for the same (state, category) pair, and Err(RcpError::UnauthorizedAccess) otherwise",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -3721,7 +3838,7 @@
     {
       "id": "REQ-LIFE-007",
       "title": "try_transition enforces the caller-supplied consistency guard",
-      "text": "RcServerState::try_transition returns Ok(target) when the is_consistent closure returns true for one of the two defined transitions, and returns Err(RcpError::HwCfgInconsistent) or Err(RcpError::RcpCfgInconsistent) (matching the attempted transition) when is_consistent returns false",
+      "text": "RcServerState::try_transition returns Ok(target) when the is_consistent closure returns true for one of the two defined transitions, and returns Err(RcpError::InvalidParameter) (for either guard) when is_consistent returns false",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -3730,7 +3847,7 @@
     {
       "id": "REQ-LIFE-008",
       "title": "try_transition rejects undefined transitions without invoking the guard, and never panics",
-      "text": "RcServerState::try_transition returns Err(RcpError::InvalidLifecycleTransition) without calling is_consistent for every (from, to) pair other than the three implemented transitions (including identity, any move originating at RcpConfigured, and skipping HwConfigured entirely), and never panics for any (from, to) pair or guard result",
+      "text": "RcServerState::try_transition returns Err(RcpError::RequestRejected) without calling is_consistent for every (from, to) pair other than the three implemented transitions (including identity, any move originating at RcpConfigured, and skipping HwConfigured entirely), and never panics for any (from, to) pair or guard result",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -3748,7 +3865,7 @@
     {
       "id": "REQ-LIFE-010",
       "title": "check_register_writable enforces the write-lock rule and distinguishes unreachable from locked",
-      "text": "check_register_writable returns Ok(()) exactly when is_register_writable would return true for the same (state, category) pair, Err(RcpError::RegisterUnreachable) if the category is not reachable at all in that state, and Err(RcpError::RegisterLocked) if it is reachable but write-locked",
+      "text": "check_register_writable returns Ok(()) exactly when is_register_writable would return true for the same (state, category) pair, Err(RcpError::UnauthorizedAccess) if the category is not reachable at all in that state, and Err(RcpError::LockedMemAccess) if it is reachable but write-locked",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -3766,7 +3883,7 @@
     {
       "id": "REQ-LIFE-012",
       "title": "Demotion path HwConfigured -> HwUnconfigured is unconditional and single-hop only",
-      "text": "RcServerState::try_transition(HwConfigured, HwUnconfigured, is_consistent) always returns Ok(HwUnconfigured) regardless of what is_consistent would return, and never invokes is_consistent for this pair; is_transition_defined(HwConfigured, HwUnconfigured) returns true; demotion originating at RcpConfigured (to either HwConfigured or HwUnconfigured) remains outside this transition's scope and continues to return Err(RcpError::InvalidLifecycleTransition)",
+      "text": "RcServerState::try_transition(HwConfigured, HwUnconfigured, is_consistent) always returns Ok(HwUnconfigured) regardless of what is_consistent would return, and never invokes is_consistent for this pair; is_transition_defined(HwConfigured, HwUnconfigured) returns true; demotion originating at RcpConfigured (to either HwConfigured or HwUnconfigured) remains outside this transition's scope and continues to return Err(RcpError::RequestRejected)",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -3811,7 +3928,7 @@
     {
       "id": "REQ-EP0-005",
       "title": "EP0 write access composes with lifecycle register writability and distinguishes unreachable from locked",
-      "text": "check_ep0_access with an info whose op is true returns the same result as lifecycle::check_register_writable for the same (state, category) pair, for every RcServerState/RegisterCategory combination, including reporting RcpError::RegisterUnreachable (not RegisterLocked) for an unreachable category and RcpError::RegisterLocked for a reachable but write-locked category",
+      "text": "check_ep0_access with an info whose op is true returns the same result as lifecycle::check_register_writable for the same (state, category) pair, for every RcServerState/RegisterCategory combination, including reporting RcpError::UnauthorizedAccess (not LockedMemAccess) for an unreachable category and RcpError::LockedMemAccess for a reachable but write-locked category",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -3855,8 +3972,8 @@
     },
     {
       "id": "REQ-EP0-010",
-      "title": "Non-root EP0 writes are rejected with RootClientRequired",
-      "text": "check_ep0_access_for_stream with an info whose op is true returns Err(RcpError::RootClientRequired) whenever requesting_stream does not equal root_client (including when root_client is None), for every RcServerState/RegisterCategory combination, without bypassing lifecycle-state gating when requesting_stream does equal root_client",
+      "title": "Non-root EP0 writes are rejected with UnauthorizedAccess",
+      "text": "check_ep0_access_for_stream with an info whose op is true returns Err(RcpError::UnauthorizedAccess) whenever requesting_stream does not equal root_client (including when root_client is None), for every RcServerState/RegisterCategory combination, without bypassing lifecycle-state gating when requesting_stream does equal root_client",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -3901,7 +4018,7 @@
     {
       "id": "REQ-RMAP-004",
       "title": "Cross-layer ep_type match invariant",
-      "text": "functional_config_matches_ep_type returns true iff a PerEpConfigBlock and a PerEpTypeFunctionalConfig carry the same EndpointType, and check_functional_config_matches_ep_type returns Ok(()) in exactly that case and Err(RcpError::EndpointTypeMismatch) otherwise, for every EndpointType pair",
+      "text": "functional_config_matches_ep_type returns true iff a PerEpConfigBlock and a PerEpTypeFunctionalConfig carry the same EndpointType, and check_functional_config_matches_ep_type returns Ok(()) in exactly that case and Err(RcpError::InvalidParameter) otherwise, for every EndpointType pair",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",

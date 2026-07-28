@@ -198,13 +198,13 @@
 //! and neither mapping is wired into [`crate::ep0::check_ep0_access`] or
 //! any other existing caller by this item.
 //!
-//! `RcpError::EndpointTypeMismatch` is this crate's own provisional error
-//! name for [`check_functional_config_matches_ep_type`], matching the
-//! pre-Error-Model-item style already used by
-//! `RcpError::RegisterUnreachable`/`RcpError::RegisterLocked`/
-//! `RcpError::RootClientRequired` before it; which of the specification's
-//! own error codes it ultimately maps to is `ROADMAP.md` Milestone 2's
-//! later "Error Model" item's call to make, not this one's.
+//! `RcpError::InvalidParameter` is Milestone 2's "Error Model" item's TC18
+//! spec error code for [`check_functional_config_matches_ep_type`] — this
+//! function originally returned a crate-invented `EndpointTypeMismatch`
+//! sentinel, since remapped onto the same spec code the lifecycle guard
+//! rejections in `crate::lifecycle` now use; see [`crate::RcpError`]'s own
+//! doc comment for the full provenance/mapping note, including why the
+//! three collapse onto one code rather than staying distinct.
 //!
 //! ## `GeneralRegisters` (`§3.6`)
 //!
@@ -341,8 +341,10 @@
 //! this performs register I/O against a real RC Server, and none of it is
 //! wired into [`crate::ep0`]'s dispatch path, [`crate::lifecycle`]'s
 //! reachability checks, or any other existing caller. Completing this item
-//! closes out the "Register Map" subsection of `ROADMAP.md` Milestone 2,
-//! leaving only that milestone's separate "Error Model" item.
+//! closed out the "Register Map" subsection of `ROADMAP.md` Milestone 2;
+//! that milestone's separate "Error Model" item — which remapped this
+//! module's own `EndpointTypeMismatch` sentinel onto
+//! [`crate::RcpError::InvalidParameter`] — has since landed too.
 //!
 //! ### Config tables provenance note
 //!
@@ -593,7 +595,7 @@ pub fn functional_config_matches_ep_type(
 /// Validating counterpart to [`functional_config_matches_ep_type`].
 ///
 /// Returns `Ok(())` if `per_type` belongs to the same [`EndpointType`] as
-/// `generic`, `Err(RcpError::EndpointTypeMismatch)` otherwise. Never panics
+/// `generic`, `Err(RcpError::InvalidParameter)` otherwise. Never panics
 /// for any input.
 // fusa:req REQ-RMAP-004
 pub fn check_functional_config_matches_ep_type(
@@ -603,7 +605,7 @@ pub fn check_functional_config_matches_ep_type(
     if functional_config_matches_ep_type(generic, per_type) {
         Ok(())
     } else {
-        Err(RcpError::EndpointTypeMismatch)
+        Err(RcpError::InvalidParameter)
     }
 }
 
@@ -1625,7 +1627,7 @@ mod tests {
                     "{generic_type:?} vs {per_type_type:?}"
                 );
                 if !matches {
-                    assert_eq!(checked, Err(RcpError::EndpointTypeMismatch));
+                    assert_eq!(checked, Err(RcpError::InvalidParameter));
                 }
             }
         }

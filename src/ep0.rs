@@ -96,12 +96,12 @@
 //!   root client, the write proceeds exactly as [`check_ep0_access`] would
 //!   decide it (i.e. still subject to lifecycle-state reachability/locking);
 //!   if it is not, the write is rejected with
-//!   [`crate::RcpError::RootClientRequired`] without even consulting
+//!   [`crate::RcpError::UnauthorizedAccess`] without even consulting
 //!   [`check_ep0_access`] — a non-root stream's EP0 write is refused
 //!   regardless of what lifecycle state would otherwise have permitted.
 //! - No root client at all (`root_client == None`) behaves like every
 //!   stream being non-root: every EP0 write is rejected with
-//!   `RootClientRequired` until some stream is designated.
+//!   `UnauthorizedAccess` until some stream is designated.
 //!
 //! This module still performs no register I/O and does not decide what a
 //! non-root stream's *per-endpoint* (device-endpoint, non-EP0) write access
@@ -201,14 +201,16 @@
 //!   — for everyone else. Nothing in the checklist bullet's text suggests
 //!   non-root streams lose EP0 *read* visibility, only that they cannot
 //!   exercise the root client's whole-server *write* privilege.
-//! - `RcpError::RootClientRequired` is this crate's own provisional error
-//!   name, matching the pre-Error-Model-item style already used by
-//!   `RcpError::RegisterUnreachable`/`RcpError::RegisterLocked` before it;
-//!   which of the specification's own error codes (e.g. a candidate like
-//!   `UNAUTHORIZED_ACCESS`) it ultimately maps to is this milestone's later
-//!   "Error Model" item's call to make, not this one's.
+//! - `RcpError::UnauthorizedAccess` is Milestone 2's "Error Model" item's
+//!   TC18 spec error code for a non-root-client stream's rejected EP0
+//!   write — this function originally returned a crate-invented
+//!   `RootClientRequired` sentinel, since remapped onto the same spec code
+//!   [`crate::lifecycle::check_register_reachable`] now uses for its own
+//!   lifecycle-state-gated rejection; see [`crate::RcpError`]'s own doc
+//!   comment for the full provenance/mapping note, including why the two
+//!   collapse onto one code rather than staying distinct.
 //! - An absent root client (`root_client == None`) rejecting every EP0
-//!   write with `RootClientRequired` — rather than, say, treating "no root
+//!   write with `UnauthorizedAccess` — rather than, say, treating "no root
 //!   client designated" as "anyone may write" — is this crate's own
 //!   conservative default: the checklist bullet describes root-client
 //!   write access as a privilege belonging to "exactly one stream", which
@@ -317,7 +319,7 @@ pub fn access_kind(info: &ByteMessageInfo) -> Ep0AccessKind {
 /// is additionally checked against [`check_register_writable`]'s write-lock
 /// rule, which itself re-checks reachability before considering the lock —
 /// so a write to an unreachable category still reports
-/// `Err(RcpError::RegisterUnreachable)`, not `RegisterLocked`, exactly as
+/// `Err(RcpError::UnauthorizedAccess)`, not `LockedMemAccess`, exactly as
 /// [`check_register_writable`]'s own doc comment specifies.
 ///
 /// This function decides only whether the access may proceed at
@@ -366,7 +368,7 @@ pub fn is_root_client(root_client: Option<StreamId>, stream: StreamId) -> bool {
 /// ([`is_root_client`]): if it is, the write is decided exactly as
 /// [`check_ep0_access`] would decide it (still subject to lifecycle-state
 /// reachability/locking); if it is not — including when `root_client` is
-/// `None` — the write is rejected with `Err(RcpError::RootClientRequired)`
+/// `None` — the write is rejected with `Err(RcpError::UnauthorizedAccess)`
 /// without consulting [`check_ep0_access`] at all, so a non-root stream's
 /// EP0 write is refused regardless of what lifecycle state would otherwise
 /// have permitted.
@@ -391,7 +393,7 @@ pub fn check_ep0_access_for_stream(
             if is_root_client(root_client, requesting_stream) {
                 check_ep0_access(state, category, info)
             } else {
-                Err(RcpError::RootClientRequired)
+                Err(RcpError::UnauthorizedAccess)
             }
         }
     }
@@ -552,7 +554,7 @@ mod tests {
                 RegisterCategory::RcpConfig,
                 &info
             ),
-            Err(RcpError::RegisterUnreachable)
+            Err(RcpError::UnauthorizedAccess)
         );
     }
 
@@ -567,7 +569,7 @@ mod tests {
                 RegisterCategory::HwConfig,
                 &info
             ),
-            Err(RcpError::RegisterLocked)
+            Err(RcpError::LockedMemAccess)
         );
     }
 
@@ -673,12 +675,12 @@ mod tests {
                 let info = info_with_op(true);
                 assert_eq!(
                     check_ep0_access_for_stream(state, category, &info, non_root, Some(root)),
-                    Err(RcpError::RootClientRequired),
+                    Err(RcpError::UnauthorizedAccess),
                     "non-root writer, {state:?} {category:?}"
                 );
                 assert_eq!(
                     check_ep0_access_for_stream(state, category, &info, non_root, None),
-                    Err(RcpError::RootClientRequired),
+                    Err(RcpError::UnauthorizedAccess),
                     "writer with no root client designated, {state:?} {category:?}"
                 );
             }
@@ -702,7 +704,7 @@ mod tests {
                 root,
                 Some(root),
             ),
-            Err(RcpError::RegisterUnreachable)
+            Err(RcpError::UnauthorizedAccess)
         );
     }
 

@@ -546,7 +546,7 @@ pub fn build_response_info(
 /// echoes the `byte_bus_id` it was received under, per Milestone 1's
 /// "Addressing" echo-back rule.
 ///
-/// Returns `Err(RcpError::EchoBackMismatch)` if `response.byte_bus_id !=
+/// Returns `Err(RcpError::EpError)` if `response.byte_bus_id !=
 /// request.byte_bus_id`. Deliberately checks nothing else about either
 /// header — in particular, it does not require `response.rsp` to be set,
 /// since that is a separate concern from the byte_bus_id-echoing rule this
@@ -560,7 +560,7 @@ pub fn verify_echo_back(
     response: &ByteMessageInfo,
 ) -> Result<(), RcpError> {
     if response.byte_bus_id != request.byte_bus_id {
-        return Err(RcpError::EchoBackMismatch);
+        return Err(RcpError::EpError);
     }
     Ok(())
 }
@@ -1050,7 +1050,7 @@ mod tests {
         };
         assert_eq!(
             verify_echo_back(&request, &response),
-            Err(RcpError::EchoBackMismatch)
+            Err(RcpError::EpError)
         );
     }
 
