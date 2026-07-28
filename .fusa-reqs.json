@@ -3924,6 +3924,51 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-007",
+      "title": "TableDescriptor encode/decode round-trip and short-input rejection",
+      "text": "TableDescriptor::encode/decode round-trip every ptr/capacity pair exactly, decode ignores any trailing bytes beyond ENCODED_LEN, and decode returns Err(RcpError::ShortFrame) for every input shorter than ENCODED_LEN",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-008",
+      "title": "GeneralRegisters models the full §3.6 general register-map field set",
+      "text": "GeneralRegisters carries the six ROADMAP.md-quoted fields (svr_oa_tc18_magic_nr, svr_version, svr_vendor_id, svr_device_id, svr_ep_count, svr_implemented_options) plus the remaining rows of this crate's own §3.6 table extraction, each independently settable/readable, defaults to an all-zero value, and reports CATEGORY == lifecycle::RegisterCategory::General",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-009",
+      "title": "GeneralRegisters encode/decode round-trip",
+      "text": "GeneralRegisters::encode/decode round-trip every field exactly (including all-default and all-max-value instances) via a fixed-length big-endian wire form, and decode ignores any trailing bytes beyond ENCODED_LEN",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-010",
+      "title": "GeneralRegisters::decode rejects short input",
+      "text": "GeneralRegisters::decode returns Err(RcpError::ShortFrame) for every input strictly shorter than ENCODED_LEN, and succeeds for input of exactly ENCODED_LEN",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-011",
+      "title": "GeneralRegisters/TableDescriptor encode/decode never panic",
+      "text": "TableDescriptor::decode and GeneralRegisters::decode never panic for arbitrary byte slices of any length, and GeneralRegisters::encode/TableDescriptor::encode never panic for any field value",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
