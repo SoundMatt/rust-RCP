@@ -4806,6 +4806,87 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-PWM-001",
+      "title": "PwmDurationPair holds independent period/active_duration fields and defaults to a zeroed pair",
+      "text": "PwmDurationPair's period and active_duration fields are independently settable u32 values, and PwmDurationPair::default() yields period == 0 and active_duration == 0",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-PWM-002",
+      "title": "PwmOutFunctionalConfig defaults to a zeroed target PwmDurationPair",
+      "text": "PwmOutFunctionalConfig::default().target equals PwmDurationPair::default()",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-PWM-003",
+      "title": "PwmOutFunctionalConfig::layer_tag matches EndpointType::PwmOut and rejects EndpointType::PwmIn",
+      "text": "PwmOutFunctionalConfig::layer_tag returns a PerEpTypeFunctionalConfig tagged EndpointType::PwmOut that satisfies regmap::functional_config_matches_ep_type/check_functional_config_matches_ep_type against a PerEpConfigBlock also tagged EndpointType::PwmOut, and does not satisfy it against a PerEpConfigBlock tagged EndpointType::PwmIn",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-PWM-004",
+      "title": "PwmInFunctionalConfig defaults to a zero no_signal_timeout",
+      "text": "PwmInFunctionalConfig::default().no_signal_timeout equals 0",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-PWM-005",
+      "title": "PwmInFunctionalConfig::layer_tag matches EndpointType::PwmIn and rejects EndpointType::PwmOut",
+      "text": "PwmInFunctionalConfig::layer_tag returns a PerEpTypeFunctionalConfig tagged EndpointType::PwmIn that satisfies regmap::functional_config_matches_ep_type/check_functional_config_matches_ep_type against a PerEpConfigBlock also tagged EndpointType::PwmIn, and does not satisfy it against a PerEpConfigBlock tagged EndpointType::PwmOut",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-PWM-006",
+      "title": "resolve_pwm_in_read reports Measured(pair) whenever elapsed_since_last_edge is below no_signal_timeout and a measurement exists",
+      "text": "resolve_pwm_in_read returns Some(PwmInReadResolution::Measured(pair)) whenever last_measured is Some(pair) and elapsed_since_last_edge is strictly less than config.no_signal_timeout",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-PWM-007",
+      "title": "resolve_pwm_in_read reports NoSignal once the timeout elapses, never re-reporting a stale prior measurement",
+      "text": "resolve_pwm_in_read returns Some(PwmInReadResolution::NoSignal) whenever elapsed_since_last_edge is greater than or equal to config.no_signal_timeout, regardless of whether last_measured carries a prior value, and a zero-valued no_signal_timeout is not treated as a disabled sentinel",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-PWM-008",
+      "title": "resolve_pwm_in_read returns None while genuinely awaiting a first edge before the timeout elapses, rather than hanging",
+      "text": "resolve_pwm_in_read returns None when last_measured is None and elapsed_since_last_edge is strictly less than config.no_signal_timeout, letting a polling caller retry instead of this function blocking",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-PWM-009",
+      "title": "resolve_pwm_in_read never panics for any sampled combination of config, last_measured, and elapsed inputs",
+      "text": "resolve_pwm_in_read does not panic across sampled boundary combinations of no_signal_timeout (including 0 and u32::MAX), last_measured (None, a zeroed pair, and a maximal pair), and elapsed_since_last_edge (including 0 and u32::MAX)",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
