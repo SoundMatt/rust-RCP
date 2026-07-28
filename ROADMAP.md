@@ -1170,9 +1170,49 @@ per-endpoint scheduler, since the spec defines that ordering natively.
       only as background, not extended. New `REQ-CMP-001`..`REQ-CMP-007`
       (in `src/request.rs`) added to `.fusa-reqs.json`, each with a
       `// fusa:req`/`// fusa:test` pair.
-- [ ] Triggered (`0x0E`): trigger-occurrence counting that runs independent
+- [x] Triggered (`0x0E`): trigger-occurrence counting that runs independent
       of endpoint busy/idle state; `trigger_exec_delay`; infinite-repeat
-      sentinel (`0xFFFF`)
+      sentinel (`0xFFFF`). Done (v0.8.0-dev): `src/request.rs` gains
+      `RequestKind::Triggered = 0x0E` alongside the existing `Compound`/
+      `CompoundWait` variants, with `to_u8`/`from_u8` extended to match;
+      `TriggerExecDelay` (a single `u32` field, mirroring
+      `CompoundExecDelays`) with `resolve_trigger_exec_delay` selecting it
+      only for `RequestKind::Triggered`; `TriggerRepeatCount` (`Finite(u16)`
+      / `Infinite`) with `to_u16`/`from_u16` modeling the `0xFFFF`
+      infinite-repeat sentinel as an explicit variant rather than a bare
+      `u16` that would let it silently mean 65535 repeats, mirroring
+      `GpioWriteSemantics::Unnamed8th`'s and `I2cSpeedMode::
+      HighSpeedRowA`/`HighSpeedRowB`'s own named-special-value precedent;
+      `is_trigger_repeat_exhausted` implementing the exhaustion check
+      against that repeat count; and `should_count_trigger_occurrence`, a
+      pure predicate that always returns `true` regardless of the
+      endpoint's busy/idle state, turning the "runs independent of endpoint
+      busy/idle state" rule into a real, testable function signature.
+      `resolve_compound_exec_delay`'s return type widened from `u32` to
+      `Option<u32>` (returning `None` for `RequestKind::Triggered`, which
+      has no `CompoundExecDelays` field of its own) to stay exhaustive over
+      the now three-variant `RequestKind`; not yet called from anywhere in
+      this crate, so this is a safe additive-stage widening, not a breaking
+      change to any consumer. Two points flagged per Guiding Principle 5:
+      (1) same as the compound/compound-wait item above, no checklist text
+      states which byte/field of a request carries the `0x0E` discriminant
+      or the `trigger_exec_delay`/occurrence-count fields' wire width
+      (`0xFFFF` fitting only a 16-bit field is the one width fact the
+      checklist text itself confirms); (2) this crate has no unified
+      endpoint busy/idle state type yet, so `should_count_trigger_occurrence`
+      takes busy/idle state as a caller-supplied, deliberately-ignored
+      `bool` parameter rather than reading real endpoint state — mirroring
+      `SequencerState`'s own caller-supplied-rather-than-read precedent.
+      Confirmed `src/gpio.rs`'s existing `GpioTriggerConfig`/
+      `GpioTriggerSignals`/`evaluate_gpio_triggers` is an unrelated,
+      narrower, already-built GPIO-specific edge-detection concept, not
+      reused or extended here. Additive standalone plumbing only, same
+      discipline as every prior Milestone 1-5 entry — not wired into any
+      decoder, dispatch loop, or the request-lifecycle state machine. New
+      `REQ-TRIG-001`..`REQ-TRIG-005` (in `src/request.rs`) added to
+      `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair;
+      `REQ-CMP-006`'s `.fusa-reqs.json` text updated to describe its new
+      `Option<u32>` return shape.
 - [ ] Chained (`0x01`): `cs`-bit abort-on-predecessor-error semantics;
       `CHAIN_ABORTED`/`CHAIN_ERROR`
 - [ ] Timed (`0x0A`): presentation-time execution as an alternative to a
