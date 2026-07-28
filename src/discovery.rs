@@ -36,7 +36,7 @@
 //!
 //! - The client-side discovery cache.
 //! - Wiring any of the below into an actual decoder, dispatch loop, or
-//!   [`crate::avtpdu`]/[`crate::acf`] caller — this module remains additive
+//!   [`crate::avtp`]/[`crate::acf`] caller — this module remains additive
 //!   standalone plumbing only, matching the discipline every prior
 //!   Milestone 1/2 entry already established. In particular,
 //!   [`DiscoveryClaim`]/[`try_claim_discovery_stream`]/
@@ -63,7 +63,7 @@
 //!   requirement. [`build_discovery_response`] calls this gate explicitly
 //!   (rather than assuming its always-true outcome) so that composition is
 //!   demonstrated and tested, not merely asserted.
-//! - [`crate::register_map::GeneralRegisters`] — register address 0's
+//! - [`crate::regmap::GeneralRegisters`] — register address 0's
 //!   field-level content (`svr_oa_tc18_magic_nr` and the rest of `§3.6`'s
 //!   table), reused as the discovery response payload's content rather than
 //!   inventing a new addressing scheme.
@@ -87,7 +87,7 @@
 //!   [`build_discovery_response`]'s own "answerable in **any** lifecycle
 //!   state" unconditional behavior.
 //! - Configuring the discovery stream ([`DiscoveryAccessKind::Configure`])
-//!   is restricted to whichever [`crate::avtpdu::StreamId`] currently holds
+//!   is restricted to whichever [`crate::avtp::StreamId`] currently holds
 //!   the live (not [`DiscoveryClaim::has_lapsed`]) claim: an unclaimed
 //!   stream, the live claimant itself, or any requester once the existing
 //!   claim has lapsed, may configure — exactly the same "who may act" rule
@@ -122,13 +122,13 @@
 //! - **Broadcast addressing.** `ROADMAP.md`'s own checklist wording states
 //!   that the discovery request must be "broadcastable" but does not name a
 //!   wire-level broadcast address convention, and
-//!   [`crate::avtpdu::StreamId`] has no broadcast/multicast concept of its
+//!   [`crate::avtp::StreamId`] has no broadcast/multicast concept of its
 //!   own (it is built as `sender_mac || unique_id`, always identifying one
 //!   specific sender). Rather than invent an out-of-band "this AVTPDU is a
 //!   broadcast" flag with no roadmap-named field to carry it, this module
 //!   reuses the reserved IEEE 802.3 all-ones Ethernet broadcast MAC address
 //!   (`FF:FF:FF:FF:FF:FF`) as `sender_mac`, paired with `unique_id == 0`,
-//!   as a single well-known sentinel [`crate::avtpdu::StreamId`] value: see
+//!   as a single well-known sentinel [`crate::avtp::StreamId`] value: see
 //!   [`DISCOVERY_BROADCAST_STREAM_ID`]. This is a crate-local sentinel
 //!   convention only, not a claim that a real TC18 RC Server recognizes
 //!   this exact `stream_id` value as "broadcast" on the wire.
@@ -142,14 +142,14 @@
 //!   roadmap has not named there, this module carries the register address
 //!   as a big-endian `u16` prefix of [`crate::acf::AcfAbbMessage::payload`]
 //!   ([`DISCOVERY_REGISTER_ADDRESS_LEN`] bytes wide, matching the crate's
-//!   existing big-endian convention — see [`crate::register_map`]'s own
+//!   existing big-endian convention — see [`crate::regmap`]'s own
 //!   `encode`/`decode` methods). This mirrors how a discovery *response*
-//!   already has to carry [`crate::register_map::GeneralRegisters::encode`]'s
+//!   already has to carry [`crate::regmap::GeneralRegisters::encode`]'s
 //!   fixed-length block somewhere, and payload is the only carrier this
 //!   crate's Milestone 1 framing offers either direction.
 //! - **Claim identity.** The roadmap names a "first-claimant rule" but does
 //!   not say what identifies a claimant. Rather than invent a new identity
-//!   type, this module reuses [`crate::avtpdu::StreamId`] — the same type
+//!   type, this module reuses [`crate::avtp::StreamId`] — the same type
 //!   [`DISCOVERY_BROADCAST_STREAM_ID`] above already models a sender
 //!   identity with — as the claimant identity
 //!   [`try_claim_discovery_stream`] compares against. The sentinel broadcast
@@ -200,10 +200,10 @@
 use std::time::{Duration, Instant};
 
 use crate::acf::{AcfAbbMessage, ByteMessageInfo};
-use crate::avtpdu::StreamId;
+use crate::avtp::StreamId;
 use crate::ep0::{access_kind, route_byte_bus_id, Ep0AccessKind, RequestRoute, EP0_BYTE_BUS_ID};
 use crate::lifecycle::{check_register_reachable, RcServerState, RegisterCategory};
-use crate::register_map::GeneralRegisters;
+use crate::regmap::GeneralRegisters;
 use crate::RcpError;
 
 // ── Broadcast addressing ─────────────────────────────────────────────────────
@@ -243,7 +243,7 @@ pub fn is_discovery_broadcast_stream_id(stream_id: StreamId) -> bool {
 pub const DISCOVERY_REGISTER_ADDRESS_LEN: usize = 2;
 
 /// The register address a discovery request targets: register address 0,
-/// the start of [`crate::register_map::GeneralRegisters`]'s block (which
+/// the start of [`crate::regmap::GeneralRegisters`]'s block (which
 /// itself begins with `svr_oa_tc18_magic_nr`).
 pub const DISCOVERY_REGISTER_ADDRESS: u16 = 0;
 
@@ -311,7 +311,7 @@ pub fn is_discovery_request(msg: &AcfAbbMessage) -> bool {
 /// "answerable in **any** lifecycle state" requirement is demonstrated and
 /// tested against the real gate, not merely asserted in a doc comment. The
 /// response payload is `general.encode()` verbatim (register address 0's
-/// full content, per [`crate::register_map::GeneralRegisters`]), and its
+/// full content, per [`crate::regmap::GeneralRegisters`]), and its
 /// `byte_message_info` header echoes `request`'s `byte_bus_id` per the
 /// existing echo-back rule ([`crate::acf::build_response_info`]).
 ///

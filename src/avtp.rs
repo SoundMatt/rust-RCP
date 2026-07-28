@@ -388,7 +388,7 @@ pub fn select_header_variant(
             decode_tscf_header(b).map(HeaderVariant::Tscf)
         }
         other => Err(RcpError::Other(format!(
-            "avtpdu: unrecognized subtype 0x{other:02X} (expected NTSCF 0x{NTSCF_SUBTYPE:02X} or TSCF 0x{TSCF_SUBTYPE:02X})"
+            "avtp: unrecognized subtype 0x{other:02X} (expected NTSCF 0x{NTSCF_SUBTYPE:02X} or TSCF 0x{TSCF_SUBTYPE:02X})"
         ))),
     }
 }

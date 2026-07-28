@@ -96,7 +96,7 @@ shared request-descriptor header that carries all per-message addressing.
 
 - [x] NTSCF header encode/decode (`ntscf_data_length`, `sequence_num`) — the
       only header variant an RC Server ever sends. Done (v0.4.0-dev):
-      `src/avtpdu.rs` adds `NtscfHeader { sequence_num, ntscf_data_length,
+      `src/avtp.rs` adds `NtscfHeader { sequence_num, ntscf_data_length,
       stream_id }` with `encode_ntscf_header`/`decode_ntscf_header`,
       round-tripping and never panicking on truncated/arbitrary input. This
       is a new, additive module — it does not yet replace `wire.rs` (no
@@ -109,7 +109,7 @@ shared request-descriptor header that carries all per-message addressing.
       Control Protocol Specification's behavior before being relied on for
       interop.
 - [x] TSCF header encode/decode (`avtp_timestamp`, `stream_data_length`) —
-      client-to-server only. Done (v0.4.0-dev): `src/avtpdu.rs` adds
+      client-to-server only. Done (v0.4.0-dev): `src/avtp.rs` adds
       `TscfHeader { sequence_num, avtp_timestamp, stream_data_length,
       stream_id }` with `encode_tscf_header`/`decode_tscf_header`,
       round-tripping and never panicking on truncated/arbitrary input,
@@ -127,7 +127,7 @@ shared request-descriptor header that carries all per-message addressing.
       interop.
 - [x] Header-variant selection/rejection rules: drop TSCF-headed AVTPDUs
       outright at a server with no time-sync support. Done (v0.4.0-dev):
-      `src/avtpdu.rs` adds `TimeSyncCapability { Capable, Incapable }` and
+      `src/avtp.rs` adds `TimeSyncCapability { Capable, Incapable }` and
       `HeaderVariant { Ntscf(NtscfHeader), Tscf(TscfHeader) }`, plus
       `select_header_variant(bytes, TimeSyncCapability) ->
       Result<HeaderVariant, RcpError>`, which peeks the leading subtype
@@ -178,14 +178,14 @@ shared request-descriptor header that carries all per-message addressing.
       interpretation, flagged in `src/acf.rs`'s provenance note for
       reconciliation against the OPEN Alliance TC18 Remote Control Protocol
       Specification's behavior before being relied on for interop. This is
-      additive alongside `avtpdu.rs` and does not yet wire either ACF
+      additive alongside `avtp.rs` and does not yet wire either ACF
       message type into an AVTPDU decoder or cut over any caller of
       `src/wire.rs` — that composition and cutover remain later work.
 
 ### Addressing
 
 - [x] `stream_id` construction/parsing (sender MAC + locally-assigned
-      unique-id suffix). Done (v0.4.0-dev): `src/avtpdu.rs` adds
+      unique-id suffix). Done (v0.4.0-dev): `src/avtp.rs` adds
       `StreamId { sender_mac: [u8; 6], unique_id: u16 }` plus the
       `build_stream_id`/`parse_stream_id` free-function pair it wraps
       (`StreamId::to_u64`/`StreamId::from_u64`, and `From`/`Into`
@@ -227,7 +227,7 @@ shared request-descriptor header that carries all per-message addressing.
       `acf::encode_byte_message_info`. Covered by round-trip, cross-stream
       non-collision, duplicate-registration-rejection, and
       never-panics-on-arbitrary-input tests. This is additive: it consumes
-      `StreamId` (`src/avtpdu.rs`) and `byte_bus_id` (`src/acf.rs`) as
+      `StreamId` (`src/avtp.rs`) and `byte_bus_id` (`src/acf.rs`) as
       inputs only, does not change either type's shape, and is not yet
       wired into any AVTPDU/ACF decoder or existing caller. The echo-back
       rule below is a separate item, now also done (see below).
@@ -309,10 +309,10 @@ shared request-descriptor header that carries all per-message addressing.
       `fuzz_wire_decode.rs`'s existing structure and CI wiring. It feeds the
       same arbitrary/truncated `data: &[u8]` slice through every
       byte-slice-accepting decode function this milestone added:
-      `avtpdu::decode_ntscf_header`, `avtpdu::decode_tscf_header`,
-      `avtpdu::select_header_variant` (under both `TimeSyncCapability`
+      `avtp::decode_ntscf_header`, `avtp::decode_tscf_header`,
+      `avtp::select_header_variant` (under both `TimeSyncCapability`
       outcomes), `acf::decode_byte_message_info`, `acf::decode_acf_abb`, and
-      `acf::decode_acf_gbb`, plus `avtpdu::StreamId::from_u64` for
+      `acf::decode_acf_gbb`, plus `avtp::StreamId::from_u64` for
       belt-and-suspenders coverage even though it takes a plain `u64` rather
       than a byte slice and so has no truncated-input shape to panic on.
       Every call is `let _ = ...;`, matching `fuzz_wire_decode.rs`'s
@@ -348,7 +348,7 @@ lifecycle machine and the register-map configuration model, replacing the
       `RcServerState`, a `#[repr(u8)]` enum with exactly these three
       variants and encodings, plus never-panicking `to_u8`/`from_u8`
       round-trip helpers (invalid bytes reject via `RcpError::Other`,
-      mirroring `avtpdu::select_header_variant`'s unrecognized-subtype
+      mirroring `avtp::select_header_variant`'s unrecognized-subtype
       handling). Register reachability is modeled as an explicit, queryable
       rule — `RegisterCategory` (`General`/`HwConfig`/`RcpConfig`, an
       abstract placeholder standing in for the not-yet-built Register Map)
@@ -507,7 +507,7 @@ lifecycle machine and the register-map configuration model, replacing the
       `check_ep0_access`. Since the concrete Register Map subsection that
       would define a real `svr_root_client_index` field is still unbuilt,
       the root client is represented as a plain
-      `Option<avtpdu::StreamId>` caller-supplied value rather than a
+      `Option<avtp::StreamId>` caller-supplied value rather than a
       dedicated register type — this crate's own working interpretation,
       flagged per Guiding Principle 5 in the module doc comment's
       Provenance note, along with the read/write scoping call and the
@@ -525,7 +525,7 @@ lifecycle machine and the register-map configuration model, replacing the
 - [x] Generic (server-owned) per-EP config block vs. common functional-config
       block vs. per-EP-type functional config — three distinct layers, not
       the old crate's single flat `ep_type`-less model. Done (v0.5.0-dev):
-      `src/register_map.rs` adds `EndpointType` (the thirteen `ep_type`
+      `src/regmap.rs` adds `EndpointType` (the thirteen `ep_type`
       codes `0x01`-`0x0D` named in Milestones 4 and 7, with
       `to_u8`/`from_u8` and `is_reserved` for `Dac`), `PerEpConfigBlock`
       (the generic per-EP layer, tagged by `ep_type`), `CommonFunctionalConfig`
@@ -549,11 +549,11 @@ lifecycle machine and the register-map configuration model, replacing the
       This is additive: like every prior Milestone 1/2 entry, nothing here
       is wired into `crate::ep0`, `crate::lifecycle`, or any other existing
       caller. New `REQ-RMAP-001`..`REQ-RMAP-006` added to `.fusa-reqs.json`,
-      each with a `// fusa:req`/`// fusa:test` pair in `src/register_map.rs`.
+      each with a `// fusa:req`/`// fusa:test` pair in `src/regmap.rs`.
 - [x] General register-map fields: `svr_oa_tc18_magic_nr`, `svr_version`,
       `svr_vendor_id`, `svr_device_id`, `svr_ep_count`,
       `svr_implemented_options`, and the rest of §3.6's table. Done
-      (v0.5.0-dev): `src/register_map.rs` adds `GeneralRegisters` — one
+      (v0.5.0-dev): `src/regmap.rs` adds `GeneralRegisters` — one
       field per row of this crate's own §3.6 general register-map table
       extraction, in table order, typed by each row's declared bit width
       (`u8`/`u16`/`u32`), starting with the six fields this bullet names
@@ -582,12 +582,12 @@ lifecycle machine and the register-map configuration model, replacing the
       `crate::lifecycle`'s reachability checks, or any other existing
       caller. New `REQ-RMAP-007`..`REQ-RMAP-011` added to
       `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair in
-      `src/register_map.rs`.
+      `src/regmap.rs`.
 - [x] Config tables: HW pin-mapping (§3.7), request-stream config (§3.8),
       EP-ID/`byte_bus_id` mapping (§3.9 — client-side ordering
       responsibility, no server-side safety net per spec), response/ack
       queue config (§3.10), sequencer-state registers (§3.11). Done
-      (v0.5.0-dev): `src/register_map.rs` adds one row-content type per
+      (v0.5.0-dev): `src/regmap.rs` adds one row-content type per
       table — `HwPinMappingEntry` (§3.7), `RequestStreamConfigEntry`
       (§3.8), `EpByteBusIdMapEntry` (§3.9), `ResponseStreamConfigEntry`
       (§3.10), `SequencerStateEntry` (§3.11) — each with never-panicking
@@ -617,7 +617,7 @@ lifecycle machine and the register-map configuration model, replacing the
       wired into `crate::ep0`'s dispatch path, `crate::lifecycle`'s
       reachability checks, or any other existing caller. New
       `REQ-RMAP-012`..`REQ-RMAP-027` added to `.fusa-reqs.json`, each with
-      a `// fusa:req`/`// fusa:test` pair in `src/register_map.rs`. This
+      a `// fusa:req`/`// fusa:test` pair in `src/regmap.rs`. This
       closes out the "Register Map" subsection.
 
 ### Error Model
@@ -641,7 +641,7 @@ lifecycle machine and the register-map configuration model, replacing the
       `EchoBackMismatch`, `RegisterUnreachable`, `HwCfgInconsistent`,
       `RcpCfgInconsistent`, `InvalidLifecycleTransition`, `RegisterLocked`,
       `RootClientRequired`, `EndpointTypeMismatch`) is retired: `lifecycle`,
-      `ep0`, `register_map`, `addressing`, `avtpdu`, and `acf`'s call sites
+      `ep0`, `regmap`, `addressing`, `avtp`, and `acf`'s call sites
       are all repointed at the new spec-named variants directly (a true
       rename, not an added indirection layer), since none of those ten
       sentinels had any caller outside this same set of Milestone 1/2
@@ -702,12 +702,12 @@ table — but it is not a substitute for this).
       for every `RcServerState`, demonstrating/testing the "answerable in
       any lifecycle state" requirement against the real gate rather than
       only asserting its always-true outcome; the response payload is
-      `register_map::GeneralRegisters::encode()` verbatim, register address
+      `regmap::GeneralRegisters::encode()` verbatim, register address
       0's field content, and its header echoes the request's `byte_bus_id`
       per the existing echo-back rule). Two working interpretations this
       item introduces are flagged per Guiding Principle 5 in the module's
       own provenance note rather than presented as spec-cited fact: (1)
-      "broadcastable" addressing, since `avtpdu::StreamId` has no
+      "broadcastable" addressing, since `avtp::StreamId` has no
       broadcast/multicast concept of its own — this crate reuses the
       reserved IEEE 802.3 all-ones Ethernet broadcast MAC paired with
       `unique_id 0` as a sentinel `DISCOVERY_BROADCAST_STREAM_ID`, checked
@@ -721,7 +721,7 @@ table — but it is not a substitute for this).
       complementary network-rendezvous helper the satellite disposition
       table already calls it. Like every prior Milestone 1/2 entry, this is
       additive standalone plumbing only — nothing here is wired into an
-      actual decoder, dispatch loop, or `avtpdu`/`acf` caller, and
+      actual decoder, dispatch loop, or `avtp`/`acf` caller, and
       discovery-stream claiming, multi-client coexistence, and the
       client-side cache (this subsection's remaining three checklist
       bullets) are untouched, separate, later work. New `REQ-DISC-001`..
@@ -730,7 +730,7 @@ table — but it is not a substitute for this).
 - [x] Discovery-stream claiming: first-claimant rule, `Discovery_TimeOut`
       (~20 ms default) lapse-and-reopen behavior. Done (v0.6.0-dev):
       `src/discovery.rs` extends its existing additive-only discipline with
-      `DiscoveryClaim` (plain data: a claimant `avtpdu::StreamId` plus the
+      `DiscoveryClaim` (plain data: a claimant `avtp::StreamId` plus the
       instant it was claimed/refreshed) and `try_claim_discovery_stream`
       (a pure function threading `Option<DiscoveryClaim>` state through
       explicitly — no timer thread, lock, or real-clock read of its own,
@@ -748,7 +748,7 @@ table — but it is not a substitute for this).
       different claimant; once lapsed, any claimant — including a new one
       — may claim it. Two working interpretations this item introduces are
       flagged per Guiding Principle 5 in the module's own provenance note:
-      (1) claim identity is modeled as `avtpdu::StreamId` (the same type
+      (1) claim identity is modeled as `avtp::StreamId` (the same type
       the broadcast-addressing sentinel already uses), with the sentinel
       `DISCOVERY_BROADCAST_STREAM_ID` itself always rejected as a claimant
       (`RcpError::InvalidParameter`) since a broadcast address names no
