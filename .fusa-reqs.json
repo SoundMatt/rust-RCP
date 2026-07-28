@@ -3492,6 +3492,51 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SID-001",
+      "title": "StreamId construct/parse model",
+      "text": "StreamId decomposes an opaque 64-bit AVTP stream_id into a sender MAC address and a locally-assigned unique-id suffix (and composes the reverse), via build_stream_id/parse_stream_id and the StreamId::to_u64/from_u64/From/Into wrappers around them",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SID-002",
+      "title": "stream_id round-trip",
+      "text": "build_stream_id composed with parse_stream_id recovers the original sender MAC address and unique-id suffix, including the all-zero and all-0xFF extremes",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SID-003",
+      "title": "stream_id bit layout",
+      "text": "build_stream_id places the sender MAC address in the upper 48 bits of the composed stream_id (most-significant octet first) and the unique-id suffix in the lower 16 bits",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SID-004",
+      "title": "parse_stream_id never panics",
+      "text": "parse_stream_id never panics for any u64 input value, across a swept range including the extremes",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SID-005",
+      "title": "StreamId interop with NTSCF/TSCF opaque field",
+      "text": "A StreamId composed to u64 and carried through NtscfHeader::stream_id or TscfHeader::stream_id's encode/decode round trip parses back to the original StreamId",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
