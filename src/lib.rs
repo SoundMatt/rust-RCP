@@ -103,6 +103,7 @@ pub mod proxy;
 pub mod ratelimit;
 pub mod record;
 pub mod redundancy;
+pub mod register_map;
 pub mod relay;
 pub mod restbridge;
 pub mod shmem;
@@ -470,6 +471,10 @@ pub enum RcpError {
 
     #[error("rcp/ep0: EP0 whole-register-map write access is restricted to the RC Server's designated root-client stream")]
     RootClientRequired,
+
+    // ── Register map errors ──────────────────────────────────────────────
+    #[error("rcp/register_map: per-EP-type functional config's EndpointType does not match the owning endpoint's declared ep_type")]
+    EndpointTypeMismatch,
 
     // ── General errors ───────────────────────────────────────────────────
     #[error("rcp: invalid size")]
