@@ -583,10 +583,42 @@ lifecycle machine and the register-map configuration model, replacing the
       caller. New `REQ-RMAP-007`..`REQ-RMAP-011` added to
       `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair in
       `src/register_map.rs`.
-- [ ] Config tables: HW pin-mapping (§3.7), request-stream config (§3.8),
+- [x] Config tables: HW pin-mapping (§3.7), request-stream config (§3.8),
       EP-ID/`byte_bus_id` mapping (§3.9 — client-side ordering
       responsibility, no server-side safety net per spec), response/ack
-      queue config (§3.10), sequencer-state registers (§3.11)
+      queue config (§3.10), sequencer-state registers (§3.11). Done
+      (v0.5.0-dev): `src/register_map.rs` adds one row-content type per
+      table — `HwPinMappingEntry` (§3.7), `RequestStreamConfigEntry`
+      (§3.8), `EpByteBusIdMapEntry` (§3.9), `ResponseStreamConfigEntry`
+      (§3.10), `SequencerStateEntry` (§3.11) — each with never-panicking
+      `encode`/`decode` to/from a fixed-length wire form and its own
+      `CATEGORY: lifecycle::RegisterCategory` cross-reference, matching
+      `TableDescriptor`/`GeneralRegisters`'s existing conventions. A
+      table's row count is not carried inside the row type: four of the
+      five already have it via their `GeneralRegisters` `TableDescriptor`
+      `capacity` field; `SequencerStateEntry` (whose `GeneralRegisters`
+      pointer is pointer-only) instead relies on `svr_sequencers_max`, per
+      this same subsection's earlier `GeneralRegisters` entry. A new
+      `ConfigTableRow` trait plus `encode_rows`/`decode_rows` give all five
+      row types one shared, generic way to pack/unpack a whole table as a
+      flat run of fixed-length rows instead of five duplicated chunking
+      loops. Per this bullet's own parenthetical, `EpByteBusIdMapEntry`
+      recognizes the documented end-of-table sentinel row
+      (`is_end_of_table`) but adds no ascending-order validation or
+      enforcement over a table's rows — maintaining that order remains
+      exclusively the writing client's responsibility, with no
+      server-side safety net invented here. Every field width not directly
+      traceable to this crate's own `§3.7`-`§3.11` extraction (which
+      records field names/purpose but no explicit bit-width table, unlike
+      `§3.6`) is this crate's own placeholder inference, flagged per
+      Guiding Principle 5 in the module doc comment's "Config tables
+      provenance note" rather than presented as settled fact. This is
+      additive: like every prior Milestone 1/2 entry, nothing here is
+      wired into `crate::ep0`'s dispatch path, `crate::lifecycle`'s
+      reachability checks, or any other existing caller. New
+      `REQ-RMAP-012`..`REQ-RMAP-027` added to `.fusa-reqs.json`, each with
+      a `// fusa:req`/`// fusa:test` pair in `src/register_map.rs`. This
+      closes out the "Register Map" subsection.
 
 ### Error Model
 

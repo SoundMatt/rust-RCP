@@ -3969,6 +3969,150 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-012",
+      "title": "HwPinMappingEntry models the §3.7 per-pin mapping row",
+      "text": "HwPinMappingEntry carries hw_ep_nr, hw_ep_pin_nr, and an undecomposed hw_pin_props byte, and reports CATEGORY == lifecycle::RegisterCategory::HwConfig",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-013",
+      "title": "HwPinMappingEntry encode/decode round-trip",
+      "text": "HwPinMappingEntry::encode/decode round-trip every field exactly via a fixed-length big-endian wire form, and decode ignores any trailing bytes beyond ENCODED_LEN",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-014",
+      "title": "HwPinMappingEntry decode rejects short input and never panics",
+      "text": "HwPinMappingEntry::decode returns Err(RcpError::ShortFrame) for every input shorter than ENCODED_LEN and never panics for any input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-015",
+      "title": "RequestStreamConfigEntry models the §3.8 per-stream config row",
+      "text": "RequestStreamConfigEntry carries rx_stream_id and the remaining fifteen per-stream fields this crate's own §3.8 extraction names, and reports CATEGORY == lifecycle::RegisterCategory::RcpConfig",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-016",
+      "title": "RequestStreamConfigEntry encode/decode round-trip",
+      "text": "RequestStreamConfigEntry::encode/decode round-trip every field exactly (including all-default and all-max-value instances) via a fixed-length big-endian wire form, and decode ignores any trailing bytes beyond ENCODED_LEN",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-017",
+      "title": "RequestStreamConfigEntry decode rejects short input and never panics",
+      "text": "RequestStreamConfigEntry::decode returns Err(RcpError::ShortFrame) for every input shorter than ENCODED_LEN and never panics for any input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-018",
+      "title": "EpByteBusIdMapEntry models the §3.9 stream/byte_bus_id-to-endpoint row and its end-of-table sentinel",
+      "text": "EpByteBusIdMapEntry carries map_stream_index, map_byte_bus_id, and map_ep_nr, reports CATEGORY == lifecycle::RegisterCategory::RcpConfig, and is_end_of_table returns true iff map_stream_index == END_OF_TABLE_STREAM_INDEX (0); this module defines no ascending-order validation or enforcement over a table's rows",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-019",
+      "title": "EpByteBusIdMapEntry encode/decode round-trip",
+      "text": "EpByteBusIdMapEntry::encode/decode round-trip every field exactly via a fixed-length big-endian wire form, and decode ignores any trailing bytes beyond ENCODED_LEN",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-020",
+      "title": "EpByteBusIdMapEntry decode rejects short input and never panics",
+      "text": "EpByteBusIdMapEntry::decode returns Err(RcpError::ShortFrame) for every input shorter than ENCODED_LEN and never panics for any input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-021",
+      "title": "ResponseStreamConfigEntry models the §3.10 response/ack queue config row",
+      "text": "ResponseStreamConfigEntry carries resp_stream_uid, resp_max_avtpdu_size, resp_queue_size, resp_flush_on_count, and resp_flush_time, and reports CATEGORY == lifecycle::RegisterCategory::RcpConfig",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-022",
+      "title": "ResponseStreamConfigEntry encode/decode round-trip",
+      "text": "ResponseStreamConfigEntry::encode/decode round-trip every field exactly via a fixed-length big-endian wire form, and decode ignores any trailing bytes beyond ENCODED_LEN",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-023",
+      "title": "ResponseStreamConfigEntry decode rejects short input and never panics",
+      "text": "ResponseStreamConfigEntry::decode returns Err(RcpError::ShortFrame) for every input shorter than ENCODED_LEN and never panics for any input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-024",
+      "title": "SequencerStateEntry models the §3.11 per-sequencer state register and its power-on default",
+      "text": "SequencerStateEntry carries seq_state, reports CATEGORY == lifecycle::RegisterCategory::RcpConfig, and power_on_default() returns seq_state == 1",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-025",
+      "title": "SequencerStateEntry encode/decode round-trip",
+      "text": "SequencerStateEntry::encode/decode round-trip every field exactly via a fixed-length wire form, and decode ignores any trailing bytes beyond ENCODED_LEN",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-026",
+      "title": "SequencerStateEntry decode rejects short input and never panics",
+      "text": "SequencerStateEntry::decode returns Err(RcpError::ShortFrame) for every input shorter than ENCODED_LEN and never panics for any input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-027",
+      "title": "Generic config-table row encode_rows/decode_rows round-trip and never panic",
+      "text": "encode_rows/decode_rows round-trip an arbitrary-length row slice for each of HwPinMappingEntry, RequestStreamConfigEntry, EpByteBusIdMapEntry, ResponseStreamConfigEntry, and SequencerStateEntry, decode_rows returns Err(RcpError::ShortFrame) when the input length is not an exact multiple of the row's ROW_LEN, and never panics for any input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
