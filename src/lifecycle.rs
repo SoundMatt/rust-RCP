@@ -3,10 +3,13 @@
 // fusa:req REQ-LIFE-003
 // fusa:req REQ-LIFE-004
 // fusa:req REQ-LIFE-005
+// fusa:req REQ-LIFE-006
+// fusa:req REQ-LIFE-007
+// fusa:req REQ-LIFE-008
 
 //! RC Server lifecycle state machine — TC18 register-map model
 //! (`ROADMAP.md` Milestone 2, "Lifecycle State Machine" subsection, first
-//! checklist item).
+//! two checklist items).
 //!
 //! This module begins Milestone 2, which replaces the legacy
 //! `Zone`/`Controller`/`Registry` abstraction with a first-class RC Server
@@ -14,20 +17,17 @@
 //! built on a foundation that will itself change later ... lifecycle model
 //! and register-map split before endpoints"), the lifecycle model comes
 //! first: [`RcServerState`] is the three-state machine every RC Server is
-//! in at all times, and [`RegisterCategory`]/[`is_register_reachable`] give
+//! in at all times, [`RegisterCategory`]/[`is_register_reachable`] give
 //! that state machine its first, coarsest teeth — which broad class of
-//! register can be touched at all in each state.
+//! register can be touched at all in each state — and
+//! [`RcServerState::try_transition`]/[`is_transition_defined`] give it its
+//! second: which moves between states are even structurally allowed, and
+//! under what caller-supplied consistency guard.
 //!
-//! This is deliberately the *first* of four "Lifecycle State Machine"
-//! checklist items and stops well short of the other three, which are
-//! separate, later work:
+//! This module now covers the *first two* of four "Lifecycle State
+//! Machine" checklist items and stops well short of the remaining two,
+//! which are separate, later work:
 //!
-//! - Transition **guard checks** (`HW_CFG_INCONSISTENT`,
-//!   `RCP_CFG_INCONSISTENT`) that gate whether a state transition is
-//!   actually allowed to happen. This module models the states and what is
-//!   reachable *within* a state; it does not yet model transitions between
-//!   them at all — there is intentionally no `RcServerState::advance()` or
-//!   similar here.
 //! - **Register-locking-by-state**, including the `W`/`W*` distinction
 //!   (permanently locked once `RCP_CONFIGURED`). [`is_register_reachable`]
 //!   answers "is this category of register touchable at all right now" —
@@ -37,6 +37,14 @@
 //!   be write-locked by that later rule; this module has no opinion on
 //!   that distinction.
 //! - The **demotion path** from `HW_CONFIGURED` back to `HW_UNCONFIGURED`.
+//!   [`RcServerState::try_transition`] deliberately implements only the two
+//!   *forward* transitions (`HW_UNCONFIGURED` -> `HW_CONFIGURED` and
+//!   `HW_CONFIGURED` -> `RCP_CONFIGURED`); every other `(from, to)` pair —
+//!   including this demotion path, any full rollback to `HW_UNCONFIGURED`,
+//!   skipping `HW_CONFIGURED` entirely, or staying in the same state — is
+//!   rejected with `RcpError::InvalidLifecycleTransition` because it is
+//!   not yet implemented here, not because this module has evaluated it
+//!   and found it illegal. The later demotion-path item may relax that.
 //!
 //! Also out of scope, as later subsections of the same milestone: EP0 (the
 //! RC-Server-as-endpoint whole-register-map read/write path) and the
@@ -46,7 +54,16 @@
 //! concrete registers the Register Map subsection eventually defines,
 //! grouped this way" — it names no concrete field, mirroring how
 //! [`crate::addressing::EndpointId`] stood in for a concrete endpoint type
-//! ahead of Milestone 4.
+//! ahead of Milestone 4. [`RcServerState::try_transition`]'s
+//! `is_consistent` closure parameter plays the same placeholder role for
+//! the `HW_CFG_INCONSISTENT`/`RCP_CFG_INCONSISTENT` guards: this crate has
+//! no register map yet to actually validate hardware or RCP-level
+//! configuration against, so the concrete consistency criteria are left to
+//! the caller (mirroring [`crate::formal::Invariant`]'s caller-supplied
+//! predicate shape) rather than guessed at here. Whatever eventually
+//! supplies a real predicate — the Register Map work, or the endpoints
+//! that sit on top of it — is this module's problem to wire up later, not
+//! this item's to invent.
 //!
 //! This module is additive and does not touch [`crate::config`] (the old,
 //! disposition-REPLACE `RcpConfig` model) or any other existing caller,
@@ -94,6 +111,40 @@
 //! working interpretation, pending reconciliation against the
 //! specification's actual behavior (never its prose) before being relied
 //! on for interop with a real TC18 RC Server.
+//!
+//! [`RcServerState::try_transition`] and [`is_transition_defined`] go a
+//! similar step further than the roadmap text, again as this crate's own
+//! working interpretation rather than a transcription of specified
+//! behavior:
+//!
+//! - That exactly the *two forward* transitions named by the two guards
+//!   (`HW_UNCONFIGURED` -> `HW_CONFIGURED`, `HW_CONFIGURED` ->
+//!   `RCP_CONFIGURED`) are structurally legal, and every other `(from,
+//!   to)` pair is rejected outright, is inferred from the roadmap
+//!   checklist ordering the two guard names alongside exactly those two
+//!   transitions and calling out the demotion path as a distinct, later
+//!   item — read together, that is this crate's evidence that no other
+//!   transition (including staying put) is meant to succeed via this
+//!   function.
+//! - Neither guard's actual pass/fail criterion is defined anywhere in
+//!   this crate yet — no register-map fields exist to validate hardware or
+//!   RCP-level configuration against, since the Register Map subsection is
+//!   later work in this same milestone. `try_transition` therefore takes
+//!   the consistency check as a caller-supplied `is_consistent: impl
+//!   FnOnce() -> bool` closure rather than evaluating anything itself; the
+//!   two new `RcpError` sentinels it can return
+//!   (`RcpError::HwCfgInconsistent`, `RcpError::RcpCfgInconsistent`) are
+//!   named after the guards for traceability but, like
+//!   `RcpError::RegisterUnreachable` before them, are this crate's own
+//!   provisional names pending the milestone's later "Error Model" item.
+//!   `RcpError::InvalidLifecycleTransition` (for any `(from, to)` pair
+//!   outside the two defined transitions) is the same kind of provisional
+//!   sentinel.
+//!
+//! Both points are flagged per Guiding Principle 5 as this crate's own
+//! working interpretation, pending reconciliation against the
+//! specification's actual behavior (never its prose) before being relied
+//! on for interop with a real TC18 RC Server.
 
 use crate::RcpError;
 
@@ -103,8 +154,9 @@ use crate::RcpError;
 /// Milestone 2.
 ///
 /// See this module's doc comment for the numeric encodings' provenance and
-/// for the transition guards, register-locking distinction, and demotion
-/// path this type deliberately does *not* yet model.
+/// for the register-locking distinction and demotion path this type
+/// deliberately does *not* yet model. See [`RcServerState::try_transition`]
+/// for the guarded transitions this type *does* model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 // fusa:req REQ-LIFE-001
@@ -240,6 +292,89 @@ pub fn check_register_reachable(
     }
 }
 
+// ── Lifecycle transitions ────────────────────────────────────────────────────
+
+/// Is `(from, to)` one of the two forward transitions this crate currently
+/// implements a guard for?
+///
+/// This is the coarse, state-shape check [`RcServerState::try_transition`]
+/// performs before it ever considers a caller-supplied consistency
+/// predicate — it says nothing about whether the hardware or RCP-level
+/// configuration being applied is actually consistent, only whether
+/// `(from, to)` is a transition shape this crate implements at all. Every
+/// pair other than the two named here is `false`, including staying in the
+/// same state, moving backward, skipping `HW_CONFIGURED` entirely, or the
+/// `HW_CONFIGURED` -> `HW_UNCONFIGURED` demotion path (a separate, later
+/// roadmap item — see this module's doc comment). Never panics for any
+/// input.
+// fusa:req REQ-LIFE-006
+pub fn is_transition_defined(from: RcServerState, to: RcServerState) -> bool {
+    matches!(
+        (from, to),
+        (RcServerState::HwUnconfigured, RcServerState::HwConfigured)
+            | (RcServerState::HwConfigured, RcServerState::RcpConfigured)
+    )
+}
+
+impl RcServerState {
+    /// Attempt to move this RC Server from its current state (`self`) to
+    /// `target`.
+    ///
+    /// Only the two forward transitions named by `ROADMAP.md`'s
+    /// `HW_CFG_INCONSISTENT`/`RCP_CFG_INCONSISTENT` guards are implemented:
+    ///
+    /// - `HW_UNCONFIGURED` -> `HW_CONFIGURED`, guarded by the
+    ///   `HW_CFG_INCONSISTENT` check
+    /// - `HW_CONFIGURED` -> `RCP_CONFIGURED`, guarded by the
+    ///   `RCP_CFG_INCONSISTENT` check
+    ///
+    /// For either of those two shapes, `is_consistent` is invoked exactly
+    /// once: if it returns `true`, the transition succeeds and `Ok(target)`
+    /// is returned; if it returns `false`, the matching guard sentinel
+    /// (`RcpError::HwCfgInconsistent` or `RcpError::RcpCfgInconsistent`)
+    /// is returned and `self` is left unchanged (this method takes `self`
+    /// by value and returns the *new* state on success — it does not
+    /// mutate anything in place).
+    ///
+    /// For every other `(self, target)` pair — see [`is_transition_defined`]
+    /// for the exact rule — `is_consistent` is never invoked at all, and
+    /// `Err(RcpError::InvalidLifecycleTransition)` is returned instead, per
+    /// this module's doc comment on why that includes the demotion path
+    /// rather than that path being evaluated and rejected on its merits.
+    ///
+    /// This crate has no register map yet to derive a real consistency
+    /// check from (see this module's doc comment's Provenance note), so
+    /// `is_consistent` is deliberately a caller-supplied placeholder,
+    /// mirroring [`crate::formal::Invariant`]'s predicate shape. Never
+    /// panics for any input, including a `target` equal to `self`.
+    // fusa:req REQ-LIFE-006
+    // fusa:req REQ-LIFE-007
+    // fusa:req REQ-LIFE-008
+    pub fn try_transition(
+        self,
+        target: Self,
+        is_consistent: impl FnOnce() -> bool,
+    ) -> Result<Self, RcpError> {
+        match (self, target) {
+            (Self::HwUnconfigured, Self::HwConfigured) => {
+                if is_consistent() {
+                    Ok(target)
+                } else {
+                    Err(RcpError::HwCfgInconsistent)
+                }
+            }
+            (Self::HwConfigured, Self::RcpConfigured) => {
+                if is_consistent() {
+                    Ok(target)
+                } else {
+                    Err(RcpError::RcpCfgInconsistent)
+                }
+            }
+            _ => Err(RcpError::InvalidLifecycleTransition),
+        }
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  Tests
 // ─────────────────────────────────────────────────────────────────────────────
@@ -366,6 +501,121 @@ mod tests {
             for category in ALL_CATEGORIES {
                 let _ = is_register_reachable(state, category);
                 let _ = check_register_reachable(state, category);
+            }
+        }
+    }
+
+    // ── Transition guard: which shapes are defined ───────────────────────
+
+    #[test]
+    // fusa:test REQ-LIFE-006
+    fn is_transition_defined_true_only_for_the_two_forward_transitions() {
+        for from in ALL_STATES {
+            for to in ALL_STATES {
+                let defined = is_transition_defined(from, to);
+                let expected = matches!(
+                    (from, to),
+                    (RcServerState::HwUnconfigured, RcServerState::HwConfigured)
+                        | (RcServerState::HwConfigured, RcServerState::RcpConfigured)
+                );
+                assert_eq!(defined, expected, "{from:?} -> {to:?}");
+            }
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-LIFE-006
+    fn try_transition_success_agrees_with_is_transition_defined_when_guard_passes() {
+        for from in ALL_STATES {
+            for to in ALL_STATES {
+                let defined = is_transition_defined(from, to);
+                let result = from.try_transition(to, || true);
+                assert_eq!(result.is_ok(), defined, "{from:?} -> {to:?}");
+            }
+        }
+    }
+
+    // ── Transition guard: round-trip on the two defined transitions ──────
+
+    #[test]
+    // fusa:test REQ-LIFE-007
+    fn hw_unconfigured_to_hw_configured_succeeds_when_guard_passes() {
+        let result =
+            RcServerState::HwUnconfigured.try_transition(RcServerState::HwConfigured, || true);
+        assert_eq!(result, Ok(RcServerState::HwConfigured));
+    }
+
+    #[test]
+    // fusa:test REQ-LIFE-007
+    fn hw_unconfigured_to_hw_configured_rejected_when_guard_fails() {
+        let result =
+            RcServerState::HwUnconfigured.try_transition(RcServerState::HwConfigured, || false);
+        assert_eq!(result, Err(RcpError::HwCfgInconsistent));
+    }
+
+    #[test]
+    // fusa:test REQ-LIFE-007
+    fn hw_configured_to_rcp_configured_succeeds_when_guard_passes() {
+        let result =
+            RcServerState::HwConfigured.try_transition(RcServerState::RcpConfigured, || true);
+        assert_eq!(result, Ok(RcServerState::RcpConfigured));
+    }
+
+    #[test]
+    // fusa:test REQ-LIFE-007
+    fn hw_configured_to_rcp_configured_rejected_when_guard_fails() {
+        let result =
+            RcServerState::HwConfigured.try_transition(RcServerState::RcpConfigured, || false);
+        assert_eq!(result, Err(RcpError::RcpCfgInconsistent));
+    }
+
+    // ── Transition guard: rejection of every undefined transition ────────
+
+    #[test]
+    // fusa:test REQ-LIFE-008
+    fn undefined_transitions_are_rejected_without_consulting_the_guard() {
+        let undefined_pairs = [
+            // Full rollback in one step.
+            (RcServerState::RcpConfigured, RcServerState::HwUnconfigured),
+            // Skipping HW_CONFIGURED entirely.
+            (RcServerState::HwUnconfigured, RcServerState::RcpConfigured),
+            // The demotion path — a separate, later roadmap item, not
+            // implemented by this function (see this module's doc comment).
+            (RcServerState::HwConfigured, RcServerState::HwUnconfigured),
+            // A single-step backward move.
+            (RcServerState::RcpConfigured, RcServerState::HwConfigured),
+            // Staying in the same state, for all three states.
+            (RcServerState::HwUnconfigured, RcServerState::HwUnconfigured),
+            (RcServerState::HwConfigured, RcServerState::HwConfigured),
+            (RcServerState::RcpConfigured, RcServerState::RcpConfigured),
+        ];
+        for (from, to) in undefined_pairs {
+            let mut guard_called = false;
+            let result = from.try_transition(to, || {
+                guard_called = true;
+                true
+            });
+            assert_eq!(
+                result,
+                Err(RcpError::InvalidLifecycleTransition),
+                "{from:?} -> {to:?}"
+            );
+            assert!(
+                !guard_called,
+                "guard should not be consulted for undefined transition {from:?} -> {to:?}"
+            );
+        }
+    }
+
+    // ── Fuzz-style: arbitrary (state, state, guard-result) never panics ──
+
+    #[test]
+    // fusa:test REQ-LIFE-008
+    fn try_transition_never_panics_for_any_state_pair_or_guard_result() {
+        for from in ALL_STATES {
+            for to in ALL_STATES {
+                let _ = from.try_transition(to, || true);
+                let _ = from.try_transition(to, || false);
             }
         }
     }
