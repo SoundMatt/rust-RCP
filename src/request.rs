@@ -10,43 +10,52 @@
 // fusa:req REQ-TRIG-003
 // fusa:req REQ-TRIG-004
 // fusa:req REQ-TRIG-005
+// fusa:req REQ-CHAIN-001
+// fusa:req REQ-CHAIN-002
+// fusa:req REQ-CHAIN-003
 
-//! Conditional-request taxonomy: compound / compound-wait (`0x0F`/`0x0B`)
-//! and triggered (`0x0E`) — `ROADMAP.md` Milestone 5 ("Conditional
-//! Requests & Sequencers"), first and second checklist bullets. The first
-//! bullet covers sequencer-gated execution and wait, with
-//! `cmp_exec_delay`/`cmpw_exec_delay` timers and the "advance sequencer
-//! only if still in start state" rule. The second covers trigger-occurrence
-//! counting that runs independent of the target endpoint's busy/idle
-//! state, the `trigger_exec_delay` timer, and the infinite-repeat sentinel
-//! (`0xFFFF`).
+//! Conditional-request taxonomy: compound / compound-wait (`0x0F`/`0x0B`),
+//! triggered (`0x0E`), and chained (`0x01`) — `ROADMAP.md` Milestone 5
+//! ("Conditional Requests & Sequencers"), first, second, and third
+//! checklist bullets. The first bullet covers sequencer-gated execution
+//! and wait, with `cmp_exec_delay`/`cmpw_exec_delay` timers and the
+//! "advance sequencer only if still in start state" rule. The second
+//! covers trigger-occurrence counting that runs independent of the target
+//! endpoint's busy/idle state, the `trigger_exec_delay` timer, and the
+//! infinite-repeat sentinel (`0xFFFF`). The third covers the `cs`-bit
+//! abort-on-predecessor-error semantics that gate whether a chained
+//! request's remaining links continue after an earlier link errors, plus
+//! the two new `CHAIN_ABORTED`/`CHAIN_ERROR` error codes that checklist
+//! bullet names.
 //!
 //! Compound/compound-wait was the opening item of Milestone 5, and the
 //! first thing to land in `src/request.rs` — the module name the
 //! naming-reconciliation pass (issue #35, PR #37, "refactor: reconcile
 //! module naming with RELAY spec v1.14 §13.7.2") reserved for this
 //! milestone's request-kind/taxonomy work, mirroring `fragment.rs`'s own
-//! reservation for Milestone 8. Triggered is the second, added here. Three
-//! of this milestone's remaining checklist items (Chained, Timed, and the
-//! cancellation trio, plus the "Standard"/unconditional kind implied by the
-//! spec's own execution-priority ordering) are still expected to extend
+//! reservation for Milestone 8. Triggered is the second, added there.
+//! Chained is the third, added here. Two of this milestone's remaining
+//! checklist items (Timed, and the cancellation trio, plus the
+//! "Standard"/unconditional kind implied by the spec's own
+//! execution-priority ordering) are still expected to extend
 //! [`RequestKind`] and add sibling sections to this module; none of that is
 //! attempted here. Same "additive standalone plumbing only" discipline as
-//! every prior Milestone 1-4 entry, and as the compound/compound-wait work
-//! immediately above: nothing here is wired into a decoder, dispatch loop,
-//! or request-lifecycle state machine. The old `src/prioqueue.rs`
+//! every prior Milestone 1-4 entry, and as the compound/compound-wait and
+//! triggered work above: nothing here is wired into a decoder, dispatch
+//! loop, or request-lifecycle state machine. The old `src/prioqueue.rs`
 //! `Zone`/`Command`/`Controller`/`Priority` decorator this milestone's own
 //! Goal text names as the eventual absorption target for "picking which
 //! pending request runs next" is read only as background for this change,
 //! not extended or touched.
 //!
-//! Seven named pieces are in scope, all implemented here:
+//! Nine named pieces are in scope, all implemented here:
 //!
-//! - [`RequestKind`] — the request-type discriminant, now covering three
-//!   values ([`RequestKind::Compound`] = `0x0F`, [`RequestKind::CompoundWait`]
-//!   = `0x0B`, [`RequestKind::Triggered`] = `0x0E`). See "Provenance note:
-//!   `RequestKind`'s wire placement" below for why this is modeled as a
-//!   standalone value type, not yet tied to a decoded byte offset.
+//! - [`RequestKind`] — the request-type discriminant, now covering four
+//!   values ([`RequestKind::Chained`] = `0x01`, [`RequestKind::CompoundWait`]
+//!   = `0x0B`, [`RequestKind::Triggered`] = `0x0E`, [`RequestKind::Compound`]
+//!   = `0x0F`). See "Provenance note: `RequestKind`'s wire placement" below
+//!   for why this is modeled as a standalone value type, not yet tied to a
+//!   decoded byte offset.
 //! - [`CompoundGateConfig`] / [`SequencerState`] /
 //!   [`check_sequencer_num_in_bounds`] / [`is_gate_satisfied`] /
 //!   [`check_compound_gate`] — the sequencer-gating rule: a compound(-wait)
@@ -83,14 +92,23 @@
 //!   following this module's own `advance_sequencer_if_still_in_start_state`
 //!   precedent. See "Provenance note: busy/idle independence as a
 //!   caller-supplied parameter" below.
+//! - [`check_chain_continuation`] — the `cs`-bit abort-on-predecessor-error
+//!   rule: whether a chained request's next link runs, given the already
+//!   decoded [`crate::acf::ByteMessageInfo::cs`] flag for that link and
+//!   whether the chain's preceding link errored. See "Provenance note: the
+//!   `cs` bit's chained-request meaning" below.
+//! - [`crate::RcpError::ChainAborted`] / [`crate::RcpError::ChainError`] —
+//!   the two new `CHAIN_ABORTED`/`CHAIN_ERROR` error codes this checklist
+//!   bullet names, added to [`crate::RcpError`] in `src/lib.rs`. See
+//!   "Provenance note: `CHAIN_ABORTED`/`CHAIN_ERROR` as new variants, and
+//!   the distinction between them" below.
 //!
 //! Deliberately out of scope:
 //!
-//! - The other three request kinds this milestone's checklist still names
-//!   (Chained, Timed, and the cancellation trio), and the "Standard"
-//!   (unconditional) kind implicit in the spec's own priority ordering.
-//!   [`RequestKind`] intentionally leaves room for them but does not add
-//!   them.
+//! - The other two request kinds this milestone's checklist still names
+//!   (Timed and the cancellation trio), and the "Standard" (unconditional)
+//!   kind implicit in the spec's own priority ordering. [`RequestKind`]
+//!   intentionally leaves room for them but does not add them.
 //! - The persistent 8-bit sequencer-state register machine itself
 //!   (`ROADMAP.md` Milestone 5's own "Sequencers" checklist bullet, not yet
 //!   built). Every function here that needs a sequencer's current state
@@ -111,9 +129,9 @@
 //!
 //! ## Provenance note: `RequestKind`'s wire placement
 //!
-//! `ROADMAP.md`'s checklist bullets name `0x0F`/`0x0B`/`0x0E` as the
-//! compound, compound-wait, and triggered discriminant values, but —
-//! unlike `acf_msg_type` ([`crate::acf::ACF_ABB_MSG_TYPE`]/
+//! `ROADMAP.md`'s checklist bullets name `0x0F`/`0x0B`/`0x0E`/`0x01` as the
+//! compound, compound-wait, triggered, and chained discriminant values, but
+//! — unlike `acf_msg_type` ([`crate::acf::ACF_ABB_MSG_TYPE`]/
 //! [`crate::acf::ACF_GBB_MSG_TYPE`]), whose byte offset within an ACF
 //! message header this crate already pinned down in Milestone 1 — no
 //! checklist text anywhere in this crate's roadmap states which byte or
@@ -123,8 +141,9 @@
 //! named numeric values as the checklist text is, and no more: it is not
 //! attached to any offset within [`crate::acf::ByteMessageInfo`] or any
 //! other already-built wire shape, and no such offset is guessed here. This
-//! reasoning is unchanged by adding [`RequestKind::Triggered`]; it is
-//! simply a third value under the same still-open question.
+//! reasoning is unchanged by adding [`RequestKind::Triggered`] or
+//! [`RequestKind::Chained`]; each is simply one more value under the same
+//! still-open question.
 //!
 //! ## Provenance note: `start_state` and the not-yet-built sequencer-state
 //! machine
@@ -213,6 +232,72 @@
 //! arming for the GPIO endpoint type specifically — and are unrelated to
 //! this request-kind-level Triggered (`0x0E`) mechanism; nothing here
 //! reuses or extends them.
+//!
+//! ## Provenance note: the `cs` bit's chained-request meaning
+//!
+//! [`crate::acf::ByteMessageInfo::cs`] was decoded in Milestone 1 as a
+//! standalone header flag; that module's own doc comment names it only as
+//! one of the shared ACF header's flag bits, with no consumer anywhere in
+//! this crate reading it for any semantic purpose. This checklist bullet is
+//! the first to give `cs` a stated meaning — gating whether a chained
+//! request's remaining links keep running after an earlier link errors —
+//! but names that meaning only for a request carrying
+//! [`RequestKind::Chained`]; nothing in `ROADMAP.md` states whether `cs`
+//! means anything at all for the other three [`RequestKind`] values, or for
+//! requests generally. [`check_chain_continuation`] therefore takes `cs` as
+//! a plain caller-supplied `bool` — this module does not assume the caller
+//! has already confirmed the request it came from is
+//! [`RequestKind::Chained`], and does not itself branch on
+//! [`RequestKind`] at all, mirroring [`is_gate_satisfied`]'s own
+//! kind-agnostic, caller-supplied-context style. Whether `cs` retains its
+//! Milestone-1 "checksum-present" reading simultaneously, or whether that
+//! reading was itself only ever this crate's own placeholder guess pending
+//! this exact item, is left unresolved here per Guiding Principle 5 — no
+//! `crate::acf` code is changed by this item.
+//!
+//! ## Provenance note: `CHAIN_ABORTED`/`CHAIN_ERROR` as new variants, and the
+//! distinction between them
+//!
+//! `ROADMAP.md` Milestone 2's own "Error Model" item closed out
+//! [`crate::RcpError`]'s eleven spec-named codes
+//! ([`crate::RcpError::UnsupportedCmd`] through
+//! [`crate::RcpError::InvalidParameter`]) and explicitly deferred "the
+//! timing- and CRC-specific codes wired in by later milestones" — see that
+//! enum's own doc comment. `CHAIN_ABORTED`/`CHAIN_ERROR` are the first such
+//! later-milestone codes to actually land. Per Guiding Principle 5, this
+//! item checked whether either name plausibly collapses onto one of the
+//! eleven already-defined variants the way UART's `UNKNOWN_CMD` collapsed
+//! onto [`crate::RcpError::UnsupportedCmd`] (Milestone 4) or the way
+//! Milestone 2's own mapping table folded several provisional sentinels
+//! onto spec-named codes: [`crate::RcpError::RequestRejected`] is the
+//! closest existing candidate (both describe a request that does not
+//! execute), but the eleven-name list's own `REQUEST_REJECTED` reading —
+//! rejected outright, before any execution begins — does not capture
+//! `CHAIN_ABORTED`'s more specific "this link was skipped mid-chain because
+//! an earlier link in the same chain errored" shape, nor `CHAIN_ERROR`'s
+//! "this link ran and failed" shape. Neither collapses cleanly, so both are
+//! added as two new [`crate::RcpError`] variants rather than folded onto an
+//! existing one.
+//!
+//! `ROADMAP.md`'s checklist text names both codes side by side but does not
+//! spell out what distinguishes them. This crate's working interpretation,
+//! flagged here rather than silently assumed: [`crate::RcpError::ChainError`]
+//! is read as "this chain link's own execution failed", the per-link
+//! failure outcome [`check_chain_continuation`]'s `predecessor_errored`
+//! parameter is fed for the *next* link's check; [`crate::RcpError::ChainAborted`]
+//! is read as "this chain link did not run at all, because
+//! [`check_chain_continuation`]'s `cs`-bit rule aborted it on account of an
+//! earlier link's [`crate::RcpError::ChainError`]". Under that reading,
+//! [`check_chain_continuation`] — the only chain-related function this item
+//! builds — can only ever construct [`crate::RcpError::ChainAborted`];
+//! [`crate::RcpError::ChainError`] is added for naming completeness per the
+//! checklist's own pairing of the two codes, but is not constructed
+//! anywhere in this crate yet, mirroring Milestone 2's own precedent of
+//! reserving [`crate::RcpError::SequencerNotKnown`],
+//! [`crate::RcpError::RequestCanceled`], [`crate::RcpError::RequestNotFound`],
+//! [`crate::RcpError::EpNotFound`], and [`crate::RcpError::ReqStorageOvfl`]
+//! ahead of the concrete per-link execution path (a later milestone item)
+//! that would actually return it.
 
 use crate::RcpError;
 
@@ -220,7 +305,7 @@ use crate::RcpError;
 
 /// The request-type discriminant naming a conditional request's kind.
 ///
-/// Only the three values the checklist bullets built so far name are
+/// Only the four values the checklist bullets built so far name are
 /// modeled; see this module's doc comment "Deliberately out of scope"
 /// section for why the remaining conditional-request kinds `ROADMAP.md`
 /// names elsewhere in this milestone are not yet added as variants.
@@ -228,7 +313,12 @@ use crate::RcpError;
 #[repr(u8)]
 // fusa:req REQ-CMP-001
 // fusa:req REQ-TRIG-001
+// fusa:req REQ-CHAIN-001
 pub enum RequestKind {
+    /// Chained (`0x01`): a sequence of requests whose remaining links are
+    /// gated on the `cs`-bit abort-on-predecessor-error rule — see
+    /// [`check_chain_continuation`].
+    Chained = 0x01,
     /// Compound-wait (`0x0B`): sequencer-gated execution that waits for its
     /// gate to be satisfied.
     CompoundWait = 0x0B,
@@ -243,6 +333,7 @@ impl RequestKind {
     /// Encode this request kind as its discriminant byte.
     // fusa:req REQ-CMP-001
     // fusa:req REQ-TRIG-001
+    // fusa:req REQ-CHAIN-001
     pub fn to_u8(self) -> u8 {
         self as u8
     }
@@ -255,8 +346,10 @@ impl RequestKind {
     /// module does not yet model. Never panics for any input.
     // fusa:req REQ-CMP-002
     // fusa:req REQ-TRIG-001
+    // fusa:req REQ-CHAIN-001
     pub fn from_u8(raw: u8) -> Result<Self, RcpError> {
         match raw {
+            0x01 => Ok(Self::Chained),
             0x0B => Ok(Self::CompoundWait),
             0x0E => Ok(Self::Triggered),
             0x0F => Ok(Self::Compound),
@@ -372,15 +465,18 @@ pub struct CompoundExecDelays {
 /// This signature widened from a bare `u32` to `Option<u32>` when
 /// [`RequestKind::Triggered`] was added as a third [`RequestKind`] variant,
 /// since `CompoundExecDelays` has no field a Triggered request could
-/// select. Not yet called from anywhere in this crate (see this module's
-/// doc comment for why), so this is a safe additive-plumbing-stage
-/// widening, not a breaking change to any consumer.
+/// select. `RequestKind::Chained` (a fourth variant, added alongside
+/// [`check_chain_continuation`]) is likewise `None` here — `ROADMAP.md`'s
+/// Chained checklist bullet names no `*_exec_delay` timer of its own. Not
+/// yet called from anywhere in this crate (see this module's doc comment
+/// for why), so this is a safe additive-plumbing-stage widening, not a
+/// breaking change to any consumer.
 // fusa:req REQ-CMP-006
 pub fn resolve_compound_exec_delay(kind: RequestKind, delays: &CompoundExecDelays) -> Option<u32> {
     match kind {
         RequestKind::Compound => Some(delays.cmp_exec_delay),
         RequestKind::CompoundWait => Some(delays.cmpw_exec_delay),
-        RequestKind::Triggered => None,
+        RequestKind::Triggered | RequestKind::Chained => None,
     }
 }
 
@@ -435,7 +531,7 @@ pub struct TriggerExecDelay(pub u32);
 pub fn resolve_trigger_exec_delay(kind: RequestKind, delay: TriggerExecDelay) -> Option<u32> {
     match kind {
         RequestKind::Triggered => Some(delay.0),
-        RequestKind::Compound | RequestKind::CompoundWait => None,
+        RequestKind::Compound | RequestKind::CompoundWait | RequestKind::Chained => None,
     }
 }
 
@@ -525,13 +621,45 @@ pub fn should_count_trigger_occurrence(endpoint_busy: bool) -> bool {
     true
 }
 
+// ── Chained (0x01): cs-bit abort-on-predecessor-error semantics ─────────────
+
+/// The `cs`-bit abort-on-predecessor-error rule this checklist bullet names
+/// for [`RequestKind::Chained`]: whether the next link in a chained request
+/// runs, given that link's own decoded
+/// [`crate::acf::ByteMessageInfo::cs`] flag and whether the chain's
+/// preceding link errored.
+///
+/// Returns `Ok(())` when the chain should continue running its next link —
+/// either `cs` is not set (this link's `cs`-bit abort-on-predecessor-error
+/// behavior is not requested) or the preceding link did not error, so there
+/// is nothing to abort on. Returns `Err(RcpError::ChainAborted)` when `cs`
+/// is set and `predecessor_errored` is `true`: the predecessor errored and
+/// this link's `cs`-bit requests aborting the remainder of the chain on
+/// that account. Never panics for any input.
+///
+/// See this module's doc comment "Provenance note: the `cs` bit's
+/// chained-request meaning" for why `cs` and `predecessor_errored` are both
+/// caller-supplied rather than read from any live chain-execution state,
+/// and "Provenance note: `CHAIN_ABORTED`/`CHAIN_ERROR` as new variants, and
+/// the distinction between them" for why this function only ever
+/// constructs [`RcpError::ChainAborted`], never [`RcpError::ChainError`].
+// fusa:req REQ-CHAIN-002
+pub fn check_chain_continuation(cs: bool, predecessor_errored: bool) -> Result<(), RcpError> {
+    if cs && predecessor_errored {
+        Err(RcpError::ChainAborted)
+    } else {
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     // ── RequestKind: discriminant round-trip / rejection ────────────────────
 
-    const ALL_REQUEST_KINDS: [RequestKind; 3] = [
+    const ALL_REQUEST_KINDS: [RequestKind; 4] = [
+        RequestKind::Chained,
         RequestKind::CompoundWait,
         RequestKind::Triggered,
         RequestKind::Compound,
@@ -540,6 +668,7 @@ mod tests {
     #[test]
     // fusa:test REQ-CMP-001
     // fusa:test REQ-TRIG-001
+    // fusa:test REQ-CHAIN-001
     fn request_kind_round_trips_through_to_u8_from_u8() {
         for kind in ALL_REQUEST_KINDS {
             assert_eq!(RequestKind::from_u8(kind.to_u8()), Ok(kind));
@@ -549,16 +678,18 @@ mod tests {
     #[test]
     // fusa:test REQ-CMP-001
     // fusa:test REQ-TRIG-001
+    // fusa:test REQ-CHAIN-001
     fn request_kind_discriminants_match_roadmap_named_values() {
         assert_eq!(RequestKind::Compound.to_u8(), 0x0F);
         assert_eq!(RequestKind::CompoundWait.to_u8(), 0x0B);
         assert_eq!(RequestKind::Triggered.to_u8(), 0x0E);
+        assert_eq!(RequestKind::Chained.to_u8(), 0x01);
     }
 
     #[test]
     // fusa:test REQ-CMP-002
     fn request_kind_from_u8_rejects_every_other_value() {
-        for raw in [0x00u8, 0x01, 0x0A, 0x0C, 0x10, 0x7F, 0xFF] {
+        for raw in [0x00u8, 0x02, 0x0A, 0x0C, 0x10, 0x7F, 0xFF] {
             assert_eq!(RequestKind::from_u8(raw), Err(RcpError::InvalidParameter));
         }
     }
@@ -567,6 +698,12 @@ mod tests {
     // fusa:test REQ-TRIG-001
     fn request_kind_from_u8_accepts_triggered_discriminant() {
         assert_eq!(RequestKind::from_u8(0x0E), Ok(RequestKind::Triggered));
+    }
+
+    #[test]
+    // fusa:test REQ-CHAIN-001
+    fn request_kind_from_u8_accepts_chained_discriminant() {
+        assert_eq!(RequestKind::from_u8(0x01), Ok(RequestKind::Chained));
     }
 
     #[test]
@@ -724,6 +861,20 @@ mod tests {
         );
     }
 
+    #[test]
+    // fusa:test REQ-CMP-006
+    // fusa:test REQ-CHAIN-001
+    fn resolve_compound_exec_delay_is_none_for_chained() {
+        let delays = CompoundExecDelays {
+            cmp_exec_delay: 100,
+            cmpw_exec_delay: 200,
+        };
+        assert_eq!(
+            resolve_compound_exec_delay(RequestKind::Chained, &delays),
+            None
+        );
+    }
+
     // ── advance_sequencer_if_still_in_start_state ────────────────────────────
 
     #[test]
@@ -789,6 +940,10 @@ mod tests {
         );
         assert_eq!(
             resolve_trigger_exec_delay(RequestKind::CompoundWait, delay),
+            None
+        );
+        assert_eq!(
+            resolve_trigger_exec_delay(RequestKind::Chained, delay),
             None
         );
     }
@@ -892,5 +1047,56 @@ mod tests {
     fn should_count_trigger_occurrence_is_always_true_regardless_of_busy_state() {
         assert!(should_count_trigger_occurrence(true));
         assert!(should_count_trigger_occurrence(false));
+    }
+
+    // ── check_chain_continuation ──────────────────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-CHAIN-002
+    fn check_chain_continuation_aborts_only_when_cs_set_and_predecessor_errored() {
+        assert_eq!(
+            check_chain_continuation(true, true),
+            Err(RcpError::ChainAborted)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-CHAIN-002
+    fn check_chain_continuation_continues_when_cs_not_set_even_if_predecessor_errored() {
+        assert_eq!(check_chain_continuation(false, true), Ok(()));
+    }
+
+    #[test]
+    // fusa:test REQ-CHAIN-002
+    fn check_chain_continuation_continues_when_predecessor_did_not_error_regardless_of_cs() {
+        assert_eq!(check_chain_continuation(true, false), Ok(()));
+        assert_eq!(check_chain_continuation(false, false), Ok(()));
+    }
+
+    #[test]
+    // fusa:test REQ-CHAIN-002
+    fn check_chain_continuation_never_panics_for_any_sampled_input() {
+        for cs in [true, false] {
+            for predecessor_errored in [true, false] {
+                let _ = check_chain_continuation(cs, predecessor_errored);
+            }
+        }
+    }
+
+    // ── RcpError::ChainAborted / RcpError::ChainError ────────────────────────
+
+    #[test]
+    // fusa:test REQ-CHAIN-003
+    fn chain_aborted_and_chain_error_are_distinct_rcp_error_variants() {
+        assert_ne!(RcpError::ChainAborted, RcpError::ChainError);
+        assert_eq!(RcpError::ChainAborted, RcpError::ChainAborted);
+        assert_eq!(RcpError::ChainError, RcpError::ChainError);
+    }
+
+    #[test]
+    // fusa:test REQ-CHAIN-003
+    fn chain_aborted_and_chain_error_carry_the_roadmap_named_codes_in_their_display_text() {
+        assert!(RcpError::ChainAborted.to_string().contains("CHAIN_ABORTED"));
+        assert!(RcpError::ChainError.to_string().contains("CHAIN_ERROR"));
     }
 }

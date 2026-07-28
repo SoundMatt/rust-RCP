@@ -5103,6 +5103,33 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CHAIN-001",
+      "title": "RequestKind gains a Chained = 0x01 variant that round-trips through to_u8/from_u8",
+      "text": "RequestKind::Chained encodes to discriminant byte 0x01 via to_u8, RequestKind::from_u8(0x01) decodes to RequestKind::Chained, and every RequestKind variant (Chained, CompoundWait, Triggered, Compound) round-trips through to_u8/from_u8; resolve_compound_exec_delay and resolve_trigger_exec_delay both return None for RequestKind::Chained to stay exhaustive over the now four-variant RequestKind; from_u8 continues to reject every other byte value and never panics across the full 0..=255 range",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CHAIN-002",
+      "title": "check_chain_continuation implements the cs-bit abort-on-predecessor-error rule for chained requests",
+      "text": "check_chain_continuation returns Err(RcpError::ChainAborted) when cs is true and predecessor_errored is true, and Ok(()) in every other combination (cs false regardless of predecessor_errored, or predecessor_errored false regardless of cs); never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CHAIN-003",
+      "title": "RcpError gains ChainAborted and ChainError as two new, distinct variants for the chained-request error codes",
+      "text": "RcpError::ChainAborted and RcpError::ChainError are added as two new variants (not collapsed onto RequestRejected or any other of the eleven Milestone 2 TC18 error codes), are distinct from each other under equality, and their Display text embeds the roadmap-named CHAIN_ABORTED/CHAIN_ERROR codes respectively, following the enum's established \"rcp/error: <CODE> - ...\" message convention",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
