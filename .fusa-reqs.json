@@ -3573,6 +3573,42 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ECHO-001",
+      "title": "Echo-back rule model",
+      "text": "The echo-back rule (a response/ack must carry the same byte_bus_id it was received under) is modeled as a pair of plain functions over already-decoded ByteMessageInfo values, build_response_info and verify_echo_back, with no dependency on StreamId/EndpointTable addressing machinery",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ECHO-002",
+      "title": "build_response_info echoes byte_bus_id and sets rsp",
+      "text": "build_response_info returns a response ByteMessageInfo with byte_bus_id copied from the request and rsp forced true, leaving every other field of the caller-supplied response template unchanged",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ECHO-003",
+      "title": "verify_echo_back accepts matching and rejects mismatched byte_bus_id",
+      "text": "verify_echo_back returns Ok when response.byte_bus_id equals request.byte_bus_id regardless of the response.rsp flag, and returns Err(RcpError::EchoBackMismatch) when byte_bus_id differs",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ECHO-004",
+      "title": "Echo-back rule functions never panic",
+      "text": "build_response_info and verify_echo_back never panic for any combination of ByteMessageInfo field values, across a swept range of byte_bus_id inputs",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
