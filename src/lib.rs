@@ -497,6 +497,28 @@ pub struct Status {
 /// those concepts, matching this same milestone's own practice of adding a
 /// named placeholder ahead of the code that will use it (e.g.
 /// `RegisterCategory` ahead of the concrete Register Map).
+///
+/// ## Chained-request error codes (`ROADMAP.md` Milestone 5, "Chained")
+///
+/// [`ChainAborted`](Self::ChainAborted) and [`ChainError`](Self::ChainError)
+/// are the first of the "timing- and CRC-specific codes wired in by later
+/// milestones" the section above defers, to actually land. Per Guiding
+/// Principle 5, [`crate::request`] — the module that names both, and
+/// consumes [`ChainAborted`](Self::ChainAborted) from
+/// [`crate::request::check_chain_continuation`] — carries this pair's full
+/// provenance note (including why neither collapses onto
+/// [`RequestRejected`](Self::RequestRejected) or any other of the eleven
+/// codes above, and this crate's working interpretation of what
+/// distinguishes the two) rather than duplicating it here; see that
+/// module's doc comment "Provenance note: `CHAIN_ABORTED`/`CHAIN_ERROR` as
+/// new variants, and the distinction between them". Both follow this
+/// enum's own `"rcp/error: <CODE> — ..."` message convention but are kept
+/// in their own enum section below, separate from the eleven-member "TC18
+/// RCP spec error codes" group [`is_tc18_error_code`](Self::is_tc18_error_code)
+/// queries — that predicate is scoped specifically to the Milestone 2
+/// "Error Model" item's own eleven named codes, and is left unchanged by
+/// this addition rather than silently widened to a twelve-or-more-member
+/// group the checklist text for that item never named.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum RcpError {
     // ── Mandatory RELAY sentinels ─────────────────────────────────────────
@@ -601,6 +623,20 @@ pub enum RcpError {
 
     #[error("rcp/error: INVALID_PARAMETER — one or more supplied parameter values is invalid")]
     InvalidParameter,
+
+    // ── Chained-request error codes (ROADMAP.md Milestone 5, "Chained") ────
+    // See this enum's own doc comment "Chained-request error codes" section
+    // and crate::request's "Provenance note: CHAIN_ABORTED/CHAIN_ERROR as
+    // new variants, and the distinction between them" for the full
+    // provenance note behind adding these as new variants rather than
+    // collapsing them onto RequestRejected or another of the eleven codes
+    // above, and this crate's working interpretation of what distinguishes
+    // the two from each other.
+    #[error("rcp/error: CHAIN_ABORTED — chained request link skipped because a preceding link in the same chain errored")]
+    ChainAborted,
+
+    #[error("rcp/error: CHAIN_ERROR — chained request link's own execution failed")]
+    ChainError,
 
     // ── General errors ───────────────────────────────────────────────────
     #[error("rcp: invalid size")]

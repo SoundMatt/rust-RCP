@@ -1213,8 +1213,47 @@ per-endpoint scheduler, since the spec defines that ordering natively.
       `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair;
       `REQ-CMP-006`'s `.fusa-reqs.json` text updated to describe its new
       `Option<u32>` return shape.
-- [ ] Chained (`0x01`): `cs`-bit abort-on-predecessor-error semantics;
-      `CHAIN_ABORTED`/`CHAIN_ERROR`
+- [x] Chained (`0x01`): `cs`-bit abort-on-predecessor-error semantics;
+      `CHAIN_ABORTED`/`CHAIN_ERROR`. Done (v0.8.0-dev): `src/request.rs`
+      gains `RequestKind::Chained = 0x01` alongside the existing
+      `Compound`/`CompoundWait`/`Triggered` variants, with `to_u8`/`from_u8`
+      extended to match; and `check_chain_continuation`, a pure function
+      taking a chained request link's decoded
+      `crate::acf::ByteMessageInfo::cs` flag and whether the chain's
+      preceding link errored, returning `Err(RcpError::ChainAborted)` when
+      both are true and `Ok(())` otherwise — the `cs`-bit
+      abort-on-predecessor-error rule this checklist bullet names.
+      `resolve_compound_exec_delay`/`resolve_trigger_exec_delay` both widen
+      to return `None` for `RequestKind::Chained` to stay exhaustive over
+      the now four-variant `RequestKind` (not yet called from anywhere in
+      this crate, so this is a safe additive-stage widening). `RcpError`
+      (`src/lib.rs`) gains two new variants, `ChainAborted`/`ChainError`,
+      for the checklist's named `CHAIN_ABORTED`/`CHAIN_ERROR` codes — the
+      first Milestone-5-era additions to `RcpError` since Milestone 2's
+      Error Model item closed out its eleven spec-named codes. Two points
+      flagged per Guiding Principle 5: (1) whether either code collapses
+      onto one of those eleven (mirroring how UART's `UNKNOWN_CMD`
+      collapsed onto `RcpError::UnsupportedCmd` in Milestone 4) was
+      checked and rejected — `RcpError::RequestRejected` is the closest
+      candidate but its "rejected outright, before execution" shape does
+      not capture either code's own mid-chain-execution meaning, so both
+      are added as genuinely new variants instead; (2) the checklist text
+      names `CHAIN_ABORTED`/`CHAIN_ERROR` side by side without stating what
+      distinguishes them — this crate's working interpretation, flagged
+      rather than silently assumed, reads `ChainError` as "this link's own
+      execution failed" and `ChainAborted` as "this link did not run at
+      all because an earlier link's `ChainError` and this link's `cs` bit
+      together aborted it", under which `check_chain_continuation` can
+      only ever construct `ChainAborted`; `ChainError` is added for naming
+      completeness but not yet constructed anywhere in this crate,
+      mirroring Milestone 2's own precedent of reserving
+      `SequencerNotKnown`/`RequestCanceled`/`RequestNotFound`/
+      `EpNotFound`/`ReqStorageOvfl` ahead of the concrete code that
+      constructs them. Same "additive standalone plumbing only" discipline
+      as every prior Milestone 1-5 entry — not wired into any decoder,
+      dispatch loop, or the request-lifecycle state machine. New
+      `REQ-CHAIN-001`..`REQ-CHAIN-003` (in `src/request.rs`) added to
+      `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair.
 - [ ] Timed (`0x0A`): presentation-time execution as an alternative to a
       TSCF header
 - [ ] Cancellation: clear-all (`0x05`, mandatory), clear-non-safestate
