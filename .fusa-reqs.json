@@ -4365,6 +4365,51 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-DISC-016",
+      "title": "Discovery cache remember/lookup round-trips the cache-worthy identity subset",
+      "text": "DiscoveryCache::remember records a DiscoveryCacheEntry for stream_id keyed off the cache-worthy subset of a supplied GeneralRegisters (svr_oa_tc18_magic_nr, svr_version, svr_vendor_id, svr_device_id, svr_ep_count) and the supplied now; DiscoveryCache::lookup/is_known retrieve it, and remembering again under the same stream_id overwrites rather than duplicates the entry",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-DISC-017",
+      "title": "Discovery cache remember rejects the broadcast sentinel as a cache key",
+      "text": "DiscoveryCache::remember returns Err(RcpError::InvalidParameter), without modifying the cache, whenever stream_id equals DISCOVERY_BROADCAST_STREAM_ID",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-DISC-018",
+      "title": "Discovery cache staleness check has an inclusive boundary and never panics on out-of-order now",
+      "text": "DiscoveryCacheEntry::is_stale (and DiscoveryCache::is_known, which composes it) reports stale once at least max_age has elapsed since the entry's cached_at, inclusive at the exact boundary, and uses Instant::saturating_duration_since so an out-of-order now never panics or wraps",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-DISC-019",
+      "title": "Discovery cache invalidate removes an entry and matches detects an identity change",
+      "text": "DiscoveryCache::invalidate removes stream_id's cached entry if present (returning true) and is a no-op returning false if absent; DiscoveryCacheEntry::matches returns false when a freshly observed GeneralRegisters' cache-worthy subset differs from the entry's own, distinguishing a still-valid cache entry from a changed server identity at the same stream_id",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-DISC-020",
+      "title": "Discovery cache operations never panic",
+      "text": "DiscoveryCache::remember/lookup/is_known/invalidate and DiscoveryCacheEntry::is_stale/matches never panic for any sampled combination of stream_id (including the broadcast sentinel), GeneralRegisters content, now, and max_age",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
