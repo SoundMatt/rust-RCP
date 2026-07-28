@@ -94,8 +94,20 @@ shared request-descriptor header that carries all per-message addressing.
 
 ### AVTPDU Framing
 
-- [ ] NTSCF header encode/decode (`ntscf_data_length`, `sequence_num`) — the
-      only header variant an RC Server ever sends
+- [x] NTSCF header encode/decode (`ntscf_data_length`, `sequence_num`) — the
+      only header variant an RC Server ever sends. Done (v0.4.0-dev):
+      `src/avtpdu.rs` adds `NtscfHeader { sequence_num, ntscf_data_length,
+      stream_id }` with `encode_ntscf_header`/`decode_ntscf_header`,
+      round-tripping and never panicking on truncated/arbitrary input. This
+      is a new, additive module — it does not yet replace `wire.rs` (no
+      existing caller is cut over) and does not implement `stream_id`
+      construction/parsing, which remains the separate "Addressing" item
+      below. The specific byte offsets/bit widths are this crate's own
+      working interpretation of IEEE 1722 AVTPDU control-format framing
+      (see the module's provenance note) and are flagged, per Guiding
+      Principle 5, for reconciliation against the OPEN Alliance TC18 Remote
+      Control Protocol Specification's behavior before being relied on for
+      interop.
 - [ ] TSCF header encode/decode (`avtp_timestamp`, `stream_data_length`) —
       client-to-server only
 - [ ] Header-variant selection/rejection rules: drop TSCF-headed AVTPDUs

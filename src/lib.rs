@@ -69,6 +69,7 @@
 pub mod adapt;
 pub mod admin;
 pub mod authz;
+pub mod avtpdu;
 pub(crate) mod base64_serde;
 pub mod canbr;
 pub mod capi;
