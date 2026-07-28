@@ -882,9 +882,38 @@ functional config) before tackling bus-protocol endpoints.
       decoder or dispatch loop. New `REQ-GPIO-001`..`REQ-GPIO-016` added to
       `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair in
       `src/gpio.rs`.
-- [ ] **SPI** (`ep_type 0x03`): up to 6 pre-configured channel configs
+- [x] **SPI** (`ep_type 0x03`): up to 6 pre-configured channel configs
       selected via `evt[2:0]`; raw PICO/POCI byte transfer; compound-wait's
-      4-of-20-byte status truncation rule
+      4-of-20-byte status truncation rule. Done (v0.7.0-dev): new
+      `src/spi.rs` adds [`SpiChannelSelect`] (the up-to-6 channel selection
+      over `evt.sub_opcode`'s full 3-bit range, with the two unused values
+      modeled as explicit spare variants rather than silently accepted) with
+      [`resolve_spi_channel_index`]/[`select_spi_channel_config`] resolving
+      a selection against [`SpiFunctionalConfig`]'s six channel slots;
+      [`SpiByteTransfer`]/[`SpiByteTransferResult`] modeling the raw
+      PICO/POCI byte transfer as an unstructured, never-panicking
+      byte-stream shape (mirroring `gpio::GpioBitmask`'s own wire-form
+      discipline) rather than an interpreted payload; and
+      [`SpiStatus`]/[`SpiCompoundWaitStatus`]/
+      [`truncate_spi_status_for_compound_wait`] representing the 20-byte
+      status and its 4-byte compound-wait-truncated form.
+      `SpiFunctionalConfig::layer_tag` composes against
+      `regmap::check_functional_config_matches_ep_type`'s existing
+      cross-layer rule unchanged, matching `GpioFunctionalConfig`'s own
+      precedent. Two points flagged per Guiding Principle 5 rather than
+      silently resolved: (1) which four of the twenty status bytes survive
+      compound-wait's truncation is unstated by the roadmap text — the
+      leading four bytes are this crate's own working interpretation; (2)
+      the content of each of the up to six pre-configured channel configs
+      (clock rate, polarity/phase, etc.) is left an intentionally empty
+      placeholder (`SpiChannelConfigSlot`), since only the up-to-6
+      *selection* mechanism is named, not per-channel field content. Like
+      GPIO, this remains additive standalone plumbing only — the
+      compound-wait truncation shape is deliberately not wired into any
+      compound-wait dispatch, since compound-wait itself is Milestone 5,
+      not yet built. New `REQ-SPI-001`..`REQ-SPI-012` added to
+      `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair in
+      `src/spi.rs`.
 - [ ] **I²C** (`ep_type 0x04`): controller-only, raw byte stream including
       address bytes; `i2c_mode` speed presets (flag the enum ambiguity
       between adjacent high-speed rows as unresolved pending errata, per
