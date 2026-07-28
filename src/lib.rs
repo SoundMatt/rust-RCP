@@ -104,6 +104,7 @@ pub mod firmware;
 pub mod formal;
 pub mod gpio;
 pub mod grpcbridge;
+pub mod i2c;
 pub mod iso21434;
 pub mod lifecycle;
 pub mod linbr;

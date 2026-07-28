@@ -914,10 +914,39 @@ functional config) before tackling bus-protocol endpoints.
       not yet built. New `REQ-SPI-001`..`REQ-SPI-012` added to
       `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair in
       `src/spi.rs`.
-- [ ] **I²C** (`ep_type 0x04`): controller-only, raw byte stream including
+- [x] **I²C** (`ep_type 0x04`): controller-only, raw byte stream including
       address bytes; `i2c_mode` speed presets (flag the enum ambiguity
       between adjacent high-speed rows as unresolved pending errata, per
-      this crate's spec-extraction §5.7 — do not silently pick one)
+      this crate's spec-extraction §5.7 — do not silently pick one). Done
+      (v0.7.0-dev): new `src/i2c.rs` adds [`I2cByteTransfer`]/
+      [`I2cByteTransferResult`] modeling the raw byte stream a request sends
+      and a response returns — address byte(s) included, unparsed — as an
+      unstructured, never-panicking byte-stream shape, mirroring
+      `spi::SpiByteTransfer`'s own PICO/POCI discipline; and
+      [`I2cSpeedMode`] modeling the five `i2c_mode` speed presets, with
+      [`I2cFunctionalConfig`] carrying it as this endpoint type's
+      functional-config content. `I2cFunctionalConfig::layer_tag` composes
+      against `regmap::check_functional_config_matches_ep_type`'s existing
+      cross-layer rule unchanged, matching `GpioFunctionalConfig`'s and
+      `SpiFunctionalConfig`'s own precedent. Two points flagged per Guiding
+      Principle 5 rather than silently resolved: (1) the two adjacent
+      high-speed `i2c_mode` rows this crate's own spec-extraction pass could
+      not distinguish are modeled as two explicit, neutrally named variants,
+      `I2cSpeedMode::HighSpeedRowA`/`I2cSpeedMode::HighSpeedRowB`, with
+      `I2cSpeedMode::is_ambiguous_high_speed_row` letting a caller detect
+      them, rather than either being silently assigned a specific named
+      speed — mirroring `GpioWriteSemantics::Unnamed8th`'s and
+      `SpiChannelSelect::Spare6`/`SpiChannelSelect::Spare7`'s own treatment
+      of unresolved enum slots; (2) since this endpoint type is
+      controller-only, no peripheral/target-mode role type is modeled at
+      all, and since the roadmap text does not state the raw stream's
+      address-byte framing (7-bit vs. 10-bit, fixed offset, etc.), this
+      module carries the whole stream — address bytes included — as opaque
+      bytes rather than guessing a framing to parse it against. Like every
+      prior Milestone 1-4 entry, this remains additive standalone plumbing
+      only — nothing here is wired into an actual decoder or dispatch loop.
+      New `REQ-I2C-001`..`REQ-I2C-006` added to `.fusa-reqs.json`, each with
+      a `// fusa:req`/`// fusa:test` pair in `src/i2c.rs`.
 - [ ] **UART** (`ep_type 0x05`): independent TX/RX queues sharing one
       functional-config block; `read_size`-or-`uart_timeout` read
       completion; payload-less-read-only rule (`UNKNOWN_CMD` if violated)
