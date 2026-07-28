@@ -1070,9 +1070,53 @@ functional config) before tackling bus-protocol endpoints.
       into an actual decoder or dispatch loop. New `REQ-PWM-001`..
       `REQ-PWM-009` added to `.fusa-reqs.json`, each with a `// fusa:req`/
       `// fusa:test` pair in `src/pwm.rs`.
-- [ ] Generic `evt[2:0]` group conventions common to all of the above
+- [x] Generic `evt[2:0]` group conventions common to all of the above
       (Groups A/B/C) and the shared common functional-config fields
       (`ep_enable`, `ep_clear_req_storage`, `ep_req_crc_enable`, etc.)
+      Done (v0.7.0-dev): this is Milestone 4's closing item, picked up only
+      after all six concrete endpoint types above had already built their
+      own private reading of `evt.sub_opcode` — this bullet generalizes
+      that experience rather than preceding it, per this milestone's own
+      Goal text. New `src/evtgroup.rs` adds [`EvtGroup`] (the three
+      roadmap-named group letters as an explicit, ordinal-round-tripping
+      enum) and [`classify_evt_sub_opcode`] (a total, never-panicking
+      function over the full `evt.sub_opcode` range). `regmap.rs`'s
+      [`CommonFunctionalConfig`] — previously a literal empty placeholder
+      struct — now carries the three named fields (`ep_enable`,
+      `ep_clear_req_storage`, `ep_req_crc_enable`) as `bool`s, with
+      [`CommonFunctionalConfig::encode`]/[`CommonFunctionalConfig::decode`]
+      giving it a never-panicking, fixed-length wire form matching every
+      other Milestone 1/2 type's own big-endian/fixed-length convention.
+      Two points flagged per Guiding Principle 5 rather than silently
+      resolved: (1) this crate's own `ROADMAP.md` names the three "Groups
+      A/B/C" letters but states neither the classification axis (per-value
+      vs. per-endpoint-type) nor any concrete value/type-to-letter
+      assignment, and no `§`-numbered citation accompanies this bullet the
+      way sibling Milestone 2 bullets cite `§3.6`-`§3.11` — so
+      `classify_evt_sub_opcode` validates `sub_opcode`'s 3-bit range but
+      always returns `Ok(None)` rather than guessing an assignment,
+      mirroring `GpioWriteSemantics::Unnamed8th`'s and
+      `I2cSpeedMode::HighSpeedRowA`/`HighSpeedRowB`'s own treatment of
+      unconfirmed slots; retrofitting GPIO's or SPI's own already-built
+      private `sub_opcode` readings onto an `EvtGroup` is explicitly left
+      to later work, not guessed at here. (2) the checklist bullet's
+      trailing "etc." implies a longer field list for
+      `CommonFunctionalConfig` than the three fields it names, but this
+      crate's own spec-extraction pass records no further field names for
+      this particular item (unlike `§3.6`'s or `§3.8`'s own fully
+      enumerated tables), so only the three named fields are modeled — no
+      plausible-sounding neighbors are invented to fill out "etc."; each
+      field is also given its own full encoded byte rather than a guessed
+      shared-byte bit-packing, mirroring `RequestStreamConfigEntry`'s own
+      "meaningfully binary but wire-width-unconfirmed" precedent. Like
+      every prior Milestone 1-4 entry, this remains additive standalone
+      plumbing only — `EvtGroup` is not wired into any decoder or dispatch
+      loop, and none of the six already-built endpoint modules were
+      retrofitted to consume it. New `REQ-EVTGRP-001`..`REQ-EVTGRP-004`
+      (in `src/evtgroup.rs`) and `REQ-RMAP-028`..`REQ-RMAP-029` (in
+      `src/regmap.rs`) added to `.fusa-reqs.json`, each with a
+      `// fusa:req`/`// fusa:test` pair. This closes out Milestone 4's
+      checklist in full.
 
 Success Criteria:
 A client can configure, enable, and drive each of these six endpoint types

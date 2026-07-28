@@ -99,6 +99,7 @@ pub mod doipbr;
 pub mod dyndata;
 pub mod e2e;
 pub mod ep0;
+pub mod evtgroup;
 pub mod faultinject;
 pub mod federation;
 pub mod firmware;

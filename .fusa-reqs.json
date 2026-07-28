@@ -4941,6 +4941,60 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-EVTGRP-001",
+      "title": "EvtGroup's three roadmap-named group labels round-trip through an ordinal encoding",
+      "text": "EvtGroup::to_u8/from_u8 round-trip every one of the three roadmap-listed group labels (A, B, C) with ordinal values 0, 1, 2 respectively, giving the still-unclassified group letters a concrete, testable type per Guiding Principle 5",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-EVTGRP-002",
+      "title": "EvtGroup::from_u8 rejects every ordinal value outside 0..=2",
+      "text": "EvtGroup::from_u8 returns Err(RcpError::InvalidParameter) for every raw value outside 0..=2 and never panics for any input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-EVTGRP-003",
+      "title": "classify_evt_sub_opcode returns Ok(None) for every in-range sub_opcode value",
+      "text": "classify_evt_sub_opcode returns Ok(None) for every sub_opcode value in 0..=EVT_SUB_OPCODE_MAX, honestly reporting that no Groups A/B/C classification is confirmed for any evt.sub_opcode value rather than guessing one, per Guiding Principle 5",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-EVTGRP-004",
+      "title": "classify_evt_sub_opcode rejects out-of-range sub_opcode values and never panics",
+      "text": "classify_evt_sub_opcode returns Err(RcpError::InvalidParameter) for every sub_opcode value greater than EVT_SUB_OPCODE_MAX, and never panics for any u8 input across the full 0..=255 range",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-028",
+      "title": "CommonFunctionalConfig models ep_enable/ep_clear_req_storage/ep_req_crc_enable and encodes each as a full byte",
+      "text": "CommonFunctionalConfig carries the three roadmap-named common functional-config fields (ep_enable, ep_clear_req_storage, ep_req_crc_enable) as bool fields, defaults to all-false, and CommonFunctionalConfig::encode produces a fixed 3-byte [0x00/0x01, 0x00/0x01, 0x00/0x01] wire form with no panics for any field combination",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-029",
+      "title": "CommonFunctionalConfig::decode round-trips encode's output and rejects short input",
+      "text": "CommonFunctionalConfig::decode(encode(cfg)) == Ok(cfg) for every sampled field combination, decode treats any nonzero byte as true, decode ignores trailing bytes beyond ENCODED_LEN, and decode returns Err(RcpError::ShortFrame) for any input shorter than CommonFunctionalConfig::ENCODED_LEN",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

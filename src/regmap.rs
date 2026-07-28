@@ -25,6 +25,8 @@
 // fusa:req REQ-RMAP-025
 // fusa:req REQ-RMAP-026
 // fusa:req REQ-RMAP-027
+// fusa:req REQ-RMAP-028
+// fusa:req REQ-RMAP-029
 
 //! Three-layer per-endpoint config taxonomy, the RC Server's general
 //! (whole-server) register-map fields, and the five child config tables
@@ -69,12 +71,13 @@
 //!   the rest of that later work.
 //! - [`CommonFunctionalConfig`] — the common functional-config block:
 //!   fields shared across *every* [`EndpointType`]'s functional config.
-//!   `ROADMAP.md`'s own Milestone 4 success-criteria text names three
-//!   examples for this layer — `ep_enable`, `ep_clear_req_storage`,
-//!   `ep_req_crc_enable` — but none of the three is modeled as a concrete
-//!   field here; this type is an empty placeholder standing in for that
-//!   still-unbuilt shape, mirroring how [`crate::lifecycle::RegisterCategory`]
-//!   stood in for the whole register map ahead of this very subsection.
+//!   `ROADMAP.md` Milestone 4's own closing checklist bullet ("Generic
+//!   `evt[2:0]` group conventions ... and the shared common
+//!   functional-config fields") names three concrete examples for this
+//!   layer — `ep_enable`, `ep_clear_req_storage`, `ep_req_crc_enable` —
+//!   and this item gives exactly those three a field, no more. See
+//!   [`CommonFunctionalConfig`]'s own doc comment for why the bullet's
+//!   trailing "etc." is left unenumerated rather than guessed at.
 //! - [`PerEpTypeFunctionalConfig`] — a distinct, type-specific config shape
 //!   for each [`EndpointType`]. Tagged by [`EndpointType`] rather than
 //!   given thirteen separate concrete shapes, since no endpoint type's
@@ -498,18 +501,82 @@ impl PerEpConfigBlock {
 /// The common functional-config block: fields shared across every
 /// [`EndpointType`]'s functional config.
 ///
-/// An empty placeholder — see this module's doc comment for the three
-/// concrete examples `ROADMAP.md` itself names (`ep_enable`,
-/// `ep_clear_req_storage`, `ep_req_crc_enable`) and why none of them is
-/// modeled as a field here yet.
+/// Models the three concrete examples `ROADMAP.md` Milestone 4's own
+/// closing checklist bullet names by name — `ep_enable`,
+/// `ep_clear_req_storage`, `ep_req_crc_enable` — and no more. That
+/// bullet's own wording ends in "etc.", implying a longer, unenumerated
+/// field list, but this crate has no textual source (its own
+/// spec-extraction pass records no further field names for this
+/// particular checklist item, unlike e.g. `§3.6`'s or `§3.8`'s own fully
+/// enumerated tables) to draw the remainder from. Per Guiding Principle 5,
+/// this type therefore claims only the three fields actually named, rather
+/// than inventing plausible-sounding neighbors to fill out "etc." —
+/// mirroring how [`crate::gpio::GpioWriteSemantics::Unnamed8th`] left an
+/// unconfirmed slot unnamed instead of guessing a name for it. A later item
+/// that does recover the remaining field names (against this crate's own
+/// spec-extraction pass, never against restated spec prose) is expected to
+/// extend this struct then, not now.
+///
+/// [`CommonFunctionalConfig::encode`]/[`CommonFunctionalConfig::decode`]
+/// give this block a never-panicking, fixed-length wire form. Unlike
+/// [`crate::acf::ByteMessageInfo`]'s flags (whose bit positions within a
+/// shared byte `ROADMAP.md` states explicitly), this crate has no basis
+/// for any bit-position assignment among these three fields, so — mirroring
+/// [`RequestStreamConfigEntry`]'s own "meaningfully binary but
+/// wire-width-unconfirmed" precedent for its eight on/off behaviors — each
+/// field is given its own full byte (`0x00`/`0x01`) rather than a guessed
+/// shared-byte bit-packing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 // fusa:req REQ-RMAP-003
-pub struct CommonFunctionalConfig;
+// fusa:req REQ-RMAP-028
+pub struct CommonFunctionalConfig {
+    /// Whether this endpoint is enabled.
+    pub ep_enable: bool,
+    /// Whether this endpoint's pending-request storage should be cleared.
+    pub ep_clear_req_storage: bool,
+    /// Whether this endpoint's request CRC checking is enabled.
+    pub ep_req_crc_enable: bool,
+}
 
 impl CommonFunctionalConfig {
     /// The [`ConfigLayer`] this type always belongs to.
     // fusa:req REQ-RMAP-003
     pub const LAYER: ConfigLayer = ConfigLayer::CommonFunctional;
+
+    /// Encoded wire length in bytes: one full byte per field, per this
+    /// type's own doc comment.
+    pub const ENCODED_LEN: usize = 3;
+
+    /// Encode this config to its 3-byte wire representation:
+    /// `ep_enable` then `ep_clear_req_storage` then `ep_req_crc_enable`,
+    /// each a full `0x00`/`0x01` byte. Never panics.
+    // fusa:req REQ-RMAP-028
+    pub fn encode(&self) -> [u8; Self::ENCODED_LEN] {
+        [
+            self.ep_enable as u8,
+            self.ep_clear_req_storage as u8,
+            self.ep_req_crc_enable as u8,
+        ]
+    }
+
+    /// Decode a [`CommonFunctionalConfig`] from a byte slice.
+    ///
+    /// Never panics on short, truncated, or arbitrary input — always
+    /// returns `Err(RcpError::ShortFrame)` for input shorter than
+    /// [`CommonFunctionalConfig::ENCODED_LEN`] instead. Any nonzero byte
+    /// decodes as `true`, matching [`crate::acf::decode_byte_message_info`]'s
+    /// own bit-to-`bool` convention of treating "nonzero" as set.
+    // fusa:req REQ-RMAP-029
+    pub fn decode(b: &[u8]) -> Result<Self, RcpError> {
+        if b.len() < Self::ENCODED_LEN {
+            return Err(RcpError::ShortFrame);
+        }
+        Ok(Self {
+            ep_enable: b[0] != 0,
+            ep_clear_req_storage: b[1] != 0,
+            ep_req_crc_enable: b[2] != 0,
+        })
+    }
 }
 
 /// A distinct, type-specific functional-config shape for the
@@ -1586,12 +1653,99 @@ mod tests {
 
     #[test]
     // fusa:test REQ-RMAP-003
-    fn common_functional_config_is_a_stable_zst_placeholder() {
-        // A ZST placeholder: every instance compares equal to every other,
-        // including a Copy of itself.
-        let a = CommonFunctionalConfig;
-        let b = a;
-        assert_eq!(a, b);
+    fn common_functional_config_default_is_all_false() {
+        let cfg = CommonFunctionalConfig::default();
+        assert!(!cfg.ep_enable);
+        assert!(!cfg.ep_clear_req_storage);
+        assert!(!cfg.ep_req_crc_enable);
+    }
+
+    // ── CommonFunctionalConfig: encode/decode round-trip ──────────────────
+
+    fn sample_common_functional_configs() -> [CommonFunctionalConfig; 4] {
+        [
+            CommonFunctionalConfig {
+                ep_enable: false,
+                ep_clear_req_storage: false,
+                ep_req_crc_enable: false,
+            },
+            CommonFunctionalConfig {
+                ep_enable: true,
+                ep_clear_req_storage: false,
+                ep_req_crc_enable: false,
+            },
+            CommonFunctionalConfig {
+                ep_enable: false,
+                ep_clear_req_storage: true,
+                ep_req_crc_enable: true,
+            },
+            CommonFunctionalConfig {
+                ep_enable: true,
+                ep_clear_req_storage: true,
+                ep_req_crc_enable: true,
+            },
+        ]
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-028
+    // fusa:test REQ-RMAP-029
+    fn common_functional_config_encode_decode_round_trips() {
+        for cfg in sample_common_functional_configs() {
+            let encoded = cfg.encode();
+            assert_eq!(encoded.len(), CommonFunctionalConfig::ENCODED_LEN);
+            assert_eq!(CommonFunctionalConfig::decode(&encoded), Ok(cfg));
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-028
+    fn common_functional_config_encode_is_one_full_byte_per_field() {
+        let cfg = CommonFunctionalConfig {
+            ep_enable: true,
+            ep_clear_req_storage: false,
+            ep_req_crc_enable: true,
+        };
+        assert_eq!(cfg.encode(), [0x01, 0x00, 0x01]);
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-029
+    fn common_functional_config_decode_rejects_short_input() {
+        for len in 0..CommonFunctionalConfig::ENCODED_LEN {
+            let bytes = vec![0u8; len];
+            assert_eq!(
+                CommonFunctionalConfig::decode(&bytes),
+                Err(RcpError::ShortFrame)
+            );
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-029
+    fn common_functional_config_decode_treats_any_nonzero_byte_as_true() {
+        let bytes = [0x01, 0xFF, 0x02];
+        assert_eq!(
+            CommonFunctionalConfig::decode(&bytes),
+            Ok(CommonFunctionalConfig {
+                ep_enable: true,
+                ep_clear_req_storage: true,
+                ep_req_crc_enable: true,
+            })
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-029
+    fn common_functional_config_decode_ignores_trailing_bytes() {
+        let cfg = CommonFunctionalConfig {
+            ep_enable: true,
+            ep_clear_req_storage: true,
+            ep_req_crc_enable: false,
+        };
+        let mut bytes = cfg.encode().to_vec();
+        bytes.extend_from_slice(&[0xFF, 0xFF]);
+        assert_eq!(CommonFunctionalConfig::decode(&bytes), Ok(cfg));
     }
 
     // ── Cross-layer invariant ─────────────────────────────────────────────
