@@ -3,12 +3,17 @@
 // fusa:req REQ-DISC-003
 // fusa:req REQ-DISC-004
 // fusa:req REQ-DISC-005
+// fusa:req REQ-DISC-006
+// fusa:req REQ-DISC-007
+// fusa:req REQ-DISC-008
+// fusa:req REQ-DISC-009
+// fusa:req REQ-DISC-010
 
-//! Discovery request/response — TC18 register-map model (`ROADMAP.md`
-//! Milestone 3 "Discovery" subsection, first checklist bullet only:
-//! "Discovery request/response: broadcastable ACF_ABB read addressed to
-//! `byte_bus_id 0`, register address 0, answerable in **any** lifecycle
-//! state").
+//! Discovery request/response and discovery-stream claiming — TC18
+//! register-map model (`ROADMAP.md` Milestone 3 "Discovery" subsection,
+//! first two checklist bullets: "Discovery request/response" and
+//! "Discovery-stream claiming: first-claimant rule, `Discovery_TimeOut`
+//! (~20 ms default) lapse-and-reopen behavior").
 //!
 //! This module begins Milestone 3, which per the subsection's own Goal text
 //! replaces [`crate::mdns`] as the *mandatory* discovery path (mDNS may
@@ -18,19 +23,23 @@
 //! model — that is a different, private-protocol concept with nothing in
 //! common with the TC18 broadcast-`ACF_ABB` mechanism modeled below.
 //!
-//! Only this subsection's first checklist bullet is in scope. Deliberately
-//! out of scope, as separate later checklist bullets in the same
-//! subsection:
+//! Only this subsection's first two checklist bullets are in scope.
+//! Deliberately out of scope, as separate later checklist bullets in the
+//! same subsection:
 //!
-//! - Discovery-stream claiming (first-claimant rule, `Discovery_TimeOut`
-//!   lapse-and-reopen behavior) — needs claimed-stream tracking state this
-//!   item does not introduce.
-//! - Multi-client coexistence once a stream is claimed.
+//! - Multi-client coexistence once a stream is claimed (other clients may
+//!   still read via discovery; only the claimant may configure) — needs a
+//!   read/configure access-kind distinction this item does not introduce.
 //! - The client-side discovery cache.
 //! - Wiring any of the below into an actual decoder, dispatch loop, or
 //!   [`crate::avtpdu`]/[`crate::acf`] caller — this module remains additive
 //!   standalone plumbing only, matching the discipline every prior
-//!   Milestone 1/2 entry already established.
+//!   Milestone 1/2 entry already established. In particular,
+//!   [`DiscoveryClaim`]/[`try_claim_discovery_stream`] model claim state as
+//!   plain data a caller owns and threads through explicitly (mirroring how
+//!   [`build_discovery_response`] takes `state`/`general` as caller-supplied
+//!   values rather than owning them) — nothing here spawns a timer thread,
+//!   holds a lock, or reads the real clock itself.
 //!
 //! This module composes with, rather than duplicates, three already-landed
 //! Milestone 1/2 pieces:
@@ -56,7 +65,7 @@
 //!
 //! ## Provenance note
 //!
-//! Two working interpretations this item introduces, per Guiding Principle
+//! Four working interpretations this item introduces, per Guiding Principle
 //! 5, are flagged here for reconciliation against the OPEN Alliance TC18
 //! Remote Control Protocol Specification v0.5.1_RC's actual behavior
 //! (never its prose) before being relied on for interop with a real TC18 RC
@@ -90,6 +99,27 @@
 //!   already has to carry [`crate::register_map::GeneralRegisters::encode`]'s
 //!   fixed-length block somewhere, and payload is the only carrier this
 //!   crate's Milestone 1 framing offers either direction.
+//! - **Claim identity.** The roadmap names a "first-claimant rule" but does
+//!   not say what identifies a claimant. Rather than invent a new identity
+//!   type, this module reuses [`crate::avtpdu::StreamId`] — the same type
+//!   [`DISCOVERY_BROADCAST_STREAM_ID`] above already models a sender
+//!   identity with — as the claimant identity
+//!   [`try_claim_discovery_stream`] compares against. The sentinel broadcast
+//!   value itself is rejected as a claimant (see
+//!   [`RcpError::InvalidParameter`] in that function's own doc comment):
+//!   a broadcast address names no single real client, so it cannot
+//!   meaningfully hold an exclusive claim.
+//! - **Re-claim by the current claimant.** Nothing in the roadmap's wording
+//!   says whether the claimant that already holds a live claim may issue
+//!   another claim request against itself. This module treats that case as
+//!   a no-op refresh (it succeeds and re-timestamps the claim at `now`,
+//!   rather than being rejected as "a second claimant") since rejecting a
+//!   claimant's own repeat request would make an idle-but-still-interested
+//!   claimant indistinguishable from one that never claimed at all —
+//!   defeating the purpose of a lapse timer. This is a working
+//!   interpretation, not a transcription of confirmed spec behavior.
+
+use std::time::{Duration, Instant};
 
 use crate::acf::{AcfAbbMessage, ByteMessageInfo};
 use crate::avtpdu::StreamId;
@@ -224,6 +254,103 @@ pub fn build_discovery_response(
         info: response_info,
         payload: general.encode().to_vec(),
     })
+}
+
+// ── Discovery-stream claiming ────────────────────────────────────────────────
+
+/// Default `Discovery_TimeOut` lapse window: the interval a claim on the
+/// discovery stream survives without being refreshed before it is
+/// considered lapsed and reopens to any claimant. Matches the roadmap's
+/// stated `~20 ms` default.
+pub const DISCOVERY_TIME_OUT: Duration = Duration::from_millis(20);
+
+/// A live claim on the discovery stream, held by exactly one
+/// [`StreamId`]-identified claimant as of a point in time.
+///
+/// Deliberately plain data: nothing here reads the real clock, spawns a
+/// timer, or holds a lock — see this module's doc comment for why. A caller
+/// owns an `Option<DiscoveryClaim>` and threads it through
+/// [`try_claim_discovery_stream`] explicitly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DiscoveryClaim {
+    claimant: StreamId,
+    claimed_at: Instant,
+}
+
+impl DiscoveryClaim {
+    /// The [`StreamId`] that currently holds this claim.
+    pub fn claimant(&self) -> StreamId {
+        self.claimant
+    }
+
+    /// The instant this claim was most recently established or refreshed.
+    pub fn claimed_at(&self) -> Instant {
+        self.claimed_at
+    }
+
+    /// Has this claim lapsed as of `now`, given `timeout`?
+    ///
+    /// A claim lapses once at least `timeout` has elapsed since
+    /// [`Self::claimed_at`]. Uses [`Instant::saturating_duration_since`], so
+    /// an `now` that is (incorrectly) earlier than [`Self::claimed_at`]
+    /// reads as zero elapsed time rather than panicking or wrapping. Never
+    /// panics for any input.
+    // fusa:req REQ-DISC-006
+    pub fn has_lapsed(&self, now: Instant, timeout: Duration) -> bool {
+        now.saturating_duration_since(self.claimed_at) >= timeout
+    }
+}
+
+/// Attempt to claim the discovery stream as `claimant` at `now`, applying
+/// the first-claimant rule against `current`'s existing claim (if any).
+///
+/// - If `current` is `None`, or holds a claim that has
+///   [`DiscoveryClaim::has_lapsed`] as of `now` under `timeout`, the claim
+///   succeeds: a new [`DiscoveryClaim`] timestamped `now` is returned. This
+///   is the `Discovery_TimeOut` lapse-and-reopen behavior.
+/// - If `current` already holds a live claim for the same `claimant`, the
+///   claim also succeeds and is re-timestamped at `now` (a refresh, not a
+///   second claimant — see this module's Provenance note).
+/// - If `current` holds a live claim for a *different* claimant, the claim
+///   is rejected with `Err(RcpError::RequestRejected)` — the first-claimant
+///   rule. `current`'s existing claim is unaffected by a rejected attempt
+///   (this function returns a new claim on success or an error on failure;
+///   it never mutates state itself, since it owns none).
+/// - `claimant == `[`DISCOVERY_BROADCAST_STREAM_ID`] is always rejected
+///   with `Err(RcpError::InvalidParameter)`, regardless of `current` — see
+///   this module's Provenance note for why a broadcast address cannot hold
+///   an exclusive claim.
+///
+/// Never panics for any input.
+// fusa:req REQ-DISC-007
+// fusa:req REQ-DISC-008
+// fusa:req REQ-DISC-009
+pub fn try_claim_discovery_stream(
+    current: Option<DiscoveryClaim>,
+    claimant: StreamId,
+    now: Instant,
+    timeout: Duration,
+) -> Result<DiscoveryClaim, RcpError> {
+    // fusa:req REQ-DISC-009
+    if is_discovery_broadcast_stream_id(claimant) {
+        return Err(RcpError::InvalidParameter);
+    }
+
+    // fusa:req REQ-DISC-007
+    let granted = match current {
+        None => true,
+        Some(existing) => existing.claimant == claimant || existing.has_lapsed(now, timeout),
+    };
+
+    if granted {
+        Ok(DiscoveryClaim {
+            claimant,
+            claimed_at: now,
+        })
+    } else {
+        // fusa:req REQ-DISC-008
+        Err(RcpError::RequestRejected)
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -390,7 +517,160 @@ mod tests {
         assert_eq!(decoded_general, general);
     }
 
+    // ── Discovery-stream claiming ───────────────────────────────────────────
+
+    fn client_a() -> StreamId {
+        StreamId::new([0x02, 0x00, 0x00, 0x00, 0x00, 0x01], 1)
+    }
+
+    fn client_b() -> StreamId {
+        StreamId::new([0x02, 0x00, 0x00, 0x00, 0x00, 0x02], 7)
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-007
+    fn first_claimant_wins_an_unclaimed_stream() {
+        let now = Instant::now();
+        let claim = try_claim_discovery_stream(None, client_a(), now, DISCOVERY_TIME_OUT)
+            .expect("first claim must succeed");
+        assert_eq!(claim.claimant(), client_a());
+        assert_eq!(claim.claimed_at(), now);
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-008
+    fn second_different_claimant_is_rejected_while_claim_is_live() {
+        let claimed_at = Instant::now();
+        let claim =
+            try_claim_discovery_stream(None, client_a(), claimed_at, DISCOVERY_TIME_OUT).unwrap();
+        let still_live = claimed_at + (DISCOVERY_TIME_OUT / 2);
+        let err =
+            try_claim_discovery_stream(Some(claim), client_b(), still_live, DISCOVERY_TIME_OUT)
+                .unwrap_err();
+        assert_eq!(err, RcpError::RequestRejected);
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-007
+    fn same_claimant_may_refresh_its_own_live_claim() {
+        let claimed_at = Instant::now();
+        let claim =
+            try_claim_discovery_stream(None, client_a(), claimed_at, DISCOVERY_TIME_OUT).unwrap();
+        let still_live = claimed_at + (DISCOVERY_TIME_OUT / 2);
+        let refreshed =
+            try_claim_discovery_stream(Some(claim), client_a(), still_live, DISCOVERY_TIME_OUT)
+                .expect("same claimant refreshing its own claim must succeed");
+        assert_eq!(refreshed.claimant(), client_a());
+        assert_eq!(refreshed.claimed_at(), still_live);
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-006
+    // fusa:test REQ-DISC-007
+    fn lapsed_claim_reopens_to_a_new_claimant() {
+        let claimed_at = Instant::now();
+        let claim =
+            try_claim_discovery_stream(None, client_a(), claimed_at, DISCOVERY_TIME_OUT).unwrap();
+        assert!(!claim.has_lapsed(claimed_at, DISCOVERY_TIME_OUT));
+
+        let after_timeout = claimed_at + DISCOVERY_TIME_OUT;
+        assert!(claim.has_lapsed(after_timeout, DISCOVERY_TIME_OUT));
+
+        let reclaimed =
+            try_claim_discovery_stream(Some(claim), client_b(), after_timeout, DISCOVERY_TIME_OUT)
+                .expect("a lapsed claim must reopen to any claimant");
+        assert_eq!(reclaimed.claimant(), client_b());
+        assert_eq!(reclaimed.claimed_at(), after_timeout);
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-006
+    fn has_lapsed_boundary_is_inclusive_of_the_exact_timeout() {
+        let claimed_at = Instant::now();
+        let claim = DiscoveryClaim {
+            claimant: client_a(),
+            claimed_at,
+        };
+        let just_before = claimed_at + (DISCOVERY_TIME_OUT - Duration::from_millis(1));
+        let exactly_at = claimed_at + DISCOVERY_TIME_OUT;
+        assert!(!claim.has_lapsed(just_before, DISCOVERY_TIME_OUT));
+        assert!(claim.has_lapsed(exactly_at, DISCOVERY_TIME_OUT));
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-006
+    fn has_lapsed_never_panics_when_now_precedes_claimed_at() {
+        let claimed_at = Instant::now();
+        let claim = DiscoveryClaim {
+            claimant: client_a(),
+            claimed_at,
+        };
+        let earlier = claimed_at.checked_sub(Duration::from_millis(5));
+        if let Some(earlier) = earlier {
+            assert!(!claim.has_lapsed(earlier, DISCOVERY_TIME_OUT));
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-009
+    fn broadcast_sentinel_is_never_an_eligible_claimant() {
+        let now = Instant::now();
+        let err = try_claim_discovery_stream(
+            None,
+            DISCOVERY_BROADCAST_STREAM_ID,
+            now,
+            DISCOVERY_TIME_OUT,
+        )
+        .unwrap_err();
+        assert_eq!(err, RcpError::InvalidParameter);
+
+        // Also rejected as an attempted claimant against an already-live
+        // claim, and against a lapsed one.
+        let claim = try_claim_discovery_stream(None, client_a(), now, DISCOVERY_TIME_OUT).unwrap();
+        let after_timeout = now + DISCOVERY_TIME_OUT;
+        assert_eq!(
+            try_claim_discovery_stream(
+                Some(claim),
+                DISCOVERY_BROADCAST_STREAM_ID,
+                after_timeout,
+                DISCOVERY_TIME_OUT,
+            ),
+            Err(RcpError::InvalidParameter)
+        );
+    }
+
     // ── Never panics ────────────────────────────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-DISC-010
+    fn try_claim_discovery_stream_never_panics_across_sampled_inputs() {
+        let mut state: u32 = 0xC1A1_0DEC;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            state
+        };
+        let base = Instant::now();
+        let claimants = [client_a(), client_b(), DISCOVERY_BROADCAST_STREAM_ID];
+        for &claimant in &claimants {
+            for existing in [None, Some(client_a()), Some(client_b())] {
+                let current = existing.map(|c| DiscoveryClaim {
+                    claimant: c,
+                    claimed_at: base,
+                });
+                let offset_ms = (next() % 50) as u64;
+                let now = base + Duration::from_millis(offset_ms);
+                let timeout_ms = 1 + (next() % 40) as u64;
+                let _ = try_claim_discovery_stream(
+                    current,
+                    claimant,
+                    now,
+                    Duration::from_millis(timeout_ms),
+                );
+            }
+        }
+    }
 
     #[test]
     // fusa:test REQ-DISC-005
