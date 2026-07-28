@@ -8,12 +8,19 @@
 // fusa:req REQ-DISC-008
 // fusa:req REQ-DISC-009
 // fusa:req REQ-DISC-010
+// fusa:req REQ-DISC-011
+// fusa:req REQ-DISC-012
+// fusa:req REQ-DISC-013
+// fusa:req REQ-DISC-014
+// fusa:req REQ-DISC-015
 
-//! Discovery request/response and discovery-stream claiming — TC18
-//! register-map model (`ROADMAP.md` Milestone 3 "Discovery" subsection,
-//! first two checklist bullets: "Discovery request/response" and
-//! "Discovery-stream claiming: first-claimant rule, `Discovery_TimeOut`
-//! (~20 ms default) lapse-and-reopen behavior").
+//! Discovery request/response, discovery-stream claiming, and multi-client
+//! coexistence — TC18 register-map model (`ROADMAP.md` Milestone 3
+//! "Discovery" subsection, first three checklist bullets: "Discovery
+//! request/response", "Discovery-stream claiming: first-claimant rule,
+//! `Discovery_TimeOut` (~20 ms default) lapse-and-reopen behavior", and
+//! "Multi-client coexistence: other clients may still read via discovery
+//! while a stream is claimed; only the claimant may configure").
 //!
 //! This module begins Milestone 3, which per the subsection's own Goal text
 //! replaces [`crate::mdns`] as the *mandatory* discovery path (mDNS may
@@ -23,20 +30,18 @@
 //! model — that is a different, private-protocol concept with nothing in
 //! common with the TC18 broadcast-`ACF_ABB` mechanism modeled below.
 //!
-//! Only this subsection's first two checklist bullets are in scope.
-//! Deliberately out of scope, as separate later checklist bullets in the
+//! Only this subsection's first three checklist bullets are in scope.
+//! Deliberately out of scope, as a separate later checklist bullet in the
 //! same subsection:
 //!
-//! - Multi-client coexistence once a stream is claimed (other clients may
-//!   still read via discovery; only the claimant may configure) — needs a
-//!   read/configure access-kind distinction this item does not introduce.
 //! - The client-side discovery cache.
 //! - Wiring any of the below into an actual decoder, dispatch loop, or
 //!   [`crate::avtpdu`]/[`crate::acf`] caller — this module remains additive
 //!   standalone plumbing only, matching the discipline every prior
 //!   Milestone 1/2 entry already established. In particular,
-//!   [`DiscoveryClaim`]/[`try_claim_discovery_stream`] model claim state as
-//!   plain data a caller owns and threads through explicitly (mirroring how
+//!   [`DiscoveryClaim`]/[`try_claim_discovery_stream`]/
+//!   [`check_discovery_access`] model claim state as plain data a caller
+//!   owns and threads through explicitly (mirroring how
 //!   [`build_discovery_response`] takes `state`/`general` as caller-supplied
 //!   values rather than owning them) — nothing here spawns a timer thread,
 //!   holds a lock, or reads the real clock itself.
@@ -63,9 +68,52 @@
 //!   table), reused as the discovery response payload's content rather than
 //!   inventing a new addressing scheme.
 //!
+//! ## Multi-client coexistence
+//!
+//! [`DiscoveryAccessKind`]/[`check_discovery_access`] add this subsection's
+//! third checklist bullet: a distinct read/configure access-kind
+//! distinction over the discovery stream, layered on top of (not replacing)
+//! [`try_claim_discovery_stream`]'s existing claim-tracking. This mirrors,
+//! at the discovery-claim level, the same shape [`crate::ep0::is_root_client`]/
+//! [`crate::ep0::check_ep0_access_for_stream`] already established at the
+//! EP0 root-client level — see that module's own "Root client" section.
+//!
+//! - Reading discovery info ([`DiscoveryAccessKind::Read`]) —
+//!   [`build_discovery_request`]/[`build_discovery_response`]'s existing
+//!   broadcast mechanism — always succeeds, for any requester, regardless of
+//!   whether the discovery stream is currently claimed, by whom, or whether
+//!   an existing claim has lapsed. [`check_discovery_access`] never even
+//!   inspects its `current` claim parameter for this kind, mirroring
+//!   [`build_discovery_response`]'s own "answerable in **any** lifecycle
+//!   state" unconditional behavior.
+//! - Configuring the discovery stream ([`DiscoveryAccessKind::Configure`])
+//!   is restricted to whichever [`crate::avtpdu::StreamId`] currently holds
+//!   the live (not [`DiscoveryClaim::has_lapsed`]) claim: an unclaimed
+//!   stream, the live claimant itself, or any requester once the existing
+//!   claim has lapsed, may configure — exactly the same "who may act" rule
+//!   [`try_claim_discovery_stream`]'s own first-claimant logic already
+//!   applies when granting a claim (both now share the same internal
+//!   `claim_permits` helper, rather than duplicating that rule twice). A
+//!   different, still-live claimant's configure attempt is rejected with
+//!   `Err(RcpError::UnauthorizedAccess)`.
+//! - [`DISCOVERY_BROADCAST_STREAM_ID`] is always rejected as a
+//!   `Configure` requester, with `Err(RcpError::InvalidParameter)`,
+//!   regardless of claim state — mirroring
+//!   [`try_claim_discovery_stream`]'s own rejection of the broadcast
+//!   sentinel as a claimant, for the same reason: a broadcast address names
+//!   no single real client, so it cannot meaningfully be "the claimant" a
+//!   configure action is attributed to.
+//!
+//! This module still performs no register I/O, does not itself decide what
+//! wire-level operation counts as "configuring" the discovery stream (that
+//! remains a later, decoder/dispatch-level concern — see the out-of-scope
+//! list above), and takes [`DiscoveryAccessKind`] as a caller-supplied value
+//! rather than deriving it from a decoded message — see this module's
+//! Provenance note for why.
+//!
 //! ## Provenance note
 //!
-//! Four working interpretations this item introduces, per Guiding Principle
+//! Five working interpretations this item introduces, per Guiding Principle
 //! 5, are flagged here for reconciliation against the OPEN Alliance TC18
 //! Remote Control Protocol Specification v0.5.1_RC's actual behavior
 //! (never its prose) before being relied on for interop with a real TC18 RC
@@ -118,6 +166,36 @@
 //!   claimant indistinguishable from one that never claimed at all —
 //!   defeating the purpose of a lapse timer. This is a working
 //!   interpretation, not a transcription of confirmed spec behavior.
+//! - **Read/configure access-kind distinction.** The roadmap's checklist
+//!   wording distinguishes "read via discovery" from "configure the
+//!   discovery stream" but does not say how a caller tells the two apart on
+//!   the wire: [`is_discovery_request`]'s own read-direction (`op = false`)
+//!   check, reused from [`crate::ep0::access_kind`], already identifies the
+//!   *discovery request/response* mechanism specifically, but nothing in
+//!   this crate's Milestone 1 framing names a distinct operation, register,
+//!   or flag for "configuring the discovery stream" the way, say,
+//!   [`crate::ep0::Ep0AccessKind::Write`] is derived structurally from
+//!   `ByteMessageInfo::op`. Rather than guess an unconfirmed encoding for a
+//!   concept the roadmap names but this crate's wire model does not yet
+//!   carry, [`DiscoveryAccessKind`] is a plain caller-supplied value
+//!   [`check_discovery_access`] takes as a parameter, not a value derived
+//!   from a decoded message — deferring "which wire operation(s) count as a
+//!   configure attempt" to whichever later item wires this into an actual
+//!   decoder/dispatch loop (see the out-of-scope list above).
+//! - **`RcpError` choice for a non-claimant's rejected configure attempt.**
+//!   Per this crate's Milestone 2 "Error Model" precedent
+//!   ([`RcpError`]'s own doc comment), this module reuses
+//!   [`RcpError::UnauthorizedAccess`] rather than inventing a new
+//!   provisional sentinel: a non-claimant's configure attempt is the same
+//!   shape of failure as [`crate::ep0::check_ep0_access_for_stream`]'s
+//!   non-root-client write rejection — the requesting stream's identity
+//!   does not authorize the attempted access — just gated on the discovery
+//!   claim axis instead of the EP0 root-client axis. The broadcast
+//!   sentinel's rejection as a `Configure` requester reuses
+//!   [`RcpError::InvalidParameter`] for the same reason
+//!   [`try_claim_discovery_stream`] already does: the supplied requester
+//!   value itself is not a meaningful single-client identity, independent
+//!   of any claim state.
 
 use std::time::{Duration, Instant};
 
@@ -337,12 +415,7 @@ pub fn try_claim_discovery_stream(
     }
 
     // fusa:req REQ-DISC-007
-    let granted = match current {
-        None => true,
-        Some(existing) => existing.claimant == claimant || existing.has_lapsed(now, timeout),
-    };
-
-    if granted {
+    if claim_permits(current, claimant, now, timeout) {
         Ok(DiscoveryClaim {
             claimant,
             claimed_at: now,
@@ -350,6 +423,99 @@ pub fn try_claim_discovery_stream(
     } else {
         // fusa:req REQ-DISC-008
         Err(RcpError::RequestRejected)
+    }
+}
+
+/// Shared "who may act" rule underlying both [`try_claim_discovery_stream`]'s
+/// first-claimant grant decision and [`check_discovery_access`]'s
+/// `Configure`-kind gate: is `who` permitted against `current`'s claim state
+/// as of `now` under `timeout`?
+///
+/// `true` iff `current` is `None` (unclaimed), `current`'s claim already
+/// belongs to `who`, or `current`'s claim has [`DiscoveryClaim::has_lapsed`]
+/// as of `now` under `timeout`. Does not itself special-case
+/// [`DISCOVERY_BROADCAST_STREAM_ID`] as `who` — both callers apply that
+/// rejection themselves, since it carries a different `RcpError` variant at
+/// each call site. Never panics for any input.
+fn claim_permits(
+    current: Option<DiscoveryClaim>,
+    who: StreamId,
+    now: Instant,
+    timeout: Duration,
+) -> bool {
+    match current {
+        None => true,
+        Some(existing) => existing.claimant == who || existing.has_lapsed(now, timeout),
+    }
+}
+
+// ── Multi-client coexistence: read/configure access-kind distinction ───────────
+
+/// The kind of access being attempted against the discovery stream: reading
+/// discovery info (always open, claim state notwithstanding) vs. configuring
+/// the discovery stream (restricted to the live claimant). See this module's
+/// "Multi-client coexistence" section and Provenance note for the full
+/// rationale, including why this is a caller-supplied value rather than one
+/// [`check_discovery_access`] derives from a decoded message itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// fusa:req REQ-DISC-011
+pub enum DiscoveryAccessKind {
+    /// Reading discovery info — the broadcast discovery request/response
+    /// mechanism ([`build_discovery_request`]/[`build_discovery_response`]).
+    Read,
+    /// Configuring the discovery stream itself.
+    Configure,
+}
+
+/// Is a `kind`-typed access against the discovery stream, by `requester`,
+/// permitted given `current`'s claim state as of `now` under `timeout`?
+///
+/// - [`DiscoveryAccessKind::Read`] always succeeds: `current`, `now`, and
+///   `timeout` are not even inspected for this kind. Any requester,
+///   claimant or not, may read discovery info regardless of claim state —
+///   see this module's "Multi-client coexistence" section.
+/// - [`DiscoveryAccessKind::Configure`] succeeds iff [`claim_permits`]
+///   answers `true` for `requester` against `current` (unclaimed, already
+///   `requester`'s own live claim, or a lapsed claim) — the same rule
+///   [`try_claim_discovery_stream`] itself applies when granting a claim.
+///   Otherwise (a live claim held by a different claimant), it is rejected
+///   with `Err(RcpError::UnauthorizedAccess)`, mirroring
+///   [`crate::ep0::check_ep0_access_for_stream`]'s non-root-writer
+///   rejection.
+/// - `requester == `[`DISCOVERY_BROADCAST_STREAM_ID`] is always rejected for
+///   [`DiscoveryAccessKind::Configure`] with `Err(RcpError::InvalidParameter)`,
+///   regardless of `current` — mirroring [`try_claim_discovery_stream`]'s own
+///   rejection of the broadcast sentinel as a claimant.
+///
+/// Performs no register I/O and does not mutate `current` — like
+/// [`try_claim_discovery_stream`], this function only ever answers a
+/// question about caller-supplied state. Never panics for any input.
+// fusa:req REQ-DISC-012
+// fusa:req REQ-DISC-013
+// fusa:req REQ-DISC-014
+pub fn check_discovery_access(
+    current: Option<DiscoveryClaim>,
+    requester: StreamId,
+    kind: DiscoveryAccessKind,
+    now: Instant,
+    timeout: Duration,
+) -> Result<(), RcpError> {
+    match kind {
+        DiscoveryAccessKind::Read => Ok(()),
+        DiscoveryAccessKind::Configure => {
+            // fusa:req REQ-DISC-014
+            if is_discovery_broadcast_stream_id(requester) {
+                return Err(RcpError::InvalidParameter);
+            }
+
+            // fusa:req REQ-DISC-012
+            if claim_permits(current, requester, now, timeout) {
+                Ok(())
+            } else {
+                // fusa:req REQ-DISC-013
+                Err(RcpError::UnauthorizedAccess)
+            }
+        }
     }
 }
 
@@ -639,6 +805,204 @@ mod tests {
         );
     }
 
+    // ── Multi-client coexistence: read/configure access-kind distinction ───
+
+    #[test]
+    // fusa:test REQ-DISC-011
+    // fusa:test REQ-DISC-012
+    fn read_access_always_succeeds_and_never_consults_claim_state() {
+        let now = Instant::now();
+        // Unclaimed.
+        assert_eq!(
+            check_discovery_access(
+                None,
+                client_a(),
+                DiscoveryAccessKind::Read,
+                now,
+                DISCOVERY_TIME_OUT
+            ),
+            Ok(())
+        );
+        // A live claim held by someone else -- still succeeds for the
+        // non-claimant reader.
+        let claim = try_claim_discovery_stream(None, client_a(), now, DISCOVERY_TIME_OUT).unwrap();
+        assert_eq!(
+            check_discovery_access(
+                Some(claim),
+                client_b(),
+                DiscoveryAccessKind::Read,
+                now,
+                DISCOVERY_TIME_OUT
+            ),
+            Ok(())
+        );
+        // Even the broadcast sentinel may read.
+        assert_eq!(
+            check_discovery_access(
+                Some(claim),
+                DISCOVERY_BROADCAST_STREAM_ID,
+                DiscoveryAccessKind::Read,
+                now,
+                DISCOVERY_TIME_OUT
+            ),
+            Ok(())
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-012
+    fn configure_succeeds_on_an_unclaimed_stream() {
+        let now = Instant::now();
+        assert_eq!(
+            check_discovery_access(
+                None,
+                client_a(),
+                DiscoveryAccessKind::Configure,
+                now,
+                DISCOVERY_TIME_OUT
+            ),
+            Ok(())
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-012
+    fn configure_succeeds_for_the_live_claimant() {
+        let claimed_at = Instant::now();
+        let claim =
+            try_claim_discovery_stream(None, client_a(), claimed_at, DISCOVERY_TIME_OUT).unwrap();
+        let still_live = claimed_at + (DISCOVERY_TIME_OUT / 2);
+        assert_eq!(
+            check_discovery_access(
+                Some(claim),
+                client_a(),
+                DiscoveryAccessKind::Configure,
+                still_live,
+                DISCOVERY_TIME_OUT
+            ),
+            Ok(())
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-013
+    fn configure_rejects_a_different_live_claimant() {
+        let claimed_at = Instant::now();
+        let claim =
+            try_claim_discovery_stream(None, client_a(), claimed_at, DISCOVERY_TIME_OUT).unwrap();
+        let still_live = claimed_at + (DISCOVERY_TIME_OUT / 2);
+        assert_eq!(
+            check_discovery_access(
+                Some(claim),
+                client_b(),
+                DiscoveryAccessKind::Configure,
+                still_live,
+                DISCOVERY_TIME_OUT
+            ),
+            Err(RcpError::UnauthorizedAccess)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-012
+    fn configure_succeeds_for_any_requester_once_the_claim_has_lapsed() {
+        let claimed_at = Instant::now();
+        let claim =
+            try_claim_discovery_stream(None, client_a(), claimed_at, DISCOVERY_TIME_OUT).unwrap();
+        let after_timeout = claimed_at + DISCOVERY_TIME_OUT;
+        assert_eq!(
+            check_discovery_access(
+                Some(claim),
+                client_b(),
+                DiscoveryAccessKind::Configure,
+                after_timeout,
+                DISCOVERY_TIME_OUT
+            ),
+            Ok(())
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-014
+    fn configure_rejects_the_broadcast_sentinel_regardless_of_claim_state() {
+        let now = Instant::now();
+        // Unclaimed.
+        assert_eq!(
+            check_discovery_access(
+                None,
+                DISCOVERY_BROADCAST_STREAM_ID,
+                DiscoveryAccessKind::Configure,
+                now,
+                DISCOVERY_TIME_OUT
+            ),
+            Err(RcpError::InvalidParameter)
+        );
+        // Live claim held by a real client.
+        let claim = try_claim_discovery_stream(None, client_a(), now, DISCOVERY_TIME_OUT).unwrap();
+        assert_eq!(
+            check_discovery_access(
+                Some(claim),
+                DISCOVERY_BROADCAST_STREAM_ID,
+                DiscoveryAccessKind::Configure,
+                now,
+                DISCOVERY_TIME_OUT
+            ),
+            Err(RcpError::InvalidParameter)
+        );
+        // Lapsed claim.
+        let after_timeout = now + DISCOVERY_TIME_OUT;
+        assert_eq!(
+            check_discovery_access(
+                Some(claim),
+                DISCOVERY_BROADCAST_STREAM_ID,
+                DiscoveryAccessKind::Configure,
+                after_timeout,
+                DISCOVERY_TIME_OUT
+            ),
+            Err(RcpError::InvalidParameter)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-012
+    // fusa:test REQ-DISC-013
+    fn check_discovery_access_configure_agrees_with_try_claim_discovery_stream_grant_decision() {
+        // check_discovery_access's Configure gate and
+        // try_claim_discovery_stream's grant decision share the same
+        // claim_permits rule -- demonstrate the two agree across a spread of
+        // claim states rather than merely asserting it in a doc comment.
+        let base = Instant::now();
+        let claimants = [client_a(), client_b()];
+        for &existing_claimant in &claimants {
+            let claim =
+                try_claim_discovery_stream(None, existing_claimant, base, DISCOVERY_TIME_OUT)
+                    .unwrap();
+            for &requester in &claimants {
+                for offset_ms in [
+                    0u64,
+                    DISCOVERY_TIME_OUT.as_millis() as u64 / 2,
+                    DISCOVERY_TIME_OUT.as_millis() as u64,
+                ] {
+                    let now = base + Duration::from_millis(offset_ms);
+                    let access = check_discovery_access(
+                        Some(claim),
+                        requester,
+                        DiscoveryAccessKind::Configure,
+                        now,
+                        DISCOVERY_TIME_OUT,
+                    );
+                    let claim_grant =
+                        try_claim_discovery_stream(Some(claim), requester, now, DISCOVERY_TIME_OUT);
+                    assert_eq!(
+                        access.is_ok(),
+                        claim_grant.is_ok(),
+                        "{existing_claimant:?} {requester:?} {offset_ms}ms"
+                    );
+                }
+            }
+        }
+    }
+
     // ── Never panics ────────────────────────────────────────────────────────
 
     #[test]
@@ -668,6 +1032,41 @@ mod tests {
                     now,
                     Duration::from_millis(timeout_ms),
                 );
+            }
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-015
+    fn check_discovery_access_never_panics_across_sampled_inputs() {
+        let mut state: u32 = 0xACCE_5501;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            state
+        };
+        let base = Instant::now();
+        let requesters = [client_a(), client_b(), DISCOVERY_BROADCAST_STREAM_ID];
+        let kinds = [DiscoveryAccessKind::Read, DiscoveryAccessKind::Configure];
+        for &requester in &requesters {
+            for existing in [None, Some(client_a()), Some(client_b())] {
+                let current = existing.map(|c| DiscoveryClaim {
+                    claimant: c,
+                    claimed_at: base,
+                });
+                for &kind in &kinds {
+                    let offset_ms = (next() % 50) as u64;
+                    let now = base + Duration::from_millis(offset_ms);
+                    let timeout_ms = 1 + (next() % 40) as u64;
+                    let _ = check_discovery_access(
+                        current,
+                        requester,
+                        kind,
+                        now,
+                        Duration::from_millis(timeout_ms),
+                    );
+                }
             }
         }
     }

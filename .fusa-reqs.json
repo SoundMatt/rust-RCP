@@ -4320,6 +4320,51 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-DISC-011",
+      "title": "Discovery read access always succeeds regardless of claim state",
+      "text": "check_discovery_access with DiscoveryAccessKind::Read succeeds unconditionally for any requester (claimant, non-claimant, or the broadcast sentinel), never consulting the current claim, now, or timeout parameters",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-DISC-012",
+      "title": "Discovery configure access permitted for unclaimed, own-claim, and lapsed-claim cases",
+      "text": "check_discovery_access with DiscoveryAccessKind::Configure succeeds when current is None (unclaimed), when current already belongs to the requester (live-claimant self-configure), or when current's claim has DiscoveryClaim::has_lapsed as of now under timeout, agreeing in every case with the grant decision try_claim_discovery_stream itself would reach for the same inputs",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-DISC-013",
+      "title": "Discovery configure access rejects a different live claimant",
+      "text": "check_discovery_access with DiscoveryAccessKind::Configure returns Err(RcpError::UnauthorizedAccess) when current holds a live (not lapsed) claim for a requester different from the one asking to configure",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-DISC-014",
+      "title": "Discovery configure access rejects the broadcast sentinel as requester",
+      "text": "check_discovery_access with DiscoveryAccessKind::Configure returns Err(RcpError::InvalidParameter) whenever requester equals DISCOVERY_BROADCAST_STREAM_ID, regardless of whether current is None, holds a live claim, or holds a lapsed claim",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-DISC-015",
+      "title": "Discovery access-kind check never panics",
+      "text": "check_discovery_access never panics for any sampled combination of current claim state, requester (including the broadcast sentinel), DiscoveryAccessKind, now, and timeout",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
