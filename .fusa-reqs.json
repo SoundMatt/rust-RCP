@@ -4995,6 +4995,69 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CMP-001",
+      "title": "RequestKind models compound (0x0F) and compound-wait (0x0B) discriminants and round-trips to_u8/from_u8",
+      "text": "RequestKind carries the two roadmap-named conditional-request discriminants (Compound = 0x0F, CompoundWait = 0x0B) and RequestKind::to_u8/from_u8 round-trip both values",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CMP-002",
+      "title": "RequestKind::from_u8 rejects every discriminant value other than the two named ones and never panics",
+      "text": "RequestKind::from_u8 returns Err(RcpError::InvalidParameter) for any byte other than 0x0B/0x0F, including the other conditional-request kinds ROADMAP.md names elsewhere in Milestone 5 that this module does not yet model, and never panics across the full 0..=255 byte range",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CMP-003",
+      "title": "SequencerState and CompoundGateConfig model a sequencer number and its required start state",
+      "text": "SequencerState wraps a single persistent-state byte mirroring regmap::SequencerStateEntry::seq_state, and CompoundGateConfig pairs a plain sequencer_num byte with the SequencerState a compound/compound-wait request requires before it may execute; both default to zero",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CMP-004",
+      "title": "check_sequencer_num_in_bounds validates a sequencer number against svr_sequencers_max",
+      "text": "check_sequencer_num_in_bounds returns Ok(()) for every sequencer_num strictly less than svr_sequencers_max and Err(RcpError::SequencerNotKnown) otherwise (including when svr_sequencers_max is 0), and never panics for any sampled input; check_compound_gate applies this bounds check ahead of its own state comparison",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CMP-005",
+      "title": "is_gate_satisfied/check_compound_gate implement the sequencer-gated execution rule",
+      "text": "is_gate_satisfied returns true only when the supplied current sequencer state equals the gate's configured start_state; check_compound_gate returns Ok(()) when the sequencer is known and its state satisfies the gate, and Err(RcpError::RequestRejected) when the sequencer is known but its state does not satisfy the gate; neither ever panics",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CMP-006",
+      "title": "CompoundExecDelays models cmp_exec_delay/cmpw_exec_delay and resolve_compound_exec_delay selects the matching timer",
+      "text": "CompoundExecDelays carries cmp_exec_delay and cmpw_exec_delay as independent u32 fields defaulting to zero, and resolve_compound_exec_delay returns cmp_exec_delay for RequestKind::Compound and cmpw_exec_delay for RequestKind::CompoundWait",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CMP-007",
+      "title": "advance_sequencer_if_still_in_start_state implements the advance-only-if-still-in-start-state race guard",
+      "text": "advance_sequencer_if_still_in_start_state returns Some(next_state) only when the observed sequencer state at advance time still equals the gate's start_state, and returns None (do not advance) when a race has moved the sequencer out of its start state in the interim; never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
