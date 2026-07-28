@@ -124,6 +124,7 @@ pub mod record;
 pub mod redundancy;
 pub mod regmap;
 pub mod relay;
+pub mod request;
 pub mod restbridge;
 pub mod shmem;
 pub mod sim;

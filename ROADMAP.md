@@ -1132,9 +1132,44 @@ that gates it. This is also where the old `prioqueue.rs` decorator's job —
 picking which pending request runs next — gets absorbed into the core
 per-endpoint scheduler, since the spec defines that ordering natively.
 
-- [ ] Compound / compound-wait (`0x0F`/`0x0B`): sequencer-gated execution
+- [x] Compound / compound-wait (`0x0F`/`0x0B`): sequencer-gated execution
       and wait; `cmp_exec_delay`/`cmpw_exec_delay` timers; "advance sequencer
-      only if still in start state" rule
+      only if still in start state" rule. Done (v0.8.0-dev): new
+      `src/request.rs` — the module name PR #37's naming-reconciliation
+      pass reserved for this work — adds `RequestKind` (`Compound = 0x0F`,
+      `CompoundWait = 0x0B`) with `to_u8`/`from_u8`; `SequencerState` and
+      `CompoundGateConfig` (a plain `sequencer_num` byte plus the required
+      `start_state`, mirroring `RequestStreamConfigEntry::
+      rx_safestate_sequencer`'s own "sequencer number is a plain byte"
+      precedent) with `check_sequencer_num_in_bounds` (against
+      `GeneralRegisters::svr_sequencers_max`), `is_gate_satisfied`, and
+      `check_compound_gate` implementing the sequencer-gated-execution
+      rule; `CompoundExecDelays { cmp_exec_delay, cmpw_exec_delay }` with
+      `resolve_compound_exec_delay` selecting the timer for a given
+      `RequestKind`; and `advance_sequencer_if_still_in_start_state`, a
+      pure function implementing the "advance only if still in start
+      state" race guard. Three points flagged per Guiding Principle 5: (1)
+      unlike `acf_msg_type`, no checklist text states which byte/field of a
+      request actually carries the `0x0F`/`0x0B` discriminant, so
+      `RequestKind` is a standalone value type not yet attached to any
+      offset within `ByteMessageInfo` or elsewhere; (2)
+      `cmp_exec_delay`/`cmpw_exec_delay` are modeled as `u32`
+      unconfirmed-width/units placeholders, mirroring `UartRxQueueConfig::
+      uart_timeout`'s and `PwmInFunctionalConfig::no_signal_timeout`'s own
+      precedent; (3) the sequencer-state machine this gating rule reads is
+      itself the next, not-yet-built checklist bullet below, so every
+      function here takes the sequencer's current state as a
+      caller-supplied `SequencerState` value (mirroring `RcServerState::
+      try_transition`'s `is_consistent` closure and `check_ep0_access_for_
+      stream`'s `root_client` parameter) rather than blocking on it, and
+      the post-execution "next state" is likewise caller-supplied since no
+      advancement convention is named. Additive standalone plumbing only —
+      not wired into any decoder, dispatch loop, or the request-lifecycle
+      state machine (a later bullet in this same milestone); the legacy
+      `src/prioqueue.rs` decorator this milestone's Goal text names is read
+      only as background, not extended. New `REQ-CMP-001`..`REQ-CMP-007`
+      (in `src/request.rs`) added to `.fusa-reqs.json`, each with a
+      `// fusa:req`/`// fusa:test` pair.
 - [ ] Triggered (`0x0E`): trigger-occurrence counting that runs independent
       of endpoint busy/idle state; `trigger_exec_delay`; infinite-repeat
       sentinel (`0xFFFF`)
