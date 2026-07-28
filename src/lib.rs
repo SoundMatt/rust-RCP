@@ -116,6 +116,7 @@ pub mod observe;
 pub mod powerstate;
 pub mod prioqueue;
 pub mod proxy;
+pub mod pwm;
 pub mod ratelimit;
 pub mod record;
 pub mod redundancy;

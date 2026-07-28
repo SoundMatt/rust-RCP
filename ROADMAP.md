@@ -989,9 +989,46 @@ functional config) before tackling bus-protocol endpoints.
 - [ ] **ADC** (`ep_type 0x09`): ≤16-bit resolution; three-level averaging
       model (`adc_sample_interval` → `adc_avg_intervals_per_request` →
       `adc_combine_avg_values`); request-driven sampling only
-- [ ] **PWM_OUT / PWM_IN** (`ep_type 0x07`/`0x08`): shared
+- [x] **PWM_OUT / PWM_IN** (`ep_type 0x07`/`0x08`): shared
       period+active-duration pair shape; PWM_IN's `PWM_IN_NO_SIGNAL` timeout
-      instead of hanging or returning stale data
+      instead of hanging or returning stale data. Done (v0.7.0-dev): new
+      `src/pwm.rs` adds [`PwmDurationPair`] (the shared period+active-duration
+      pair shape) as a field on two dedicated per-direction functional-config
+      types, [`PwmOutFunctionalConfig`] and [`PwmInFunctionalConfig`] — this
+      is the first Milestone 4 checklist bullet naming two
+      `regmap::EndpointType` tags (`PwmOut`/`PwmIn`) at once, so unlike
+      `UartFunctionalConfig`'s single shared block, each direction gets its
+      own type with its own `layer_tag` composing against
+      `regmap::check_functional_config_matches_ep_type`'s existing
+      cross-layer rule independently; and
+      [`PwmInReadResolution`]/[`resolve_pwm_in_read`] turning the
+      `PWM_IN_NO_SIGNAL` timeout rule into a pure function mirroring
+      `uart::resolve_uart_read_completion`'s own prose-rule-to-function
+      discipline — it never blocks (returns `None` for a genuinely
+      in-progress read, letting a polling caller retry rather than hanging)
+      and never re-reports a stale prior measurement once the timeout
+      elapses (`NoSignal` always wins over any `last_measured` value past
+      the threshold). Three points flagged per Guiding Principle 5 rather
+      than silently resolved: (1) `PwmDurationPair`'s `period`/
+      `active_duration` field widths and units are unstated by the
+      checklist text, so both are carried as unconfirmed-width/units `u32`
+      values, mirroring `uart::UartRxQueueConfig::uart_timeout`'s own
+      precedent, and whether `active_duration` may validly exceed `period`
+      is left unvalidated; (2) as with UART's zero-threshold discipline, a
+      zero-valued `no_signal_timeout` is not treated as "disabled," so a
+      default, zeroed `PwmInFunctionalConfig` resolves every read as
+      `NoSignal` immediately; (3) `PWM_IN_NO_SIGNAL` has no candidate among
+      Milestone 2's Error Model's eleven TC18-spec-named `RcpError`
+      variants (unlike UART's `UNKNOWN_CMD`/`UnsupportedCmd` mapping), so it
+      is modeled as a resolved measurement outcome
+      (`PwmInReadResolution::NoSignal`) rather than as an `RcpError` variant,
+      and the module does not infer no-signal from a genuinely-zero
+      measured pair — only elapsed time against the configured timeout
+      drives the outcome. Like every prior Milestone 1-4 entry, this
+      remains additive standalone plumbing only — nothing here is wired
+      into an actual decoder or dispatch loop. New `REQ-PWM-001`..
+      `REQ-PWM-009` added to `.fusa-reqs.json`, each with a `// fusa:req`/
+      `// fusa:test` pair in `src/pwm.rs`.
 - [ ] Generic `evt[2:0]` group conventions common to all of the above
       (Groups A/B/C) and the shared common functional-config fields
       (`ep_enable`, `ep_clear_req_storage`, `ep_req_crc_enable`, etc.)
