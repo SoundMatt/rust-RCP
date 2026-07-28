@@ -89,6 +89,7 @@ pub mod firmware;
 pub mod formal;
 pub mod grpcbridge;
 pub mod iso21434;
+pub mod lifecycle;
 pub mod linbr;
 pub mod loan;
 pub mod mdns;
@@ -450,6 +451,9 @@ pub enum RcpError {
 
     #[error("rcp/addressing: response byte_bus_id does not match the byte_bus_id it was received under (echo-back rule)")]
     EchoBackMismatch,
+
+    #[error("rcp/lifecycle: register category is not reachable in the RC Server's current lifecycle state")]
+    RegisterUnreachable,
 
     // ── General errors ───────────────────────────────────────────────────
     #[error("rcp: invalid size")]

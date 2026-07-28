@@ -342,9 +342,33 @@ lifecycle machine and the register-map configuration model, replacing the
 
 ### Lifecycle State Machine
 
-- [ ] `HW_UNCONFIGURED` (`0x00`) / `HW_CONFIGURED` (`0x55`) /
+- [x] `HW_UNCONFIGURED` (`0x00`) / `HW_CONFIGURED` (`0x55`) /
       `RCP_CONFIGURED` (`0xAA`) states with correct per-state register
-      reachability
+      reachability. Done (v0.5.0-dev): new `src/lifecycle.rs` adds
+      `RcServerState`, a `#[repr(u8)]` enum with exactly these three
+      variants and encodings, plus never-panicking `to_u8`/`from_u8`
+      round-trip helpers (invalid bytes reject via `RcpError::Other`,
+      mirroring `avtpdu::select_header_variant`'s unrecognized-subtype
+      handling). Register reachability is modeled as an explicit, queryable
+      rule — `RegisterCategory` (`General`/`HwConfig`/`RcpConfig`, an
+      abstract placeholder standing in for the not-yet-built Register Map)
+      and `is_register_reachable`/`check_register_reachable`, which gate
+      `RcpConfig` unreachable while `HW_UNCONFIGURED` and leave `General`/
+      `HwConfig` reachable in every state. The module's doc comment flags,
+      per Guiding Principle 5, that this reachability rule and the
+      `HW_UNCONFIGURED`-default are this crate's own working interpretation
+      (inferred from the `HW_CFG_INCONSISTENT`/`RCP_CFG_INCONSISTENT` guard
+      naming and Milestone 3's discovery needs, respectively), and that no
+      `§3.x` section number is yet recorded anywhere in this crate for the
+      lifecycle state machine itself, unlike the Register Map subsection's
+      already-cited `§3.6`–`§3.11`. Deliberately does not yet implement the
+      other three "Lifecycle State Machine" items (transition guards,
+      `W`/`W*` register-locking, or the `HW_CONFIGURED`→`HW_UNCONFIGURED`
+      demotion path) or anything from the "EP0"/"Register Map" subsections
+      — see the module doc comment for the explicit boundary. New
+      `RcpError::RegisterUnreachable` sentinel added, following the
+      existing "Wire / E2E errors" grouping convention, as a provisional
+      name pending this milestone's later "Error Model" item.
 - [ ] Transition guard checks: `HW_CFG_INCONSISTENT` (HW→HW_CONFIGURED),
       `RCP_CFG_INCONSISTENT` (HW_CONFIGURED→RCP_CONFIGURED)
 - [ ] Register-locking-by-state, including the `W` vs `W*` (permanently

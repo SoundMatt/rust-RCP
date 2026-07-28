@@ -3663,6 +3663,51 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-LIFE-001",
+      "title": "RcServerState three-state model and numeric encoding",
+      "text": "RcServerState models the three named RC Server lifecycle states (HwUnconfigured, HwConfigured, RcpConfigured) with wire-level byte encodings 0x00/0x55/0xAA respectively, defaults to HwUnconfigured, and round-trips every valid encoding through to_u8/from_u8",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-LIFE-002",
+      "title": "RcServerState::from_u8 rejects unrecognized bytes",
+      "text": "RcServerState::from_u8 returns Err(RcpError::Other) for every byte other than 0x00, 0x55, and 0xAA, without panicking",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-LIFE-003",
+      "title": "Per-state register category reachability rule",
+      "text": "is_register_reachable models RegisterCategory::General and RegisterCategory::HwConfig as reachable in every RcServerState, and RegisterCategory::RcpConfig as reachable only in HwConfigured and RcpConfigured, not in HwUnconfigured",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-LIFE-004",
+      "title": "check_register_reachable enforces the reachability rule",
+      "text": "check_register_reachable returns Ok(()) exactly when is_register_reachable would return true for the same (state, category) pair, and Err(RcpError::RegisterUnreachable) otherwise",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-LIFE-005",
+      "title": "Lifecycle decode and reachability checks never panic",
+      "text": "RcServerState::from_u8 never panics across the full 0..=255 byte range, and is_register_reachable/check_register_reachable never panic for any RcServerState/RegisterCategory pair",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
