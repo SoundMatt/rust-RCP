@@ -6,10 +6,13 @@
 // fusa:req REQ-LIFE-006
 // fusa:req REQ-LIFE-007
 // fusa:req REQ-LIFE-008
+// fusa:req REQ-LIFE-009
+// fusa:req REQ-LIFE-010
+// fusa:req REQ-LIFE-011
 
 //! RC Server lifecycle state machine — TC18 register-map model
 //! (`ROADMAP.md` Milestone 2, "Lifecycle State Machine" subsection, first
-//! two checklist items).
+//! three checklist items).
 //!
 //! This module begins Milestone 2, which replaces the legacy
 //! `Zone`/`Controller`/`Registry` abstraction with a first-class RC Server
@@ -24,18 +27,20 @@
 //! second: which moves between states are even structurally allowed, and
 //! under what caller-supplied consistency guard.
 //!
-//! This module now covers the *first two* of four "Lifecycle State
-//! Machine" checklist items and stops well short of the remaining two,
-//! which are separate, later work:
+//! This module now covers the *first three* of four "Lifecycle State
+//! Machine" checklist items and stops well short of the remaining one,
+//! which is separate, later work:
 //!
 //! - **Register-locking-by-state**, including the `W`/`W*` distinction
 //!   (permanently locked once `RCP_CONFIGURED`). [`is_register_reachable`]
 //!   answers "is this category of register touchable at all right now" —
 //!   a coarser question than locking's "given that it's reachable, is a
 //!   *write* to it still permitted, or has it become permanently locked".
-//!   A category this module reports reachable in a given state may still
-//!   be write-locked by that later rule; this module has no opinion on
-//!   that distinction.
+//!   [`LockPolicy`]/[`lock_policy`]/[`is_register_writable`]/
+//!   [`check_register_writable`] now answer that finer question, layered
+//!   on top of (not replacing) reachability: a category this module
+//!   reports reachable in a given state may still be write-locked by this
+//!   rule.
 //! - The **demotion path** from `HW_CONFIGURED` back to `HW_UNCONFIGURED`.
 //!   [`RcServerState::try_transition`] deliberately implements only the two
 //!   *forward* transitions (`HW_UNCONFIGURED` -> `HW_CONFIGURED` and
@@ -142,6 +147,46 @@
 //!   sentinel.
 //!
 //! Both points are flagged per Guiding Principle 5 as this crate's own
+//! working interpretation, pending reconciliation against the
+//! specification's actual behavior (never its prose) before being relied
+//! on for interop with a real TC18 RC Server.
+//!
+//! [`LockPolicy`] and [`lock_policy`]'s per-[`RegisterCategory`] assignment
+//! go the same step further than the roadmap text, and are — like
+//! [`RegisterCategory`] itself — this crate's own working interpretation,
+//! not a transcription of the specification's behavior. No concrete
+//! Register Map exists yet (that subsection is later work in this same
+//! milestone) to derive a real per-field `W`/`W*` assignment from, so this
+//! crate reasons at the same [`RegisterCategory`] granularity
+//! [`is_register_reachable`] already uses:
+//!
+//! - [`RegisterCategory::General`] is modeled as never writable through
+//!   this module at all (`lock_policy` returns `None`), inferred from this
+//!   module's own doc comment already describing that category as
+//!   server-identity/status fields (`svr_vendor_id`, `svr_device_id`,
+//!   etc.) — read/status data, not configuration a client would plausibly
+//!   write.
+//! - [`RegisterCategory::HwConfig`] is modeled as `W*`: writable while
+//!   reachable, but permanently locked the moment `RCP_CONFIGURED` is
+//!   reached. This is inferred from `HwConfig` being the *foundation*
+//!   layer — the `RCP_CFG_INCONSISTENT` guard that admits
+//!   `HW_CONFIGURED` -> `RCP_CONFIGURED` validates RCP-level configuration
+//!   against whatever hardware configuration already exists at that
+//!   moment, with no guard defined anywhere in this crate that
+//!   re-validates RCP-level configuration if hardware configuration were
+//!   changed out from under it afterward — permanently locking `HwConfig`
+//!   once `RCP_CONFIGURED` is reached is this crate's reading of what
+//!   keeps that invariant from silently breaking.
+//! - [`RegisterCategory::RcpConfig`] is modeled as `W`: writable whenever
+//!   reachable, including while `RCP_CONFIGURED`, with no permanent lock
+//!   this module adds on top of reachability. This is inferred from
+//!   `RcpConfig` being the *operating* layer built on top of `HwConfig` —
+//!   this crate's own reasonable expectation (per Guiding Principle 5,
+//!   flagged rather than asserted as spec fact) that functional/operating
+//!   parameters remain adjustable once a server is fully configured, unlike
+//!   the foundation they were built on.
+//!
+//! All three points are flagged per Guiding Principle 5 as this crate's own
 //! working interpretation, pending reconciliation against the
 //! specification's actual behavior (never its prose) before being relied
 //! on for interop with a real TC18 RC Server.
@@ -289,6 +334,101 @@ pub fn check_register_reachable(
         Ok(())
     } else {
         Err(RcpError::RegisterUnreachable)
+    }
+}
+
+// ── Register write-locking (W vs W*) ───────────────────────────────────────────
+
+/// The write-lock policy governing whether an already-[`is_register_reachable`]
+/// [`RegisterCategory`] may additionally be *written*, per `ROADMAP.md`'s
+/// `W`/`W*` distinction.
+///
+/// See this module's doc comment for how the per-category assignment
+/// ([`lock_policy`]) was inferred, and [`is_register_writable`] for how a
+/// policy combines with reachability to produce a final writable/not
+/// answer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// fusa:req REQ-LIFE-009
+pub enum LockPolicy {
+    /// `W` — write access may still vary with lifecycle state (through
+    /// [`is_register_reachable`]'s reachability gate) but this policy never
+    /// *permanently* forecloses it: there is no state past which this rule
+    /// alone rejects a write.
+    W,
+    /// `W*` — write access is available whenever the category is otherwise
+    /// reachable, up to and including `HW_CONFIGURED`, but becomes
+    /// permanently locked the moment the RC Server reaches
+    /// `RCP_CONFIGURED`. No transition [`RcServerState::try_transition`]
+    /// currently implements moves a server back out of `RCP_CONFIGURED`,
+    /// so today this lock is permanent for the remaining lifetime of the
+    /// in-memory state; the still-unbuilt demotion path is this rule's
+    /// stated escape hatch, not a loophole this module implements.
+    WStar,
+}
+
+/// This crate's provisional mapping from [`RegisterCategory`] to
+/// [`LockPolicy`], or `None` if this module models the category as never
+/// writable at all regardless of lifecycle state.
+///
+/// See this module's doc comment for the per-category reasoning behind
+/// each assignment. Never panics for any input.
+// fusa:req REQ-LIFE-009
+pub fn lock_policy(category: RegisterCategory) -> Option<LockPolicy> {
+    match category {
+        RegisterCategory::General => None,
+        RegisterCategory::HwConfig => Some(LockPolicy::WStar),
+        RegisterCategory::RcpConfig => Some(LockPolicy::W),
+    }
+}
+
+/// Is `category` writable while the RC Server is in `state`?
+///
+/// Composes [`is_register_reachable`] (a category must be reachable at all
+/// before a write to it can be considered) with [`lock_policy`]'s `W`/`W*`
+/// rule: unreachable categories are never writable; categories with no
+/// [`LockPolicy`] (`None`) are never writable; `W` categories are writable
+/// whenever reachable; `W*` categories are writable whenever reachable
+/// except while `RcServerState::RcpConfigured`, where they are permanently
+/// locked. Never panics for any input.
+// fusa:req REQ-LIFE-009
+// fusa:req REQ-LIFE-010
+pub fn is_register_writable(state: RcServerState, category: RegisterCategory) -> bool {
+    if !is_register_reachable(state, category) {
+        return false;
+    }
+    match lock_policy(category) {
+        None => false,
+        Some(LockPolicy::W) => true,
+        Some(LockPolicy::WStar) => state != RcServerState::RcpConfigured,
+    }
+}
+
+/// Validating counterpart to [`is_register_writable`].
+///
+/// Returns `Ok(())` if `category` is writable while the RC Server is in
+/// `state`. Otherwise distinguishes *why* the write is rejected —
+/// `Err(RcpError::RegisterUnreachable)` if `category` is not reachable at
+/// all in `state` (mirroring [`check_register_reachable`]), or
+/// `Err(RcpError::RegisterLocked)` if it is reachable but write-locked by
+/// [`lock_policy`]'s rule. Never panics for any input.
+///
+/// `RcpError::RegisterLocked` is this crate's own provisional name, matching
+/// the pre-Error-Model-item style already used by
+/// `RcpError::RegisterUnreachable` and the lifecycle guard sentinels before
+/// it; which of the specification's own error codes it ultimately maps to
+/// is this milestone's later "Error Model" item's call to make, not this
+/// one's.
+// fusa:req REQ-LIFE-010
+pub fn check_register_writable(
+    state: RcServerState,
+    category: RegisterCategory,
+) -> Result<(), RcpError> {
+    if !is_register_reachable(state, category) {
+        Err(RcpError::RegisterUnreachable)
+    } else if is_register_writable(state, category) {
+        Ok(())
+    } else {
+        Err(RcpError::RegisterLocked)
     }
 }
 
@@ -501,6 +641,115 @@ mod tests {
             for category in ALL_CATEGORIES {
                 let _ = is_register_reachable(state, category);
                 let _ = check_register_reachable(state, category);
+            }
+        }
+    }
+
+    // ── Register write-locking (W vs W*) ──────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-LIFE-009
+    fn lock_policy_matches_the_documented_per_category_assignment() {
+        assert_eq!(lock_policy(RegisterCategory::General), None);
+        assert_eq!(
+            lock_policy(RegisterCategory::HwConfig),
+            Some(LockPolicy::WStar)
+        );
+        assert_eq!(
+            lock_policy(RegisterCategory::RcpConfig),
+            Some(LockPolicy::W)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-LIFE-009
+    // fusa:test REQ-LIFE-010
+    fn general_registers_are_never_writable_in_any_state() {
+        for state in ALL_STATES {
+            assert!(!is_register_writable(state, RegisterCategory::General));
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-LIFE-009
+    // fusa:test REQ-LIFE-010
+    fn hw_config_registers_are_writable_until_permanently_locked_at_rcp_configured() {
+        assert!(is_register_writable(
+            RcServerState::HwUnconfigured,
+            RegisterCategory::HwConfig
+        ));
+        assert!(is_register_writable(
+            RcServerState::HwConfigured,
+            RegisterCategory::HwConfig
+        ));
+        assert!(!is_register_writable(
+            RcServerState::RcpConfigured,
+            RegisterCategory::HwConfig
+        ));
+    }
+
+    #[test]
+    // fusa:test REQ-LIFE-009
+    // fusa:test REQ-LIFE-010
+    fn rcp_config_registers_are_writable_whenever_reachable_including_at_rcp_configured() {
+        // Unreachable in HW_UNCONFIGURED, so not writable either -- but for
+        // reachability's reason, not a write-lock.
+        assert!(!is_register_writable(
+            RcServerState::HwUnconfigured,
+            RegisterCategory::RcpConfig
+        ));
+        assert!(is_register_writable(
+            RcServerState::HwConfigured,
+            RegisterCategory::RcpConfig
+        ));
+        // Unlike HwConfig, RcpConfig is never permanently locked by this
+        // rule -- it remains writable at RCP_CONFIGURED.
+        assert!(is_register_writable(
+            RcServerState::RcpConfigured,
+            RegisterCategory::RcpConfig
+        ));
+    }
+
+    #[test]
+    // fusa:test REQ-LIFE-010
+    fn is_register_writable_never_true_for_an_unreachable_category() {
+        for state in ALL_STATES {
+            for category in ALL_CATEGORIES {
+                if !is_register_reachable(state, category) {
+                    assert!(!is_register_writable(state, category));
+                }
+            }
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-LIFE-010
+    fn check_register_writable_agrees_with_is_register_writable_and_distinguishes_the_reason() {
+        for state in ALL_STATES {
+            for category in ALL_CATEGORIES {
+                let writable = is_register_writable(state, category);
+                let checked = check_register_writable(state, category);
+                assert_eq!(checked.is_ok(), writable, "{state:?} {category:?}");
+                if !writable {
+                    let expected = if !is_register_reachable(state, category) {
+                        RcpError::RegisterUnreachable
+                    } else {
+                        RcpError::RegisterLocked
+                    };
+                    assert_eq!(checked, Err(expected), "{state:?} {category:?}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-LIFE-011
+    fn write_lock_checks_never_panic_for_any_state_category_pair() {
+        for state in ALL_STATES {
+            for category in ALL_CATEGORIES {
+                let _ = lock_policy(category);
+                let _ = is_register_writable(state, category);
+                let _ = check_register_writable(state, category);
             }
         }
     }
