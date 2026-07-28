@@ -13,14 +13,21 @@
 // fusa:req REQ-DISC-013
 // fusa:req REQ-DISC-014
 // fusa:req REQ-DISC-015
+// fusa:req REQ-DISC-016
+// fusa:req REQ-DISC-017
+// fusa:req REQ-DISC-018
+// fusa:req REQ-DISC-019
+// fusa:req REQ-DISC-020
 
-//! Discovery request/response, discovery-stream claiming, and multi-client
-//! coexistence — TC18 register-map model (`ROADMAP.md` Milestone 3
-//! "Discovery" subsection, first three checklist bullets: "Discovery
-//! request/response", "Discovery-stream claiming: first-claimant rule,
-//! `Discovery_TimeOut` (~20 ms default) lapse-and-reopen behavior", and
-//! "Multi-client coexistence: other clients may still read via discovery
-//! while a stream is claimed; only the claimant may configure").
+//! Discovery request/response, discovery-stream claiming, multi-client
+//! coexistence, and the client-side discovery cache — TC18 register-map
+//! model (`ROADMAP.md` Milestone 3 "Discovery" subsection, all four
+//! checklist bullets: "Discovery request/response", "Discovery-stream
+//! claiming: first-claimant rule, `Discovery_TimeOut` (~20 ms default)
+//! lapse-and-reopen behavior", "Multi-client coexistence: other clients may
+//! still read via discovery while a stream is claimed; only the claimant
+//! may configure", and "Client-side discovery cache so re-discovery isn't
+//! mandatory on every power cycle for already-known topology").
 //!
 //! This module begins Milestone 3, which per the subsection's own Goal text
 //! replaces [`crate::mdns`] as the *mandatory* discovery path (mDNS may
@@ -30,21 +37,20 @@
 //! model — that is a different, private-protocol concept with nothing in
 //! common with the TC18 broadcast-`ACF_ABB` mechanism modeled below.
 //!
-//! Only this subsection's first three checklist bullets are in scope.
-//! Deliberately out of scope, as a separate later checklist bullet in the
-//! same subsection:
+//! All four of this subsection's checklist bullets are now in scope, which
+//! closes the "Discovery" subsection out entirely. Deliberately still out of
+//! scope, per every prior Milestone 1/2/3 entry's own discipline:
 //!
-//! - The client-side discovery cache.
 //! - Wiring any of the below into an actual decoder, dispatch loop, or
 //!   [`crate::avtp`]/[`crate::acf`] caller — this module remains additive
 //!   standalone plumbing only, matching the discipline every prior
 //!   Milestone 1/2 entry already established. In particular,
 //!   [`DiscoveryClaim`]/[`try_claim_discovery_stream`]/
-//!   [`check_discovery_access`] model claim state as plain data a caller
-//!   owns and threads through explicitly (mirroring how
-//!   [`build_discovery_response`] takes `state`/`general` as caller-supplied
-//!   values rather than owning them) — nothing here spawns a timer thread,
-//!   holds a lock, or reads the real clock itself.
+//!   [`check_discovery_access`]/[`DiscoveryCache`] model claim/cache state
+//!   as plain data a caller owns and threads through explicitly (mirroring
+//!   how [`build_discovery_response`] takes `state`/`general` as
+//!   caller-supplied values rather than owning them) — nothing here spawns a
+//!   timer thread, holds a lock, or reads the real clock itself.
 //!
 //! This module composes with, rather than duplicates, three already-landed
 //! Milestone 1/2 pieces:
@@ -66,7 +72,8 @@
 //! - [`crate::regmap::GeneralRegisters`] — register address 0's
 //!   field-level content (`svr_oa_tc18_magic_nr` and the rest of `§3.6`'s
 //!   table), reused as the discovery response payload's content rather than
-//!   inventing a new addressing scheme.
+//!   inventing a new addressing scheme, and as the source
+//!   [`DiscoveryCache::remember`] snapshots its cache-worthy subset from.
 //!
 //! ## Multi-client coexistence
 //!
@@ -111,13 +118,55 @@
 //! rather than deriving it from a decoded message — see this module's
 //! Provenance note for why.
 //!
+//! ## Client-side discovery cache
+//!
+//! [`DiscoveryCache`]/[`DiscoveryCacheEntry`] add this subsection's fourth
+//! and final checklist bullet: a client-side cache of already-discovered
+//! servers, so a client reconnecting to previously-known topology is not
+//! forced to re-run [`build_discovery_request`]/[`build_discovery_response`]'s
+//! broadcast exchange on every power cycle.
+//!
+//! - [`DiscoveryCache`] is a plain [`StreamId`]-keyed map a caller owns and
+//!   threads through explicitly, matching the same "no timer thread, no
+//!   lock, no real-clock read of its own" discipline
+//!   [`DiscoveryClaim`]/[`try_claim_discovery_stream`] already established
+//!   for claim state — see the out-of-scope list above. Claim state and
+//!   cache state are deliberately independent: this module does not use a
+//!   [`DiscoveryClaim`]'s lapse to auto-evict a [`DiscoveryCache`] entry, or
+//!   vice versa — see this module's Provenance note for why.
+//! - [`DiscoveryCache::remember`] records the cache-worthy subset of a
+//!   [`GeneralRegisters`] value the caller already obtained (e.g. by
+//!   decoding a prior [`build_discovery_response`] payload) under the
+//!   [`StreamId`] the caller reached that server through — [`DiscoveryCache`]
+//!   performs no discovery I/O of its own, exactly as [`build_discovery_response`]
+//!   performs none either.
+//! - [`DiscoveryCache::is_known`]/[`DiscoveryCacheEntry::is_stale`] let a
+//!   caller decide, given its own choice of staleness window, whether a
+//!   cached entry is still fresh enough to skip re-discovery for — this
+//!   module deliberately imposes no default staleness window of its own
+//!   (unlike [`DISCOVERY_TIME_OUT`], which the roadmap explicitly names a
+//!   default for) — see this module's Provenance note.
+//! - [`DiscoveryCacheEntry::matches`] lets a caller confirm a freshly
+//!   observed [`GeneralRegisters`] still agrees with a cached entry's
+//!   identity, distinguishing "the same previously discovered server,
+//!   cache still valid" from "a different server now answers at this
+//!   address, cache entry is stale in the identity sense and real
+//!   re-discovery is warranted" — a currently-fresh (per
+//!   [`DiscoveryCacheEntry::is_stale`]) entry can still fail this check if
+//!   the underlying topology changed without the client observing it age
+//!   out.
+//! - [`DiscoveryCache::invalidate`] lets a caller drop a single entry
+//!   explicitly (e.g. after [`DiscoveryCacheEntry::matches`] returns
+//!   `false`, or on any other caller-decided trigger) without needing to
+//!   discard the whole cache.
+//!
 //! ## Provenance note
 //!
-//! Five working interpretations this item introduces, per Guiding Principle
-//! 5, are flagged here for reconciliation against the OPEN Alliance TC18
-//! Remote Control Protocol Specification v0.5.1_RC's actual behavior
-//! (never its prose) before being relied on for interop with a real TC18 RC
-//! Server:
+//! Nine working interpretations this item introduces, per Guiding
+//! Principle 5, are flagged here for reconciliation against the OPEN
+//! Alliance TC18 Remote Control Protocol Specification v0.5.1_RC's actual
+//! behavior (never its prose) before being relied on for interop with a
+//! real TC18 RC Server:
 //!
 //! - **Broadcast addressing.** `ROADMAP.md`'s own checklist wording states
 //!   that the discovery request must be "broadcastable" but does not name a
@@ -196,7 +245,41 @@
 //!   [`try_claim_discovery_stream`] already does: the supplied requester
 //!   value itself is not a meaningful single-client identity, independent
 //!   of any claim state.
+//! - **Which `GeneralRegisters` fields are cache-worthy.** The roadmap names
+//!   `svr_oa_tc18_magic_nr`, `svr_vendor_id`, `svr_device_id`, and
+//!   `svr_ep_count` as example identifying/topology fields but does not give
+//!   an exhaustive list. [`DiscoveryCacheEntry`] snapshots exactly those four
+//!   plus `svr_version` (the protocol version a client would also want to
+//!   recognize a server by across a reconnect) and deliberately excludes the
+//!   rest of [`GeneralRegisters`] — in particular
+//!   `svr_configuration_lock` and the `§3.6` table-descriptor fields
+//!   (`svr_hw_cfg` and siblings), which describe current, potentially
+//!   reconfigurable server state rather than a server's stable identity, and
+//!   so are treated as must-always-be-read-fresh rather than cache-worthy.
+//!   This five-field subset is this crate's own working judgment call, not a
+//!   spec-cited list.
+//! - **Cache staleness policy.** The roadmap's checklist wording does not
+//!   state a cache lifetime, unlike [`DISCOVERY_TIME_OUT`]'s explicitly
+//!   roadmap-stated `~20 ms` default. Rather than invent an unstated
+//!   default staleness window, [`DiscoveryCache::is_known`]/
+//!   [`DiscoveryCacheEntry::is_stale`] take `now`/`max_age` as caller-supplied
+//!   parameters (mirroring [`DiscoveryClaim::has_lapsed`]'s own
+//!   `now`/`timeout` shape) rather than this module picking a duration of
+//!   its own.
+//! - **Cache/claim independence.** Nothing in the roadmap's wording says
+//!   whether a lapsed [`DiscoveryClaim`] should evict a [`DiscoveryCache`]
+//!   entry for the same [`StreamId`], or whether an invalidated cache entry
+//!   should affect claim state. This module treats the two as orthogonal:
+//!   a discovery-stream claim is about who may currently *configure* the
+//!   discovery stream, while a cache entry is about what a client
+//!   previously *learned* about a server's identity — a claim lapsing (e.g.
+//!   because the claimant went briefly idle) says nothing about whether the
+//!   server's identity changed, and an invalidated cache entry says nothing
+//!   about who currently holds the discovery-stream claim. A caller that
+//!   wants the two coupled composes them explicitly rather than this module
+//!   assuming that coupling on the caller's behalf.
 
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use crate::acf::{AcfAbbMessage, ByteMessageInfo};
@@ -516,6 +599,202 @@ pub fn check_discovery_access(
                 Err(RcpError::UnauthorizedAccess)
             }
         }
+    }
+}
+
+// ── Client-side discovery cache ─────────────────────────────────────────────
+
+/// The cache-worthy subset of a discovered server's [`GeneralRegisters`],
+/// snapshotted as of the [`Instant`] it was cached, keyed elsewhere (in
+/// [`DiscoveryCache`]) by the [`StreamId`] the caller reached that server
+/// through.
+///
+/// See this module's "Client-side discovery cache" section and Provenance
+/// note for which fields were chosen as cache-worthy and why. Deliberately
+/// plain data, mirroring [`DiscoveryClaim`]'s own discipline: nothing here
+/// reads the real clock, spawns a timer, or holds a lock.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DiscoveryCacheEntry {
+    svr_oa_tc18_magic_nr: u32,
+    svr_version: u32,
+    svr_vendor_id: u16,
+    svr_device_id: u16,
+    svr_ep_count: u16,
+    cached_at: Instant,
+}
+
+impl DiscoveryCacheEntry {
+    /// Snapshot the cache-worthy subset of `general` as of `cached_at`.
+    fn from_general_registers(general: &GeneralRegisters, cached_at: Instant) -> Self {
+        Self {
+            svr_oa_tc18_magic_nr: general.svr_oa_tc18_magic_nr,
+            svr_version: general.svr_version,
+            svr_vendor_id: general.svr_vendor_id,
+            svr_device_id: general.svr_device_id,
+            svr_ep_count: general.svr_ep_count,
+            cached_at,
+        }
+    }
+
+    /// This entry's cached `svr_oa_tc18_magic_nr`.
+    pub fn svr_oa_tc18_magic_nr(&self) -> u32 {
+        self.svr_oa_tc18_magic_nr
+    }
+
+    /// This entry's cached `svr_version`.
+    pub fn svr_version(&self) -> u32 {
+        self.svr_version
+    }
+
+    /// This entry's cached `svr_vendor_id`.
+    pub fn svr_vendor_id(&self) -> u16 {
+        self.svr_vendor_id
+    }
+
+    /// This entry's cached `svr_device_id`.
+    pub fn svr_device_id(&self) -> u16 {
+        self.svr_device_id
+    }
+
+    /// This entry's cached `svr_ep_count`.
+    pub fn svr_ep_count(&self) -> u16 {
+        self.svr_ep_count
+    }
+
+    /// The instant this entry was most recently inserted or refreshed via
+    /// [`DiscoveryCache::remember`].
+    pub fn cached_at(&self) -> Instant {
+        self.cached_at
+    }
+
+    /// Has this entry gone stale as of `now`, given `max_age`?
+    ///
+    /// Mirrors [`DiscoveryClaim::has_lapsed`]'s own boundary/never-panic
+    /// discipline exactly: an entry is stale once at least `max_age` has
+    /// elapsed since [`Self::cached_at`] (inclusive at the boundary), using
+    /// [`Instant::saturating_duration_since`] so an out-of-order `now` reads
+    /// as zero elapsed time rather than panicking or wrapping. `max_age` is
+    /// entirely caller-supplied — see this module's Provenance note for why
+    /// no default is provided here. Never panics for any input.
+    // fusa:req REQ-DISC-018
+    pub fn is_stale(&self, now: Instant, max_age: Duration) -> bool {
+        now.saturating_duration_since(self.cached_at) >= max_age
+    }
+
+    /// Does this entry's cached identity still agree with a freshly observed
+    /// `general`?
+    ///
+    /// Compares only the same cache-worthy subset [`Self::from_general_registers`]
+    /// snapshots, not [`Self::cached_at`]. `false` means the server this
+    /// entry was cached from is no longer the one answering at the cached
+    /// [`StreamId`] — a real re-discovery is warranted, not merely a cache
+    /// refresh — see this module's "Client-side discovery cache" section.
+    /// Never panics for any input.
+    // fusa:req REQ-DISC-019
+    pub fn matches(&self, general: &GeneralRegisters) -> bool {
+        self.svr_oa_tc18_magic_nr == general.svr_oa_tc18_magic_nr
+            && self.svr_version == general.svr_version
+            && self.svr_vendor_id == general.svr_vendor_id
+            && self.svr_device_id == general.svr_device_id
+            && self.svr_ep_count == general.svr_ep_count
+    }
+}
+
+/// A client-side cache of previously discovered servers, keyed by the
+/// [`StreamId`] a caller reached each one through.
+///
+/// See this module's "Client-side discovery cache" section for the full
+/// rationale. Deliberately plain, caller-owned state: no timer thread, no
+/// lock, no real-clock read of its own — a caller supplies `now` to every
+/// staleness-aware method, exactly as [`try_claim_discovery_stream`] and
+/// [`check_discovery_access`] already require for claim state.
+#[derive(Debug, Clone, Default)]
+pub struct DiscoveryCache {
+    entries: HashMap<StreamId, DiscoveryCacheEntry>,
+}
+
+impl DiscoveryCache {
+    /// Construct an empty cache.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record (or refresh) `stream_id`'s discovered identity from `general`
+    /// as of `now` — e.g. learned from a prior [`build_discovery_response`]
+    /// payload this client already decoded.
+    ///
+    /// Returns `Err(RcpError::InvalidParameter)` — without modifying the
+    /// cache — if `stream_id` is [`DISCOVERY_BROADCAST_STREAM_ID`]: the
+    /// broadcast sentinel names no single real server, so it cannot
+    /// meaningfully be a cache key, mirroring
+    /// [`try_claim_discovery_stream`]'s own rejection of it as a claimant.
+    /// An existing entry for `stream_id`, if any, is overwritten rather than
+    /// preserved. Never panics for any input.
+    // fusa:req REQ-DISC-016
+    // fusa:req REQ-DISC-017
+    pub fn remember(
+        &mut self,
+        stream_id: StreamId,
+        general: &GeneralRegisters,
+        now: Instant,
+    ) -> Result<(), RcpError> {
+        if is_discovery_broadcast_stream_id(stream_id) {
+            return Err(RcpError::InvalidParameter);
+        }
+        self.entries.insert(
+            stream_id,
+            DiscoveryCacheEntry::from_general_registers(general, now),
+        );
+        Ok(())
+    }
+
+    /// Look up `stream_id`'s cached entry, if any, regardless of staleness.
+    ///
+    /// Callers that care about staleness should check
+    /// [`DiscoveryCacheEntry::is_stale`] themselves, or use [`Self::is_known`]
+    /// — this module holds no opinion of its own on what staleness window is
+    /// appropriate, see this module's Provenance note. Never panics for any
+    /// input.
+    pub fn lookup(&self, stream_id: StreamId) -> Option<&DiscoveryCacheEntry> {
+        self.entries.get(&stream_id)
+    }
+
+    /// Is `stream_id` cached and not [`DiscoveryCacheEntry::is_stale`] as of
+    /// `now` under `max_age`?
+    ///
+    /// The intended use: a client may skip re-running
+    /// [`build_discovery_request`]'s broadcast exchange for `stream_id` when
+    /// this returns `true`, and falls back to real discovery otherwise
+    /// (unknown, or known but stale). Never panics for any input.
+    // fusa:req REQ-DISC-016
+    // fusa:req REQ-DISC-018
+    pub fn is_known(&self, stream_id: StreamId, now: Instant, max_age: Duration) -> bool {
+        self.entries
+            .get(&stream_id)
+            .is_some_and(|entry| !entry.is_stale(now, max_age))
+    }
+
+    /// Remove `stream_id`'s cached entry, if any.
+    ///
+    /// Returns `true` iff an entry was present and removed, `false`
+    /// otherwise. This module never invalidates a cache entry on its own
+    /// (e.g. because a [`DiscoveryClaim`] lapsed) — see this module's
+    /// Provenance note for why claim state and cache state are deliberately
+    /// kept independent; a caller that wants that coupling calls this
+    /// explicitly. Never panics for any input.
+    // fusa:req REQ-DISC-019
+    pub fn invalidate(&mut self, stream_id: StreamId) -> bool {
+        self.entries.remove(&stream_id).is_some()
+    }
+
+    /// Number of entries currently cached, stale or not.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Is the cache empty?
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
     }
 }
 
@@ -1003,6 +1282,174 @@ mod tests {
         }
     }
 
+    // ── Client-side discovery cache ─────────────────────────────────────────
+
+    fn sample_general_registers_b() -> GeneralRegisters {
+        GeneralRegisters {
+            svr_oa_tc18_magic_nr: 0x4F41_5443,
+            svr_version: 0x0006_0001,
+            svr_vendor_id: 0x0506,
+            svr_device_id: 0x0708,
+            svr_ep_count: 8,
+            ..GeneralRegisters::default()
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-016
+    fn discovery_cache_remember_then_lookup_round_trips_the_cache_worthy_subset() {
+        let mut cache = DiscoveryCache::new();
+        assert!(cache.is_empty());
+        let general = sample_general_registers();
+        let now = Instant::now();
+        cache.remember(client_a(), &general, now).unwrap();
+        assert_eq!(cache.len(), 1);
+        assert!(!cache.is_empty());
+
+        let entry = cache.lookup(client_a()).expect("entry must be present");
+        assert_eq!(entry.svr_oa_tc18_magic_nr(), general.svr_oa_tc18_magic_nr);
+        assert_eq!(entry.svr_version(), general.svr_version);
+        assert_eq!(entry.svr_vendor_id(), general.svr_vendor_id);
+        assert_eq!(entry.svr_device_id(), general.svr_device_id);
+        assert_eq!(entry.svr_ep_count(), general.svr_ep_count);
+        assert_eq!(entry.cached_at(), now);
+        assert!(entry.matches(&general));
+
+        // An unremembered stream_id has no entry.
+        assert!(cache.lookup(client_b()).is_none());
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-016
+    fn discovery_cache_remember_overwrites_an_existing_entry_for_the_same_stream_id() {
+        let mut cache = DiscoveryCache::new();
+        let first = Instant::now();
+        cache
+            .remember(client_a(), &sample_general_registers(), first)
+            .unwrap();
+        assert_eq!(cache.len(), 1);
+
+        let second = first + Duration::from_millis(5);
+        let updated = sample_general_registers_b();
+        cache.remember(client_a(), &updated, second).unwrap();
+
+        // Still exactly one entry -- overwritten, not appended.
+        assert_eq!(cache.len(), 1);
+        let entry = cache.lookup(client_a()).unwrap();
+        assert_eq!(entry.svr_device_id(), updated.svr_device_id);
+        assert_eq!(entry.cached_at(), second);
+        assert!(entry.matches(&updated));
+        assert!(!entry.matches(&sample_general_registers()));
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-017
+    fn discovery_cache_remember_rejects_the_broadcast_sentinel_as_stream_id() {
+        let mut cache = DiscoveryCache::new();
+        let err = cache
+            .remember(
+                DISCOVERY_BROADCAST_STREAM_ID,
+                &sample_general_registers(),
+                Instant::now(),
+            )
+            .unwrap_err();
+        assert_eq!(err, RcpError::InvalidParameter);
+        assert!(cache.is_empty());
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-018
+    fn discovery_cache_is_known_reflects_staleness_under_max_age() {
+        let mut cache = DiscoveryCache::new();
+        let cached_at = Instant::now();
+        cache
+            .remember(client_a(), &sample_general_registers(), cached_at)
+            .unwrap();
+        let max_age = Duration::from_millis(30);
+
+        // Not yet stale.
+        assert!(cache.is_known(client_a(), cached_at, max_age));
+        assert!(cache.is_known(client_a(), cached_at + (max_age / 2), max_age));
+
+        // Stale once max_age has fully elapsed (inclusive boundary).
+        assert!(!cache.is_known(client_a(), cached_at + max_age, max_age));
+
+        // An unknown stream_id is never "known".
+        assert!(!cache.is_known(client_b(), cached_at, max_age));
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-018
+    fn discovery_cache_entry_is_stale_boundary_is_inclusive_and_never_panics_on_out_of_order_now() {
+        let cached_at = Instant::now();
+        let general = sample_general_registers();
+        let entry = DiscoveryCacheEntry::from_general_registers(&general, cached_at);
+        let max_age = Duration::from_millis(20);
+
+        let just_before = cached_at + (max_age - Duration::from_millis(1));
+        let exactly_at = cached_at + max_age;
+        assert!(!entry.is_stale(just_before, max_age));
+        assert!(entry.is_stale(exactly_at, max_age));
+
+        if let Some(earlier) = cached_at.checked_sub(Duration::from_millis(5)) {
+            assert!(!entry.is_stale(earlier, max_age));
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-019
+    fn discovery_cache_entry_matches_detects_an_identity_change() {
+        let general = sample_general_registers();
+        let entry = DiscoveryCacheEntry::from_general_registers(&general, Instant::now());
+        assert!(entry.matches(&general));
+
+        let mut changed = general;
+        changed.svr_device_id = general.svr_device_id.wrapping_add(1);
+        assert!(!entry.matches(&changed));
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-019
+    fn discovery_cache_invalidate_removes_the_entry_and_is_idempotent() {
+        let mut cache = DiscoveryCache::new();
+        cache
+            .remember(client_a(), &sample_general_registers(), Instant::now())
+            .unwrap();
+        assert!(cache.invalidate(client_a()));
+        assert!(cache.lookup(client_a()).is_none());
+        assert!(cache.is_empty());
+
+        // Invalidating an already-absent entry reports false, not an error.
+        assert!(!cache.invalidate(client_a()));
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-016
+    fn discovery_cache_holds_independent_entries_across_multiple_stream_ids() {
+        let mut cache = DiscoveryCache::new();
+        let now = Instant::now();
+        cache
+            .remember(client_a(), &sample_general_registers(), now)
+            .unwrap();
+        cache
+            .remember(client_b(), &sample_general_registers_b(), now)
+            .unwrap();
+        assert_eq!(cache.len(), 2);
+        assert_eq!(
+            cache.lookup(client_a()).unwrap().svr_device_id(),
+            sample_general_registers().svr_device_id
+        );
+        assert_eq!(
+            cache.lookup(client_b()).unwrap().svr_device_id(),
+            sample_general_registers_b().svr_device_id
+        );
+
+        cache.invalidate(client_a());
+        assert_eq!(cache.len(), 1);
+        assert!(cache.lookup(client_a()).is_none());
+        assert!(cache.lookup(client_b()).is_some());
+    }
+
     // ── Never panics ────────────────────────────────────────────────────────
 
     #[test]
@@ -1131,6 +1578,40 @@ mod tests {
             ];
             let unique_id = (next() & 0xFFFF) as u16;
             let _ = is_discovery_broadcast_stream_id(StreamId::new(mac, unique_id));
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-020
+    fn discovery_cache_operations_never_panic_across_sampled_inputs() {
+        let mut state: u32 = 0xCAC4_E5EE;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            state
+        };
+        let base = Instant::now();
+        let stream_ids = [client_a(), client_b(), DISCOVERY_BROADCAST_STREAM_ID];
+        let generals = [sample_general_registers(), sample_general_registers_b()];
+        let mut cache = DiscoveryCache::new();
+        for &stream_id in &stream_ids {
+            for general in &generals {
+                let offset_ms = (next() % 50) as u64;
+                let now = base + Duration::from_millis(offset_ms);
+                let _ = cache.remember(stream_id, general, now);
+
+                let query_offset_ms = (next() % 50) as u64;
+                let query_now = base + Duration::from_millis(query_offset_ms);
+                let max_age_ms = 1 + (next() % 40) as u64;
+                let _ = cache.is_known(stream_id, query_now, Duration::from_millis(max_age_ms));
+                let _ = cache.lookup(stream_id);
+                if let Some(entry) = cache.lookup(stream_id) {
+                    let _ = entry.is_stale(query_now, Duration::from_millis(max_age_ms));
+                    let _ = entry.matches(general);
+                }
+                let _ = cache.invalidate(stream_id);
+            }
         }
     }
 }

@@ -797,8 +797,46 @@ table — but it is not a substitute for this).
       is untouched, separate, later work. New `REQ-DISC-011`..`REQ-DISC-015`
       added to `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test`
       pair in `src/discovery.rs`.
-- [ ] Client-side discovery cache so re-discovery isn't mandatory on every
-      power cycle for already-known topology
+- [x] Client-side discovery cache so re-discovery isn't mandatory on every
+      power cycle for already-known topology. Done (v0.6.0-dev):
+      `src/discovery.rs` extends its existing additive-only discipline with
+      `DiscoveryCacheEntry` (a plain, timestamped snapshot of the
+      cache-worthy subset of `regmap::GeneralRegisters` — `svr_oa_tc18_magic_nr`,
+      `svr_version`, `svr_vendor_id`, `svr_device_id`, `svr_ep_count`) and
+      `DiscoveryCache` (a plain `avtp::StreamId`-keyed map of those entries,
+      mirroring how `DiscoveryClaim`/`try_claim_discovery_stream` already
+      thread claim state through explicitly — no timer thread, lock, or
+      real-clock read of its own). `DiscoveryCache::remember` records a
+      server's identity as learned from a prior `build_discovery_response`
+      payload; `DiscoveryCache::lookup`/`is_known` let a caller decide
+      whether a cached entry is fresh enough (via caller-supplied
+      `now`/`max_age`, mirroring `DiscoveryClaim::has_lapsed`'s own
+      `now`/`timeout` shape and inclusive-boundary/never-panic discipline)
+      to skip re-running `build_discovery_request`/`is_discovery_request`'s
+      broadcast exchange for already-known topology;
+      `DiscoveryCacheEntry::matches` lets a caller confirm a freshly
+      observed `GeneralRegisters` still agrees with a cached identity, and
+      `DiscoveryCache::invalidate` drops a stale-in-the-identity-sense entry
+      explicitly. Three working interpretations this item introduces are
+      flagged per Guiding Principle 5 in the module's own provenance note:
+      (1) which `GeneralRegisters` fields are cache-worthy — the five named
+      above, chosen as stable-identity fields, deliberately excluding
+      reconfigurable state such as `svr_configuration_lock` and the `§3.6`
+      table descriptors, which remain must-always-be-read-fresh; (2) cache
+      staleness policy — unlike `Discovery_TimeOut`'s roadmap-stated `~20 ms`
+      default, this item names no cache lifetime, so `max_age` is entirely
+      caller-supplied rather than this crate inventing an unstated default;
+      (3) cache/claim independence — a lapsed `DiscoveryClaim` does not
+      auto-evict a `DiscoveryCache` entry, and vice versa, since claim state
+      (who may currently configure) and cache state (what a client
+      previously learned about a server's identity) are orthogonal concerns
+      a caller may compose explicitly if it wants that coupling. Like every
+      prior bullet in this subsection, this remains additive standalone
+      plumbing only — nothing here is wired into an actual decoder or
+      dispatch loop. This closes Milestone 3's "Discovery" subsection
+      checklist entirely. New `REQ-DISC-016`..`REQ-DISC-020` added to
+      `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair in
+      `src/discovery.rs`.
 
 Success Criteria:
 A client can broadcast-discover a server in any lifecycle state, claim the
