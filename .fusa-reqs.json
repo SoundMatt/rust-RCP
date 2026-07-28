@@ -3537,6 +3537,42 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-EPLK-001",
+      "title": "EndpointTable / EndpointId model",
+      "text": "EndpointTable models a (stream_id, byte_bus_id) -> EndpointId lookup as a map keyed first by StreamId and then, per stream, by byte_bus_id, so that byte_bus_id's keyspace is scoped to a single stream rather than shared globally across all streams",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-EPLK-002",
+      "title": "EndpointTable::register enforces per-pair uniqueness and field width",
+      "text": "EndpointTable::register rejects a byte_bus_id wider than the 11-bit field width shared with ByteMessageInfo::byte_bus_id with RcpError::InvalidSize, and rejects re-registering an already-registered (stream_id, byte_bus_id) pair with RcpError::EndpointAlreadyRegistered without modifying the existing registration, while permitting the same byte_bus_id to be registered independently under a different stream_id",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-EPLK-003",
+      "title": "EndpointTable::lookup resolves the stream-relative pair",
+      "text": "EndpointTable::lookup resolves a (stream_id, byte_bus_id) pair to the EndpointId registered under that exact pair, returning None when either component does not match a registered entry, and never returning an endpoint registered under a different stream_id even when byte_bus_id matches",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-EPLK-004",
+      "title": "EndpointTable::lookup never panics",
+      "text": "EndpointTable::lookup never panics for any (stream_id, byte_bus_id) input, on an empty table or a populated one, across a swept range including the all-zero and all-0xFF/u16::MAX extremes",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

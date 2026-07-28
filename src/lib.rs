@@ -68,6 +68,7 @@
 
 pub mod acf;
 pub mod adapt;
+pub mod addressing;
 pub mod admin;
 pub mod authz;
 pub mod avtpdu;
@@ -442,6 +443,9 @@ pub enum RcpError {
 
     #[error("rcp/avtpdu: TSCF header requires server time-sync support")]
     TimeSyncUnsupported,
+
+    #[error("rcp/addressing: (stream_id, byte_bus_id) pair already registered")]
+    EndpointAlreadyRegistered,
 
     // ── General errors ───────────────────────────────────────────────────
     #[error("rcp: invalid size")]
