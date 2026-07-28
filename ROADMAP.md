@@ -418,7 +418,34 @@ lifecycle machine and the register-map configuration model, replacing the
       module doc comment's provenance note for the reasoning and its
       Guiding-Principle-5 flag. Deliberately does not implement the demotion
       path — see the module doc comment for the explicit boundary.
-- [ ] Demotion path from `HW_CONFIGURED` back to `HW_UNCONFIGURED`
+- [x] Demotion path from `HW_CONFIGURED` back to `HW_UNCONFIGURED`. Done
+      (v0.5.0-dev): `src/lifecycle.rs`'s `RcServerState::try_transition`
+      adds a `HwConfigured -> HwUnconfigured` match arm (and
+      `is_transition_defined` a matching case), completing the "Lifecycle
+      State Machine" subsection's four checklist items. Two judgment calls,
+      flagged per Guiding Principle 5 in the module doc comment's
+      Provenance note rather than silently assumed: (1) the demotion is
+      modeled as **unconditional** — `is_consistent` is accepted by
+      `try_transition`'s signature but never invoked for this pair, since
+      the roadmap names no `..._INCONSISTENT`-style guard for it and there
+      is no newly-admitted configuration for a guard to plausibly validate
+      against (demoting discards configuration rather than accepting new
+      configuration); (2) only the single `HW_CONFIGURED` ->
+      `HW_UNCONFIGURED` hop this bullet literally names is implemented —
+      `RCP_CONFIGURED` -> `HW_CONFIGURED` and `RCP_CONFIGURED` ->
+      `HW_UNCONFIGURED` remain undefined and continue to reject with
+      `RcpError::InvalidLifecycleTransition`, left as an explicit open
+      question for a later item rather than folded in here. A consequence
+      of that second call: since `LockPolicy::WStar`'s permanent lock only
+      ever engages at `RCP_CONFIGURED`, and no transition this crate
+      implements moves a server *out of* `RCP_CONFIGURED`, this item's
+      narrowly-scoped hop does not actually unlock a `RCP_CONFIGURED`-locked
+      `HwConfig` register — that remains a still-unbuilt, separate concern.
+      Covered by new round-trip/never-consults-guard/never-panics tests in
+      `src/lifecycle.rs`'s test module, plus new `REQ-LIFE-012` in
+      `.fusa-reqs.json` (and updated text for `REQ-LIFE-006`/`REQ-LIFE-008`,
+      which previously described only the two forward transitions). This
+      closes out the "Lifecycle State Machine" subsection.
 
 ### EP0 (RC-Server-as-Endpoint)
 

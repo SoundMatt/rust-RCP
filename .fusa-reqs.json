@@ -3711,8 +3711,8 @@
     },
     {
       "id": "REQ-LIFE-006",
-      "title": "Transition guard defines exactly the two forward transitions",
-      "text": "is_transition_defined returns true only for (HwUnconfigured, HwConfigured) and (HwConfigured, RcpConfigured), and false for every other RcServerState pair; RcServerState::try_transition succeeds (subject to the consistency guard) exactly on those same two pairs",
+      "title": "Transition guard defines exactly the three implemented transitions",
+      "text": "is_transition_defined returns true only for (HwUnconfigured, HwConfigured), (HwConfigured, RcpConfigured), and (HwConfigured, HwUnconfigured), and false for every other RcServerState pair; RcServerState::try_transition succeeds on exactly those same three pairs (subject to the consistency guard for the first two, unconditionally for the third)",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -3730,7 +3730,7 @@
     {
       "id": "REQ-LIFE-008",
       "title": "try_transition rejects undefined transitions without invoking the guard, and never panics",
-      "text": "RcServerState::try_transition returns Err(RcpError::InvalidLifecycleTransition) without calling is_consistent for every (from, to) pair other than the two defined forward transitions (including identity, backward, skip, and the HW_CONFIGURED -> HW_UNCONFIGURED demotion path), and never panics for any (from, to) pair or guard result",
+      "text": "RcServerState::try_transition returns Err(RcpError::InvalidLifecycleTransition) without calling is_consistent for every (from, to) pair other than the three implemented transitions (including identity, any move originating at RcpConfigured, and skipping HwConfigured entirely), and never panics for any (from, to) pair or guard result",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -3758,6 +3758,15 @@
       "id": "REQ-LIFE-011",
       "title": "Write-lock checks never panic",
       "text": "lock_policy, is_register_writable, and check_register_writable never panic for any RcServerState/RegisterCategory pair",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-LIFE-012",
+      "title": "Demotion path HwConfigured -> HwUnconfigured is unconditional and single-hop only",
+      "text": "RcServerState::try_transition(HwConfigured, HwUnconfigured, is_consistent) always returns Ok(HwUnconfigured) regardless of what is_consistent would return, and never invokes is_consistent for this pair; is_transition_defined(HwConfigured, HwUnconfigured) returns true; demotion originating at RcpConfigured (to either HwConfigured or HwUnconfigured) remains outside this transition's scope and continues to return Err(RcpError::InvalidLifecycleTransition)",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
