@@ -28,3 +28,9 @@ name = "fuzz_config_parse"
 path = "fuzz_targets/fuzz_config_parse.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "fuzz_avtpdu_acf_decode"
+path = "fuzz_targets/fuzz_avtpdu_acf_decode.rs"
+test = false
+doc = false
