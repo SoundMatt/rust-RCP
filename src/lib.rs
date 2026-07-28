@@ -93,6 +93,7 @@ pub mod codegen;
 pub mod config;
 pub mod ddsbr;
 pub mod deadline;
+pub mod discovery;
 pub mod doipbr;
 pub mod dyndata;
 pub mod e2e;
