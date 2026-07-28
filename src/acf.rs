@@ -43,7 +43,10 @@
 //!   carry a 64-bit `message_timestamp`. Per this Milestone 1 item's own
 //!   scope, `message_timestamp` here is a raw passthrough value only — its
 //!   width/rollover behavior and the all-zero-timestamp fallback rule are
-//!   the separate, still-unchecked "Timestamp Semantics" checklist item.
+//!   the separate "Timestamp Semantics" checklist item, now implemented in
+//!   [`crate::timestamp`] ([`crate::timestamp::MessageTimestamp`]) as a
+//!   standalone newtype consuming this field's raw `u64` value, rather than
+//!   a change to this field's own type.
 //! - **`byte_message_info`** — [`ByteMessageInfo`] /
 //!   [`encode_byte_message_info`] / [`decode_byte_message_info`]. The
 //!   shared header both ACF_ABB and ACF_GBB carry immediately after their
@@ -71,9 +74,10 @@
 //!   11-bit value only.
 //! - `avtp_timestamp`/`message_timestamp` width/rollover semantics and the
 //!   all-zero-timestamp fallback rule (the "Timestamp Semantics"
-//!   subsection) — moot for ACF_ABB, since it has no timestamp field to
-//!   apply that rule to; for ACF_GBB, `message_timestamp` is carried as a
-//!   raw `u64` only.
+//!   subsection, in [`crate::timestamp`]) — moot for ACF_ABB, since it has
+//!   no timestamp field to apply that rule to; for ACF_GBB,
+//!   `message_timestamp` is carried as a raw `u64` only, not wired into
+//!   [`crate::timestamp::MessageTimestamp`] at encode/decode time.
 //! - Wiring either message type into [`crate::avtpdu`]'s AVTPDU decoders,
 //!   or cutting over any caller of [`crate::wire`] — this module is
 //!   additive only, matching the pattern [`crate::avtpdu`] itself
@@ -417,14 +421,18 @@ pub fn decode_acf_abb(b: &[u8]) -> Result<AcfAbbMessage, RcpError> {
 /// `message_timestamp` is carried here as a raw 64-bit value only — this
 /// module does not implement its rollover period or the all-zero-timestamp
 /// "treat as untimed" fallback rule; those are the separate "Timestamp
-/// Semantics" checklist item.
+/// Semantics" checklist item, implemented in
+/// [`crate::timestamp::MessageTimestamp`] as a standalone wrapper over this
+/// field's raw value.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 // fusa:req REQ-GBB-001
 pub struct AcfGbbMessage {
     /// The shared `byte_message_info` header. See [`ByteMessageInfo`].
     pub info: ByteMessageInfo,
     /// Raw 64-bit message timestamp. See the struct-level doc comment for
-    /// what semantics this module does not yet apply to it.
+    /// what semantics this module does not apply to it, and
+    /// [`crate::timestamp::MessageTimestamp`] for where those semantics
+    /// live.
     pub message_timestamp: u64,
     /// Opaque bytes following `message_timestamp`. This module does not
     /// parse any further internal structure of an ACF_GBB payload.

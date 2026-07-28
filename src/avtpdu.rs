@@ -47,10 +47,14 @@
 //! server drops it outright rather than decoding the remainder of the
 //! header.
 //!
-//! The two ACF message types (implemented separately in [`crate::acf`]) and
-//! full timestamp semantics (`message_timestamp`, invalid-timestamp
-//! fallback) remain separate, later items on the same Milestone 1 checklist
-//! and are intentionally not implemented here.
+//! The two ACF message types (implemented separately in [`crate::acf`]) are
+//! a separate item on the same Milestone 1 checklist and are intentionally
+//! not implemented here. Full timestamp semantics — `avtp_timestamp`'s
+//! width/rollover behavior and the invalid-timestamp fallback rule — are
+//! also a separate item, now implemented in [`crate::timestamp`]
+//! ([`crate::timestamp::AvtpTimestamp`]) as a standalone newtype rather
+//! than a change to [`TscfHeader::avtp_timestamp`]'s own field type; see
+//! that module's doc comment.
 //!
 //! `stream_id` construction/parsing — the first "Addressing" checklist
 //! item — *is* implemented in this module: [`StreamId`] decomposes/composes
@@ -231,10 +235,11 @@ pub const TSCF_DATA_LENGTH_MAX: u16 = 0x07FF;
 pub struct TscfHeader {
     /// Per-stream sequence number, incremented once per TSCF AVTPDU sent.
     pub sequence_num: u8,
-    /// 32-bit AVTP presentation timestamp. TSCF-only — see
-    /// `ROADMAP.md`'s "Timestamp Semantics" item for how this differs from
-    /// ACF_GBB's 64-bit `message_timestamp`, which this module does not yet
-    /// model.
+    /// 32-bit AVTP presentation timestamp. TSCF-only. Carried here as a
+    /// raw passthrough value; wrap it in [`crate::timestamp::AvtpTimestamp`]
+    /// for its width/rollover semantics and the invalid-timestamp fallback
+    /// rule, which distinguish it from ACF_GBB's 64-bit `message_timestamp`
+    /// (see [`crate::timestamp`]).
     pub avtp_timestamp: u32,
     /// Length, in bytes, of the ACF message(s) carried after this header.
     /// Valid range is `0..=TSCF_DATA_LENGTH_MAX` (11 bits).
