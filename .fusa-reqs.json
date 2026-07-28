@@ -5044,7 +5044,7 @@
     {
       "id": "REQ-CMP-006",
       "title": "CompoundExecDelays models cmp_exec_delay/cmpw_exec_delay and resolve_compound_exec_delay selects the matching timer",
-      "text": "CompoundExecDelays carries cmp_exec_delay and cmpw_exec_delay as independent u32 fields defaulting to zero, and resolve_compound_exec_delay returns cmp_exec_delay for RequestKind::Compound and cmpw_exec_delay for RequestKind::CompoundWait",
+      "text": "CompoundExecDelays carries cmp_exec_delay and cmpw_exec_delay as independent u32 fields defaulting to zero, and resolve_compound_exec_delay returns Some(cmp_exec_delay) for RequestKind::Compound, Some(cmpw_exec_delay) for RequestKind::CompoundWait, and None for RequestKind::Triggered (which has no CompoundExecDelays field of its own)",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -5054,6 +5054,51 @@
       "id": "REQ-CMP-007",
       "title": "advance_sequencer_if_still_in_start_state implements the advance-only-if-still-in-start-state race guard",
       "text": "advance_sequencer_if_still_in_start_state returns Some(next_state) only when the observed sequencer state at advance time still equals the gate's start_state, and returns None (do not advance) when a race has moved the sequencer out of its start state in the interim; never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-TRIG-001",
+      "title": "RequestKind gains a Triggered = 0x0E variant that round-trips through to_u8/from_u8",
+      "text": "RequestKind::Triggered encodes to discriminant byte 0x0E via to_u8, RequestKind::from_u8(0x0E) decodes to RequestKind::Triggered, and every RequestKind variant (Compound, CompoundWait, Triggered) round-trips through to_u8/from_u8; from_u8 continues to reject every other byte value and never panics across the full 0..=255 range",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-TRIG-002",
+      "title": "TriggerExecDelay models trigger_exec_delay and resolve_trigger_exec_delay selects it only for RequestKind::Triggered",
+      "text": "TriggerExecDelay carries trigger_exec_delay as a single u32 field defaulting to zero, and resolve_trigger_exec_delay returns Some(delay.0) for RequestKind::Triggered and None for every other RequestKind",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-TRIG-003",
+      "title": "TriggerRepeatCount models a Triggered request's occurrence repeat count with an explicit infinite-repeat sentinel",
+      "text": "TriggerRepeatCount::from_u16 decodes raw value 0xFFFF (TRIGGER_REPEAT_COUNT_INFINITE_SENTINEL) to TriggerRepeatCount::Infinite and every other raw u16 value to TriggerRepeatCount::Finite(raw); TriggerRepeatCount::to_u16 encodes Finite(n) back to n and Infinite back to 0xFFFF; every value produced by from_u16 round-trips through to_u16/from_u16, while a directly-constructed Finite(0xFFFF) deliberately collapses to Infinite on the next from_u16 decode since the wire has only the one sentinel value",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-TRIG-004",
+      "title": "is_trigger_repeat_exhausted determines whether a Triggered request's occurrence count has been exhausted",
+      "text": "is_trigger_repeat_exhausted returns false for every occurrences_so_far value when repeat_count is TriggerRepeatCount::Infinite (it never exhausts on its own), and returns true once occurrences_so_far is greater than or equal to the finite configured target; never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-TRIG-005",
+      "title": "should_count_trigger_occurrence implements the busy/idle-independent trigger-occurrence-counting rule",
+      "text": "should_count_trigger_occurrence returns true regardless of the endpoint_busy parameter it is given, capturing the rule that Triggered trigger-occurrence counting runs independent of the target endpoint's busy/idle state",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
