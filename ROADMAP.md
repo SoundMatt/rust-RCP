@@ -206,9 +206,32 @@ shared request-descriptor header that carries all per-message addressing.
       provenance note for reconciliation before being relied on for
       interop. The other two Addressing bullets below —
       `(stream_id, byte_bus_id)` endpoint lookup and the echo-back rule —
-      remain separate, unimplemented items.
-- [ ] `(stream_id, byte_bus_id)` → endpoint lookup, with the stream-relative
-      (not global) uniqueness of `byte_bus_id` modeled explicitly
+      remain separate items; the former is now also done (see below), the
+      echo-back rule remains unimplemented.
+- [x] `(stream_id, byte_bus_id)` → endpoint lookup, with the stream-relative
+      (not global) uniqueness of `byte_bus_id` modeled explicitly. Done
+      (v0.4.0-dev): new module `src/addressing.rs` adds `EndpointTable`, a
+      lookup keyed on the `(stream_id, byte_bus_id)` pair, plus
+      `EndpointTable::register`/`EndpointTable::lookup` and a placeholder
+      `EndpointId` handle standing in for the concrete endpoint
+      representation later milestones (Milestone 4 onward) will introduce.
+      The stream-relative uniqueness rule is modeled structurally, not just
+      documented: `EndpointTable` is internally a map from `StreamId` to a
+      per-stream map from `byte_bus_id` to `EndpointId`, so two streams each
+      get their own independent `byte_bus_id` keyspace and the same
+      `byte_bus_id` value under two different streams can never collide.
+      `register` rejects re-registering an already-registered pair with the
+      new `RcpError::EndpointAlreadyRegistered` sentinel (without
+      overwriting the existing entry) rather than silently allowing an
+      ambiguous double-registration, and rejects a `byte_bus_id` wider than
+      the 11-bit field width already enforced by
+      `acf::encode_byte_message_info`. Covered by round-trip, cross-stream
+      non-collision, duplicate-registration-rejection, and
+      never-panics-on-arbitrary-input tests. This is additive: it consumes
+      `StreamId` (`src/avtpdu.rs`) and `byte_bus_id` (`src/acf.rs`) as
+      inputs only, does not change either type's shape, and is not yet
+      wired into any AVTPDU/ACF decoder or existing caller. The echo-back
+      rule below remains a separate, unimplemented item.
 - [ ] Echo-back rule: a response/ack must carry the same `byte_bus_id` it
       was received under
 
