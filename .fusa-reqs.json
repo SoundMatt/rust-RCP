@@ -3771,6 +3771,60 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-EP0-001",
+      "title": "EP0 reserved byte_bus_id recognition",
+      "text": "EP0_BYTE_BUS_ID is 0, and is_ep0_address returns true iff byte_bus_id equals EP0_BYTE_BUS_ID, for every representable byte_bus_id value, without panicking",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-EP0-002",
+      "title": "EP0 vs. device-endpoint routing is decided before and independent of EndpointTable",
+      "text": "route_byte_bus_id returns RequestRoute::Ep0 iff byte_bus_id is EP0_BYTE_BUS_ID and RequestRoute::DeviceEndpoint otherwise, for every representable byte_bus_id value, without panicking and without taking or consulting an EndpointTable; the routing decision for EP0_BYTE_BUS_ID is unchanged regardless of whether EndpointTable has an entry registered at that byte_bus_id",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-EP0-003",
+      "title": "EP0 access direction derived from ByteMessageInfo::op",
+      "text": "access_kind returns Ep0AccessKind::Read when info.op is false and Ep0AccessKind::Write when info.op is true",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-EP0-004",
+      "title": "EP0 read access composes with lifecycle register reachability",
+      "text": "check_ep0_access with an info whose op is false returns the same result as lifecycle::check_register_reachable for the same (state, category) pair, for every RcServerState/RegisterCategory combination",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-EP0-005",
+      "title": "EP0 write access composes with lifecycle register writability and distinguishes unreachable from locked",
+      "text": "check_ep0_access with an info whose op is true returns the same result as lifecycle::check_register_writable for the same (state, category) pair, for every RcServerState/RegisterCategory combination, including reporting RcpError::RegisterUnreachable (not RegisterLocked) for an unreachable category and RcpError::RegisterLocked for a reachable but write-locked category",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-EP0-006",
+      "title": "EP0 access check never panics",
+      "text": "check_ep0_access never panics for any RcServerState/RegisterCategory/op combination",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
