@@ -3366,6 +3366,132 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-BMI-001",
+      "title": "ByteMessageInfo field model",
+      "text": "ByteMessageInfo models the ACF_ABB/ACF_GBB shared header fields (acf_msg_length, pad, mtv, byte_bus_id, evt as an ack flag plus 3-bit sub_opcode, hs, cs, transaction_num, op, rsp, err, ms) plus a documented, non-ambiguous convention for the dual-purpose read_size/segment_num field rather than a single ambiguous field",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-BMI-002",
+      "title": "byte_message_info encode/decode round-trip",
+      "text": "encode_byte_message_info followed by decode_byte_message_info recovers the original ByteMessageInfo, including at the 11-bit byte_bus_id/acf_msg_length maxima and the 3-bit evt.sub_opcode maximum",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-BMI-003",
+      "title": "byte_message_info encode rejects out-of-range fields",
+      "text": "encode_byte_message_info rejects an acf_msg_length or byte_bus_id wider than 11 bits and an evt.sub_opcode wider than 3 bits",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-BMI-004",
+      "title": "byte_message_info decode never panics",
+      "text": "decode_byte_message_info never panics on truncated or arbitrary input, across a swept range of input lengths",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ABB-001",
+      "title": "AcfAbbMessage field model",
+      "text": "AcfAbbMessage models an ACF_ABB message as a ByteMessageInfo plus an opaque payload only, with no timestamp field of any kind and no reserved gap sized for one",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ABB-002",
+      "title": "ACF_ABB encode/decode round-trip",
+      "text": "encode_acf_abb followed by decode_acf_abb recovers the original message, and the encoded length is always exactly the discriminant byte plus byte_message_info plus the payload, with no timestamp region inserted",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ABB-003",
+      "title": "ACF_ABB acf_msg_type discriminant",
+      "text": "Encoded ACF_ABB messages carry the acf_msg_type discriminant 0x0E as their leading byte",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ABB-004",
+      "title": "ACF_ABB decode rejects malformed input",
+      "text": "decode_acf_abb rejects empty/too-short input and input whose leading byte is not the ACF_ABB discriminant 0x0E, distinguishing the ACF_GBB discriminant 0x0D with a specific hint",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ABB-005",
+      "title": "ACF_ABB decode never panics",
+      "text": "decode_acf_abb never panics on arbitrary or truncated input, across a swept range of input lengths",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GBB-001",
+      "title": "AcfGbbMessage field model",
+      "text": "AcfGbbMessage models an ACF_GBB message as a ByteMessageInfo plus a 64-bit message_timestamp plus an opaque payload; message_timestamp is carried/round-tripped as a raw value only, with full rollover/fallback semantics deferred to the Timestamp Semantics checklist item",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GBB-002",
+      "title": "ACF_GBB encode/decode round-trip",
+      "text": "encode_acf_gbb followed by decode_acf_gbb recovers the original message, including the full 64-bit message_timestamp range, and the encoded length is always exactly the discriminant byte plus byte_message_info plus the 8-byte timestamp plus the payload",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GBB-003",
+      "title": "ACF_GBB acf_msg_type discriminant",
+      "text": "Encoded ACF_GBB messages carry the acf_msg_type discriminant 0x0D as their leading byte",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GBB-004",
+      "title": "ACF_GBB decode rejects malformed input",
+      "text": "decode_acf_gbb rejects empty/too-short input and input whose leading byte is not the ACF_GBB discriminant 0x0D, distinguishing the ACF_ABB discriminant 0x0E with a specific hint",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-GBB-005",
+      "title": "ACF_GBB decode never panics",
+      "text": "decode_acf_gbb never panics on arbitrary or truncated input, across a swept range of input lengths",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

@@ -66,6 +66,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod acf;
 pub mod adapt;
 pub mod admin;
 pub mod authz;
