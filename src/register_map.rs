@@ -9,11 +9,27 @@
 // fusa:req REQ-RMAP-009
 // fusa:req REQ-RMAP-010
 // fusa:req REQ-RMAP-011
+// fusa:req REQ-RMAP-012
+// fusa:req REQ-RMAP-013
+// fusa:req REQ-RMAP-014
+// fusa:req REQ-RMAP-015
+// fusa:req REQ-RMAP-016
+// fusa:req REQ-RMAP-017
+// fusa:req REQ-RMAP-018
+// fusa:req REQ-RMAP-019
+// fusa:req REQ-RMAP-020
+// fusa:req REQ-RMAP-021
+// fusa:req REQ-RMAP-022
+// fusa:req REQ-RMAP-023
+// fusa:req REQ-RMAP-024
+// fusa:req REQ-RMAP-025
+// fusa:req REQ-RMAP-026
+// fusa:req REQ-RMAP-027
 
-//! Three-layer per-endpoint config taxonomy, plus the RC Server's general
-//! (whole-server) register-map fields — TC18 register-map model
-//! (`ROADMAP.md` Milestone 2, "Register Map" subsection, first and second
-//! items).
+//! Three-layer per-endpoint config taxonomy, the RC Server's general
+//! (whole-server) register-map fields, and the five child config tables
+//! `§3.6`'s pointer/capacity rows point at — TC18 register-map model
+//! (`ROADMAP.md` Milestone 2, "Register Map" subsection, all three items).
 //!
 //! Per Guiding Principle 2 ("sequence work so nothing is built on a
 //! foundation that will itself change later ... lifecycle model and
@@ -29,9 +45,15 @@
 //! map's *general* section (the RC Server's own whole-server identity,
 //! capacity, and child-table-pointer fields, read via EP0 rather than any
 //! per-endpoint config) its first concrete field content — the "Register
-//! Map" subsection's second checklist bullet, citing `§3.6`. The
-//! subsection's remaining bullet (config tables `§3.7`-`§3.11`) is later,
-//! still-unbuilt work; [`GeneralRegisters`] claims only `§3.6`'s own table.
+//! Map" subsection's second checklist bullet, citing `§3.6`.
+//!
+//! This module's third and final item gives each of the five child config
+//! tables [`GeneralRegisters`]'s own pointer/capacity (or, for one table,
+//! pointer-only) rows point at its own row-content type: [`HwPinMappingEntry`]
+//! (`§3.7`), [`RequestStreamConfigEntry`] (`§3.8`), [`EpByteBusIdMapEntry`]
+//! (`§3.9`), [`ResponseStreamConfigEntry`] (`§3.10`), and
+//! [`SequencerStateEntry`] (`§3.11`) — see "Config tables (`§3.7`-`§3.11`)"
+//! below.
 //!
 //! [`ROADMAP.md`]'s own checklist bullet names three distinct layers, not
 //! the old crate's single flat `ep_type`-less config model:
@@ -260,6 +282,102 @@
 //! [`GeneralRegisters`] follows that same ptr-vs-ptr+capacity split
 //! field-by-field rather than assuming every pointer row is uniformly
 //! shaped.
+//!
+//! ## Config tables (`§3.7`-`§3.11`)
+//!
+//! [`HwPinMappingEntry`], [`RequestStreamConfigEntry`],
+//! [`EpByteBusIdMapEntry`], [`ResponseStreamConfigEntry`], and
+//! [`SequencerStateEntry`] each model one row of the child config table its
+//! corresponding [`GeneralRegisters`] pointer field reaches:
+//! [`GeneralRegisters::svr_hw_cfg`] (`§3.7`),
+//! [`GeneralRegisters::svr_request_stream_cfg`] (`§3.8`),
+//! [`GeneralRegisters::svr_ep_bytebus_id_map`] (`§3.9`),
+//! [`GeneralRegisters::svr_response_stream_cfg`] (`§3.10`), and
+//! [`GeneralRegisters::svr_sequencer_state_ptr`] (`§3.11`) respectively.
+//! Every row type gets the same never-panicking, fixed-length encode/decode
+//! treatment [`TableDescriptor`]/[`GeneralRegisters`] already established;
+//! [`ConfigTableRow`]/[`encode_rows`]/[`decode_rows`] additionally give the
+//! five row types one shared, generic way to pack/unpack an entire table as
+//! a flat run of fixed-length rows, rather than five copies of the same
+//! chunking loop.
+//!
+//! A table's *row count* is not carried inside the row type itself — four
+//! of the five tables already have it from the paired `capacity` field on
+//! their [`GeneralRegisters`] [`TableDescriptor`] (cross-referenced, but not
+//! asserted equal to, the more specific per-table capacity fields
+//! [`GeneralRegisters::svr_io_pin_count`],
+//! [`GeneralRegisters::svr_req_stream_max`], and
+//! [`GeneralRegisters::svr_responder_streams_max`] already carry); the
+//! fifth, [`SequencerStateEntry`], has no paired capacity field at all
+//! (`svr_sequencer_state_ptr` is pointer-only, per this module's doc
+//! comment above), so its row count comes from
+//! [`GeneralRegisters::svr_sequencers_max`] instead — the same bound this
+//! crate's own Milestone 5 lifecycle work is expected to use for
+//! sequencer-state ("power-on default state 1, bounded by
+//! `svr_sequencers_max`"). None of that cross-referencing is enforced by
+//! this module: it performs no register I/O and holds no reference to a
+//! live [`GeneralRegisters`] value, so it cannot itself check a decoded
+//! table's length against any of these bounds — that check is a later
+//! caller's job once one exists.
+//!
+//! **`§3.9` is a client-side ordering responsibility, not a server-side
+//! safety net.** [`EpByteBusIdMapEntry::is_end_of_table`] recognizes the
+//! documented end-of-table sentinel row (`map_stream_index == 0`, which
+//! this crate's own extraction of `§3.9` also records as doubling for the
+//! default EP0 mapping) — a fixed, stated wire convention, not a validation
+//! rule this crate invented. What this module deliberately does **not**
+//! add is any check that a table's rows are kept in ascending order:
+//! per `ROADMAP.md`'s own parenthetical for this checklist bullet
+//! ("client-side ordering responsibility, no server-side safety net per
+//! spec"), maintaining that order is exclusively the writing client's
+//! responsibility, and this crate's own `§3.9` extraction independently
+//! notes that ordering violations are implementation-defined with no
+//! corrective mechanism specified. Inventing a sorting/validation gate here
+//! would be inventing behavior the specification does not require, per
+//! Guiding Principle 5 — so none exists.
+//!
+//! Like every prior Milestone 1/2 entry, all five row types and the
+//! [`encode_rows`]/[`decode_rows`] helpers are purely additive: none of
+//! this performs register I/O against a real RC Server, and none of it is
+//! wired into [`crate::ep0`]'s dispatch path, [`crate::lifecycle`]'s
+//! reachability checks, or any other existing caller. Completing this item
+//! closes out the "Register Map" subsection of `ROADMAP.md` Milestone 2,
+//! leaving only that milestone's separate "Error Model" item.
+//!
+//! ### Config tables provenance note
+//!
+//! Unlike `§3.6`'s own table, this crate's own extraction of `§3.7`-`§3.11`
+//! records each table's field *names* and *purpose* in prose, but no
+//! explicit per-field bit-width or byte-offset table comparable to `§3.6`'s
+//! own. Every field width chosen below — including which of the sixteen
+//! `§3.8` fields are modeled as a single byte-aligned flag versus a wider
+//! counter/index/identifier — is therefore this crate's own placeholder
+//! inference, not a spec-cited fact, flagged here per Guiding Principle 5
+//! rather than presented as settled:
+//!
+//! - [`HwPinMappingEntry::hw_pin_props`] is left an undecomposed raw `u8`,
+//!   the same choice [`GeneralRegisters::svr_implemented_options`] already
+//!   made for a packed multi-property byte with no recorded bit-position
+//!   assignment.
+//! - Every one of [`RequestStreamConfigEntry`]'s eight documented on/off
+//!   behaviors (`rx_enforce_e2e` through `rx_wd_info_enable`) is modeled as
+//!   its own byte-aligned `u8` field rather than packed into a shared
+//!   bitmask, matching [`GeneralRegisters::svr_configuration_lock`]'s own
+//!   "meaningfully binary but wire-width `u8`" precedent — this crate has
+//!   no textual basis for a specific bit-position assignment if it *were*
+//!   to pack them, so it does not invent one.
+//! - [`EpByteBusIdMapEntry::map_byte_bus_id`] is typed `u16`, matching
+//!   [`crate::acf::ByteMessageInfo::byte_bus_id`]'s own existing
+//!   already-established field width for the same wire concept, even
+//!   though this table's row-level encoding of it is otherwise unrelated to
+//!   ACF message framing.
+//! - Every row is packed sequentially with no inter-field padding, matching
+//!   [`GeneralRegisters`]'s own sequential-byte-packing inference (see
+//!   above) rather than a newly-invented convention.
+//!
+//! A real RC Server's actual per-table byte layout must be reconciled
+//! against this crate's own working guesses (never against spec prose)
+//! before any of these encode/decode forms are relied on for interop.
 
 use crate::lifecycle::RegisterCategory;
 use crate::RcpError;
@@ -768,6 +886,572 @@ impl GeneralRegisters {
             svr_time_synch_cfg,
             svr_security_cfg,
         })
+    }
+}
+
+// ── ConfigTableRow / encode_rows / decode_rows ────────────────────────────────
+
+/// Shared row-codec contract for this module's five `§3.7`-`§3.11` child
+/// config-table row types.
+///
+/// Lets [`encode_rows`]/[`decode_rows`] pack/unpack a whole table as a flat
+/// run of fixed-length rows once, generically, instead of five copies of
+/// the same chunking loop. See this module's doc comment "Config tables"
+/// section for what determines a table's row *count* (never carried inside
+/// the row type itself).
+pub trait ConfigTableRow: Sized {
+    /// Encoded wire length of a single row, in bytes. Never zero for any
+    /// type implementing this trait in this crate.
+    const ROW_LEN: usize;
+
+    /// Encode this row as a fixed-length byte block. Never panics.
+    fn encode_row(&self) -> Vec<u8>;
+
+    /// Decode a single row from the front of `bytes`.
+    ///
+    /// Returns `Err(RcpError::ShortFrame)` if `bytes` is shorter than
+    /// `Self::ROW_LEN`. Never panics for any input.
+    fn decode_row(bytes: &[u8]) -> Result<Self, RcpError>;
+}
+
+/// Encode every row in `rows`, back-to-back, with no padding between rows.
+/// Never panics.
+// fusa:req REQ-RMAP-027
+pub fn encode_rows<T: ConfigTableRow>(rows: &[T]) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(rows.len() * T::ROW_LEN);
+    for row in rows {
+        buf.extend_from_slice(&row.encode_row());
+    }
+    buf
+}
+
+/// Decode `bytes` as a flat run of fixed-length `T::ROW_LEN` rows.
+///
+/// Returns `Err(RcpError::ShortFrame)` if `bytes.len()` is not an exact
+/// multiple of `T::ROW_LEN` (including a non-empty remainder shorter than
+/// one row). An empty input decodes to an empty table. Never panics for any
+/// input.
+// fusa:req REQ-RMAP-027
+pub fn decode_rows<T: ConfigTableRow>(bytes: &[u8]) -> Result<Vec<T>, RcpError> {
+    debug_assert!(T::ROW_LEN > 0, "ConfigTableRow::ROW_LEN must not be zero");
+    if T::ROW_LEN == 0 || bytes.len() % T::ROW_LEN != 0 {
+        return Err(RcpError::ShortFrame);
+    }
+    let mut rows = Vec::with_capacity(bytes.len() / T::ROW_LEN);
+    let mut off = 0usize;
+    while off < bytes.len() {
+        rows.push(T::decode_row(&bytes[off..off + T::ROW_LEN])?);
+        off += T::ROW_LEN;
+    }
+    Ok(rows)
+}
+
+// ── HwPinMappingEntry (§3.7) ─────────────────────────────────────────────────
+
+/// One row of the HW pin-mapping table (`§3.7`): which endpoint owns a
+/// physical I/O pin, which of that endpoint's named signal indices is bound
+/// to it, and the pin's packed electrical properties.
+///
+/// See this module's doc comment "Config tables" section for this table's
+/// row-count source ([`GeneralRegisters::svr_hw_cfg`]'s `capacity`,
+/// cross-referenced against [`GeneralRegisters::svr_io_pin_count`]) and
+/// "Config tables provenance note" for [`Self::hw_pin_props`]'s undecomposed
+/// byte.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+// fusa:req REQ-RMAP-012
+pub struct HwPinMappingEntry {
+    /// Endpoint slot number this pin is assigned to.
+    pub hw_ep_nr: u8,
+    /// Index into that endpoint type's own named-signal enumeration (e.g.
+    /// SPI's CLK/PICO/POCI/CS lines) that this pin is bound to.
+    pub hw_ep_pin_nr: u8,
+    /// Packed pin-electrical-property byte (pull-up/down/float, output
+    /// stage, drive strength, Schmitt-trigger enable). Left undecomposed —
+    /// see this module's doc comment provenance note.
+    pub hw_pin_props: u8,
+}
+
+impl HwPinMappingEntry {
+    /// Encoded wire length in bytes.
+    pub const ENCODED_LEN: usize = 3;
+
+    /// The [`RegisterCategory`] this table's rows belong to.
+    pub const CATEGORY: RegisterCategory = RegisterCategory::HwConfig;
+
+    /// Encode as `[hw_ep_nr, hw_ep_pin_nr, hw_pin_props]`. Never panics.
+    // fusa:req REQ-RMAP-013
+    pub fn encode(&self) -> [u8; Self::ENCODED_LEN] {
+        [self.hw_ep_nr, self.hw_ep_pin_nr, self.hw_pin_props]
+    }
+
+    /// Decode from the front of `bytes`.
+    ///
+    /// Returns `Err(RcpError::ShortFrame)` if `bytes` is shorter than
+    /// [`Self::ENCODED_LEN`]. Trailing bytes beyond `ENCODED_LEN` are
+    /// ignored. Never panics for any input.
+    // fusa:req REQ-RMAP-014
+    pub fn decode(bytes: &[u8]) -> Result<Self, RcpError> {
+        if bytes.len() < Self::ENCODED_LEN {
+            return Err(RcpError::ShortFrame);
+        }
+        Ok(Self {
+            hw_ep_nr: bytes[0],
+            hw_ep_pin_nr: bytes[1],
+            hw_pin_props: bytes[2],
+        })
+    }
+}
+
+impl ConfigTableRow for HwPinMappingEntry {
+    const ROW_LEN: usize = Self::ENCODED_LEN;
+
+    fn encode_row(&self) -> Vec<u8> {
+        self.encode().to_vec()
+    }
+
+    fn decode_row(bytes: &[u8]) -> Result<Self, RcpError> {
+        Self::decode(bytes)
+    }
+}
+
+// ── RequestStreamConfigEntry (§3.8) ──────────────────────────────────────────
+
+/// One row of the request-stream config table (`§3.8`): the receive-side
+/// configuration for one stream the RC Server listens on.
+///
+/// See this module's doc comment "Config tables" section for this table's
+/// row-count source ([`GeneralRegisters::svr_request_stream_cfg`]'s
+/// `capacity`, cross-referenced against
+/// [`GeneralRegisters::svr_req_stream_max`]) and "Config tables provenance
+/// note" for why each on/off behavior is its own byte-aligned field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+// fusa:req REQ-RMAP-015
+pub struct RequestStreamConfigEntry {
+    /// 64-bit stream identifier this entry is bound to; a sentinel default
+    /// value means "unconfigured, no reception."
+    pub rx_stream_id: u64,
+    /// Largest single fragmented request this stream will reassemble, in
+    /// bytes; `0` means fragmentation is unsupported on this stream.
+    pub rx_stream_max_request_size: u16,
+    /// Per-stream watchdog timeout, in clock ticks.
+    pub rx_wd_timeout_interval: u16,
+    /// Required MACsec secure-channel index; `0` means no security /
+    /// uncontrolled port.
+    pub rx_secure_channel_index: u8,
+    /// `0`/`1`: whether an E2E-CRC failure at one endpoint only drops that
+    /// bad request, versus latching the whole stream into a fault/safe
+    /// state until explicitly released.
+    pub rx_enforce_e2e: u8,
+    /// `0`/`1`: require strictly increasing sequence numbers before a
+    /// request is queued for execution at all.
+    pub rx_enforce_seq: u8,
+    /// `0`/`1`: drive every endpoint on this stream to safe-state if the
+    /// monotonic sequence-number check fails.
+    pub rx_seq_safestate_enable: u8,
+    /// `0`/`1`: enable this stream's watchdog.
+    pub rx_wd_enable: u8,
+    /// `0`/`1`: drive every endpoint on this stream to safe-state on
+    /// watchdog expiry.
+    pub rx_wd_safestate_enable: u8,
+    /// `0`/`1`: drive every endpoint on this stream to safe-state if any of
+    /// its endpoints' request storage overflows.
+    pub rx_ovrflw_safestate_enable: u8,
+    /// `0`/`1`: whether safe-state means forcing every I/O pin to
+    /// high-impedance, versus running a configured sequencer-based safety
+    /// request sequence.
+    pub rx_safety_measure: u8,
+    /// `0`/`1`: keep sending a repeating notification response while in the
+    /// safe state.
+    pub rx_wd_info_enable: u8,
+    /// Which sequencer number runs the safety sequence, when
+    /// `rx_safety_measure` selects the sequencer-driven safe-state.
+    pub rx_safestate_sequencer: u8,
+    /// Target sequencer state that kicks off the safety-sequence requests.
+    pub rx_safe_sequencer_state: u8,
+    /// Which response/ack queue this stream's endpoints use for
+    /// acknowledgements; `0` suppresses acknowledgements entirely.
+    pub rx_ack_stream_index: u8,
+    /// Which response/ack queue is used for data responses.
+    pub rx_resp_stream_index: u8,
+}
+
+impl RequestStreamConfigEntry {
+    /// Encoded wire length in bytes.
+    pub const ENCODED_LEN: usize = 25;
+
+    /// The [`RegisterCategory`] this table's rows belong to.
+    pub const CATEGORY: RegisterCategory = RegisterCategory::RcpConfig;
+
+    /// Encode as a fixed-length, big-endian byte block, field order above,
+    /// with no padding between fields. Never panics.
+    // fusa:req REQ-RMAP-016
+    pub fn encode(&self) -> [u8; Self::ENCODED_LEN] {
+        let mut buf = [0u8; Self::ENCODED_LEN];
+        let mut off = 0usize;
+
+        macro_rules! put {
+            ($val:expr) => {{
+                let bytes = $val.to_be_bytes();
+                buf[off..off + bytes.len()].copy_from_slice(&bytes);
+                off += bytes.len();
+            }};
+        }
+
+        put!(self.rx_stream_id);
+        put!(self.rx_stream_max_request_size);
+        put!(self.rx_wd_timeout_interval);
+        put!(self.rx_secure_channel_index);
+        put!(self.rx_enforce_e2e);
+        put!(self.rx_enforce_seq);
+        put!(self.rx_seq_safestate_enable);
+        put!(self.rx_wd_enable);
+        put!(self.rx_wd_safestate_enable);
+        put!(self.rx_ovrflw_safestate_enable);
+        put!(self.rx_safety_measure);
+        put!(self.rx_wd_info_enable);
+        put!(self.rx_safestate_sequencer);
+        put!(self.rx_safe_sequencer_state);
+        put!(self.rx_ack_stream_index);
+        put!(self.rx_resp_stream_index);
+
+        debug_assert_eq!(off, Self::ENCODED_LEN);
+        buf
+    }
+
+    /// Decode a fixed-length, big-endian byte block produced by
+    /// [`Self::encode`].
+    ///
+    /// Returns `Err(RcpError::ShortFrame)` if `bytes` is shorter than
+    /// [`Self::ENCODED_LEN`]. Trailing bytes beyond `ENCODED_LEN` are
+    /// ignored. Never panics for any input.
+    // fusa:req REQ-RMAP-017
+    pub fn decode(bytes: &[u8]) -> Result<Self, RcpError> {
+        if bytes.len() < Self::ENCODED_LEN {
+            return Err(RcpError::ShortFrame);
+        }
+        let mut off = 0usize;
+
+        macro_rules! take_u8 {
+            () => {{
+                let v = bytes[off];
+                off += 1;
+                v
+            }};
+        }
+        macro_rules! take_u16 {
+            () => {{
+                let v = u16::from_be_bytes([bytes[off], bytes[off + 1]]);
+                off += 2;
+                v
+            }};
+        }
+        macro_rules! take_u64 {
+            () => {{
+                let v = u64::from_be_bytes([
+                    bytes[off],
+                    bytes[off + 1],
+                    bytes[off + 2],
+                    bytes[off + 3],
+                    bytes[off + 4],
+                    bytes[off + 5],
+                    bytes[off + 6],
+                    bytes[off + 7],
+                ]);
+                off += 8;
+                v
+            }};
+        }
+
+        let rx_stream_id = take_u64!();
+        let rx_stream_max_request_size = take_u16!();
+        let rx_wd_timeout_interval = take_u16!();
+        let rx_secure_channel_index = take_u8!();
+        let rx_enforce_e2e = take_u8!();
+        let rx_enforce_seq = take_u8!();
+        let rx_seq_safestate_enable = take_u8!();
+        let rx_wd_enable = take_u8!();
+        let rx_wd_safestate_enable = take_u8!();
+        let rx_ovrflw_safestate_enable = take_u8!();
+        let rx_safety_measure = take_u8!();
+        let rx_wd_info_enable = take_u8!();
+        let rx_safestate_sequencer = take_u8!();
+        let rx_safe_sequencer_state = take_u8!();
+        let rx_ack_stream_index = take_u8!();
+        let rx_resp_stream_index = take_u8!();
+
+        debug_assert_eq!(off, Self::ENCODED_LEN);
+        Ok(Self {
+            rx_stream_id,
+            rx_stream_max_request_size,
+            rx_wd_timeout_interval,
+            rx_secure_channel_index,
+            rx_enforce_e2e,
+            rx_enforce_seq,
+            rx_seq_safestate_enable,
+            rx_wd_enable,
+            rx_wd_safestate_enable,
+            rx_ovrflw_safestate_enable,
+            rx_safety_measure,
+            rx_wd_info_enable,
+            rx_safestate_sequencer,
+            rx_safe_sequencer_state,
+            rx_ack_stream_index,
+            rx_resp_stream_index,
+        })
+    }
+}
+
+impl ConfigTableRow for RequestStreamConfigEntry {
+    const ROW_LEN: usize = Self::ENCODED_LEN;
+
+    fn encode_row(&self) -> Vec<u8> {
+        self.encode().to_vec()
+    }
+
+    fn decode_row(bytes: &[u8]) -> Result<Self, RcpError> {
+        Self::decode(bytes)
+    }
+}
+
+// ── EpByteBusIdMapEntry (§3.9) ───────────────────────────────────────────────
+
+/// One row of the EP-ID/`byte_bus_id` mapping table (`§3.9`): maps a
+/// `(request_stream_index, byte_bus_id)` pair to a target endpoint number.
+///
+/// See this module's doc comment "Config tables" section for this table's
+/// row-count source ([`GeneralRegisters::svr_ep_bytebus_id_map`]'s
+/// `capacity`) and, importantly, for why this type and this module add
+/// **no** row-ordering validation — that is the writing client's
+/// responsibility, per `ROADMAP.md`'s own parenthetical for this checklist
+/// item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+// fusa:req REQ-RMAP-018
+pub struct EpByteBusIdMapEntry {
+    /// Which request stream this mapping applies to.
+    pub map_stream_index: u8,
+    /// The `byte_bus_id` value, scoped to `map_stream_index`, that this row
+    /// maps. Widened to `u16` to match
+    /// [`crate::acf::ByteMessageInfo::byte_bus_id`]'s existing field width
+    /// for the same 11-bit wire concept.
+    pub map_byte_bus_id: u16,
+    /// The endpoint slot number this `(stream, byte_bus_id)` pair resolves
+    /// to.
+    pub map_ep_nr: u8,
+}
+
+impl EpByteBusIdMapEntry {
+    /// Encoded wire length in bytes.
+    pub const ENCODED_LEN: usize = 4;
+
+    /// The [`RegisterCategory`] this table's rows belong to.
+    pub const CATEGORY: RegisterCategory = RegisterCategory::RcpConfig;
+
+    /// The documented `map_stream_index` sentinel value marking both
+    /// end-of-table and the default mapping to EP0.
+    pub const END_OF_TABLE_STREAM_INDEX: u8 = 0;
+
+    /// Does this row carry the documented end-of-table sentinel?
+    ///
+    /// This recognizes a fixed, stated wire convention only — it is not a
+    /// row-ordering check. See this type's doc comment. Never panics for
+    /// any input.
+    // fusa:req REQ-RMAP-018
+    pub fn is_end_of_table(&self) -> bool {
+        self.map_stream_index == Self::END_OF_TABLE_STREAM_INDEX
+    }
+
+    /// Encode as `[map_stream_index, map_byte_bus_id (big-endian),
+    /// map_ep_nr]`. Never panics.
+    // fusa:req REQ-RMAP-019
+    pub fn encode(&self) -> [u8; Self::ENCODED_LEN] {
+        let mut buf = [0u8; Self::ENCODED_LEN];
+        buf[0] = self.map_stream_index;
+        buf[1..3].copy_from_slice(&self.map_byte_bus_id.to_be_bytes());
+        buf[3] = self.map_ep_nr;
+        buf
+    }
+
+    /// Decode from the front of `bytes`.
+    ///
+    /// Returns `Err(RcpError::ShortFrame)` if `bytes` is shorter than
+    /// [`Self::ENCODED_LEN`]. Trailing bytes beyond `ENCODED_LEN` are
+    /// ignored. Never panics for any input.
+    // fusa:req REQ-RMAP-020
+    pub fn decode(bytes: &[u8]) -> Result<Self, RcpError> {
+        if bytes.len() < Self::ENCODED_LEN {
+            return Err(RcpError::ShortFrame);
+        }
+        Ok(Self {
+            map_stream_index: bytes[0],
+            map_byte_bus_id: u16::from_be_bytes([bytes[1], bytes[2]]),
+            map_ep_nr: bytes[3],
+        })
+    }
+}
+
+impl ConfigTableRow for EpByteBusIdMapEntry {
+    const ROW_LEN: usize = Self::ENCODED_LEN;
+
+    fn encode_row(&self) -> Vec<u8> {
+        self.encode().to_vec()
+    }
+
+    fn decode_row(bytes: &[u8]) -> Result<Self, RcpError> {
+        Self::decode(bytes)
+    }
+}
+
+// ── ResponseStreamConfigEntry (§3.10) ────────────────────────────────────────
+
+/// One row of the response/acknowledge queue config table (`§3.10`).
+///
+/// See this module's doc comment "Config tables" section for this table's
+/// row-count source ([`GeneralRegisters::svr_response_stream_cfg`]'s
+/// `capacity`, cross-referenced against
+/// [`GeneralRegisters::svr_responder_streams_max`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+// fusa:req REQ-RMAP-021
+pub struct ResponseStreamConfigEntry {
+    /// 16 least-significant bits of this queue's destination stream
+    /// identifier.
+    pub resp_stream_uid: u16,
+    /// Largest single AVTPDU this queue may generate, respecting network
+    /// MTU; larger payloads require fragmentation.
+    pub resp_max_avtpdu_size: u16,
+    /// Reserved memory for this queue, in 32-bit words.
+    pub resp_queue_size: u16,
+    /// Quadlet-count threshold that triggers a proactive flush; `1` means
+    /// send immediately with no batching.
+    pub resp_flush_on_count: u16,
+    /// Time-based flush trigger: flush after this much elapsed time even if
+    /// the count threshold has not been reached; also drives periodic
+    /// empty-payload liveness heartbeats.
+    pub resp_flush_time: u16,
+}
+
+impl ResponseStreamConfigEntry {
+    /// Encoded wire length in bytes.
+    pub const ENCODED_LEN: usize = 10;
+
+    /// The [`RegisterCategory`] this table's rows belong to.
+    pub const CATEGORY: RegisterCategory = RegisterCategory::RcpConfig;
+
+    /// Encode as a fixed-length, big-endian byte block, field order above,
+    /// with no padding between fields. Never panics.
+    // fusa:req REQ-RMAP-022
+    pub fn encode(&self) -> [u8; Self::ENCODED_LEN] {
+        let mut buf = [0u8; Self::ENCODED_LEN];
+        buf[0..2].copy_from_slice(&self.resp_stream_uid.to_be_bytes());
+        buf[2..4].copy_from_slice(&self.resp_max_avtpdu_size.to_be_bytes());
+        buf[4..6].copy_from_slice(&self.resp_queue_size.to_be_bytes());
+        buf[6..8].copy_from_slice(&self.resp_flush_on_count.to_be_bytes());
+        buf[8..10].copy_from_slice(&self.resp_flush_time.to_be_bytes());
+        buf
+    }
+
+    /// Decode a fixed-length, big-endian byte block produced by
+    /// [`Self::encode`].
+    ///
+    /// Returns `Err(RcpError::ShortFrame)` if `bytes` is shorter than
+    /// [`Self::ENCODED_LEN`]. Trailing bytes beyond `ENCODED_LEN` are
+    /// ignored. Never panics for any input.
+    // fusa:req REQ-RMAP-023
+    pub fn decode(bytes: &[u8]) -> Result<Self, RcpError> {
+        if bytes.len() < Self::ENCODED_LEN {
+            return Err(RcpError::ShortFrame);
+        }
+        Ok(Self {
+            resp_stream_uid: u16::from_be_bytes([bytes[0], bytes[1]]),
+            resp_max_avtpdu_size: u16::from_be_bytes([bytes[2], bytes[3]]),
+            resp_queue_size: u16::from_be_bytes([bytes[4], bytes[5]]),
+            resp_flush_on_count: u16::from_be_bytes([bytes[6], bytes[7]]),
+            resp_flush_time: u16::from_be_bytes([bytes[8], bytes[9]]),
+        })
+    }
+}
+
+impl ConfigTableRow for ResponseStreamConfigEntry {
+    const ROW_LEN: usize = Self::ENCODED_LEN;
+
+    fn encode_row(&self) -> Vec<u8> {
+        self.encode().to_vec()
+    }
+
+    fn decode_row(bytes: &[u8]) -> Result<Self, RcpError> {
+        Self::decode(bytes)
+    }
+}
+
+// ── SequencerStateEntry (§3.11) ──────────────────────────────────────────────
+
+/// One row of the sequencer-state register block (`§3.11`): a single
+/// persistent 8-bit state register for one sequencer.
+///
+/// See this module's doc comment "Config tables" section for this table's
+/// row-count source ([`GeneralRegisters::svr_sequencers_max`] — the one
+/// table of the five with no paired `capacity` field on its
+/// [`GeneralRegisters`] pointer, since [`GeneralRegisters::svr_sequencer_state_ptr`]
+/// is pointer-only).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// fusa:req REQ-RMAP-024
+pub struct SequencerStateEntry {
+    /// This sequencer's current persistent state.
+    pub seq_state: u8,
+}
+
+impl SequencerStateEntry {
+    /// Encoded wire length in bytes.
+    pub const ENCODED_LEN: usize = 1;
+
+    /// The [`RegisterCategory`] this table's rows belong to.
+    pub const CATEGORY: RegisterCategory = RegisterCategory::RcpConfig;
+
+    /// The documented power-on default state for a freshly reset
+    /// sequencer.
+    // fusa:req REQ-RMAP-024
+    pub fn power_on_default() -> Self {
+        Self { seq_state: 1 }
+    }
+
+    /// Encode as a single state byte. Never panics.
+    // fusa:req REQ-RMAP-025
+    pub fn encode(&self) -> [u8; Self::ENCODED_LEN] {
+        [self.seq_state]
+    }
+
+    /// Decode from the front of `bytes`.
+    ///
+    /// Returns `Err(RcpError::ShortFrame)` if `bytes` is empty. Trailing
+    /// bytes beyond [`Self::ENCODED_LEN`] are ignored. Never panics for any
+    /// input.
+    // fusa:req REQ-RMAP-026
+    pub fn decode(bytes: &[u8]) -> Result<Self, RcpError> {
+        if bytes.is_empty() {
+            return Err(RcpError::ShortFrame);
+        }
+        Ok(Self {
+            seq_state: bytes[0],
+        })
+    }
+}
+
+impl Default for SequencerStateEntry {
+    /// Defaults to the documented power-on state (`1`), not `0` — see
+    /// [`Self::power_on_default`].
+    fn default() -> Self {
+        Self::power_on_default()
+    }
+}
+
+impl ConfigTableRow for SequencerStateEntry {
+    const ROW_LEN: usize = Self::ENCODED_LEN;
+
+    fn encode_row(&self) -> Vec<u8> {
+        self.encode().to_vec()
+    }
+
+    fn decode_row(bytes: &[u8]) -> Result<Self, RcpError> {
+        Self::decode(bytes)
     }
 }
 
@@ -1283,5 +1967,516 @@ mod tests {
         for d in sample_descriptors() {
             let _ = d.encode();
         }
+    }
+
+    // ── HwPinMappingEntry (§3.7) ────────────────────────────────────────────
+
+    fn sample_hw_pin_mapping_entries() -> [HwPinMappingEntry; 3] {
+        [
+            HwPinMappingEntry::default(),
+            HwPinMappingEntry {
+                hw_ep_nr: 2,
+                hw_ep_pin_nr: 3,
+                hw_pin_props: 0b0101_1010,
+            },
+            HwPinMappingEntry {
+                hw_ep_nr: u8::MAX,
+                hw_ep_pin_nr: u8::MAX,
+                hw_pin_props: u8::MAX,
+            },
+        ]
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-012
+    fn hw_pin_mapping_entry_category_is_hw_config() {
+        assert_eq!(HwPinMappingEntry::CATEGORY, RegisterCategory::HwConfig);
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-012
+    fn hw_pin_mapping_entry_fields_are_independently_settable() {
+        let e = HwPinMappingEntry {
+            hw_ep_nr: 7,
+            hw_ep_pin_nr: 9,
+            hw_pin_props: 0x3C,
+        };
+        assert_eq!(e.hw_ep_nr, 7);
+        assert_eq!(e.hw_ep_pin_nr, 9);
+        assert_eq!(e.hw_pin_props, 0x3C);
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-013
+    fn hw_pin_mapping_entry_encode_decode_round_trips() {
+        for e in sample_hw_pin_mapping_entries() {
+            let encoded = e.encode();
+            assert_eq!(encoded.len(), HwPinMappingEntry::ENCODED_LEN);
+            assert_eq!(HwPinMappingEntry::decode(&encoded), Ok(e));
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-013
+    fn hw_pin_mapping_entry_decode_ignores_trailing_bytes() {
+        let e = HwPinMappingEntry {
+            hw_ep_nr: 1,
+            hw_ep_pin_nr: 2,
+            hw_pin_props: 3,
+        };
+        let mut bytes = e.encode().to_vec();
+        bytes.extend_from_slice(&[0xFF, 0xFF]);
+        assert_eq!(HwPinMappingEntry::decode(&bytes), Ok(e));
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-014
+    fn hw_pin_mapping_entry_decode_rejects_short_input() {
+        for len in 0..HwPinMappingEntry::ENCODED_LEN {
+            let bytes = vec![0u8; len];
+            assert_eq!(HwPinMappingEntry::decode(&bytes), Err(RcpError::ShortFrame));
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-014
+    fn hw_pin_mapping_entry_never_panics_across_arbitrary_lengths() {
+        for len in 0..=50usize {
+            let bytes: Vec<u8> = (0..len).map(|i| (i % 256) as u8).collect();
+            let _ = HwPinMappingEntry::decode(&bytes);
+        }
+    }
+
+    // ── RequestStreamConfigEntry (§3.8) ─────────────────────────────────────
+
+    fn sample_request_stream_config_entries() -> [RequestStreamConfigEntry; 3] {
+        [
+            RequestStreamConfigEntry::default(),
+            RequestStreamConfigEntry {
+                rx_stream_id: 0x0011_2233_4455_6677,
+                rx_stream_max_request_size: 128,
+                rx_wd_timeout_interval: 1000,
+                rx_secure_channel_index: 1,
+                rx_enforce_e2e: 1,
+                rx_enforce_seq: 0,
+                rx_seq_safestate_enable: 1,
+                rx_wd_enable: 1,
+                rx_wd_safestate_enable: 0,
+                rx_ovrflw_safestate_enable: 1,
+                rx_safety_measure: 1,
+                rx_wd_info_enable: 0,
+                rx_safestate_sequencer: 2,
+                rx_safe_sequencer_state: 5,
+                rx_ack_stream_index: 1,
+                rx_resp_stream_index: 1,
+            },
+            RequestStreamConfigEntry {
+                rx_stream_id: u64::MAX,
+                rx_stream_max_request_size: u16::MAX,
+                rx_wd_timeout_interval: u16::MAX,
+                rx_secure_channel_index: u8::MAX,
+                rx_enforce_e2e: u8::MAX,
+                rx_enforce_seq: u8::MAX,
+                rx_seq_safestate_enable: u8::MAX,
+                rx_wd_enable: u8::MAX,
+                rx_wd_safestate_enable: u8::MAX,
+                rx_ovrflw_safestate_enable: u8::MAX,
+                rx_safety_measure: u8::MAX,
+                rx_wd_info_enable: u8::MAX,
+                rx_safestate_sequencer: u8::MAX,
+                rx_safe_sequencer_state: u8::MAX,
+                rx_ack_stream_index: u8::MAX,
+                rx_resp_stream_index: u8::MAX,
+            },
+        ]
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-015
+    fn request_stream_config_entry_category_is_rcp_config() {
+        assert_eq!(
+            RequestStreamConfigEntry::CATEGORY,
+            RegisterCategory::RcpConfig
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-015
+    fn request_stream_config_entry_fields_are_independently_settable() {
+        let e = sample_request_stream_config_entries()[1];
+        assert_eq!(e.rx_stream_id, 0x0011_2233_4455_6677);
+        assert_eq!(e.rx_stream_max_request_size, 128);
+        assert_eq!(e.rx_wd_timeout_interval, 1000);
+        assert_eq!(e.rx_secure_channel_index, 1);
+        assert_eq!(e.rx_ack_stream_index, 1);
+        assert_eq!(e.rx_resp_stream_index, 1);
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-016
+    fn request_stream_config_entry_encode_decode_round_trips() {
+        for e in sample_request_stream_config_entries() {
+            let encoded = e.encode();
+            assert_eq!(encoded.len(), RequestStreamConfigEntry::ENCODED_LEN);
+            assert_eq!(RequestStreamConfigEntry::decode(&encoded), Ok(e));
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-016
+    fn request_stream_config_entry_decode_ignores_trailing_bytes() {
+        let e = sample_request_stream_config_entries()[1];
+        let mut bytes = e.encode().to_vec();
+        bytes.extend_from_slice(&[0xAA, 0xBB, 0xCC]);
+        assert_eq!(RequestStreamConfigEntry::decode(&bytes), Ok(e));
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-017
+    fn request_stream_config_entry_decode_rejects_short_input() {
+        for len in 0..RequestStreamConfigEntry::ENCODED_LEN {
+            let bytes = vec![0u8; len];
+            assert_eq!(
+                RequestStreamConfigEntry::decode(&bytes),
+                Err(RcpError::ShortFrame)
+            );
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-017
+    fn request_stream_config_entry_never_panics_across_arbitrary_lengths() {
+        for len in 0..=100usize {
+            let bytes: Vec<u8> = (0..len).map(|i| ((i * 3) % 256) as u8).collect();
+            let _ = RequestStreamConfigEntry::decode(&bytes);
+        }
+    }
+
+    // ── EpByteBusIdMapEntry (§3.9) ───────────────────────────────────────────
+
+    fn sample_ep_bytebus_id_map_entries() -> [EpByteBusIdMapEntry; 3] {
+        [
+            EpByteBusIdMapEntry::default(),
+            EpByteBusIdMapEntry {
+                map_stream_index: 3,
+                map_byte_bus_id: 0x0555,
+                map_ep_nr: 4,
+            },
+            EpByteBusIdMapEntry {
+                map_stream_index: u8::MAX,
+                map_byte_bus_id: u16::MAX,
+                map_ep_nr: u8::MAX,
+            },
+        ]
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-018
+    fn ep_bytebus_id_map_entry_category_is_rcp_config() {
+        assert_eq!(EpByteBusIdMapEntry::CATEGORY, RegisterCategory::RcpConfig);
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-018
+    fn ep_bytebus_id_map_entry_is_end_of_table_true_only_for_sentinel_stream_index() {
+        for stream_index in 0u8..=255 {
+            let e = EpByteBusIdMapEntry {
+                map_stream_index: stream_index,
+                map_byte_bus_id: 42,
+                map_ep_nr: 1,
+            };
+            assert_eq!(
+                e.is_end_of_table(),
+                stream_index == EpByteBusIdMapEntry::END_OF_TABLE_STREAM_INDEX
+            );
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-019
+    fn ep_bytebus_id_map_entry_encode_decode_round_trips() {
+        for e in sample_ep_bytebus_id_map_entries() {
+            let encoded = e.encode();
+            assert_eq!(encoded.len(), EpByteBusIdMapEntry::ENCODED_LEN);
+            assert_eq!(EpByteBusIdMapEntry::decode(&encoded), Ok(e));
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-019
+    fn ep_bytebus_id_map_entry_decode_ignores_trailing_bytes() {
+        let e = EpByteBusIdMapEntry {
+            map_stream_index: 1,
+            map_byte_bus_id: 0x0102,
+            map_ep_nr: 5,
+        };
+        let mut bytes = e.encode().to_vec();
+        bytes.extend_from_slice(&[0xEE]);
+        assert_eq!(EpByteBusIdMapEntry::decode(&bytes), Ok(e));
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-020
+    fn ep_bytebus_id_map_entry_decode_rejects_short_input() {
+        for len in 0..EpByteBusIdMapEntry::ENCODED_LEN {
+            let bytes = vec![0u8; len];
+            assert_eq!(
+                EpByteBusIdMapEntry::decode(&bytes),
+                Err(RcpError::ShortFrame)
+            );
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-020
+    fn ep_bytebus_id_map_entry_never_panics_across_arbitrary_lengths() {
+        for len in 0..=50usize {
+            let bytes: Vec<u8> = (0..len).map(|i| (i % 256) as u8).collect();
+            let _ = EpByteBusIdMapEntry::decode(&bytes);
+        }
+    }
+
+    // ── ResponseStreamConfigEntry (§3.10) ───────────────────────────────────
+
+    fn sample_response_stream_config_entries() -> [ResponseStreamConfigEntry; 3] {
+        [
+            ResponseStreamConfigEntry::default(),
+            ResponseStreamConfigEntry {
+                resp_stream_uid: 0x1234,
+                resp_max_avtpdu_size: 1500,
+                resp_queue_size: 64,
+                resp_flush_on_count: 4,
+                resp_flush_time: 200,
+            },
+            ResponseStreamConfigEntry {
+                resp_stream_uid: u16::MAX,
+                resp_max_avtpdu_size: u16::MAX,
+                resp_queue_size: u16::MAX,
+                resp_flush_on_count: u16::MAX,
+                resp_flush_time: u16::MAX,
+            },
+        ]
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-021
+    fn response_stream_config_entry_category_is_rcp_config() {
+        assert_eq!(
+            ResponseStreamConfigEntry::CATEGORY,
+            RegisterCategory::RcpConfig
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-021
+    fn response_stream_config_entry_fields_are_independently_settable() {
+        let e = sample_response_stream_config_entries()[1];
+        assert_eq!(e.resp_stream_uid, 0x1234);
+        assert_eq!(e.resp_max_avtpdu_size, 1500);
+        assert_eq!(e.resp_queue_size, 64);
+        assert_eq!(e.resp_flush_on_count, 4);
+        assert_eq!(e.resp_flush_time, 200);
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-022
+    fn response_stream_config_entry_encode_decode_round_trips() {
+        for e in sample_response_stream_config_entries() {
+            let encoded = e.encode();
+            assert_eq!(encoded.len(), ResponseStreamConfigEntry::ENCODED_LEN);
+            assert_eq!(ResponseStreamConfigEntry::decode(&encoded), Ok(e));
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-022
+    fn response_stream_config_entry_decode_ignores_trailing_bytes() {
+        let e = sample_response_stream_config_entries()[1];
+        let mut bytes = e.encode().to_vec();
+        bytes.extend_from_slice(&[0x11, 0x22]);
+        assert_eq!(ResponseStreamConfigEntry::decode(&bytes), Ok(e));
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-023
+    fn response_stream_config_entry_decode_rejects_short_input() {
+        for len in 0..ResponseStreamConfigEntry::ENCODED_LEN {
+            let bytes = vec![0u8; len];
+            assert_eq!(
+                ResponseStreamConfigEntry::decode(&bytes),
+                Err(RcpError::ShortFrame)
+            );
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-023
+    fn response_stream_config_entry_never_panics_across_arbitrary_lengths() {
+        for len in 0..=50usize {
+            let bytes: Vec<u8> = (0..len).map(|i| (i % 256) as u8).collect();
+            let _ = ResponseStreamConfigEntry::decode(&bytes);
+        }
+    }
+
+    // ── SequencerStateEntry (§3.11) ─────────────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-RMAP-024
+    fn sequencer_state_entry_category_is_rcp_config() {
+        assert_eq!(SequencerStateEntry::CATEGORY, RegisterCategory::RcpConfig);
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-024
+    fn sequencer_state_entry_power_on_default_is_state_one() {
+        assert_eq!(SequencerStateEntry::power_on_default().seq_state, 1);
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-024
+    fn sequencer_state_entry_default_matches_power_on_default() {
+        assert_eq!(
+            SequencerStateEntry::default(),
+            SequencerStateEntry::power_on_default()
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-025
+    fn sequencer_state_entry_encode_decode_round_trips() {
+        for seq_state in [0u8, 1, 2, 128, u8::MAX] {
+            let e = SequencerStateEntry { seq_state };
+            let encoded = e.encode();
+            assert_eq!(encoded.len(), SequencerStateEntry::ENCODED_LEN);
+            assert_eq!(SequencerStateEntry::decode(&encoded), Ok(e));
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-025
+    fn sequencer_state_entry_decode_ignores_trailing_bytes() {
+        let e = SequencerStateEntry { seq_state: 7 };
+        let mut bytes = e.encode().to_vec();
+        bytes.extend_from_slice(&[0xFF, 0xFF]);
+        assert_eq!(SequencerStateEntry::decode(&bytes), Ok(e));
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-026
+    fn sequencer_state_entry_decode_rejects_empty_input() {
+        assert_eq!(SequencerStateEntry::decode(&[]), Err(RcpError::ShortFrame));
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-026
+    fn sequencer_state_entry_never_panics_across_arbitrary_lengths() {
+        for len in 0..=20usize {
+            let bytes: Vec<u8> = (0..len).map(|i| (i % 256) as u8).collect();
+            let _ = SequencerStateEntry::decode(&bytes);
+        }
+    }
+
+    // ── ConfigTableRow / encode_rows / decode_rows (all five row types) ────
+
+    #[test]
+    // fusa:test REQ-RMAP-027
+    fn encode_rows_decode_rows_round_trip_hw_pin_mapping_entries() {
+        let rows: Vec<HwPinMappingEntry> = sample_hw_pin_mapping_entries().to_vec();
+        let encoded = encode_rows(&rows);
+        assert_eq!(encoded.len(), rows.len() * HwPinMappingEntry::ENCODED_LEN);
+        assert_eq!(decode_rows::<HwPinMappingEntry>(&encoded), Ok(rows));
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-027
+    fn encode_rows_decode_rows_round_trip_request_stream_config_entries() {
+        let rows: Vec<RequestStreamConfigEntry> = sample_request_stream_config_entries().to_vec();
+        let encoded = encode_rows(&rows);
+        assert_eq!(
+            encoded.len(),
+            rows.len() * RequestStreamConfigEntry::ENCODED_LEN
+        );
+        assert_eq!(decode_rows::<RequestStreamConfigEntry>(&encoded), Ok(rows));
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-027
+    fn encode_rows_decode_rows_round_trip_ep_bytebus_id_map_entries() {
+        let rows: Vec<EpByteBusIdMapEntry> = sample_ep_bytebus_id_map_entries().to_vec();
+        let encoded = encode_rows(&rows);
+        assert_eq!(encoded.len(), rows.len() * EpByteBusIdMapEntry::ENCODED_LEN);
+        assert_eq!(decode_rows::<EpByteBusIdMapEntry>(&encoded), Ok(rows));
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-027
+    fn encode_rows_decode_rows_round_trip_response_stream_config_entries() {
+        let rows: Vec<ResponseStreamConfigEntry> = sample_response_stream_config_entries().to_vec();
+        let encoded = encode_rows(&rows);
+        assert_eq!(
+            encoded.len(),
+            rows.len() * ResponseStreamConfigEntry::ENCODED_LEN
+        );
+        assert_eq!(decode_rows::<ResponseStreamConfigEntry>(&encoded), Ok(rows));
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-027
+    fn encode_rows_decode_rows_round_trip_sequencer_state_entries() {
+        let rows: Vec<SequencerStateEntry> = [0u8, 1, 255]
+            .into_iter()
+            .map(|seq_state| SequencerStateEntry { seq_state })
+            .collect();
+        let encoded = encode_rows(&rows);
+        assert_eq!(encoded.len(), rows.len() * SequencerStateEntry::ENCODED_LEN);
+        assert_eq!(decode_rows::<SequencerStateEntry>(&encoded), Ok(rows));
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-027
+    fn decode_rows_empty_input_is_empty_table() {
+        assert_eq!(
+            decode_rows::<HwPinMappingEntry>(&[]),
+            Ok(Vec::<HwPinMappingEntry>::new())
+        );
+        assert_eq!(
+            decode_rows::<SequencerStateEntry>(&[]),
+            Ok(Vec::<SequencerStateEntry>::new())
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-027
+    fn decode_rows_rejects_length_not_a_multiple_of_row_len() {
+        // One full HwPinMappingEntry row (3 bytes) plus one extra byte is
+        // not a whole number of rows.
+        let mut bytes = HwPinMappingEntry::default().encode().to_vec();
+        bytes.push(0xFF);
+        assert_eq!(
+            decode_rows::<HwPinMappingEntry>(&bytes),
+            Err(RcpError::ShortFrame)
+        );
+
+        // A single byte can never be a whole ResponseStreamConfigEntry row
+        // (10 bytes).
+        assert_eq!(
+            decode_rows::<ResponseStreamConfigEntry>(&[0u8]),
+            Err(RcpError::ShortFrame)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-027
+    fn encode_rows_decode_rows_never_panic_across_arbitrary_lengths() {
+        for len in 0..=100usize {
+            let bytes: Vec<u8> = (0..len).map(|i| ((i * 5) % 256) as u8).collect();
+            let _ = decode_rows::<HwPinMappingEntry>(&bytes);
+            let _ = decode_rows::<RequestStreamConfigEntry>(&bytes);
+            let _ = decode_rows::<EpByteBusIdMapEntry>(&bytes);
+            let _ = decode_rows::<ResponseStreamConfigEntry>(&bytes);
+            let _ = decode_rows::<SequencerStateEntry>(&bytes);
+        }
+        let hw_rows = sample_hw_pin_mapping_entries();
+        let _ = encode_rows(&hw_rows);
     }
 }
