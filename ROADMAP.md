@@ -449,7 +449,45 @@ lifecycle machine and the register-map configuration model, replacing the
 
 ### EP0 (RC-Server-as-Endpoint)
 
-- [ ] Whole-register-map read/write addressed through EP0
+- [x] Whole-register-map read/write addressed through EP0. Done
+      (v0.5.0-dev): new `src/ep0.rs` adds `EP0_BYTE_BUS_ID` (`0`) /
+      `is_ep0_address` naming the reserved address explicitly, and
+      `RequestRoute`/`route_byte_bus_id` making the routing consequence
+      structural — a `byte_bus_id` of `0` decides `RequestRoute::Ep0` from
+      the `byte_bus_id` value alone, without ever taking or consulting a
+      `crate::addressing::EndpointTable`, so a request addressed to EP0 can
+      never be resolved through that table's per-stream device-endpoint
+      keyspace. The read/write path itself, `check_ep0_access`, composes
+      with (rather than duplicates) the "Lifecycle State Machine"
+      subsection's already-implemented gates: `Ep0AccessKind`/`access_kind`
+      derives a read/write direction from `acf::ByteMessageInfo::op`, a read
+      is checked against `lifecycle::check_register_reachable`, and a write
+      is additionally checked against `lifecycle::check_register_writable`
+      — both at `RegisterCategory` granularity, since the concrete Register
+      Map subsection (register addresses, field layout) remains later work
+      this item does not anticipate. No new `RcpError` variant was needed:
+      `check_ep0_access` surfaces the same `RegisterUnreachable`/
+      `RegisterLocked` sentinels `lifecycle` already defined. The existing
+      echo-back rule (`acf::build_response_info`/`acf::verify_echo_back`)
+      needed no EP0-specific counterpart either — both already operate
+      purely on `byte_bus_id`, and `0` passes through unchanged, covered by
+      a dedicated round-trip test. Per Guiding Principle 5, `access_kind`'s
+      `op = false` → read / `op = true` → write convention is flagged in
+      the module's provenance note as this crate's own working
+      interpretation, since `acf.rs`'s own provenance note documents `op`
+      only as "Operation flag" with no direction assigned either way.
+      Deliberately does not implement the root-client concept (the next
+      checklist item — every caller is currently treated as equally
+      privileged) or any concrete register content (the sibling "Register
+      Map" subsection). This is additive: like every prior Milestone 1/2
+      entry, neither `route_byte_bus_id` nor `check_ep0_access` is wired
+      into any decoder, dispatch loop, or existing `EndpointTable` caller,
+      and `EndpointTable::register` itself is left unchanged (it still
+      structurally permits registering a device endpoint at `byte_bus_id
+      0`; a dedicated test demonstrates that this does not affect
+      `route_byte_bus_id`'s routing decision either way). New
+      `REQ-EP0-001`..`REQ-EP0-006` added to `.fusa-reqs.json`, each with a
+      `// fusa:req`/`// fusa:test` pair in `src/ep0.rs`.
 - [ ] Root-client concept (`svr_root_client_index`): full-server write
       access for exactly one stream, per-endpoint-restricted access for
       everyone else
