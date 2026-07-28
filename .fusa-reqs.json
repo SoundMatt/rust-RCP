@@ -3735,6 +3735,33 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-LIFE-009",
+      "title": "LockPolicy per-category (W vs W*) assignment",
+      "text": "lock_policy maps RegisterCategory::General to None (never writable), RegisterCategory::HwConfig to Some(LockPolicy::WStar), and RegisterCategory::RcpConfig to Some(LockPolicy::W); is_register_writable composes that mapping with is_register_reachable so General is never writable, HwConfig is writable while reachable except in RcpConfigured, and RcpConfig is writable whenever reachable including in RcpConfigured",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-LIFE-010",
+      "title": "check_register_writable enforces the write-lock rule and distinguishes unreachable from locked",
+      "text": "check_register_writable returns Ok(()) exactly when is_register_writable would return true for the same (state, category) pair, Err(RcpError::RegisterUnreachable) if the category is not reachable at all in that state, and Err(RcpError::RegisterLocked) if it is reachable but write-locked",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-LIFE-011",
+      "title": "Write-lock checks never panic",
+      "text": "lock_policy, is_register_writable, and check_register_writable never panic for any RcServerState/RegisterCategory pair",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

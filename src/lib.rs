@@ -464,6 +464,9 @@ pub enum RcpError {
     #[error("rcp/lifecycle: requested state transition is not one of the guarded transitions this crate currently implements")]
     InvalidLifecycleTransition,
 
+    #[error("rcp/lifecycle: register category is reachable but locked against writes in the RC Server's current lifecycle state")]
+    RegisterLocked,
+
     // ── General errors ───────────────────────────────────────────────────
     #[error("rcp: invalid size")]
     InvalidSize,

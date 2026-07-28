@@ -395,8 +395,29 @@ lifecycle machine and the register-map configuration model, replacing the
       `RcpError::RegisterUnreachable` before them. Deliberately does not
       implement register-locking-by-state or the demotion path — see the
       module doc comment for the explicit boundary.
-- [ ] Register-locking-by-state, including the `W` vs `W*` (permanently
-      locked once `RCP_CONFIGURED`) distinction
+- [x] Register-locking-by-state, including the `W` vs `W*` (permanently
+      locked once `RCP_CONFIGURED`) distinction. Done (v0.5.0-dev):
+      `src/lifecycle.rs` adds a `LockPolicy` enum (`W`/`WStar`) plus a
+      `lock_policy(RegisterCategory) -> Option<LockPolicy>` mapping, and
+      `is_register_writable`/`check_register_writable` free functions
+      mirroring the existing `is_register_reachable`/`check_register_reachable`
+      peek-vs-validate pairing. This is a new axis layered on top of, not a
+      replacement for, reachability: a category must first be reachable
+      before write-locking is even considered. `RegisterCategory::General`
+      maps to `None` (never writable through this module),
+      `RegisterCategory::HwConfig` maps to `W*` (writable while reachable,
+      permanently locked the moment `RCP_CONFIGURED` is reached), and
+      `RegisterCategory::RcpConfig` maps to `W` (writable whenever
+      reachable, including while `RCP_CONFIGURED`, with no permanent lock
+      this module adds). New `RcpError::RegisterLocked` sentinel added,
+      following the existing "Wire / E2E errors" grouping convention, as a
+      provisional name pending this milestone's later "Error Model" item.
+      Since no concrete Register Map exists yet, the per-category `W`/`W*`
+      assignment is this crate's own working interpretation (like
+      `RegisterCategory` itself was for the reachability item) — see the
+      module doc comment's provenance note for the reasoning and its
+      Guiding-Principle-5 flag. Deliberately does not implement the demotion
+      path — see the module doc comment for the explicit boundary.
 - [ ] Demotion path from `HW_CONFIGURED` back to `HW_UNCONFIGURED`
 
 ### EP0 (RC-Server-as-Endpoint)
