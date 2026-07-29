@@ -5346,6 +5346,33 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CRC-001",
+      "title": "crc32_tc18 implements the TC18 safe-point CRC-32 (poly 0xF4ACFB13, init/xorout 0xFFFFFFFF, reflected in/out), verified against an independent reference implementation of the same definition",
+      "text": "crc32_tc18(data) matches a structurally independent reference implementation of the same poly=0xF4ACFB13/init=0xFFFFFFFF/xorout=0xFFFFFFFF/reflect-in/reflect-out CRC-32 definition across the empty input, the ASCII \"123456789\" check corpus, all-zero and all-0xFF 16-byte boundary inputs, and several other varied-length inputs including a full 0..=255 byte-value pattern",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CRC-002",
+      "title": "crc32_tc18 never panics for arbitrary-length input, including empty input",
+      "text": "crc32_tc18 returns a u32 without panicking for input slices of length 0 and for a range of other lengths up to at least 1000 bytes",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CRC-003",
+      "title": "crc32_tc18 is sensitive to input changes: different payloads and single-bit flips change the CRC",
+      "text": "crc32_tc18 returns different values for two different sampled payloads, and returns a different value when a single bit of a given input is flipped, consistent with its role as an integrity check over safe-point frame bytes",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

@@ -6,15 +6,54 @@
 // fusa:req REQ-E2E-006
 // fusa:req REQ-E2E-007
 // fusa:req REQ-E2E-008
+// fusa:req REQ-CRC-001
+// fusa:req REQ-CRC-002
+// fusa:req REQ-CRC-003
 
-//! End-to-end protection: CRC-16/CCITT-FALSE header + replay guard.
+//! End-to-end protection: CRC-16/CCITT-FALSE header + replay guard, plus
+//! (as of `ROADMAP.md` Milestone 6) the standalone OPEN Alliance TC18
+//! safe-point CRC-32 algorithm this module is migrating toward.
 //!
-//! Frame layout:
+//! Frame layout (current `wrap`/`unwrap`, unchanged by this milestone entry):
 //! ```text
 //! [0:4]  seqNum  (u32 big-endian)
 //! [4:6]  CRC-16  (u16 big-endian, over seqNum bytes ++ original payload)
 //! [6..]  original payload
 //! ```
+//!
+//! [`crc32_tc18`] is added additively alongside the above: it is not yet
+//! called from `wrap`/`unwrap` or from [`E2eController`]. Deciding exactly
+//! which bytes of a real safe-point frame the CRC-32 covers (`stream_id`,
+//! `avtp_timestamp`, the ACF header, and payload, per `ROADMAP.md`
+//! Milestone 6's "Coverage rule" bullet) requires the AVTPDU/ACF framing
+//! types from [`crate::avtp`]/[`crate::acf`], and is deliberately deferred
+//! to that bullet rather than guessed at here.
+//!
+//! ## Provenance note: `crc32_tc18` verified by cross-implementation, not
+//! by a published check value
+//!
+//! The four parameters `ROADMAP.md`'s Milestone 6 checklist bullet states —
+//! polynomial `0xF4ACFB13`, init `0xFFFFFFFF`, final XOR `0xFFFFFFFF`,
+//! reflected input and output — fully and unambiguously determine one
+//! specific CRC-32 variant mathematically, so (per Guiding Principle 5)
+//! there is little genuine ambiguity left to flag about the algorithm
+//! itself. But because `0xF4ACFB13` is not a named/published CRC-32
+//! variant, there is no externally citable "check value" (the way the
+//! standard CRC-32/ISO-HDLC check value for `"123456789"` is publicly
+//! known) to test [`crc32_tc18`] against. This module's tests instead
+//! cross-validate [`crc32_tc18`]'s reflected-engine implementation (which
+//! runs the shift register LSB-first against the bit-reversed polynomial)
+//! against a second, structurally independent implementation of the exact
+//! same four parameters (which reflects each input byte and the final
+//! register by hand around a plain MSB-first shift register using the
+//! *unreversed* polynomial) across the classic `"123456789"` corpus,
+//! all-zero/all-`0xFF` boundary inputs, and several other patterns — the
+//! two agreeing is the correctness evidence, since both are direct,
+//! independently-written renderings of the same stated definition.
+//!
+//! This entry does not take a position on which requests/streams actually
+//! get CRC-protected in the first place — that is `ROADMAP.md` Milestone
+//! 6's later "Per-stream safety config" bullet's job, not this one's.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
@@ -46,6 +85,50 @@ fn crc16_ccitt_false(data: &[u8]) -> u16 {
         }
     }
     crc
+}
+
+// ── CRC-32 (TC18 safe-point) ────────────────────────────────────────────────
+
+/// Bit-reversal of the OPEN Alliance TC18 safe-point CRC-32 polynomial
+/// `0xF4ACFB13`, precomputed so [`crc32_tc18`] can shift its register right
+/// (LSB-first) instead of reflecting every input byte and the final
+/// register by hand — the standard technique for implementing a reflected
+/// CRC without an explicit per-byte/per-register bit-reversal step. See
+/// this module's provenance note above; the unreversed polynomial itself
+/// reappears in `tests::crc32_tc18_reference`, the independent
+/// cross-check.
+const CRC32_TC18_POLY_REFLECTED: u32 = 0xC8DF_352F;
+
+/// Initial and final-XOR value, `0xFFFFFFFF`, shared by both ends of the
+/// algorithm per `ROADMAP.md` Milestone 6's stated parameters.
+const CRC32_TC18_INIT_XOROUT: u32 = 0xFFFF_FFFF;
+
+/// Computes the OPEN Alliance TC18 safe-point CRC-32 over `data`.
+///
+/// Polynomial `0xF4ACFB13`, init and final XOR both `0xFFFFFFFF`, reflected
+/// input and output. A genuinely different algorithm from
+/// [`crc16_ccitt_false`] above — different width, different polynomial,
+/// different (reflected vs. non-reflected) bit order — not a width-widened
+/// variant of it.
+///
+/// This function computes the CRC over exactly the bytes it is given; it
+/// takes no position on which bytes of a safe-point frame belong in that
+/// slice (see this module's provenance note above).
+// fusa:req REQ-CRC-001
+// fusa:req REQ-CRC-002
+pub fn crc32_tc18(data: &[u8]) -> u32 {
+    let mut crc = CRC32_TC18_INIT_XOROUT;
+    for &byte in data {
+        crc ^= byte as u32;
+        for _ in 0..8 {
+            crc = if crc & 1 != 0 {
+                (crc >> 1) ^ CRC32_TC18_POLY_REFLECTED
+            } else {
+                crc >> 1
+            };
+        }
+    }
+    crc ^ CRC32_TC18_INIT_XOROUT
 }
 
 // ── Wrap / Unwrap ─────────────────────────────────────────────────────────────
@@ -178,6 +261,114 @@ mod tests {
     use super::*;
     use crate::mock::MockController;
     use crate::Zone;
+
+    // ── crc32_tc18 ──────────────────────────────────────────────────────────
+
+    /// Independent reference implementation of the same
+    /// poly=`0xF4ACFB13`/init=`0xFFFFFFFF`/xorout=`0xFFFFFFFF`/reflect-in/
+    /// reflect-out CRC-32 definition, structured differently from
+    /// [`crc32_tc18`]: it reflects each input byte and the final register
+    /// by hand around a plain MSB-first shift register using the
+    /// *unreversed* polynomial, instead of [`crc32_tc18`]'s LSB-first
+    /// shift against the pre-reversed polynomial. Exists only so the two
+    /// can be cross-checked against each other — see this module's
+    /// provenance note. Test-only; not part of the public API.
+    fn crc32_tc18_reference(data: &[u8]) -> u32 {
+        // The un-reversed OPEN Alliance TC18 safe-point CRC-32 polynomial;
+        // deliberately re-declared here (rather than sharing
+        // `CRC32_TC18_POLY_REFLECTED`) so this reference implementation
+        // has no code in common with `crc32_tc18` beyond the four stated
+        // parameters themselves.
+        const POLY: u32 = 0xF4AC_FB13;
+        let mut crc = CRC32_TC18_INIT_XOROUT;
+        for &byte in data {
+            crc ^= (byte.reverse_bits() as u32) << 24;
+            for _ in 0..8 {
+                crc = if crc & 0x8000_0000 != 0 {
+                    (crc << 1) ^ POLY
+                } else {
+                    crc << 1
+                };
+            }
+        }
+        crc.reverse_bits() ^ CRC32_TC18_INIT_XOROUT
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-001
+    fn crc32_tc18_empty_input_matches_reference() {
+        assert_eq!(crc32_tc18(&[]), crc32_tc18_reference(&[]));
+        assert_eq!(crc32_tc18(&[]), 0x0000_0000);
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-001
+    fn crc32_tc18_ascii_check_string_matches_reference() {
+        // "123456789" is the conventional CRC-32 check corpus; the expected
+        // constant below is this polynomial's own derived value (see this
+        // module's provenance note), not an externally published one.
+        let data = b"123456789";
+        assert_eq!(crc32_tc18(data), crc32_tc18_reference(data));
+        assert_eq!(crc32_tc18(data), 0x1697_d06a);
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-001
+    fn crc32_tc18_all_zero_boundary_matches_reference() {
+        let data = [0u8; 16];
+        assert_eq!(crc32_tc18(&data), crc32_tc18_reference(&data));
+        assert_eq!(crc32_tc18(&data), 0x0fa6_214b);
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-001
+    fn crc32_tc18_all_0xff_boundary_matches_reference() {
+        let data = [0xFFu8; 16];
+        assert_eq!(crc32_tc18(&data), crc32_tc18_reference(&data));
+        assert_eq!(crc32_tc18(&data), 0xb0f2_7ef5);
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-001
+    fn crc32_tc18_matches_reference_across_varied_inputs() {
+        let vectors: [&[u8]; 4] = [
+            b"OPEN Alliance TC18",
+            &[0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07],
+            b"a",
+            b"safe-point",
+        ];
+        for v in vectors {
+            assert_eq!(crc32_tc18(v), crc32_tc18_reference(v));
+        }
+        let pattern: Vec<u8> = (0..=255u8).collect();
+        assert_eq!(crc32_tc18(&pattern), crc32_tc18_reference(&pattern));
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-002
+    fn crc32_tc18_never_panics_across_arbitrary_lengths() {
+        for len in [0usize, 1, 2, 3, 6, 17, 64, 257, 1000] {
+            let data: Vec<u8> = (0..len).map(|i| (i % 256) as u8).collect();
+            let _ = crc32_tc18(&data);
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-003
+    fn crc32_tc18_different_payload_produces_different_crc() {
+        let a = crc32_tc18(b"payload-a");
+        let b = crc32_tc18(b"payload-b");
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-003
+    fn crc32_tc18_single_bit_flip_changes_crc() {
+        let mut data = b"integrity check data".to_vec();
+        let baseline = crc32_tc18(&data);
+        data[0] ^= 0x01;
+        assert_ne!(crc32_tc18(&data), baseline);
+    }
 
     // ── Header length ─────────────────────────────────────────────────────────
 
