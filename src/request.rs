@@ -34,14 +34,18 @@
 // fusa:req REQ-RLC-004
 // fusa:req REQ-RLC-005
 // fusa:req REQ-RLC-006
+// fusa:req REQ-BUNDLE-001
+// fusa:req REQ-BUNDLE-002
 
 //! Conditional-request taxonomy: compound / compound-wait (`0x0F`/`0x0B`),
 //! triggered (`0x0E`), chained (`0x01`), timed (`0x0A`), the
 //! cancellation trio clear-all / clear-non-safestate / clear-single
-//! (`0x05`/`0x06`/`0x07`), the persistent sequencer-state register bank, and
-//! the execution priority ordering that selects which pending request runs
-//! next — `ROADMAP.md` Milestone 5 ("Conditional Requests & Sequencers"),
-//! first through eighth checklist bullets. The first bullet
+//! (`0x05`/`0x06`/`0x07`), the persistent sequencer-state register bank, the
+//! execution priority ordering that selects which pending request runs
+//! next, the request lifecycle state machine, and the feature-bundle
+//! gating rule for honestly claiming "compound request support" —
+//! `ROADMAP.md` Milestone 5 ("Conditional Requests & Sequencers"), all nine
+//! checklist bullets, closing out the milestone. The first bullet
 //! covers sequencer-gated
 //! execution and wait, with `cmp_exec_delay`/`cmpw_exec_delay` timers and
 //! the "advance sequencer only if still in start state" rule. The second
@@ -102,6 +106,23 @@
 //! mapping from checklist wording to source, since §3.14 is cited by
 //! section number only per this crate's spec-citation policy.
 //!
+//! The ninth and final bullet, closing out the milestone, is
+//! feature-bundle gating: [`check_compound_bundle_claim`], the rule that
+//! honestly claiming the "compound request support" optional-feature
+//! bundle — the bit [`crate::regmap::GeneralRegisters::
+//! claims_compound_wait_bundle`] reads — requires *all three* of this
+//! milestone's own prior deliverables together (compound-wait support,
+//! a sequencer bank sized for at least four sequencers, and
+//! clear-non-safestate cancellation support), not any one of them alone
+//! and not compound-message parsing by itself. This is deliberately a
+//! composing, not a discovering, item: every fact it consults
+//! ([`RequestKind::CompoundWait`], [`SequencerBank::svr_sequencers_max`],
+//! [`check_clear_non_safestate_cancellation`]) already exists from the
+//! milestone's first eight bullets; this item's own job is only the
+//! gating rule that ties the three together into one honesty check. See
+//! "Provenance note: the compound-bundle gate as three caller-supplied
+//! facts, not a read `GeneralRegisters`" below.
+//!
 //! Compound/compound-wait was the opening item of Milestone 5, and the
 //! first thing to land in `src/request.rs` — the module name the
 //! naming-reconciliation pass (issue #35, PR #37, "refactor: reconcile
@@ -112,14 +133,19 @@
 //! Cancellation is the fifth, added there. [`SequencerBank`] is the sixth,
 //! added in the prior entry this one extends. Execution priority ordering
 //! is the seventh, added in the prior entry this one extends. The request
-//! lifecycle state machine is the eighth, added here. Same "additive
-//! standalone plumbing only" discipline as every prior Milestone 1-5 entry,
-//! and as the compound/compound-wait, triggered, chained, timed,
-//! cancellation, sequencer-bank, and execution-priority work above:
-//! [`RequestLifecycleState::try_transition`] is a pure, self-consuming
-//! function over caller-supplied inputs — nothing here is wired into a
-//! decoder or dispatch loop, and [`select_next_pending_request`] is still
-//! not called from anywhere in this crate, including from this item's own
+//! lifecycle state machine is the eighth, added in the prior entry this
+//! one extends. Feature-bundle gating is the ninth and last, added here.
+//! Same "additive standalone plumbing only" discipline as every prior
+//! Milestone 1-5 entry, and as the compound/compound-wait, triggered,
+//! chained, timed, cancellation, sequencer-bank, execution-priority, and
+//! lifecycle-state-machine work above: [`check_compound_bundle_claim`] is
+//! a pure function over caller-supplied inputs — nothing here is wired
+//! into a decoder, dispatch loop, or any not-yet-built "read a live
+//! `GeneralRegisters` and validate its own claimed
+//! `svr_implemented_options`" caller. [`RequestLifecycleState::
+//! try_transition`] is likewise still a pure, self-consuming function
+//! over caller-supplied inputs, and [`select_next_pending_request`] is
+//! still not called from anywhere in this crate, including from
 //! [`RequestLifecycleState::try_transition`] (see this module's doc
 //! comment "Deliberately out of scope" section below for why picking
 //! *which* pending request goes next and advancing *that* request's own
@@ -131,8 +157,8 @@
 //! "Deliberately out of scope" section below for why `prioqueue.rs` itself
 //! is still not touched.
 //!
-//! Twenty-four named pieces are in scope, all implemented here or in the six
-//! prior entries this one extends:
+//! Twenty-five named pieces are in scope, all implemented here or in the
+//! seven prior entries this one extends:
 //!
 //! - [`RequestKind`] — the request-type discriminant, now covering nine
 //!   values ([`RequestKind::ClearAll`] = `0x05`,
@@ -296,6 +322,18 @@
 //!   every other [`RequestKind`]'s role (gating its own progression). All
 //!   three are idempotent against an already-[`RequestLifecycleState::Finalized`]
 //!   target.
+//! - [`check_compound_bundle_claim`] — the feature-bundle gating rule this
+//!   checklist bullet names: claiming the "compound request support"
+//!   bundle is honest only when compound-wait support, a sequencer bank
+//!   sized for at least [`MIN_SEQUENCERS_FOR_COMPOUND_BUNDLE`] sequencers,
+//!   and clear-non-safestate cancellation support are all true together.
+//!   See "Provenance note: the compound-bundle gate as three
+//!   caller-supplied facts, not a read `GeneralRegisters`" below for why
+//!   this takes its three prerequisite facts as plain caller-supplied
+//!   values instead of reading them off a live
+//!   [`crate::regmap::GeneralRegisters`], and "Provenance note:
+//!   `InvalidParameter` as the compound-bundle gate's rejection code"
+//!   below for the error-code choice.
 //!
 //! Deliberately out of scope:
 //!
@@ -349,6 +387,22 @@
 //!   execution priority is evaluated across (per-endpoint, per-stream, or
 //!   server-wide). See "Provenance note: what execution priority ordering
 //!   does not decide" below.
+//! - Reading a live [`crate::regmap::GeneralRegisters`] value and deciding,
+//!   on this crate's own initiative, whether its own
+//!   `svr_implemented_options` claim is honest. This crate has no
+//!   not-yet-built "RC Server instance holding its own live register
+//!   state" concept yet — the same gap every prior Milestone 5 entry
+//!   already works around by taking its own facts as caller-supplied
+//!   parameters rather than reading them from one. See "Provenance note:
+//!   the compound-bundle gate as three caller-supplied facts, not a read
+//!   `GeneralRegisters`" below.
+//! - Gating any of the other four `svr_implemented_options` bundles
+//!   (triggered / chained / time-sync&timed / enhanced-cancel) this
+//!   checklist bullet does not name. `ROADMAP.md`'s "Feature-bundle
+//!   gating" bullet states a rule only for the "compound request support"
+//!   bundle; [`check_compound_bundle_claim`] is scoped to that one bundle
+//!   only, and does not generalize to (or take a position on) what an
+//!   honest claim for any of the other four would require.
 //!
 //! ## Provenance note: `RequestLifecycleState` carries no numeric encoding
 //!
@@ -782,6 +836,56 @@
 //!    were `ROADMAP.md` ever to name one — belongs to whatever later item
 //!    owns the actual pending-request store this function's caller would
 //!    draw its slice from, not to this pure selection rule.
+//!
+//! ## Provenance note: the compound-bundle gate as three caller-supplied
+//! facts, not a read `GeneralRegisters`
+//!
+//! `ROADMAP.md`'s "Feature-bundle gating" checklist bullet reads as a rule
+//! about what an implementation is allowed to *claim* — i.e., about
+//! whatever sets [`crate::regmap::GeneralRegisters::svr_implemented_options`]
+//! before it is exposed to a client, not about a client-side check run
+//! against an already-received register block. This crate has no
+//! not-yet-built "RC Server instance that owns its own live
+//! `GeneralRegisters` and decides what to set `svr_implemented_options`
+//! to" concept yet — the same gap every prior Milestone 5 entry already
+//! works around by taking its own inputs as caller-supplied parameters
+//! rather than reading them from a live server object (mirroring
+//! [`SequencerState`], `root_client`, and `is_safestate_related` all being
+//! taken the same way in this milestone's earlier entries; see this
+//! module's doc comment "Deliberately out of scope" section above).
+//! [`check_compound_bundle_claim`] therefore takes its three prerequisite
+//! facts — `has_compound_wait`, `svr_sequencers_max`, and
+//! `has_clear_non_safestate` — as plain caller-supplied values instead of
+//! a [`crate::regmap::GeneralRegisters`] reference, leaving it to whichever
+//! later item builds that owning RC Server concept to call this function
+//! with the right facts before deciding whether to set the bit
+//! [`crate::regmap::GeneralRegisters::claims_compound_wait_bundle`] reads.
+//! `svr_sequencers_max` specifically is modeled as a plain `u8` rather than
+//! a [`SequencerBank`] reference for the same reason
+//! [`check_sequencer_num_in_bounds`] already takes it as a plain `u8`
+//! elsewhere in this module: the count bound, not the bank's live mutable
+//! state, is all this gate needs.
+//!
+//! ## Provenance note: `InvalidParameter` as the compound-bundle gate's
+//! rejection code
+//!
+//! `ROADMAP.md`'s checklist bullet names the *rule* a false or partial
+//! "compound request support" claim violates but no error code for it.
+//! Per Guiding Principle 5, this crate checked [`RcpError::RequestRejected`]
+//! — the collapse candidate every prior Milestone 5 entry checked first for
+//! its own new outcome codes — and rejected it for the same reason
+//! [`check_clear_all_cancellation`] and siblings did: `RequestRejected`
+//! names a *request* (a message a client sent) that is refused, not a
+//! *capability claim* (a server's own `svr_implemented_options` bit) that
+//! fails a self-consistency check with no client request involved at all.
+//! [`RcpError::InvalidParameter`] — already one of the eleven confirmed
+//! TC18 spec error codes this crate's Milestone 2 "Error Model" item added
+//! — reads as the closer fit: its own doc comment already describes it as
+//! covering "one or more supplied parameter values is invalid", which a
+//! bundle claim contradicted by its own three prerequisite facts is a
+//! specific instance of. [`check_compound_bundle_claim`] therefore reuses
+//! [`RcpError::InvalidParameter`] rather than inventing a new
+//! bundle-gating-specific sentinel of its own.
 
 use crate::regmap::SequencerStateEntry;
 use crate::timestamp::AvtpTimestamp;
@@ -1854,6 +1958,64 @@ pub fn try_force_cancel_single(
             *current = RequestLifecycleState::Finalized;
             Err(err)
         }
+    }
+}
+
+// ── Feature-bundle gating ────────────────────────────────────────────────────
+
+/// The minimum sequencer count [`check_compound_bundle_claim`] requires
+/// before a "compound request support" claim is honest — `ROADMAP.md`'s
+/// "Feature-bundle gating" checklist bullet's own stated "≥4 sequencers"
+/// threshold.
+pub const MIN_SEQUENCERS_FOR_COMPOUND_BUNDLE: u8 = 4;
+
+/// The feature-bundle gating rule `ROADMAP.md`'s "Feature-bundle gating"
+/// checklist bullet names: honestly claiming the "compound request
+/// support" optional-feature bundle — the bit
+/// [`crate::regmap::GeneralRegisters::claims_compound_wait_bundle`] reads —
+/// requires shipping compound-wait support, a sequencer bank sized for at
+/// least [`MIN_SEQUENCERS_FOR_COMPOUND_BUNDLE`] sequencers, *and*
+/// clear-non-safestate cancellation support, all three together, not
+/// compound-message parsing (i.e. [`RequestKind::Compound`]/
+/// [`RequestKind::CompoundWait`] decoding alone) by itself.
+///
+/// `has_compound_wait` and `has_clear_non_safestate` are presumed to
+/// already reflect whether this implementation actually executes
+/// [`RequestKind::CompoundWait`] (via [`check_compound_gate`]/
+/// [`resolve_compound_exec_delay`]) and honors clear-non-safestate (via
+/// [`check_clear_non_safestate_cancellation`]) respectively, not merely
+/// whether it can decode the corresponding wire bytes.
+/// `svr_sequencers_max` is presumed to already be the same bound
+/// [`SequencerBank::new`]/[`check_sequencer_num_in_bounds`] enforce
+/// elsewhere in this module (mirroring
+/// [`crate::regmap::GeneralRegisters::svr_sequencers_max`]).
+///
+/// Returns `Ok(())` only when all three hold, and
+/// `Err(RcpError::InvalidParameter)` if any one is missing — including
+/// when all three are false, and when `svr_sequencers_max` is nonzero but
+/// still below [`MIN_SEQUENCERS_FOR_COMPOUND_BUNDLE`]. Never panics for
+/// any input.
+///
+/// See this module's doc comment "Provenance note: the compound-bundle
+/// gate as three caller-supplied facts, not a read `GeneralRegisters`" for
+/// why these three facts are taken as plain caller-supplied values rather
+/// than read from a live [`crate::regmap::GeneralRegisters`], and
+/// "Provenance note: `InvalidParameter` as the compound-bundle gate's
+/// rejection code" for the error-code choice.
+// fusa:req REQ-BUNDLE-001
+// fusa:req REQ-BUNDLE-002
+pub fn check_compound_bundle_claim(
+    has_compound_wait: bool,
+    svr_sequencers_max: u8,
+    has_clear_non_safestate: bool,
+) -> Result<(), RcpError> {
+    if has_compound_wait
+        && svr_sequencers_max >= MIN_SEQUENCERS_FOR_COMPOUND_BUNDLE
+        && has_clear_non_safestate
+    {
+        Ok(())
+    } else {
+        Err(RcpError::InvalidParameter)
     }
 }
 
@@ -3454,6 +3616,77 @@ mod tests {
             let _ = try_force_cancel_single(&mut s, 0, ClearTransactionNum(0));
             let mut s = state;
             let _ = try_force_cancel_single(&mut s, 1, ClearTransactionNum(0));
+        }
+    }
+
+    // ── check_compound_bundle_claim ─────────────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-BUNDLE-001
+    fn check_compound_bundle_claim_accepts_all_three_prerequisites_together() {
+        assert_eq!(check_compound_bundle_claim(true, 4, true), Ok(()));
+        // More than the minimum sequencer count is also honest.
+        assert_eq!(check_compound_bundle_claim(true, 8, true), Ok(()));
+        assert_eq!(check_compound_bundle_claim(true, u8::MAX, true), Ok(()));
+    }
+
+    #[test]
+    // fusa:test REQ-BUNDLE-001
+    fn check_compound_bundle_claim_rejects_missing_compound_wait() {
+        assert_eq!(
+            check_compound_bundle_claim(false, 4, true),
+            Err(RcpError::InvalidParameter)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-BUNDLE-002
+    fn check_compound_bundle_claim_rejects_too_few_sequencers() {
+        assert_eq!(
+            check_compound_bundle_claim(true, 3, true),
+            Err(RcpError::InvalidParameter)
+        );
+        assert_eq!(
+            check_compound_bundle_claim(true, 0, true),
+            Err(RcpError::InvalidParameter)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-BUNDLE-001
+    fn check_compound_bundle_claim_rejects_missing_clear_non_safestate() {
+        assert_eq!(
+            check_compound_bundle_claim(true, 4, false),
+            Err(RcpError::InvalidParameter)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-BUNDLE-001
+    fn check_compound_bundle_claim_rejects_compound_message_parsing_alone() {
+        // The checklist's own named failure case: none of the three real
+        // prerequisites are met, only (implicitly) the ability to decode a
+        // compound-request message, which this function does not accept as
+        // input at all.
+        assert_eq!(
+            check_compound_bundle_claim(false, 0, false),
+            Err(RcpError::InvalidParameter)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-BUNDLE-002
+    fn check_compound_bundle_claim_never_panics_for_any_sampled_input() {
+        for has_compound_wait in [false, true] {
+            for svr_sequencers_max in [0, 1, 3, 4, 5, u8::MAX] {
+                for has_clear_non_safestate in [false, true] {
+                    let _ = check_compound_bundle_claim(
+                        has_compound_wait,
+                        svr_sequencers_max,
+                        has_clear_non_safestate,
+                    );
+                }
+            }
         }
     }
 }

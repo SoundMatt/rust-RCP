@@ -5319,6 +5319,33 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RMAP-030",
+      "title": "GeneralRegisters::claims_compound_wait_bundle reads svr_implemented_options bit 0, this crate's placeholder position for the compound&wait option bundle",
+      "text": "GeneralRegisters::claims_compound_wait_bundle(&self) returns true only when bit 0 of svr_implemented_options is set, and false otherwise, regardless of the state of any other bit in the bitmask; never panics for any sampled svr_implemented_options value",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-BUNDLE-001",
+      "title": "check_compound_bundle_claim requires compound-wait support, \u22654 sequencers, and clear-non-safestate support together before accepting a \"compound request support\" claim",
+      "text": "check_compound_bundle_claim(has_compound_wait, svr_sequencers_max, has_clear_non_safestate) returns Ok(()) only when has_compound_wait is true, svr_sequencers_max is greater than or equal to MIN_SEQUENCERS_FOR_COMPOUND_BUNDLE, and has_clear_non_safestate is true, all three simultaneously; returns Err(RcpError::InvalidParameter) whenever any one of the three does not hold, including when none of them hold; never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-BUNDLE-002",
+      "title": "MIN_SEQUENCERS_FOR_COMPOUND_BUNDLE fixes the \"\u22654 sequencers\" threshold check_compound_bundle_claim enforces",
+      "text": "MIN_SEQUENCERS_FOR_COMPOUND_BUNDLE equals 4; check_compound_bundle_claim rejects every svr_sequencers_max value strictly below MIN_SEQUENCERS_FOR_COMPOUND_BUNDLE (with the other two prerequisites otherwise satisfied) and accepts every svr_sequencers_max value at or above it, up to and including u8::MAX; never panics for any sampled svr_sequencers_max value",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

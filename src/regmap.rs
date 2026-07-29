@@ -27,6 +27,7 @@
 // fusa:req REQ-RMAP-027
 // fusa:req REQ-RMAP-028
 // fusa:req REQ-RMAP-029
+// fusa:req REQ-RMAP-030
 
 //! Three-layer per-endpoint config taxonomy, the RC Server's general
 //! (whole-server) register-map fields, and the five child config tables
@@ -267,14 +268,29 @@
 //!   layout (byte offsets, alignment, padding) must be reconciled against
 //!   this guess (never against spec prose) before this encode/decode form
 //!   is relied on for interop.
-//! - **`svr_implemented_options` left undecomposed.** The extraction names
-//!   five option bundles the bitmask covers (compound&wait / triggered /
-//!   chained / time-sync&timed / enhanced-cancel) but no bit-position
-//!   assignment for any of them. Rather than invent an ordering this crate
-//!   has no textual basis for, [`GeneralRegisters::implemented_options`] is
-//!   left as a raw `u8`; named per-bit accessors are deferred to whichever
-//!   later item first needs to test a specific optional-feature bundle
-//!   against a real bit position.
+//! - **`svr_implemented_options` mostly left undecomposed.** The extraction
+//!   names five option bundles the bitmask covers (compound&wait /
+//!   triggered / chained / time-sync&timed / enhanced-cancel) but no
+//!   bit-position assignment for any of them. Rather than invent an
+//!   ordering this crate has no textual basis for, the raw
+//!   [`GeneralRegisters::svr_implemented_options`] field is kept as a plain
+//!   `u8`; named per-bit accessors are still deferred to whichever later
+//!   item first needs to test a specific optional-feature bundle against a
+//!   real bit position. `ROADMAP.md` Milestone 5's "Feature-bundle gating"
+//!   checklist bullet — [`crate::request::check_compound_bundle_claim`] —
+//!   is the first such item, needing to know which single bit the
+//!   "compound request support" bundle occupies. Per Guiding Principle 5,
+//!   this crate assigns the five bundles to bits `0`-`4` in the same
+//!   top-to-bottom order the extraction itself lists them (compound&wait =
+//!   bit `0`, triggered = bit `1`, chained = bit `2`, time-sync&timed = bit
+//!   `3`, enhanced-cancel = bit `4`) — a crate-local placeholder ordering,
+//!   not a confirmed bit-position assignment, and reconciled against a real
+//!   RC Server (never against spec prose) before being relied on for
+//!   interop, the same caveat as the sequential-byte-packing inference
+//!   above. [`GeneralRegisters::claims_compound_wait_bundle`] is the one
+//!   named per-bit accessor built on that placeholder assignment so far —
+//!   bit `0` only; the other four bundles stay unaddressed by a named
+//!   accessor until a later item needs one.
 //!
 //! Several rows pair a pointer with a capacity field for a later child
 //! config table (HW pin-mapping `§3.7`, request-stream config `§3.8`,
@@ -955,6 +971,30 @@ impl GeneralRegisters {
             svr_time_synch_cfg,
             svr_security_cfg,
         })
+    }
+
+    /// Bit position this crate assigns `svr_implemented_options`'s
+    /// compound&wait option bundle within the placeholder five-bundle
+    /// ordering this module's doc comment "`GeneralRegisters` provenance
+    /// note" describes — not a confirmed spec bit position.
+    const IMPLEMENTED_OPTIONS_COMPOUND_WAIT_BIT: u8 = 0;
+
+    /// Whether `svr_implemented_options` claims the compound & compound-wait
+    /// request-kind bundle (`ROADMAP.md` Milestone 5's "compound&wait" name
+    /// for it): bit [`Self::IMPLEMENTED_OPTIONS_COMPOUND_WAIT_BIT`] of the
+    /// raw bitmask.
+    ///
+    /// This only reports what the bitmask *claims*; it does not check
+    /// whether that claim is honest. See
+    /// [`crate::request::check_compound_bundle_claim`] for the "does the
+    /// server that claims this bundle actually ship all three prerequisite
+    /// pieces together" rule `ROADMAP.md`'s "Feature-bundle gating"
+    /// checklist bullet names, and this module's doc comment "provenance
+    /// note" for why bit `0` — rather than any other position — is this
+    /// crate's own placeholder choice for this one bundle.
+    // fusa:req REQ-RMAP-030
+    pub fn claims_compound_wait_bundle(&self) -> bool {
+        self.svr_implemented_options & (1 << Self::IMPLEMENTED_OPTIONS_COMPOUND_WAIT_BIT) != 0
     }
 }
 
@@ -1986,6 +2026,28 @@ mod tests {
     // fusa:test REQ-RMAP-008
     fn general_registers_category_is_lifecycle_general() {
         assert_eq!(GeneralRegisters::CATEGORY, RegisterCategory::General);
+    }
+
+    // ── GeneralRegisters: claims_compound_wait_bundle ───────────────────────
+
+    #[test]
+    // fusa:test REQ-RMAP-030
+    fn claims_compound_wait_bundle_reads_bit_zero_only() {
+        let mut regs = sample_general_registers();
+
+        regs.svr_implemented_options = 0b0000_0000;
+        assert!(!regs.claims_compound_wait_bundle());
+
+        regs.svr_implemented_options = 0b0000_0001;
+        assert!(regs.claims_compound_wait_bundle());
+
+        // Every other bit set, bit 0 clear: still false.
+        regs.svr_implemented_options = 0b1111_1110;
+        assert!(!regs.claims_compound_wait_bundle());
+
+        // Bit 0 set alongside every other bit: still true.
+        regs.svr_implemented_options = 0b1111_1111;
+        assert!(regs.claims_compound_wait_bundle());
     }
 
     // ── GeneralRegisters: encode/decode round-trip ─────────────────────────
