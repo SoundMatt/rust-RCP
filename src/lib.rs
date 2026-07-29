@@ -143,7 +143,6 @@ pub mod udp;
 pub mod udsbr;
 pub mod wakeup;
 pub mod watchdog;
-pub mod wire;
 pub mod zonegroup;
 
 pub use adapt::{adapt, from_message, to_message};
@@ -567,9 +566,12 @@ pub enum RcpError {
     // `Registry` surface (`ROADMAP.md` Milestone 9's satellite-package
     // migration and Milestone 10's core-surface cutover) — kept unchanged
     // by this item since dozens of still-live satellite packages (`mock`,
-    // `capi`, `canbr`, `linbr`, `udp`, and others) construct and match on
-    // them today. Out of scope for the "Error Model" checklist item, which
-    // names only the TC18 spec's own error codes below.
+    // `capi`, `canbr`, `linbr`, and others) construct and match on them
+    // today. `udp`'s own `wire` REPLACE cutover (Milestone 9) already
+    // dropped its use of `ZoneMismatch` — see `src/udp.rs` — but the
+    // variant itself stays for the packages that still construct it. Out
+    // of scope for the "Error Model" checklist item, which names only the
+    // TC18 spec's own error codes below.
     #[error("rcp: zone not found")]
     NotFound,
 
@@ -583,10 +585,14 @@ pub enum RcpError {
     ZoneMismatch,
 
     // ── Wire / E2E errors ────────────────────────────────────────────────
-    // `BadMagic`/`BadVersion`/`CrcMismatch`/`Replay` are likewise legacy
-    // 16-byte-frame-specific (see `wire`/`e2e`'s own REPLACE disposition in
-    // `ROADMAP.md`'s satellite table) and kept unchanged for the same
-    // reason. `ShortFrame` is not legacy-only — every TC18 AVTPDU/ACF
+    // `CrcMismatch`/`Replay` are likewise legacy 16-byte-frame-specific (see
+    // `e2e`'s own REPLACE disposition in `ROADMAP.md`'s satellite table)
+    // and kept unchanged pending that item. `BadMagic`/`BadVersion` — the
+    // `wire`-specific counterparts this comment used to name alongside them
+    // — are retired by Milestone 9's `wire` REPLACE cutover: `src/wire.rs`
+    // (their only constructor) is deleted, and no other module ever
+    // constructed or matched on either variant, so nothing is left for them
+    // to serve. `ShortFrame` is not legacy-only — every TC18 AVTPDU/ACF
     // decoder added in Milestone 1 (`avtp`, `acf`) and the Register Map
     // config-table decoders added earlier in this milestone
     // (`regmap`) also return it for undersized input, so it stays as
@@ -594,12 +600,6 @@ pub enum RcpError {
     // into the TC18 error-code group below.
     #[error("rcp/wire: frame too short")]
     ShortFrame,
-
-    #[error("rcp/wire: bad magic bytes")]
-    BadMagic,
-
-    #[error("rcp/wire: unsupported protocol version")]
-    BadVersion,
 
     #[error("rcp/e2e: CRC mismatch")]
     CrcMismatch,

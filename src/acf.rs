@@ -78,10 +78,13 @@
 //!   no timestamp field to apply that rule to; for ACF_GBB,
 //!   `message_timestamp` is carried as a raw `u64` only, not wired into
 //!   [`crate::timestamp::MessageTimestamp`] at encode/decode time.
-//! - Wiring either message type into [`crate::avtp`]'s AVTPDU decoders,
-//!   or cutting over any caller of [`crate::wire`] — this module is
-//!   additive only, matching the pattern [`crate::avtp`] itself
-//!   established for NTSCF/TSCF.
+//! - Wiring either message type into [`crate::avtp`]'s AVTPDU decoders —
+//!   this module is additive only, matching the pattern [`crate::avtp`]
+//!   itself established for NTSCF/TSCF. (`ROADMAP.md` Milestone 9's `wire`
+//!   REPLACE cutover later did exactly this composition —
+//!   [`crate::avtp::encode_ntscf_frame`]/[`crate::avtp::decode_ntscf_frame`]
+//!   — and deleted the legacy `crate::wire` module these two message types
+//!   used to coexist alongside.)
 //!
 //! ## Provenance note
 //!

@@ -2170,6 +2170,43 @@ package-by-package audit below, now that the core protocol (Milestones 1–8)
 exists to migrate them onto.
 
 - [ ] All **REPLACE**-disposition packages rebuilt against the new core
+      Progress (v0.12.0-dev): 3 of 10 done. `watchdog`/`powerstate` were
+      already REPLACEd ahead of schedule inside Milestones 6/7 (see their
+      own "Done" notes above); `wire` is now done too. `src/wire.rs` — the
+      legacy 16-byte private frame — is deleted outright, its role fully
+      absorbed by the already-built Milestone 1 AVTPDU/ACF stack: `src/
+      avtp.rs` gains two new composition functions,
+      `encode_ntscf_frame`/`decode_ntscf_frame`, wrapping an
+      already-encoded ACF_ABB/ACF_GBB payload (`src/acf.rs`) in its NTSCF
+      envelope — the "combine one whole on-wire AVTPDU" step every prior
+      Milestone 1 entry flagged as not yet done. Both of `wire`'s two
+      remaining callers are cut over: `src/udp.rs`'s old `Zone`/
+      `Controller`-based `UdpBridge` is REPLACEd outright (deleted, not
+      adapted, the same discipline `watchdog`/`powerstate` used) with a new
+      `UdpTransport` addressed by `avtp::StreamId` instead of `Zone`,
+      sending/receiving NTSCF-wrapped ACF_ABB/ACF_GBB frames and resolving
+      `byte_bus_id` through a new `resolve_endpoint` helper composing
+      `ep0::route_byte_bus_id`/`addressing::EndpointTable` instead of a
+      zone lookup; `src/tlstransport.rs`'s `TlsBridge` (ADAPT disposition)
+      keeps its TLS-wrapping mechanics and mutual-auth posture unchanged
+      per its own scope, with only its encode/decode calls retargeted the
+      same way. This item closes only `wire`'s row — `udp`'s own REPLACE
+      disposition (a real RC-Server-endpoint-level rebuild: register-map-
+      driven dispatch, discovery integration) remains open and is tracked
+      separately. `fuzz/fuzz_targets/fuzz_wire_decode.rs` is repointed at
+      `avtp::decode_ntscf_frame` rather than deleted, carrying its
+      never-panics discipline forward. `RcpError::BadMagic`/`BadVersion` —
+      the two sentinels `wire.rs` alone constructed — are removed from
+      `src/lib.rs`, since Milestone 2's own "Error Model" note had already
+      flagged their removal as this milestone's job. `.fusa-reqs.json`'s
+      `REQ-WIRE-001`..`009` are retargeted in place (same IDs, same
+      "Never renumber or reuse" discipline Milestone 6 established for
+      `REQ-WDG-*`) to describe the new NTSCF frame composition instead of
+      the deleted frame; `REQ-UDP-001`..`005` and `REQ-TLS-004` are
+      likewise retargeted to `UdpTransport`/`TlsBridge`'s new framing; new
+      `REQ-UDP-006`..`007` cover `resolve_endpoint`. Remaining REPLACE
+      packages: `e2e`, `mock`, `config`, `capi`, `canbr`, `linbr`, and
+      `udp`'s own deeper rebuild.
 - [ ] All **ADAPT**-disposition packages retargeted to whatever new
       endpoint/RC-Server trait surface replaces `Controller`/`Registry`
 - [ ] All **DEPRECATE**-disposition packages removed, with a migration note
