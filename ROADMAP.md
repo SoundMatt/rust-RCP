@@ -2792,9 +2792,73 @@ Ship a stable, TC18-conformant rust-RCP.
 - [ ] Full FuSa artifact re-basing: HARA, SAFETY_PLAN.md, and tara.json
       rewritten against the new architecture (the old versions describe
       hazards and threats specific to the replaced protocol)
-- [ ] RELAY spec `Adapt()`/`to_message()`/`from_message()` rebuilt against
+- [x] RELAY spec `Adapt()`/`to_message()`/`from_message()` rebuilt against
       the new endpoint-addressed `Message` shape (no more zone-name-as-`id`
       mapping)
+      Done (v0.13.0-dev): `src/adapt.rs`'s `adapt()`/`RcpAdapter`/
+      `to_message()`/`from_message()`/`response_to_message()` no longer
+      reference `Zone`/`Command`/`CommandType`/`Priority`/`Controller`/
+      `Response`/`Status`/`zone_from_str` — `adapt()` now wraps an
+      `Arc<mock::RcServer>` as a `relay::Caller`/`Node`, addressed by
+      `(avtp::StreamId, byte_bus_id)` instead of a zone name.
+      `Adapter`/`AdaptEndpoint`/`PassthroughAdapter` (already retargeted in
+      Milestone 9) are untouched.
+
+      Three flagged, this-crate-own design choices this rebuild had to make
+      (Guiding Principle 5), documented in `src/adapt.rs`'s own provenance
+      note:
+
+      - **`Message.id` encoding**: `format_endpoint_id`/`parse_endpoint_id`
+        encode `(stream_id, byte_bus_id)` as
+        `"<16 hex digits>.<decimal byte_bus_id>"`, replacing the retired
+        zone-name-as-`id` convention. Malformed input is
+        `Err(RcpError::InvalidParameter)`, never a panic.
+      - **Read vs. write inference**: `RcServer::handle_abb` dispatches on
+        a boolean `op` flag with no third "no-op" case (unlike the retired
+        `CommandType`). `from_message` reads an optional `"rcp.op"` meta
+        key (`"read"`/`"write"`) and, absent one, infers it from whether
+        `msg.payload` is empty. An optional `"rcp.read_size"` meta key
+        (decimal `u8`, default `u8::MAX`) supplies the read byte count
+        `Command` never needed to carry.
+      - **`subscribe`**: `mock::RcServer` still has no live-notification
+        mechanism (its own doc comment states this is an open gap, not
+        resolved by this item). Rather than invent one or overload a RELAY
+        error sentinel to mean "unsupported," `RcpAdapter::subscribe`
+        returns a channel that is immediately, legitimately closed — an
+        honest "no events, currently" answer within `Node::subscribe`'s
+        existing typed contract. Building a real forwarding path is left to
+        whichever later item gives `RcServer` a live-notification
+        mechanism to forward. The retired `Controller::subscribe`-forwarding
+        plumbing (`AdaptQueue`, its blocking-producer task) is removed
+        rather than kept as unused scaffolding for the same reason.
+      - **`close`**: `RcServer` tracks an `RcServerState` lifecycle
+        position, not an open/closed connection boolean, so `RcpAdapter`
+        keeps its own `closed: AtomicBool` (mirroring
+        `udp::UdpTransport::close`'s own no-real-resource-to-close
+        precedent in this model) so `Node::close`'s "further calls fail"
+        contract stays meaningful rather than becoming a pure no-op.
+
+      An already-expired `Context` is now surfaced as `relay::Error::Timeout`
+      before dispatch (the closest available analog to the retired
+      `Controller::send`'s "zero timeout = already expired" check, since
+      `RcServer::handle_abb` itself has no timeout parameter to honor
+      mid-call).
+
+      `.fusa-reqs.json` `REQ-ADAPT-006`/`007`/`008`/`009`/`010` text is
+      updated to describe the new `AcfAbbMessage`/`RcServer`-based behavior
+      in place of the retired `Status`/`Command`/`Response`/`Controller`
+      wording; a new `REQ-ADAPT-011` covers the `format_endpoint_id`/
+      `parse_endpoint_id` encoding. `src/adapt.rs`'s own tests are rewritten
+      against `mock::RcServer`/`MockEndpoint` in place of `MockController`/
+      `Zone`/`Command`/`Response`/`Status`.
+
+      `cargo build --all-targets`, `cargo clippy --all-targets --all-features
+      -- -D warnings`, `cargo test --all-targets` (1062 lib tests, up from
+      1056 — 20 in `adapt::tests`, up from 14 — plus 19 unchanged `src/bin/
+      rcp.rs` tests), and `cargo fmt --all -- --check` are clean; `bash
+      scripts/fusa-gap-check.sh` reports 622/622 (100%) requirements traced;
+      `bash scripts/cyber-gap-check.sh` reports 6/6 threats with tested
+      countermeasures.
 - [ ] CLI (`rust-rcp`) command surface updated: discovery, register
       read/write, per-endpoint drive commands, replacing the old
       `send`/`zones`/`status --zone` shape

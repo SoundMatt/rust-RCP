@@ -5,7 +5,62 @@ the roadmap milestone that produced them (see `ROADMAP.md`), since this
 crate's `Cargo.toml` version does not move until the OPEN Alliance TC18
 core replacement reaches `v1.0.0`.
 
-## Unreleased — v0.12.0-dev (Milestone 9)
+## Unreleased — v0.13.0-dev (Milestone 10)
+
+### Changed
+
+`src/adapt.rs`'s RELAY spec `Adapt()`/`to_message()`/`from_message()`/
+`response_to_message()` binding is rebuilt against `mock::RcServer`'s
+`(avtp::StreamId, byte_bus_id)`-addressed model, replacing the
+zone-name-as-`Message.id` mapping this module's own Milestone 9 doc comment
+had explicitly deferred to this item. `adapt()` now takes an
+`Arc<mock::RcServer>` in place of `Arc<dyn Controller>`; no reference to
+`Zone`/`Command`/`CommandType`/`Priority`/`Controller`/`Response`/`Status`/
+`zone_from_str` remains in the module. `Adapter`/`AdaptEndpoint`/
+`PassthroughAdapter` (already retargeted in Milestone 9) are untouched.
+
+Three flagged design choices this rebuild made where neither the RELAY spec
+nor `ROADMAP.md` pin one down (see `src/adapt.rs`'s own provenance note for
+the full reasoning):
+
+- `Message.id` now encodes `(stream_id, byte_bus_id)` as
+  `"<16 hex digits>.<decimal byte_bus_id>"` (`format_endpoint_id`/
+  `parse_endpoint_id`), rejecting malformed input with
+  `RcpError::InvalidParameter` rather than panicking.
+- `from_message` infers read vs. write from an optional `"rcp.op"` meta key,
+  defaulting to whether `msg.payload` is empty (`RcServer::handle_abb` has
+  no third "no-op" case); an optional `"rcp.read_size"` meta key (default
+  `u8::MAX`) supplies the read byte count.
+- `RcpAdapter::subscribe` returns an immediately-closed channel rather than
+  inventing a notification source: `mock::RcServer` still has no live
+  asynchronous-notification mechanism (a gap that module's own doc comment
+  already named, and this item does not resolve). The retired
+  `Controller::subscribe`-forwarding plumbing (`AdaptQueue` and its
+  blocking-producer task) is removed rather than kept as dead code;
+  whichever later item gives `RcServer` a live-notification mechanism can
+  reintroduce the same `relay::BackPressurePolicy`-driven shape once it has
+  something real to forward.
+- `RcpAdapter` tracks its own `closed` flag, since `RcServer` has an
+  `RcServerState` lifecycle position rather than an open/closed connection
+  boolean for `Node::close` to delegate to.
+
+### Traceability
+
+`.fusa-reqs.json` `REQ-ADAPT-006`/`007`/`008`/`009`/`010` text is updated
+to describe the new `AcfAbbMessage`/`RcServer`-based behavior; a new
+`REQ-ADAPT-011` covers the endpoint-address encode/decode pair.
+`src/adapt.rs`'s tests are rewritten against `mock::RcServer`/
+`MockEndpoint` in place of `MockController`/`Zone`/`Command`/`Response`/
+`Status` (20 tests, up from 14).
+
+`cargo build --all-targets`, `cargo clippy --all-targets --all-features --
+-D warnings`, `cargo test --all-targets` (1062 lib tests, up from 1056;
+19 unchanged `src/bin/rcp.rs` tests), and `cargo fmt --all -- --check` are
+clean; `bash scripts/fusa-gap-check.sh` reports 622/622 (100%) requirements
+traced; `bash scripts/cyber-gap-check.sh` reports 6/6 threats with tested
+countermeasures.
+
+## v0.12.0-dev (Milestone 9) — closed
 
 ### Removed
 

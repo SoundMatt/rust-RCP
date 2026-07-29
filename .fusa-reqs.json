@@ -2568,8 +2568,8 @@
     },
     {
       "id": "REQ-ADAPT-006",
-      "title": "Status.ToMessage()",
-      "text": "to_message() shall convert a Status to a relay::Message per RELAY spec \u00a715.7.5 (zone name as ID, seq, healthy meta key, payload)",
+      "title": "AcfAbbMessage response ToMessage()",
+      "text": "to_message() shall convert an addressed ACF_ABB response to a relay::Message per RELAY spec \u00a715.7.5 (stream_id+byte_bus_id encoded as ID, op surfaced via the rcp.op meta key, payload)",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -2577,8 +2577,8 @@
     },
     {
       "id": "REQ-ADAPT-007",
-      "title": "Message.FromMessage() to Command",
-      "text": "from_message() shall convert a relay::Message to a Command per RELAY spec \u00a715.7.5 (zone from ID, priority/cmd_type from meta keys), returning NotFound for an unknown zone",
+      "title": "Message.FromMessage() to AcfAbbMessage",
+      "text": "from_message() shall convert a relay::Message to an addressed ACF_ABB request per RELAY spec \u00a715.7.5 (stream_id+byte_bus_id decoded from ID, op/read_size from meta keys), returning InvalidParameter for a malformed ID or an unrecognized rcp.op value",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -2586,8 +2586,8 @@
     },
     {
       "id": "REQ-ADAPT-008",
-      "title": "Response.ToMessage()",
-      "text": "response_to_message() shall convert a Response to a relay::Message per RELAY spec \u00a715.7.5 (zone name as ID, status meta key, payload)",
+      "title": "AcfAbbMessage response.ToMessage() reply half",
+      "text": "response_to_message() shall convert an addressed ACF_ABB response to a relay::Message per RELAY spec \u00a715.7.5 (Caller.Call reply half), matching to_message()'s own conversion",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -2596,7 +2596,7 @@
     {
       "id": "REQ-ADAPT-009",
       "title": "Adapt()",
-      "text": "adapt() shall wrap a Controller as a relay::Node/Caller per RELAY spec \u00a710.3, dispatching blocking Controller calls via spawn_blocking and applying the SubscriberOptions back-pressure policy per \u00a710.5",
+      "text": "adapt() shall wrap an RcServer as a relay::Node/Caller per RELAY spec \u00a710.3, addressed by (StreamId, byte_bus_id), dispatching blocking RcServer calls via spawn_blocking, honoring an already-expired Context as Timeout, tracking its own closed state since RcServer has no open/closed connection concept of its own, and returning an immediately-closed channel from subscribe() since RcServer has no live-notification mechanism to forward",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -2605,7 +2605,16 @@
     {
       "id": "REQ-ADAPT-010",
       "title": "Caller.Call()",
-      "text": "The Adapt() adapter's call() shall dispatch a Command derived from the request Message and return the Response as a relay::Message per RELAY spec \u00a710.2/\u00a715.7.5",
+      "text": "The Adapt() adapter's call() shall dispatch an addressed ACF_ABB request derived from the request Message against the wrapped RcServer and return its response as a relay::Message per RELAY spec \u00a710.2/\u00a715.7.5",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ADAPT-011",
+      "title": "Endpoint-address Message.id encoding",
+      "text": "format_endpoint_id()/parse_endpoint_id() shall encode/decode a (StreamId, byte_bus_id) pair to/from a relay::Message.id string, rejecting malformed input with InvalidParameter rather than panicking",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
