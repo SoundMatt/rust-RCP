@@ -226,6 +226,18 @@
 //! working interpretation, pending reconciliation against the
 //! specification's actual behavior (never its prose) before being relied
 //! on for interop with a real TC18 RC Server.
+//!
+//! ## `Serialize`/`Deserialize` derive (`ROADMAP.md` Milestone 9, `config`
+//! ## REPLACE cutover)
+//!
+//! [`RcServerState`] additionally derives `serde`'s `Serialize`/
+//! `Deserialize` here, purely additively, so [`crate::config`] can load a
+//! human-authored initial lifecycle state by variant name
+//! (`HwUnconfigured`/`HwConfigured`/`RcpConfigured`) without duplicating
+//! this type in a parallel loader-only shape. No transition rule, guard, or
+//! existing derive changes.
+
+use serde::{Deserialize, Serialize};
 
 use crate::RcpError;
 
@@ -239,7 +251,7 @@ use crate::RcpError;
 /// (see [`LockPolicy`] instead). See [`RcServerState::try_transition`] for
 /// the guarded and unconditional transitions this type *does* model,
 /// including the `HW_CONFIGURED` -> `HW_UNCONFIGURED` demotion path.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 // fusa:req REQ-LIFE-001
 pub enum RcServerState {
