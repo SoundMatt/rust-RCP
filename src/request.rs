@@ -13,20 +13,28 @@
 // fusa:req REQ-CHAIN-001
 // fusa:req REQ-CHAIN-002
 // fusa:req REQ-CHAIN-003
+// fusa:req REQ-TIME-001
+// fusa:req REQ-TIME-002
+// fusa:req REQ-TIME-003
 
 //! Conditional-request taxonomy: compound / compound-wait (`0x0F`/`0x0B`),
-//! triggered (`0x0E`), and chained (`0x01`) — `ROADMAP.md` Milestone 5
-//! ("Conditional Requests & Sequencers"), first, second, and third
-//! checklist bullets. The first bullet covers sequencer-gated execution
-//! and wait, with `cmp_exec_delay`/`cmpw_exec_delay` timers and the
-//! "advance sequencer only if still in start state" rule. The second
+//! triggered (`0x0E`), chained (`0x01`), and timed (`0x0A`) — `ROADMAP.md`
+//! Milestone 5 ("Conditional Requests & Sequencers"), first, second, third,
+//! and fourth checklist bullets. The first bullet covers sequencer-gated
+//! execution and wait, with `cmp_exec_delay`/`cmpw_exec_delay` timers and
+//! the "advance sequencer only if still in start state" rule. The second
 //! covers trigger-occurrence counting that runs independent of the target
 //! endpoint's busy/idle state, the `trigger_exec_delay` timer, and the
 //! infinite-repeat sentinel (`0xFFFF`). The third covers the `cs`-bit
 //! abort-on-predecessor-error semantics that gate whether a chained
 //! request's remaining links continue after an earlier link errors, plus
 //! the two new `CHAIN_ABORTED`/`CHAIN_ERROR` error codes that checklist
-//! bullet names.
+//! bullet names. The fourth covers presentation-time execution as this
+//! checklist bullet's own named alternative to a TSCF header: a request
+//! that did not arrive framed with [`crate::avtp::TscfHeader::
+//! avtp_timestamp`] (e.g. one carried by NTSCF/ACF_ABB instead, which
+//! Milestone 1 modeled as having no timestamp field at all) can still
+//! carry its own presentation-time execution gate.
 //!
 //! Compound/compound-wait was the opening item of Milestone 5, and the
 //! first thing to land in `src/request.rs` — the module name the
@@ -34,26 +42,29 @@
 //! module naming with RELAY spec v1.14 §13.7.2") reserved for this
 //! milestone's request-kind/taxonomy work, mirroring `fragment.rs`'s own
 //! reservation for Milestone 8. Triggered is the second, added there.
-//! Chained is the third, added here. Two of this milestone's remaining
-//! checklist items (Timed, and the cancellation trio, plus the
-//! "Standard"/unconditional kind implied by the spec's own
-//! execution-priority ordering) are still expected to extend
-//! [`RequestKind`] and add sibling sections to this module; none of that is
-//! attempted here. Same "additive standalone plumbing only" discipline as
-//! every prior Milestone 1-4 entry, and as the compound/compound-wait and
-//! triggered work above: nothing here is wired into a decoder, dispatch
-//! loop, or request-lifecycle state machine. The old `src/prioqueue.rs`
-//! `Zone`/`Command`/`Controller`/`Priority` decorator this milestone's own
-//! Goal text names as the eventual absorption target for "picking which
-//! pending request runs next" is read only as background for this change,
-//! not extended or touched.
+//! Chained is the third, added there. Timed is the fourth, added here.
+//! This milestone's one remaining conditional-request checklist item (the
+//! cancellation trio), plus the "Standard"/unconditional kind implied by
+//! the spec's own execution-priority ordering, are still expected to
+//! extend [`RequestKind`] and add sibling sections to this module; none of
+//! that is attempted here. Same "additive standalone plumbing only"
+//! discipline as every prior Milestone 1-4 entry, and as the
+//! compound/compound-wait, triggered, and chained work above: nothing here
+//! is wired into a decoder, dispatch loop, or request-lifecycle state
+//! machine. The old `src/prioqueue.rs` `Zone`/`Command`/`Controller`/
+//! `Priority` decorator this milestone's own Goal text names as the
+//! eventual absorption target for "picking which pending request runs
+//! next" is read only as background for this change, not extended or
+//! touched.
 //!
-//! Nine named pieces are in scope, all implemented here:
+//! Twelve named pieces are in scope, all implemented here or in the three
+//! prior entries this one extends:
 //!
-//! - [`RequestKind`] — the request-type discriminant, now covering four
-//!   values ([`RequestKind::Chained`] = `0x01`, [`RequestKind::CompoundWait`]
-//!   = `0x0B`, [`RequestKind::Triggered`] = `0x0E`, [`RequestKind::Compound`]
-//!   = `0x0F`). See "Provenance note: `RequestKind`'s wire placement" below
+//! - [`RequestKind`] — the request-type discriminant, now covering five
+//!   values ([`RequestKind::Chained`] = `0x01`, [`RequestKind::Timed`] =
+//!   `0x0A`, [`RequestKind::CompoundWait`] = `0x0B`,
+//!   [`RequestKind::Triggered`] = `0x0E`, [`RequestKind::Compound`] =
+//!   `0x0F`). See "Provenance note: `RequestKind`'s wire placement" below
 //!   for why this is modeled as a standalone value type, not yet tied to a
 //!   decoded byte offset.
 //! - [`CompoundGateConfig`] / [`SequencerState`] /
@@ -102,13 +113,30 @@
 //!   bullet names, added to [`crate::RcpError`] in `src/lib.rs`. See
 //!   "Provenance note: `CHAIN_ABORTED`/`CHAIN_ERROR` as new variants, and
 //!   the distinction between them" below.
+//! - [`TimedExecutionTime`] — the presentation-time execution gate a Timed
+//!   request carries in place of a TSCF header's own
+//!   [`crate::avtp::TscfHeader::avtp_timestamp`], modeled by composing
+//!   [`crate::timestamp::AvtpTimestamp`] rather than duplicating its
+//!   shape. See "Provenance note: `TimedExecutionTime`'s wire placement,
+//!   width, and the choice to compose `AvtpTimestamp`" below.
+//! - [`is_timed_request_ready`] — the presentation-time-execution
+//!   readiness rule this checklist bullet's own wording implies: a Timed
+//!   request is ready to execute once a caller-supplied current
+//!   presentation time has reached or passed the request's own carried
+//!   [`TimedExecutionTime`], reusing
+//!   [`crate::timestamp::AvtpTimestamp::is_after`]'s existing
+//!   wraparound-aware ordering and
+//!   [`crate::timestamp::AvtpTimestamp::is_untimed`]'s existing
+//!   all-zero-means-untimed fallback rather than inventing new ordering or
+//!   fallback logic of its own.
 //!
 //! Deliberately out of scope:
 //!
-//! - The other two request kinds this milestone's checklist still names
-//!   (Timed and the cancellation trio), and the "Standard" (unconditional)
-//!   kind implicit in the spec's own priority ordering. [`RequestKind`]
-//!   intentionally leaves room for them but does not add them.
+//! - The one remaining conditional-request kind this milestone's checklist
+//!   still names (the cancellation trio), and the "Standard"
+//!   (unconditional) kind implicit in the spec's own priority ordering.
+//!   [`RequestKind`] intentionally leaves room for them but does not add
+//!   them.
 //! - The persistent 8-bit sequencer-state register machine itself
 //!   (`ROADMAP.md` Milestone 5's own "Sequencers" checklist bullet, not yet
 //!   built). Every function here that needs a sequencer's current state
@@ -129,20 +157,21 @@
 //!
 //! ## Provenance note: `RequestKind`'s wire placement
 //!
-//! `ROADMAP.md`'s checklist bullets name `0x0F`/`0x0B`/`0x0E`/`0x01` as the
-//! compound, compound-wait, triggered, and chained discriminant values, but
-//! — unlike `acf_msg_type` ([`crate::acf::ACF_ABB_MSG_TYPE`]/
-//! [`crate::acf::ACF_GBB_MSG_TYPE`]), whose byte offset within an ACF
-//! message header this crate already pinned down in Milestone 1 — no
-//! checklist text anywhere in this crate's roadmap states which byte or
-//! field of a request actually carries this discriminant. Per Guiding
-//! Principle 5, [`RequestKind`] is therefore modeled as a standalone value
-//! type with its own `to_u8`/`from_u8` pair, exactly as confident about its
-//! named numeric values as the checklist text is, and no more: it is not
-//! attached to any offset within [`crate::acf::ByteMessageInfo`] or any
-//! other already-built wire shape, and no such offset is guessed here. This
-//! reasoning is unchanged by adding [`RequestKind::Triggered`] or
-//! [`RequestKind::Chained`]; each is simply one more value under the same
+//! `ROADMAP.md`'s checklist bullets name `0x0F`/`0x0B`/`0x0E`/`0x01`/`0x0A`
+//! as the compound, compound-wait, triggered, chained, and timed
+//! discriminant values, but — unlike `acf_msg_type`
+//! ([`crate::acf::ACF_ABB_MSG_TYPE`]/[`crate::acf::ACF_GBB_MSG_TYPE`]),
+//! whose byte offset within an ACF message header this crate already
+//! pinned down in Milestone 1 — no checklist text anywhere in this crate's
+//! roadmap states which byte or field of a request actually carries this
+//! discriminant. Per Guiding Principle 5, [`RequestKind`] is therefore
+//! modeled as a standalone value type with its own `to_u8`/`from_u8` pair,
+//! exactly as confident about its named numeric values as the checklist
+//! text is, and no more: it is not attached to any offset within
+//! [`crate::acf::ByteMessageInfo`] or any other already-built wire shape,
+//! and no such offset is guessed here. This reasoning is unchanged by
+//! adding [`RequestKind::Triggered`], [`RequestKind::Chained`], or
+//! [`RequestKind::Timed`]; each is simply one more value under the same
 //! still-open question.
 //!
 //! ## Provenance note: `start_state` and the not-yet-built sequencer-state
@@ -298,14 +327,45 @@
 //! [`crate::RcpError::EpNotFound`], and [`crate::RcpError::ReqStorageOvfl`]
 //! ahead of the concrete per-link execution path (a later milestone item)
 //! that would actually return it.
+//!
+//! ## Provenance note: `TimedExecutionTime`'s wire placement, width, and the
+//! choice to compose `AvtpTimestamp`
+//!
+//! `ROADMAP.md`'s checklist bullet names Timed's mechanism only in prose —
+//! "presentation-time execution as an alternative to a TSCF header" — and,
+//! like every other conditional-request kind in this module, states
+//! neither the byte offset a Timed request's own execution-time field
+//! occupies nor its field name. What the wording does pin down is the
+//! *shape* of the alternative being offered: the one presentation-time
+//! field this crate already carries is
+//! [`crate::avtp::TscfHeader::avtp_timestamp`], modeled in Milestone 1 as
+//! [`crate::timestamp::AvtpTimestamp`] — a 32-bit value with its own
+//! rollover-aware comparison and all-zero-means-untimed fallback rule.
+//! Reading "alternative to a TSCF header" as "carries the same kind of
+//! presentation-time value a TSCF header would have supplied, just sourced
+//! from the request itself instead", [`TimedExecutionTime`] composes
+//! [`crate::timestamp::AvtpTimestamp`] directly rather than introducing a
+//! second, differently-shaped timestamp type or an unconfirmed-width `u32`
+//! placeholder of its own — following this recommendation's own guidance
+//! to compose the module's existing timestamp primitives as a
+//! caller-supplied value rather than duplicate them. This is still a
+//! Guiding-Principle-5 judgment call, not a confirmed wire fact: nothing
+//! in this crate's roadmap states that a Timed request's execution-time
+//! field is actually 32 bits wide, or that it is bit-for-bit identical to
+//! [`crate::avtp::TscfHeader::avtp_timestamp`]'s own encoding, only that it
+//! serves the same presentation-time-execution purpose. [`TimedExecutionTime`]
+//! is, like [`RequestKind`] itself, a standalone value type not yet tied to
+//! any offset within [`crate::acf::ByteMessageInfo`] or any other decoded
+//! wire shape.
 
+use crate::timestamp::AvtpTimestamp;
 use crate::RcpError;
 
 // ── RequestKind ──────────────────────────────────────────────────────────────
 
 /// The request-type discriminant naming a conditional request's kind.
 ///
-/// Only the four values the checklist bullets built so far name are
+/// Only the five values the checklist bullets built so far name are
 /// modeled; see this module's doc comment "Deliberately out of scope"
 /// section for why the remaining conditional-request kinds `ROADMAP.md`
 /// names elsewhere in this milestone are not yet added as variants.
@@ -314,11 +374,16 @@ use crate::RcpError;
 // fusa:req REQ-CMP-001
 // fusa:req REQ-TRIG-001
 // fusa:req REQ-CHAIN-001
+// fusa:req REQ-TIME-001
 pub enum RequestKind {
     /// Chained (`0x01`): a sequence of requests whose remaining links are
     /// gated on the `cs`-bit abort-on-predecessor-error rule — see
     /// [`check_chain_continuation`].
     Chained = 0x01,
+    /// Timed (`0x0A`): presentation-time execution as this checklist
+    /// bullet's own named alternative to a TSCF header — see
+    /// [`TimedExecutionTime`] and [`is_timed_request_ready`].
+    Timed = 0x0A,
     /// Compound-wait (`0x0B`): sequencer-gated execution that waits for its
     /// gate to be satisfied.
     CompoundWait = 0x0B,
@@ -334,6 +399,7 @@ impl RequestKind {
     // fusa:req REQ-CMP-001
     // fusa:req REQ-TRIG-001
     // fusa:req REQ-CHAIN-001
+    // fusa:req REQ-TIME-001
     pub fn to_u8(self) -> u8 {
         self as u8
     }
@@ -347,9 +413,11 @@ impl RequestKind {
     // fusa:req REQ-CMP-002
     // fusa:req REQ-TRIG-001
     // fusa:req REQ-CHAIN-001
+    // fusa:req REQ-TIME-001
     pub fn from_u8(raw: u8) -> Result<Self, RcpError> {
         match raw {
             0x01 => Ok(Self::Chained),
+            0x0A => Ok(Self::Timed),
             0x0B => Ok(Self::CompoundWait),
             0x0E => Ok(Self::Triggered),
             0x0F => Ok(Self::Compound),
@@ -467,16 +535,20 @@ pub struct CompoundExecDelays {
 /// since `CompoundExecDelays` has no field a Triggered request could
 /// select. `RequestKind::Chained` (a fourth variant, added alongside
 /// [`check_chain_continuation`]) is likewise `None` here — `ROADMAP.md`'s
-/// Chained checklist bullet names no `*_exec_delay` timer of its own. Not
-/// yet called from anywhere in this crate (see this module's doc comment
-/// for why), so this is a safe additive-plumbing-stage widening, not a
-/// breaking change to any consumer.
+/// Chained checklist bullet names no `*_exec_delay` timer of its own —
+/// and so is `RequestKind::Timed` (a fifth variant, added alongside
+/// [`TimedExecutionTime`]): Timed's own gate is
+/// [`is_timed_request_ready`], not an elapsed-tick delay timer like
+/// [`CompoundExecDelays`]/[`TriggerExecDelay`]. Not yet called from
+/// anywhere in this crate (see this module's doc comment for why), so this
+/// is a safe additive-plumbing-stage widening, not a breaking change to
+/// any consumer.
 // fusa:req REQ-CMP-006
 pub fn resolve_compound_exec_delay(kind: RequestKind, delays: &CompoundExecDelays) -> Option<u32> {
     match kind {
         RequestKind::Compound => Some(delays.cmp_exec_delay),
         RequestKind::CompoundWait => Some(delays.cmpw_exec_delay),
-        RequestKind::Triggered | RequestKind::Chained => None,
+        RequestKind::Triggered | RequestKind::Chained | RequestKind::Timed => None,
     }
 }
 
@@ -531,7 +603,10 @@ pub struct TriggerExecDelay(pub u32);
 pub fn resolve_trigger_exec_delay(kind: RequestKind, delay: TriggerExecDelay) -> Option<u32> {
     match kind {
         RequestKind::Triggered => Some(delay.0),
-        RequestKind::Compound | RequestKind::CompoundWait | RequestKind::Chained => None,
+        RequestKind::Compound
+        | RequestKind::CompoundWait
+        | RequestKind::Chained
+        | RequestKind::Timed => None,
     }
 }
 
@@ -652,14 +727,56 @@ pub fn check_chain_continuation(cs: bool, predecessor_errored: bool) -> Result<(
     }
 }
 
+// ── Timed (0x0A): presentation-time execution as an alternative to a TSCF
+//    header ──────────────────────────────────────────────────────────────────
+
+/// A Timed request's own carried presentation-time execution gate — the
+/// mechanism this checklist bullet names as an alternative to a TSCF
+/// header's own [`crate::avtp::TscfHeader::avtp_timestamp`], for a request
+/// that did not arrive framed with one.
+///
+/// See this module's doc comment "Provenance note: `TimedExecutionTime`'s
+/// wire placement, width, and the choice to compose `AvtpTimestamp`" for
+/// why this composes [`crate::timestamp::AvtpTimestamp`] rather than
+/// duplicating its shape or introducing a new unconfirmed-width
+/// placeholder.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+// fusa:req REQ-TIME-002
+pub struct TimedExecutionTime(pub AvtpTimestamp);
+
+/// Whether a Timed request is ready to execute: `true` once `current` — a
+/// caller-supplied reference presentation time, in the same units as
+/// `exec_time` — has reached or passed `exec_time`, the request's own
+/// carried [`TimedExecutionTime`].
+///
+/// Ordering reuses [`crate::timestamp::AvtpTimestamp::is_after`]'s
+/// existing wraparound-aware comparison rather than a plain numeric `>=`,
+/// so a `current` that has just rolled over past `exec_time` is still
+/// correctly read as ready. An `exec_time` whose wrapped
+/// [`crate::timestamp::AvtpTimestamp`] is
+/// [`crate::timestamp::AvtpTimestamp::is_untimed`] (the all-zero fallback
+/// [`crate::timestamp`] already established for TSCF's own
+/// `avtp_timestamp`) carries no timing constraint at all, so this function
+/// reads that case as always ready — mirroring the same fallback rule
+/// rather than treating an untimed `exec_time` as an unreachable instant
+/// far in the past or future. Never panics for any input.
+// fusa:req REQ-TIME-003
+pub fn is_timed_request_ready(current: AvtpTimestamp, exec_time: TimedExecutionTime) -> bool {
+    if exec_time.0.is_untimed() {
+        return true;
+    }
+    current == exec_time.0 || current.is_after(exec_time.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     // ── RequestKind: discriminant round-trip / rejection ────────────────────
 
-    const ALL_REQUEST_KINDS: [RequestKind; 4] = [
+    const ALL_REQUEST_KINDS: [RequestKind; 5] = [
         RequestKind::Chained,
+        RequestKind::Timed,
         RequestKind::CompoundWait,
         RequestKind::Triggered,
         RequestKind::Compound,
@@ -669,6 +786,7 @@ mod tests {
     // fusa:test REQ-CMP-001
     // fusa:test REQ-TRIG-001
     // fusa:test REQ-CHAIN-001
+    // fusa:test REQ-TIME-001
     fn request_kind_round_trips_through_to_u8_from_u8() {
         for kind in ALL_REQUEST_KINDS {
             assert_eq!(RequestKind::from_u8(kind.to_u8()), Ok(kind));
@@ -679,17 +797,19 @@ mod tests {
     // fusa:test REQ-CMP-001
     // fusa:test REQ-TRIG-001
     // fusa:test REQ-CHAIN-001
+    // fusa:test REQ-TIME-001
     fn request_kind_discriminants_match_roadmap_named_values() {
         assert_eq!(RequestKind::Compound.to_u8(), 0x0F);
         assert_eq!(RequestKind::CompoundWait.to_u8(), 0x0B);
         assert_eq!(RequestKind::Triggered.to_u8(), 0x0E);
         assert_eq!(RequestKind::Chained.to_u8(), 0x01);
+        assert_eq!(RequestKind::Timed.to_u8(), 0x0A);
     }
 
     #[test]
     // fusa:test REQ-CMP-002
     fn request_kind_from_u8_rejects_every_other_value() {
-        for raw in [0x00u8, 0x02, 0x0A, 0x0C, 0x10, 0x7F, 0xFF] {
+        for raw in [0x00u8, 0x02, 0x0C, 0x10, 0x7F, 0xFF] {
             assert_eq!(RequestKind::from_u8(raw), Err(RcpError::InvalidParameter));
         }
     }
@@ -704,6 +824,12 @@ mod tests {
     // fusa:test REQ-CHAIN-001
     fn request_kind_from_u8_accepts_chained_discriminant() {
         assert_eq!(RequestKind::from_u8(0x01), Ok(RequestKind::Chained));
+    }
+
+    #[test]
+    // fusa:test REQ-TIME-001
+    fn request_kind_from_u8_accepts_timed_discriminant() {
+        assert_eq!(RequestKind::from_u8(0x0A), Ok(RequestKind::Timed));
     }
 
     #[test]
@@ -875,6 +1001,20 @@ mod tests {
         );
     }
 
+    #[test]
+    // fusa:test REQ-CMP-006
+    // fusa:test REQ-TIME-001
+    fn resolve_compound_exec_delay_is_none_for_timed() {
+        let delays = CompoundExecDelays {
+            cmp_exec_delay: 100,
+            cmpw_exec_delay: 200,
+        };
+        assert_eq!(
+            resolve_compound_exec_delay(RequestKind::Timed, &delays),
+            None
+        );
+    }
+
     // ── advance_sequencer_if_still_in_start_state ────────────────────────────
 
     #[test]
@@ -946,6 +1086,7 @@ mod tests {
             resolve_trigger_exec_delay(RequestKind::Chained, delay),
             None
         );
+        assert_eq!(resolve_trigger_exec_delay(RequestKind::Timed, delay), None);
     }
 
     // ── TriggerRepeatCount ────────────────────────────────────────────────────
@@ -1098,5 +1239,78 @@ mod tests {
     fn chain_aborted_and_chain_error_carry_the_roadmap_named_codes_in_their_display_text() {
         assert!(RcpError::ChainAborted.to_string().contains("CHAIN_ABORTED"));
         assert!(RcpError::ChainError.to_string().contains("CHAIN_ERROR"));
+    }
+
+    // ── TimedExecutionTime / is_timed_request_ready ──────────────────────────
+
+    #[test]
+    // fusa:test REQ-TIME-002
+    fn timed_execution_time_default_is_untimed() {
+        let exec_time = TimedExecutionTime::default();
+        assert_eq!(exec_time.0, AvtpTimestamp::default());
+        assert!(exec_time.0.is_untimed());
+    }
+
+    #[test]
+    // fusa:test REQ-TIME-002
+    fn timed_execution_time_wraps_avtp_timestamp_by_value() {
+        let exec_time = TimedExecutionTime(AvtpTimestamp::new(1_000));
+        assert_eq!(exec_time.0.to_u32(), 1_000);
+    }
+
+    #[test]
+    // fusa:test REQ-TIME-003
+    fn is_timed_request_ready_false_before_exec_time_is_reached() {
+        let exec_time = TimedExecutionTime(AvtpTimestamp::new(1_000));
+        assert!(!is_timed_request_ready(AvtpTimestamp::new(999), exec_time));
+    }
+
+    #[test]
+    // fusa:test REQ-TIME-003
+    fn is_timed_request_ready_true_exactly_at_exec_time() {
+        let exec_time = TimedExecutionTime(AvtpTimestamp::new(1_000));
+        assert!(is_timed_request_ready(AvtpTimestamp::new(1_000), exec_time));
+    }
+
+    #[test]
+    // fusa:test REQ-TIME-003
+    fn is_timed_request_ready_true_after_exec_time_has_passed() {
+        let exec_time = TimedExecutionTime(AvtpTimestamp::new(1_000));
+        assert!(is_timed_request_ready(AvtpTimestamp::new(1_001), exec_time));
+    }
+
+    #[test]
+    // fusa:test REQ-TIME-003
+    fn is_timed_request_ready_true_across_a_rollover() {
+        // AvtpTimestamp::is_after is wraparound-aware; a current time that
+        // just wrapped past u32::MAX back to a small value must still read
+        // as ready for an exec_time set just before the rollover.
+        let exec_time = TimedExecutionTime(AvtpTimestamp::new(u32::MAX - 1));
+        assert!(is_timed_request_ready(AvtpTimestamp::new(2), exec_time));
+    }
+
+    #[test]
+    // fusa:test REQ-TIME-003
+    fn is_timed_request_ready_always_true_for_an_untimed_exec_time() {
+        let exec_time = TimedExecutionTime(AvtpTimestamp::default());
+        for current in [0u32, 1, 1_000, u32::MAX] {
+            assert!(is_timed_request_ready(
+                AvtpTimestamp::new(current),
+                exec_time
+            ));
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-TIME-003
+    fn is_timed_request_ready_never_panics_for_any_sampled_input() {
+        for current in [0u32, 1, 1_000, u32::MAX] {
+            for target in [0u32, 1, 1_000, u32::MAX] {
+                let _ = is_timed_request_ready(
+                    AvtpTimestamp::new(current),
+                    TimedExecutionTime(AvtpTimestamp::new(target)),
+                );
+            }
+        }
     }
 }
