@@ -5697,6 +5697,105 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CAN-001",
+      "title": "FrameFormat round-trips through to_u8/from_u8 and its classification helpers partition all six variants",
+      "text": "FrameFormat::to_u8/FrameFormat::from_u8 round-trip each of the six CBFF/CEFF/FBFF/FEFF/XL-classical/XL-new variants, and exactly one of is_classical/is_fd/is_xl is true for each variant",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CAN-002",
+      "title": "FrameFormat::from_u8 rejects any byte outside 0..=5",
+      "text": "FrameFormat::from_u8 returns Err(RcpError::InvalidParameter) for any byte value outside 0..=5, and never panics for any input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CAN-003",
+      "title": "CLASSICAL_CAN_MAX_DATA and CAN_FD_MAX_PAYLOAD match the real classical CAN 2.0 and CAN FD physical data-length ceilings",
+      "text": "can::CLASSICAL_CAN_MAX_DATA == 8 (classical CAN 2.0's own physical ceiling) and can::CAN_FD_MAX_PAYLOAD == 64, defined as crate::canbr::CAN_FD_MAX_PAYLOAD, reusing that value as a physical fact about the bus rather than duplicating a second literal or reusing any of canbr::CanBridge's surrounding Zone/Command-coupled logic",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CAN-004",
+      "title": "CanDataFrame round-trips format+id+data through encode/decode, and FrameFormat's id-width/data-ceiling helpers match the real base/extended and classical/FD physical facts",
+      "text": "CanDataFrame::encode/CanDataFrame::decode round-trip any of the four non-XL FrameFormat variants together with an arbitration id within that format's real id width (CAN_STANDARD_ID_MAX for base formats, CAN_EXTENDED_ID_MAX for extended formats per FrameFormat::is_extended_id) and data up to that format's own FrameFormat::max_data_len ceiling",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CAN-005",
+      "title": "CanDataFrame::decode rejects short input, XL format tags, out-of-width arbitration ids, and data exceeding the format's ceiling, and never panics",
+      "text": "CanDataFrame::decode returns Err(RcpError::ShortFrame) for input shorter than 5 bytes, Err(RcpError::InvalidParameter) when the decoded format is an XL variant or the arbitration id exceeds the width that format allows, Err(RcpError::PayloadTooLarge) when data exceeds the format's FrameFormat::max_data_len ceiling, and never panics for any input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CAN-006",
+      "title": "CanXlSubHeader round-trips its 6 opaque bytes through encode/decode and CAN_XL_SUB_HEADER_LEN/CAN_XL_MAX_PAYLOAD match ROADMAP.md's stated CAN XL ceilings",
+      "text": "CanXlSubHeader::encode/CanXlSubHeader::decode round-trip any 6-byte value without interpreting its contents, decode returns Err(RcpError::ShortFrame) for input shorter than CAN_XL_SUB_HEADER_LEN, and can::CAN_XL_SUB_HEADER_LEN == 6 while can::CAN_XL_MAX_PAYLOAD == 2048, matching ROADMAP.md Milestone 7's own stated CAN XL sub-header length and payload ceiling",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CAN-007",
+      "title": "CanXlFrame round-trips format+sub_header+payload through encode/decode for both XL variants",
+      "text": "CanXlFrame::encode/CanXlFrame::decode round-trip FrameFormat::XlClassical and FrameFormat::XlNew together with any CanXlSubHeader and any payload up to CAN_XL_MAX_PAYLOAD bytes",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CAN-008",
+      "title": "CanXlFrame::decode rejects short input and non-XL format tags, and never panics",
+      "text": "CanXlFrame::decode returns Err(RcpError::ShortFrame) for input too short to contain the format tag plus a full CAN_XL_SUB_HEADER_LEN-byte sub-header, Err(RcpError::InvalidParameter) when the decoded format is not FrameFormat::XlClassical or FrameFormat::XlNew, and never panics for any input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CAN-009",
+      "title": "CanXlFrame::decode rejects payload exceeding CAN_XL_MAX_PAYLOAD and accepts exactly CAN_XL_MAX_PAYLOAD",
+      "text": "CanXlFrame::decode returns Err(RcpError::PayloadTooLarge) when the payload following the sub-header exceeds CAN_XL_MAX_PAYLOAD (2048) bytes in length, and succeeds when it equals CAN_XL_MAX_PAYLOAD exactly",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CAN-010",
+      "title": "CanXlCombinedPayload::assemble concatenates caller-supplied fragment-train segments in the order given",
+      "text": "CanXlCombinedPayload::assemble concatenates a slice of caller-supplied, already-ordered byte-segment slices verbatim in the order given, yields an empty combined payload for an empty segment slice, and never panics for any input including empty per-segment payloads, mirroring crate::e2e::CombinedFragmentPayload::assemble's own caller-supplied-ordering discipline for the same Milestone 8 forward dependency",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CAN-011",
+      "title": "CanFunctionalConfig's layer tag matches crate::regmap's EndpointType::Can cross-layer rule",
+      "text": "CanFunctionalConfig::layer_tag produces a crate::regmap::PerEpTypeFunctionalConfig tagged EndpointType::Can that satisfies crate::regmap::check_functional_config_matches_ep_type against a generic PerEpConfigBlock of the same ep_type, and is rejected by functional_config_matches_ep_type against a mismatched ep_type",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
