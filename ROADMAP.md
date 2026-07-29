@@ -2530,8 +2530,135 @@ exists to migrate them onto.
       `// fusa:req`/`// fusa:test` pair, following the same "retarget in
       place, or add new — never renumber or reuse" discipline every prior
       Milestone 9 REPLACE cutover in this bullet established.
-- [ ] All **ADAPT**-disposition packages retargeted to whatever new
+- [x] All **ADAPT**-disposition packages retargeted to whatever new
       endpoint/RC-Server trait surface replaces `Controller`/`Registry`
+      Done (v0.12.0-dev): 16 of 16 packages resolved. `tlstransport` was
+      already fully retargeted as a side effect of `wire`'s own REPLACE
+      cutover earlier in this milestone (it and `udp` were `wire`'s only
+      two callers) — confirmed unchanged here. `mdns` needed only its
+      `ServiceRecord.zone: u8` field replaced with `ServiceRecord.stream_id:
+      avtp::StreamId`, since `MdnsRegistry` was never itself an `impl` of
+      the legacy `Controller`/`Registry` traits. The other 14 —
+      `ratelimit`, `sim`, `deadline`, `faultinject`, `loan`, `proxy`,
+      `redundancy`, `observe`, `authz`, `record`, `federation`, `admin`,
+      `shmem`, `adapt` — are rebuilt against `mock::Endpoint` (or, for
+      `federation`/`admin`, `discovery::DiscoveryCache`, the
+      discovery-derived server registry their own disposition-table
+      reasons named as a dependency) in place of `Controller`/`Registry`/
+      `Zone`/`Command`/`Response`/`Status`. `src/lib.rs`'s `Controller`/
+      `Registry`/`Zone`/`Command`/`Response`/`Status`/`LoaningController`
+      types are left in place, unremoved — that core-surface cutover is
+      Milestone 10's job, not this bullet's — so `src/bin/rcp.rs` and
+      this crate's still-live `mock::MockController`/`MockRegistry` test
+      double continue to compile and pass unchanged; `rcp.rs`'s own CLI
+      overhaul is explicitly deferred to Milestone 10, per the judgment
+      call flagged when this item was picked up.
+
+      Most of the 14 are a mechanical decorator retarget: `ep_type()`
+      replaces `zone()`, and `read(read_size)`/`write(payload)` replace
+      `send(cmd, timeout)`, mirroring `mock::RcServer::handle_abb`'s own
+      `op` bool convention (`true` = write) for anything keyed on request
+      direction. Several needed a flagged judgment call rather than a
+      1:1 port, since `Endpoint` is a narrower trait than `Controller` —
+      no `Priority`, no `timeout` parameter, no `subscribe`/`Status`
+      broadcast, and two distinct verbs instead of one `send`:
+
+      - `ratelimit`/`authz`: the old `Priority`-keyed carve-outs
+        (`exempt_critical`, the `min_priority`/`max_priority` range) have
+        no analog and are dropped; `authz::Policy` is rekeyed from
+        `CommandType` to `(EndpointType, is_write)` per its own
+        disposition-table text. `REQ-RL-007` ("Critical exempt from rate
+        limit") and `REQ-SIM-005` ("Zone mismatch returns ZoneMismatch")
+        described only dropped, no-longer-possible behavior, so both are
+        retired in `.fusa-reqs.json` rather than force-retargeted, per
+        this item's own "retarget in place, or explicitly retire if no
+        equivalent behavior exists" instruction; every other touched
+        `REQ-RL-*`/`REQ-SIM-*`/`REQ-DL-*`/`REQ-FI-*`/`REQ-LOAN-*`/
+        `REQ-PROXY-*`/`REQ-RED-*`/`REQ-OBS-*`/`REQ-AUTHZ-*`/`REQ-REC-*`/
+        `REQ-FED-*`/`REQ-ADMIN-*`/`REQ-SHM-*`/`REQ-ADAPT-001`..`005`/
+        `REQ-MDNS-*` ID is retargeted in place (same ID, updated
+        title/text) to describe its new `Endpoint`-based behavior.
+        Retiring `REQ-RL-007` also meant retargeting its cross-references
+        in `.fusa-dfmea.json` (`FM-007`), `.fusa-iec62443.json` (`T-004`),
+        and `tara.json` (`T-RCP-04`, `CSG-RCP-03`), each with its residual
+        risk honestly raised to reflect that DoS-vs-critical-priority
+        mitigation now depends solely on `prioqueue::PrioController` — a
+        DEPRECATE-disposition package itself slated for removal by this
+        milestone's next checklist bullet — rather than silently keeping
+        a "low" rating a live dual mitigation would justify. `authz`'s own
+        rekeying similarly meant raising `tara.json` `T-RCP-05`/
+        `CSG-RCP-04`'s residual risk: `authz::AuthzEndpoint` protects the
+        new `Endpoint` surface, but no longer offers any ACL wrapper for a
+        still-live legacy `Controller`-based zone controller, which
+        Milestone 10 alone can close by retiring `Controller`/`Command`
+        themselves.
+      - `deadline`: `Endpoint::read`/`write`'s fixed signatures carry no
+        `timeout` parameter, so deadline enforcement is exposed through
+        two additional inherent methods, `read_with_deadline`/
+        `write_with_deadline`, alongside a plain pass-through `Endpoint`
+        impl — the same "extend the base trait with extra methods" shape
+        `LoaningController` already established for loaned sends. On this
+        crate's synchronous, in-process `Endpoint` model, only the
+        zero-timeout-is-already-expired case has an observable effect;
+        the `min(caller, deadline)` computation has nothing left to bound.
+      - `sim`: implements `Endpoint` directly (like `MockEndpoint`) rather
+        than wrapping one; the old single `queue_response` FIFO becomes
+        two independent FIFOs (`queue_read_response`/
+        `queue_write_response`), and the old `publish`/`subscribe`
+        `Status` broadcast is dropped outright rather than invented here,
+        matching `mock.rs`'s own doc comment that this crate's new core
+        has no live asynchronous-notification mechanism yet.
+      - `observe`/`record`: split their single old hook/entry shape
+        (keyed on one `Command`/`Response` pair) into read- and
+        write-specific hooks/entry variants, since `Endpoint::read`/
+        `write` return different `Result` types with no common shape.
+      - `loan`: `LoanPoolEndpoint` exposes `loan`/`write_loaned` as its
+        own inherent methods rather than implementing `LoaningController`
+        (which requires `Controller`, no longer implemented); `Loan`/
+        `LoanPool` themselves are unchanged, generic buffer-pool
+        machinery with no trait coupling of their own.
+      - `federation`/`admin`: rebuilt against `discovery::DiscoveryCache`
+        — a passive, client-side cache of previously observed peer
+        identities, not a live collection of dispatch handles the old
+        `Registry` was. `FederationRouter::lookup_peer` now returns a
+        `Copy` `DiscoveryCacheEntry` snapshot instead of a live
+        `Arc<dyn Controller>`; `AdminServer::is_healthy` narrows to
+        "cache non-empty" (no live reachability call left to dispatch),
+        with a separate `is_peer_healthy` for a real per-`StreamId`
+        staleness check, and `shutdown_peer` invalidates a cache entry in
+        place of closing a registry.
+      - `shmem`: retargeted exactly the way `tlstransport`'s own `wire`
+        REPLACE cutover retargeted it earlier in this milestone —
+        `ShmChannel` unchanged (already byte-agnostic), `ShmBridge`
+        addressed by `StreamId` and carrying NTSCF-wrapped ACF_ABB/ACF_GBB
+        frames via `send_acf_abb`/`send_acf_gbb`.
+      - `adapt`: deliberately split scope, per its own disposition-table
+        text reserving the deeper rebuild for Milestone 10.
+        `Adapter<M>`/`AdaptEndpoint` (the generic external-format
+        decorator layer) are retargeted onto `Endpoint` now, modeling one
+        external "call" as a write-then-read round trip — this crate's
+        own simplification, not a transcription of any real external
+        protocol's semantics. `adapt()`/`RcpAdapter`/`to_message`/
+        `from_message`/`response_to_message` (the RELAY §10.3/§15.7.5
+        binding itself, mapping a zone *name* to/from `relay::Message.id`)
+        stay bound to `Controller`/`Zone`/`Command`/`Response`/`Status`
+        unchanged: honestly retargeting that half needs the
+        endpoint-addressed `Message` shape this row's own text reserves
+        for Milestone 10, plus a resolution for `mock::RcServer`'s
+        still-open "no live notification mechanism" gap before
+        `Status`-style `subscribe` forwarding has anything real to
+        forward — inventing either here would guess at undecided
+        behavior rather than retarget existing behavior.
+
+      `README.md`'s module index, `SECURITY.md`'s security-controls
+      table, `HARA.md`'s `SG-006` row, and `INCIDENT-RESPONSE.md`'s
+      containment step are updated to name the new `*Endpoint`/
+      `DiscoveryCache`-based types in place of the deleted
+      `*Controller`/`Registry`-based ones. `cargo build`/`cargo clippy -D
+      warnings`/`cargo test --all-targets` (including `--release`) are
+      clean; `bash scripts/fusa-gap-check.sh` reports 678/678 (100%)
+      requirements traced; `bash scripts/cyber-gap-check.sh` reports 6/6
+      threats with tested countermeasures.
 - [ ] All **DEPRECATE**-disposition packages removed, with a migration note
       in the changelog explaining the replacement path (generally: use
       RELAY's `crossbar` router instead of an in-crate protocol bridge)

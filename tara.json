@@ -26,13 +26,13 @@
     {
       "id": "A-004",
       "name": "Authorization policy enforcement",
-      "description": "authz::Policy allowlist correctly restricts which CommandTypes and priorities a caller may dispatch to a given zone controller",
+      "description": "authz::Policy allowlist correctly restricts which (endpoint-type, request-type) pairs a caller may dispatch to a given endpoint — retargeted by Milestone 9's ADAPT retarget from the deleted CommandType/priority key space",
       "cybersecurityProperty": "Integrity"
     },
     {
       "id": "A-005",
       "name": "Rate-limiter and priority-queue availability",
-      "description": "ratelimit::TokenBucket and prioqueue::PrioController remain responsive to Critical-priority commands under load from lower-priority traffic",
+      "description": "ratelimit::RateLimitEndpoint remains responsive under sustained load (uniform per-call token-bucket admission, with no Critical-priority exemption since Milestone 9's ADAPT retarget — see T-RCP-04) and prioqueue::PrioController remains responsive to Critical-priority commands under load from lower-priority traffic",
       "cybersecurityProperty": "Availability"
     },
     {
@@ -153,8 +153,8 @@
       "feasibilityRating": "High",
       "cal": "CAL-3",
       "cybersecurityGoal": "CSG-RCP-03",
-      "mitigations": ["REQ-RL-006", "REQ-RL-007", "REQ-PQ-004"],
-      "residualRisk": "Low when both controllers are composed — ratelimit::TokenBucket exempts Critical priority from the bucket (REQ-RL-007) and prioqueue::PrioController always dispatches Critical before High/Normal (REQ-PQ-004); a deployment that omits either wrapper remains exposed"
+      "mitigations": ["REQ-RL-006", "REQ-PQ-004"],
+      "residualRisk": "Medium — ratelimit::RateLimitEndpoint's own token bucket (REQ-RL-006) now applies uniformly with no Critical-priority exemption of its own (Milestone 9's ADAPT retarget retired the old REQ-RL-007 carve-out, since Endpoint requests carry no Priority field at all); mitigation against a flood starving genuinely critical requests depends entirely on prioqueue::PrioController's dispatch ordering (REQ-PQ-004) being composed — itself a DEPRECATE-disposition package slated for removal by this same milestone's next checklist bullet, with no priority-aware replacement decided yet. A deployment that composes only ratelimit today has no protection against this scenario"
     },
     {
       "id": "T-RCP-05",
@@ -163,7 +163,7 @@
       "property": "Integrity",
       "stride": "Elevation of Privilege",
       "description": "A caller without the intended authority sends a Reset, Sleep, or Wake command to a zone controller that should only accept Get/Set from that caller, attempting to force an unintended power-state transition.",
-      "attackPath": "Attacker (or a compromised, lower-trust peer) obtains network access to a zone controller that is composed without an authz::AuthzController wrapper, or whose Policy allowlist was misconfigured to allow_all(); sends a Reset/Sleep/Wake Command directly.",
+      "attackPath": "Attacker (or a compromised, lower-trust peer) obtains network access to a zone controller that is composed without an ACL wrapper, or whose Policy allowlist was misconfigured to allow_all(); sends a Reset/Sleep/Wake Command directly. Milestone 9's ADAPT retarget replaced authz::AuthzController (a Controller-wrapping ACL) with authz::AuthzEndpoint (an Endpoint-wrapping ACL keyed on (ep_type, is_write) instead of CommandType) — see that module's own doc comment — so this exact Command-shaped attack against a legacy Controller now has no in-crate ACL wrapper available to compose against it at all, until Milestone 10's core-surface cutover replaces Controller/Command with the endpoint-addressed model authz::AuthzEndpoint already protects.",
       "impact": {
         "safety": "Severe",
         "financial": "Moderate",
@@ -182,7 +182,7 @@
       "cal": "CAL-3",
       "cybersecurityGoal": "CSG-RCP-04",
       "mitigations": ["REQ-AUTHZ-001", "REQ-AUTHZ-005", "REQ-AUTHZ-006"],
-      "residualRisk": "Residual risk depends on deployment: the ACL is enforced only when the integrator wraps every externally reachable Controller in an AuthzController with a least-privilege Policy; rust-RCP cannot force composition at the library level"
+      "residualRisk": "High for a deployment still composing a legacy Controller-based zone controller: authz no longer offers a Controller-wrapping ACL at all (that capability was retargeted to authz::AuthzEndpoint, an Endpoint-space ACL, by Milestone 9's ADAPT retarget), so this exact Command-shaped attack has no in-crate mitigation until Milestone 10 replaces the Controller/Command surface itself. For the new Endpoint-space surface, residual risk remains deployment-dependent as before: the ACL is enforced only when the integrator wraps every externally reachable Endpoint in an AuthzEndpoint with a least-privilege Policy; rust-RCP cannot force composition at the library level"
     },
     {
       "id": "T-RCP-06",
@@ -287,14 +287,14 @@
     },
     {
       "id": "CSG-RCP-03",
-      "description": "rust-RCP shall resist priority-inversion denial-of-service by exempting Critical-priority commands from rate limiting and always dispatching them ahead of lower-priority traffic when both wrappers are composed.",
+      "description": "rust-RCP shall resist priority-inversion denial-of-service by always dispatching Critical-priority commands ahead of lower-priority traffic when prioqueue is composed, and by admitting no unbounded request flood through ratelimit's own token bucket. Milestone 9's ADAPT retarget of ratelimit dropped its own Critical-priority exemption (Endpoint requests carry no Priority field), so this goal is presently satisfied only when prioqueue is composed — itself a DEPRECATE-disposition package slated for removal, with no priority-aware replacement decided yet; flagged as an open gap for whichever later item defines one.",
       "cal": "CAL-3",
       "threats": ["T-RCP-04"],
-      "requirements": ["REQ-RL-006", "REQ-RL-007", "REQ-PQ-004"]
+      "requirements": ["REQ-RL-006", "REQ-PQ-004"]
     },
     {
       "id": "CSG-RCP-04",
-      "description": "rust-RCP shall provide an authorization allowlist that integrators can compose in front of any Controller to restrict which command types a caller may dispatch, and a per-stream watchdog mechanism whose liveness-reset and safe-state-on-expiry behavior is independently verifiable.",
+      "description": "rust-RCP shall provide an authorization allowlist that integrators can compose in front of any Endpoint to restrict which (endpoint-type, request-type) pairs a caller may dispatch, and a per-stream watchdog mechanism whose liveness-reset and safe-state-on-expiry behavior is independently verifiable. Milestone 9's ADAPT retarget moved this allowlist from wrapping Controller (keyed on CommandType) to wrapping Endpoint (keyed on (ep_type, is_write)) — see T-RCP-05's own residualRisk for the resulting Controller-space coverage gap.",
       "cal": "CAL-3",
       "threats": ["T-RCP-05", "T-RCP-08"],
       "requirements": ["REQ-AUTHZ-001", "REQ-AUTHZ-005", "REQ-AUTHZ-006", "REQ-WDG-002", "REQ-WDG-005"]

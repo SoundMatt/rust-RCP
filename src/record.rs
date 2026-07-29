@@ -4,36 +4,76 @@
 // fusa:req REQ-REC-004
 // fusa:req REQ-REC-005
 
-//! Command/response recorder for replay, audit trails, and regression testing.
+//! Call recorder for replay, audit trails, and regression testing, wrapping
+//! an [`Endpoint`].
+//!
+//! `ROADMAP.md` Milestone 9 ("All ADAPT-disposition packages retargeted...")
+//! cutover: per this module's own ADAPT disposition ("generic audit-log
+//! decorator, protocol-agnostic"), [`RecordEndpoint`] replaces the legacy
+//! `RecordController`, wrapping [`crate::mock::Endpoint`] instead of
+//! `Controller`. The old single `Entry { command, result }` shape, built
+//! around one `Command`/`Response` pair, has no single-shape analog now
+//! that the base trait has two distinct verbs with two distinct result
+//! types (`Vec<u8>` vs `()`) — [`Entry`] becomes an enum with a `Read`/
+//! `Write` variant instead, the same split [`crate::observe`]'s own
+//! retargeting note already flagged for the identical reason.
 
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime};
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::time::SystemTime;
 
-use crate::{Command, Controller, RcpError, Response, Subscription, Zone};
+use crate::mock::Endpoint;
+use crate::regmap::EndpointType;
+use crate::RcpError;
 
 // ── Record entry ──────────────────────────────────────────────────────────────
 
 /// A single recorded interaction.
 // fusa:req REQ-REC-001
 #[derive(Clone, Debug)]
-pub struct Entry {
-    pub timestamp: SystemTime,
-    pub command: Command,
-    pub result: Result<Response, RcpError>,
+pub enum Entry {
+    Read {
+        timestamp: SystemTime,
+        read_size: u8,
+        result: Result<Vec<u8>, RcpError>,
+    },
+    Write {
+        timestamp: SystemTime,
+        payload: Vec<u8>,
+        result: Result<(), RcpError>,
+    },
 }
 
-// ── RecordController ──────────────────────────────────────────────────────────
+impl Entry {
+    /// The timestamp common to either variant.
+    pub fn timestamp(&self) -> SystemTime {
+        match self {
+            Entry::Read { timestamp, .. } => *timestamp,
+            Entry::Write { timestamp, .. } => *timestamp,
+        }
+    }
 
-/// Controller wrapper that records every command/response pair.
+    /// True if this entry's recorded result was an error.
+    pub fn is_err(&self) -> bool {
+        match self {
+            Entry::Read { result, .. } => result.is_err(),
+            Entry::Write { result, .. } => result.is_err(),
+        }
+    }
+}
+
+// ── RecordEndpoint ─────────────────────────────────────────────────────────────
+
+/// Endpoint wrapper that records every read/write call and its result.
 // fusa:req REQ-REC-002
-pub struct RecordController {
-    inner: Arc<dyn Controller>,
+pub struct RecordEndpoint {
+    inner: Arc<dyn Endpoint>,
     log: Mutex<Vec<Entry>>,
 }
 
-impl RecordController {
-    pub fn new(inner: Arc<dyn Controller>) -> Self {
-        RecordController {
+impl RecordEndpoint {
+    pub fn new(inner: Arc<dyn Endpoint>) -> Self {
+        RecordEndpoint {
             inner,
             log: Mutex::new(Vec::new()),
         }
@@ -52,28 +92,31 @@ impl RecordController {
     }
 }
 
-impl Controller for RecordController {
-    fn zone(&self) -> Zone {
-        self.inner.zone()
+impl Endpoint for RecordEndpoint {
+    fn ep_type(&self) -> EndpointType {
+        self.inner.ep_type()
     }
 
     // fusa:req REQ-REC-005
-    fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
-        let result = self.inner.send(cmd, timeout);
-        self.log.lock().unwrap().push(Entry {
+    fn read(&self, read_size: u8) -> Result<Vec<u8>, RcpError> {
+        let result = self.inner.read(read_size);
+        self.log.lock().unwrap().push(Entry::Read {
             timestamp: SystemTime::now(),
-            command: cmd.clone(),
+            read_size,
             result: result.clone(),
         });
         result
     }
 
-    fn subscribe(&self) -> Result<Subscription, RcpError> {
-        self.inner.subscribe()
-    }
-
-    fn close(&self) -> Result<(), RcpError> {
-        self.inner.close()
+    // fusa:req REQ-REC-005
+    fn write(&self, payload: &[u8]) -> Result<(), RcpError> {
+        let result = self.inner.write(payload);
+        self.log.lock().unwrap().push(Entry::Write {
+            timestamp: SystemTime::now(),
+            payload: payload.to_vec(),
+            result: result.clone(),
+        });
+        result
     }
 }
 
@@ -83,65 +126,57 @@ impl Controller for RecordController {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mock::MockController;
-    use crate::{Command, Zone};
+    use crate::mock::MockEndpoint;
+    use std::time::Duration;
 
-    fn rec() -> RecordController {
-        let inner = MockController::new(Zone::FRONT_LEFT, None) as Arc<dyn Controller>;
-        RecordController::new(inner)
+    fn rec() -> RecordEndpoint {
+        let inner = MockEndpoint::new(EndpointType::Gpio, vec![0u8; 4]) as Arc<dyn Endpoint>;
+        RecordEndpoint::new(inner)
     }
 
     #[test]
     // fusa:test REQ-REC-002
     // fusa:test REQ-REC-005
-    fn records_successful_sends() {
+    fn records_successful_writes() {
         let r = rec();
-        for i in 1u32..=3 {
-            r.send(
-                &Command {
-                    id: i,
-                    zone: Zone::FRONT_LEFT,
-                    ..Default::default()
-                },
-                None,
-            )
-            .unwrap();
+        for i in 1u8..=3 {
+            r.write(&[i]).unwrap();
         }
         let entries = r.entries();
         assert_eq!(entries.len(), 3);
-        assert_eq!(entries[0].command.id, 1);
+        match &entries[0] {
+            Entry::Write { payload, .. } => assert_eq!(payload, &vec![1u8]),
+            _ => panic!("expected Write entry"),
+        }
     }
 
     #[test]
     // fusa:test REQ-REC-005
     fn records_errors() {
-        let inner = MockController::new(Zone::FRONT_LEFT, None) as Arc<dyn Controller>;
-        inner.close().unwrap();
-        let r = RecordController::new(inner);
-        let _ = r.send(
-            &Command {
-                zone: Zone::FRONT_LEFT,
-                ..Default::default()
-            },
-            None,
-        );
+        struct AlwaysFail;
+        impl Endpoint for AlwaysFail {
+            fn ep_type(&self) -> EndpointType {
+                EndpointType::Gpio
+            }
+            fn read(&self, _read_size: u8) -> Result<Vec<u8>, RcpError> {
+                Err(RcpError::Closed)
+            }
+            fn write(&self, _payload: &[u8]) -> Result<(), RcpError> {
+                Err(RcpError::Closed)
+            }
+        }
+        let r = RecordEndpoint::new(Arc::new(AlwaysFail) as Arc<dyn Endpoint>);
+        let _ = r.write(b"x");
         let entries = r.entries();
         assert_eq!(entries.len(), 1);
-        assert!(entries[0].result.is_err());
+        assert!(entries[0].is_err());
     }
 
     #[test]
     // fusa:test REQ-REC-004
     fn clear_empties_log() {
         let r = rec();
-        r.send(
-            &Command {
-                zone: Zone::FRONT_LEFT,
-                ..Default::default()
-            },
-            None,
-        )
-        .unwrap();
+        r.write(b"x").unwrap();
         r.clear();
         assert!(r.entries().is_empty());
     }
@@ -150,16 +185,9 @@ mod tests {
     // fusa:test REQ-REC-001
     fn entry_timestamp_is_recent() {
         let r = rec();
-        r.send(
-            &Command {
-                zone: Zone::FRONT_LEFT,
-                ..Default::default()
-            },
-            None,
-        )
-        .unwrap();
+        r.write(b"x").unwrap();
         let e = &r.entries()[0];
-        let age = e.timestamp.elapsed().unwrap_or(Duration::ZERO);
+        let age = e.timestamp().elapsed().unwrap_or(Duration::ZERO);
         assert!(age < Duration::from_secs(5), "timestamp must be recent");
     }
 
@@ -167,18 +195,17 @@ mod tests {
     // fusa:test REQ-REC-003
     fn entries_in_order() {
         let r = rec();
-        for i in 1u32..=5 {
-            r.send(
-                &Command {
-                    id: i,
-                    zone: Zone::FRONT_LEFT,
-                    ..Default::default()
-                },
-                None,
-            )
-            .unwrap();
+        for i in 1u8..=5 {
+            r.write(&[i]).unwrap();
         }
-        let ids: Vec<u32> = r.entries().iter().map(|e| e.command.id).collect();
-        assert_eq!(ids, vec![1, 2, 3, 4, 5]);
+        let payloads: Vec<Vec<u8>> = r
+            .entries()
+            .iter()
+            .map(|e| match e {
+                Entry::Write { payload, .. } => payload.clone(),
+                _ => panic!("expected Write entry"),
+            })
+            .collect();
+        assert_eq!(payloads, vec![vec![1], vec![2], vec![3], vec![4], vec![5]]);
     }
 }

@@ -9,11 +9,25 @@
 //! Uses a pair of in-process ring buffers protected by `Mutex` to simulate
 //! shared memory. Production deployments replace these with OS shared-memory
 //! regions via the [`ShmChannel`] trait.
+//!
+//! `ROADMAP.md` Milestone 9 ("All ADAPT-disposition packages retargeted...")
+//! cutover: per this module's own ADAPT disposition ("transport is
+//! byte-agnostic; just needs to carry new AVTPDU bytes instead of old wire
+//! frames"), [`ShmChannel`] is unchanged — it was already a plain
+//! byte-in/byte-out abstraction with no `Zone`/`Command` coupling of its
+//! own — and [`ShmBridge`] is retargeted exactly the way
+//! `src/tlstransport.rs`'s `TlsBridge` was retargeted by the `wire`
+//! REPLACE cutover earlier in this milestone: addressed by
+//! [`crate::avtp::StreamId`] instead of `Zone`, and carrying NTSCF-wrapped
+//! ACF_ABB/ACF_GBB messages instead of the deleted `wire::encode_command`
+//! frame.
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
-use crate::{Command, Controller, RcpError, Response, ResponseStatus, Subscription, Zone};
+use crate::acf::{self, AcfAbbMessage, AcfGbbMessage};
+use crate::avtp::{self, StreamId};
+use crate::RcpError;
 
 // ── ShmChannel trait ──────────────────────────────────────────────────────────
 
@@ -29,14 +43,14 @@ pub trait ShmChannel: Send + Sync {
 /// Simple in-process FIFO channel (for tests and integration).
 // fusa:req REQ-SHM-002
 pub struct InProcChannel {
-    buf: Mutex<std::collections::VecDeque<Vec<u8>>>,
+    buf: std::sync::Mutex<std::collections::VecDeque<Vec<u8>>>,
     cvar: std::sync::Condvar,
 }
 
 impl InProcChannel {
     pub fn new() -> Arc<Self> {
         Arc::new(InProcChannel {
-            buf: Mutex::new(std::collections::VecDeque::new()),
+            buf: std::sync::Mutex::new(std::collections::VecDeque::new()),
             cvar: std::sync::Condvar::new(),
         })
     }
@@ -45,7 +59,7 @@ impl InProcChannel {
 impl Default for InProcChannel {
     fn default() -> Self {
         InProcChannel {
-            buf: Mutex::new(std::collections::VecDeque::new()),
+            buf: std::sync::Mutex::new(std::collections::VecDeque::new()),
             cvar: std::sync::Condvar::new(),
         }
     }
@@ -88,55 +102,79 @@ impl ShmChannel for InProcChannel {
 
 // ── ShmBridge ─────────────────────────────────────────────────────────────────
 
-/// Shared-memory bridge controller.
+/// Shared-memory bridge, addressed by `local_stream`
+/// ([`crate::avtp::StreamId`]) rather than the legacy `Zone`.
 ///
 /// The caller must wire `tx` (write) and `rx` (read) channels to the peer process.
 // fusa:req REQ-SHM-003
 pub struct ShmBridge {
-    zone: Zone,
+    local_stream: StreamId,
     tx: Arc<dyn ShmChannel>,
     rx: Arc<dyn ShmChannel>,
 }
 
 impl ShmBridge {
-    pub fn new(zone: Zone, tx: Arc<dyn ShmChannel>, rx: Arc<dyn ShmChannel>) -> Self {
-        ShmBridge { zone, tx, rx }
-    }
-}
-
-impl Controller for ShmBridge {
-    fn zone(&self) -> Zone {
-        self.zone
+    pub fn new(local_stream: StreamId, tx: Arc<dyn ShmChannel>, rx: Arc<dyn ShmChannel>) -> Self {
+        ShmBridge {
+            local_stream,
+            tx,
+            rx,
+        }
     }
 
+    /// This bridge's local [`StreamId`].
+    pub fn local_stream(&self) -> StreamId {
+        self.local_stream
+    }
+
+    /// Send an ACF_ABB request wrapped in an NTSCF frame, and decode the
+    /// ACF_ABB response, verifying it echoes the request's `byte_bus_id` —
+    /// the same framing `crate::tlstransport::TlsBridge::send_acf_abb`
+    /// uses, over an [`ShmChannel`] pair instead of a TLS stream.
     // fusa:req REQ-SHM-004
-    fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
+    pub fn send_acf_abb(
+        &self,
+        msg: &AcfAbbMessage,
+        sequence_num: u8,
+        timeout: Option<Duration>,
+    ) -> Result<AcfAbbMessage, RcpError> {
         if timeout == Some(Duration::ZERO) {
             return Err(RcpError::Timeout);
         }
-        if cmd.zone != self.zone {
-            return Err(RcpError::ZoneMismatch);
+        let payload = acf::encode_acf_abb(msg)?;
+        let frame = avtp::encode_ntscf_frame(self.local_stream, sequence_num, &payload)?;
+        self.tx.write(&frame)?;
+        let resp_frame = self.rx.read(timeout)?;
+        let (_, resp_payload) = avtp::decode_ntscf_frame(&resp_frame)?;
+        let resp = acf::decode_acf_abb(resp_payload)?;
+        acf::verify_echo_back(&msg.info, &resp.info)?;
+        Ok(resp)
+    }
+
+    /// Same as [`Self::send_acf_abb`], for an ACF_GBB request/response pair.
+    // fusa:req REQ-SHM-004
+    pub fn send_acf_gbb(
+        &self,
+        msg: &AcfGbbMessage,
+        sequence_num: u8,
+        timeout: Option<Duration>,
+    ) -> Result<AcfGbbMessage, RcpError> {
+        if timeout == Some(Duration::ZERO) {
+            return Err(RcpError::Timeout);
         }
-        self.tx.write(cmd.payload.as_deref().unwrap_or(&[]))?;
-        let data = self.rx.read(timeout)?;
-        Ok(Response {
-            command_id: cmd.id,
-            zone: self.zone,
-            status: if data.first() == Some(&0) {
-                ResponseStatus::OK
-            } else {
-                ResponseStatus::ERROR
-            },
-            payload: None,
-        })
+        let payload = acf::encode_acf_gbb(msg)?;
+        let frame = avtp::encode_ntscf_frame(self.local_stream, sequence_num, &payload)?;
+        self.tx.write(&frame)?;
+        let resp_frame = self.rx.read(timeout)?;
+        let (_, resp_payload) = avtp::decode_ntscf_frame(&resp_frame)?;
+        let resp = acf::decode_acf_gbb(resp_payload)?;
+        acf::verify_echo_back(&msg.info, &resp.info)?;
+        Ok(resp)
     }
 
-    fn subscribe(&self) -> Result<Subscription, RcpError> {
-        Err(RcpError::NotFound)
-    }
-
+    /// No-op, matching this module's pre-Milestone-9 behavior.
     // fusa:req REQ-SHM-005
-    fn close(&self) -> Result<(), RcpError> {
+    pub fn close(&self) -> Result<(), RcpError> {
         Ok(())
     }
 }
@@ -147,47 +185,75 @@ impl Controller for ShmBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Command, Zone};
+    use crate::acf::ByteMessageInfo;
+
+    fn local_stream() -> StreamId {
+        StreamId::new([0x02, 0x11, 0x22, 0x33, 0x44, 0x55], 0x0002)
+    }
 
     fn make_bridge() -> ShmBridge {
         let tx = InProcChannel::new() as Arc<dyn ShmChannel>;
         let rx = InProcChannel::new() as Arc<dyn ShmChannel>;
-        // Prime rx with an OK response
-        rx.write(&[0u8]).unwrap();
-        ShmBridge::new(Zone::FRONT_LEFT, tx, rx)
+        ShmBridge::new(local_stream(), tx, rx)
+    }
+
+    fn request(byte_bus_id: u16) -> AcfAbbMessage {
+        AcfAbbMessage {
+            info: ByteMessageInfo {
+                byte_bus_id,
+                op: true,
+                ..Default::default()
+            },
+            payload: vec![0x01, 0x02],
+        }
+    }
+
+    fn queue_response(rx: &Arc<dyn ShmChannel>, byte_bus_id: u16) {
+        let resp = AcfAbbMessage {
+            info: ByteMessageInfo {
+                byte_bus_id,
+                rsp: true,
+                ..Default::default()
+            },
+            payload: vec![0xAA],
+        };
+        let payload = acf::encode_acf_abb(&resp).unwrap();
+        let frame = avtp::encode_ntscf_frame(local_stream(), 1, &payload).unwrap();
+        rx.write(&frame).unwrap();
     }
 
     #[test]
     // fusa:test REQ-SHM-003
     // fusa:test REQ-SHM-004
-    fn shm_bridge_send_ok() {
-        let b = make_bridge();
-        let resp = b
-            .send(
-                &Command {
-                    zone: Zone::FRONT_LEFT,
-                    ..Default::default()
-                },
-                None,
-            )
-            .unwrap();
-        assert_eq!(resp.status, ResponseStatus::OK);
+    fn shm_bridge_send_acf_abb_ok() {
+        let tx = InProcChannel::new() as Arc<dyn ShmChannel>;
+        let rx = InProcChannel::new() as Arc<dyn ShmChannel>;
+        queue_response(&rx, 7);
+        let b = ShmBridge::new(local_stream(), tx, rx);
+        let resp = b.send_acf_abb(&request(7), 0, None).unwrap();
+        assert_eq!(resp.info.byte_bus_id, 7);
+        assert!(resp.info.rsp);
     }
 
     #[test]
     // fusa:test REQ-SHM-004
-    fn zone_mismatch_rejected() {
+    fn shm_bridge_rejects_echo_back_mismatch() {
+        let tx = InProcChannel::new() as Arc<dyn ShmChannel>;
+        let rx = InProcChannel::new() as Arc<dyn ShmChannel>;
+        queue_response(&rx, 99); // mismatched byte_bus_id
+        let b = ShmBridge::new(local_stream(), tx, rx);
+        let err = b.send_acf_abb(&request(7), 0, None).unwrap_err();
+        assert_eq!(err, RcpError::EpError);
+    }
+
+    #[test]
+    // fusa:test REQ-SHM-004
+    fn zero_timeout_rejected() {
         let b = make_bridge();
         let err = b
-            .send(
-                &Command {
-                    zone: Zone::REAR_LEFT,
-                    ..Default::default()
-                },
-                None,
-            )
+            .send_acf_abb(&request(7), 0, Some(Duration::ZERO))
             .unwrap_err();
-        assert_eq!(err, RcpError::ZoneMismatch);
+        assert_eq!(err, RcpError::Timeout);
     }
 
     #[test]

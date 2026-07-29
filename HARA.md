@@ -28,7 +28,7 @@ Full machine-readable HARA is in `.fusa-hara.json`.
 | SG-003 | Replay detection | ASIL-B | 500 | `REQ-SEQENF-003`, `evaluate_rx_enforce_seq` (not yet wired into a live request-acceptance path — see `tara.json` T-RCP-03) |
 | SG-004 | Payload integrity | ASIL-B | 200 | `REQ-CRC-004`, TC18 safe-point CRC-32 (`crc32_tc18`) |
 | SG-005 | Watchdog monitoring | ASIL-B | 3000 | `REQ-WDG-*`, per-stream `StreamWatchdogState`/`evaluate_stream_watchdog` |
-| SG-006 | Auth enforcement | ASIL-B | 0 | `REQ-AUTHZ-*`, `AuthzController` |
+| SG-006 | Auth enforcement | ASIL-B | 0 | `REQ-AUTHZ-*`, `AuthzEndpoint` |
 | SG-007 | Atomic power transitions | ASIL-A | 500 | `REQ-PWR-*`/`REQ-PWRSTART-*`/`REQ-WAKE-*`, `try_enter_power_mode`/`try_cold_start`/`try_hot_start` gated by `PowerModeGateInput`, driven at the Wakeup endpoint by `wakeup::request_sleep_via_sleep_cmd`/`wakeup::wake_source_signals_trigger_handshake` |
 | SG-008 | Payload size validation | ASIL-B | 0 | `REQ-WIRE-007`, MAX_PAYLOAD check |
 | SG-009 | Critical preemption | ASIL-B | 100 | `REQ-PQ-004`, `PrioController` |

@@ -7,38 +7,51 @@
 // fusa:req REQ-RED-007
 // fusa:req REQ-RED-008
 
-//! Redundant controller pair with automatic failover (1-of-2 hot standby).
+//! Redundant endpoint pair with automatic failover (1-of-2 hot standby).
 //!
-//! All commands are sent to the primary. On primary failure, the secondary
-//! is promoted and becomes the new primary. The failed controller is closed.
+//! All calls are dispatched to the primary. On primary failure, the
+//! secondary is promoted and becomes the new primary.
+//!
+//! `ROADMAP.md` Milestone 9 ("All ADAPT-disposition packages retargeted...")
+//! cutover: per this module's own ADAPT disposition ("generic 1-of-2
+//! failover decorator; retarget to the new trait once defined"),
+//! [`RedundancyEndpoint`] replaces the legacy `RedundancyController`,
+//! wrapping [`crate::mock::Endpoint`] instead of `Controller`. Unlike the
+//! old type, this one has no `close()` to forward on failover (`Endpoint`
+//! defines none — see `src/mock.rs`'s own doc comment for why), so the
+//! demoted primary is simply dropped once replaced, rather than
+//! explicitly closed first; since this type is a plain `Arc<dyn Endpoint>`
+//! holder, if it held the sole reference, the demoted endpoint goes out of
+//! scope (and is deallocated) at that point.
 
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
-use crate::{Command, Controller, RcpError, Response, Subscription, Zone};
+use crate::mock::Endpoint;
+use crate::regmap::EndpointType;
+use crate::RcpError;
 
-// ── RedundancyController ──────────────────────────────────────────────────────
+// ── RedundancyEndpoint ────────────────────────────────────────────────────────
 
 struct Inner {
-    primary: Arc<dyn Controller>,
-    secondary: Option<Arc<dyn Controller>>,
+    primary: Arc<dyn Endpoint>,
+    secondary: Option<Arc<dyn Endpoint>>,
     failovers: u32,
 }
 
-/// Hot-standby redundant controller.
+/// Hot-standby redundant endpoint.
 // fusa:req REQ-RED-001
-pub struct RedundancyController {
-    zone: Zone,
+pub struct RedundancyEndpoint {
+    ep_type: EndpointType,
     state: Mutex<Inner>,
 }
 
-impl RedundancyController {
-    /// Create with a primary and a secondary controller.
+impl RedundancyEndpoint {
+    /// Create with a primary and a secondary endpoint.
     // fusa:req REQ-RED-002
-    pub fn new(primary: Arc<dyn Controller>, secondary: Arc<dyn Controller>) -> Self {
-        let zone = primary.zone();
-        RedundancyController {
-            zone,
+    pub fn new(primary: Arc<dyn Endpoint>, secondary: Arc<dyn Endpoint>) -> Self {
+        let ep_type = primary.ep_type();
+        RedundancyEndpoint {
+            ep_type,
             state: Mutex::new(Inner {
                 primary,
                 secondary: Some(secondary),
@@ -58,54 +71,54 @@ impl RedundancyController {
     pub fn has_secondary(&self) -> bool {
         self.state.lock().unwrap().secondary.is_some()
     }
-}
 
-impl Controller for RedundancyController {
-    fn zone(&self) -> Zone {
-        self.zone
-    }
-
-    // fusa:req REQ-RED-003
-    // fusa:req REQ-RED-004
-    // fusa:req REQ-RED-005
-    fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
+    /// Run `op` against the primary; on error, promote the secondary (if
+    /// any) and retry once.
+    fn dispatch<T>(
+        &self,
+        op: impl Fn(&dyn Endpoint) -> Result<T, RcpError>,
+    ) -> Result<T, RcpError> {
         let result = {
             let g = self.state.lock().unwrap();
-            g.primary.send(cmd, timeout)
+            op(g.primary.as_ref())
         };
 
         match result {
-            Ok(resp) => Ok(resp),
+            Ok(v) => Ok(v),
             Err(primary_err) => {
                 let mut g = self.state.lock().unwrap();
                 match g.secondary.take() {
                     None => Err(primary_err),
                     Some(sec) => {
-                        // Promote secondary
-                        let old_primary = std::mem::replace(&mut g.primary, sec);
-                        let _ = old_primary.close();
+                        // Promote secondary.
+                        g.primary = sec;
                         g.failovers += 1;
+                        let primary = Arc::clone(&g.primary);
                         drop(g);
-                        // Retry on new primary
-                        self.state.lock().unwrap().primary.send(cmd, timeout)
+                        // Retry on new primary.
+                        op(primary.as_ref())
                     }
                 }
             }
         }
     }
+}
 
-    // fusa:req REQ-RED-008
-    fn subscribe(&self) -> Result<Subscription, RcpError> {
-        self.state.lock().unwrap().primary.subscribe()
+impl Endpoint for RedundancyEndpoint {
+    fn ep_type(&self) -> EndpointType {
+        self.ep_type
     }
 
-    fn close(&self) -> Result<(), RcpError> {
-        let g = self.state.lock().unwrap();
-        let _ = g.primary.close();
-        if let Some(ref sec) = g.secondary {
-            let _ = sec.close();
-        }
-        Ok(())
+    // fusa:req REQ-RED-003
+    // fusa:req REQ-RED-004
+    // fusa:req REQ-RED-005
+    fn read(&self, read_size: u8) -> Result<Vec<u8>, RcpError> {
+        self.dispatch(|ep| ep.read(read_size))
+    }
+
+    // fusa:req REQ-RED-008
+    fn write(&self, payload: &[u8]) -> Result<(), RcpError> {
+        self.dispatch(|ep| ep.write(payload))
     }
 }
 
@@ -115,41 +128,35 @@ impl Controller for RedundancyController {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mock::MockController;
-    use crate::{Command, Response, ResponseStatus, Zone};
+    use crate::mock::MockEndpoint;
 
-    fn ok_ctrl(zone: Zone) -> Arc<dyn Controller> {
-        let h: crate::mock::Handler = Box::new(move |cmd| Response {
-            command_id: cmd.id,
-            zone: cmd.zone,
-            status: ResponseStatus::OK,
-            payload: None,
-        });
-        MockController::new(zone, Some(h)) as Arc<dyn Controller>
+    fn ok_ep(ep_type: EndpointType) -> Arc<dyn Endpoint> {
+        MockEndpoint::new(ep_type, vec![0u8; 4]) as Arc<dyn Endpoint>
     }
 
-    fn failing_ctrl(zone: Zone) -> Arc<dyn Controller> {
-        let h: crate::mock::Handler = Box::new(|_cmd| Response {
-            command_id: 0,
-            zone: Zone::UNKNOWN,
-            status: ResponseStatus::OK,
-            payload: None,
-        });
-        let ctrl = MockController::new(zone, Some(h));
-        ctrl.close().unwrap();
-        ctrl as Arc<dyn Controller>
+    struct AlwaysFail;
+    impl Endpoint for AlwaysFail {
+        fn ep_type(&self) -> EndpointType {
+            EndpointType::Gpio
+        }
+        fn read(&self, _read_size: u8) -> Result<Vec<u8>, RcpError> {
+            Err(RcpError::Closed)
+        }
+        fn write(&self, _payload: &[u8]) -> Result<(), RcpError> {
+            Err(RcpError::Closed)
+        }
+    }
+
+    fn failing_ep() -> Arc<dyn Endpoint> {
+        Arc::new(AlwaysFail) as Arc<dyn Endpoint>
     }
 
     #[test]
     // fusa:test REQ-RED-001
     // fusa:test REQ-RED-003
     fn primary_success_no_failover() {
-        let r = RedundancyController::new(ok_ctrl(Zone::FRONT_LEFT), ok_ctrl(Zone::FRONT_LEFT));
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            ..Default::default()
-        };
-        r.send(&cmd, None).unwrap();
+        let r = RedundancyEndpoint::new(ok_ep(EndpointType::Gpio), ok_ep(EndpointType::Gpio));
+        r.write(b"x").unwrap();
         assert_eq!(r.failover_count(), 0);
     }
 
@@ -157,26 +164,16 @@ mod tests {
     // fusa:test REQ-RED-004
     // fusa:test REQ-RED-005
     fn primary_failure_triggers_failover_to_secondary() {
-        let r =
-            RedundancyController::new(failing_ctrl(Zone::FRONT_LEFT), ok_ctrl(Zone::FRONT_LEFT));
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            ..Default::default()
-        };
-        r.send(&cmd, None).unwrap();
+        let r = RedundancyEndpoint::new(failing_ep(), ok_ep(EndpointType::Gpio));
+        r.write(b"x").unwrap();
         assert_eq!(r.failover_count(), 1);
     }
 
     #[test]
     // fusa:test REQ-RED-006
     fn failover_count_increments() {
-        let r =
-            RedundancyController::new(failing_ctrl(Zone::FRONT_LEFT), ok_ctrl(Zone::FRONT_LEFT));
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            ..Default::default()
-        };
-        r.send(&cmd, None).unwrap(); // triggers failover
+        let r = RedundancyEndpoint::new(failing_ep(), ok_ep(EndpointType::Gpio));
+        r.write(b"x").unwrap(); // triggers failover
         assert_eq!(r.failover_count(), 1);
         // Secondary is now primary; no more secondary
         assert!(!r.has_secondary());
@@ -185,43 +182,31 @@ mod tests {
     #[test]
     // fusa:test REQ-RED-007
     fn no_secondary_after_failover() {
-        let r =
-            RedundancyController::new(failing_ctrl(Zone::FRONT_LEFT), ok_ctrl(Zone::FRONT_LEFT));
+        let r = RedundancyEndpoint::new(failing_ep(), ok_ep(EndpointType::Gpio));
         assert!(r.has_secondary());
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            ..Default::default()
-        };
-        r.send(&cmd, None).unwrap();
+        r.write(b"x").unwrap();
         assert!(!r.has_secondary());
     }
 
     #[test]
     // fusa:test REQ-RED-005
     fn both_failed_returns_error() {
-        let r = RedundancyController::new(
-            failing_ctrl(Zone::FRONT_LEFT),
-            failing_ctrl(Zone::FRONT_LEFT),
-        );
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            ..Default::default()
-        };
-        let err = r.send(&cmd, None).unwrap_err();
+        let r = RedundancyEndpoint::new(failing_ep(), failing_ep());
+        let err = r.write(b"x").unwrap_err();
         assert_eq!(err, RcpError::Closed);
     }
 
     #[test]
     // fusa:test REQ-RED-002
-    fn zone_matches_primary() {
-        let r = RedundancyController::new(ok_ctrl(Zone::REAR_RIGHT), ok_ctrl(Zone::REAR_RIGHT));
-        assert_eq!(r.zone(), Zone::REAR_RIGHT);
+    fn ep_type_matches_primary() {
+        let r = RedundancyEndpoint::new(ok_ep(EndpointType::Adc), ok_ep(EndpointType::Adc));
+        assert_eq!(r.ep_type(), EndpointType::Adc);
     }
 
     #[test]
     // fusa:test REQ-RED-008
-    fn subscribe_forwarded_to_primary() {
-        let r = RedundancyController::new(ok_ctrl(Zone::FRONT_LEFT), ok_ctrl(Zone::FRONT_LEFT));
-        r.subscribe().unwrap();
+    fn read_forwarded_to_primary() {
+        let r = RedundancyEndpoint::new(ok_ep(EndpointType::Gpio), ok_ep(EndpointType::Gpio));
+        r.read(4).unwrap();
     }
 }

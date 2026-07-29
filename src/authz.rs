@@ -6,74 +6,83 @@
 // fusa:req REQ-AUTHZ-006
 // fusa:req REQ-AUTHZ-007
 
-//! Authorization policy enforcement on zone controllers.
+//! Authorization policy enforcement over an [`Endpoint`].
 //!
-//! Implements an allowlist-based command-type ACL; disallowed commands return
-//! `Err(RcpError::NotFound)` (maps to `relay::ErrNotConnected` per spec §5).
+//! Implements an allowlist-based (endpoint-type, request-type) ACL;
+//! disallowed calls return `Err(RcpError::NotFound)` (maps to
+//! `relay::ErrNotConnected` per spec §5).
+//!
+//! `ROADMAP.md` Milestone 9 ("All ADAPT-disposition packages retargeted...")
+//! cutover: per this module's own ADAPT disposition ("generic ACL
+//! decorator; retarget its key space from `CommandType` to
+//! endpoint-type/request-type"), [`AuthzEndpoint`] replaces the legacy
+//! `AuthzController`, wrapping [`crate::mock::Endpoint`] instead of
+//! `Controller`. [`Policy::allowed`] is now keyed on `(`[`EndpointType`]
+//! `as u8, is_write: bool)` pairs — `is_write` mirrors
+//! [`crate::acf::ByteMessageInfo::op`]'s own true-is-write convention (see
+//! `src/mock.rs`'s `RcServer::handle_abb`) — replacing the old
+//! `allowed_cmd_types: HashSet<u16>` keyed on the deleted `CommandType`.
+//! The old `min_priority`/`max_priority` range has no surviving analog:
+//! `Endpoint` requests carry no `Priority` field at all (see
+//! `ratelimit`'s own retargeting note for the same gap), so it is dropped
+//! rather than force-mapped onto unrelated behavior.
 
 use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
-use std::time::Duration;
 
-use crate::{Command, Controller, RcpError, Response, Subscription, Zone};
+use crate::mock::Endpoint;
+use crate::regmap::EndpointType;
+use crate::RcpError;
 
 // ── Policy ────────────────────────────────────────────────────────────────────
 
-/// Authorization policy for a zone controller.
+/// Authorization policy for an endpoint: an allowlist of
+/// `(ep_type, is_write)` pairs. Empty = deny all.
 // fusa:req REQ-AUTHZ-001
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Policy {
-    /// Allowed command types. Empty = deny all.
-    pub allowed_cmd_types: HashSet<u16>,
-    /// Allowed priority range (min..=max by inner value).
-    pub min_priority: u8,
-    pub max_priority: u8,
+    pub allowed: HashSet<(u8, bool)>,
 }
 
+/// Every `ep_type` byte this crate's [`EndpointType::from_u8`] recognizes
+/// (`0x01..=0x0D`), per that function's own doc comment.
+const ALL_EP_TYPE_BYTES: std::ops::RangeInclusive<u8> = 0x01..=0x0D;
+
 impl Policy {
-    /// Allow everything (open policy).
+    /// Allow every recognized endpoint type, for both reads and writes.
     // fusa:req REQ-AUTHZ-002
     pub fn allow_all() -> Self {
         let mut set = HashSet::new();
-        for v in 0..=6u16 {
-            set.insert(v);
+        for b in ALL_EP_TYPE_BYTES {
+            set.insert((b, false));
+            set.insert((b, true));
         }
-        Policy {
-            allowed_cmd_types: set,
-            min_priority: 0,
-            max_priority: 2,
-        }
+        Policy { allowed: set }
     }
 
-    /// Deny all commands (closed policy).
+    /// Deny everything (closed policy).
     // fusa:req REQ-AUTHZ-003
     pub fn deny_all() -> Self {
-        Policy {
-            allowed_cmd_types: HashSet::new(),
-            min_priority: 0,
-            max_priority: 2,
-        }
+        Policy::default()
     }
 
-    pub fn is_allowed(&self, cmd: &Command) -> bool {
-        self.allowed_cmd_types.contains(&cmd.cmd_type.0)
-            && cmd.priority.0 >= self.min_priority
-            && cmd.priority.0 <= self.max_priority
+    pub fn is_allowed(&self, ep_type: EndpointType, is_write: bool) -> bool {
+        self.allowed.contains(&(ep_type.to_u8(), is_write))
     }
 }
 
-// ── AuthzController ───────────────────────────────────────────────────────────
+// ── AuthzEndpoint ──────────────────────────────────────────────────────────────
 
-/// Policy-enforcing controller wrapper.
+/// Policy-enforcing endpoint wrapper.
 // fusa:req REQ-AUTHZ-004
-pub struct AuthzController {
-    inner: Arc<dyn Controller>,
+pub struct AuthzEndpoint {
+    inner: Arc<dyn Endpoint>,
     policy: RwLock<Policy>,
 }
 
-impl AuthzController {
-    pub fn new(inner: Arc<dyn Controller>, policy: Policy) -> Self {
-        AuthzController {
+impl AuthzEndpoint {
+    pub fn new(inner: Arc<dyn Endpoint>, policy: Policy) -> Self {
+        AuthzEndpoint {
             inner,
             policy: RwLock::new(policy),
         }
@@ -91,26 +100,28 @@ impl AuthzController {
     }
 }
 
-impl Controller for AuthzController {
-    fn zone(&self) -> Zone {
-        self.inner.zone()
+impl Endpoint for AuthzEndpoint {
+    fn ep_type(&self) -> EndpointType {
+        self.inner.ep_type()
     }
 
     // fusa:req REQ-AUTHZ-005
-    fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
-        if !self.policy.read().unwrap().is_allowed(cmd) {
+    fn read(&self, read_size: u8) -> Result<Vec<u8>, RcpError> {
+        let ep_type = self.inner.ep_type();
+        if !self.policy.read().unwrap().is_allowed(ep_type, false) {
             return Err(RcpError::NotFound);
         }
-        self.inner.send(cmd, timeout)
+        self.inner.read(read_size)
     }
 
-    fn subscribe(&self) -> Result<Subscription, RcpError> {
-        self.inner.subscribe()
-    }
-
+    // fusa:req REQ-AUTHZ-005
     // fusa:req REQ-AUTHZ-007
-    fn close(&self) -> Result<(), RcpError> {
-        self.inner.close()
+    fn write(&self, payload: &[u8]) -> Result<(), RcpError> {
+        let ep_type = self.inner.ep_type();
+        if !self.policy.read().unwrap().is_allowed(ep_type, true) {
+            return Err(RcpError::NotFound);
+        }
+        self.inner.write(payload)
     }
 }
 
@@ -120,38 +131,28 @@ impl Controller for AuthzController {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mock::MockController;
-    use crate::{Command, CommandType, Zone};
+    use crate::mock::MockEndpoint;
 
-    fn inner() -> Arc<dyn Controller> {
-        MockController::new(Zone::FRONT_LEFT, None) as Arc<dyn Controller>
+    fn inner(ep_type: EndpointType) -> Arc<dyn Endpoint> {
+        MockEndpoint::new(ep_type, vec![0u8; 4]) as Arc<dyn Endpoint>
     }
 
     #[test]
     // fusa:test REQ-AUTHZ-002
     // fusa:test REQ-AUTHZ-004
     // fusa:test REQ-AUTHZ-005
-    fn allow_all_permits_any_command() {
-        let a = AuthzController::new(inner(), Policy::allow_all());
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            cmd_type: CommandType::SET,
-            ..Default::default()
-        };
-        a.send(&cmd, None).unwrap();
+    fn allow_all_permits_any_call() {
+        let a = AuthzEndpoint::new(inner(EndpointType::Gpio), Policy::allow_all());
+        a.write(b"x").unwrap();
+        a.read(4).unwrap();
     }
 
     #[test]
     // fusa:test REQ-AUTHZ-003
     // fusa:test REQ-AUTHZ-005
-    fn deny_all_blocks_every_command() {
-        let a = AuthzController::new(inner(), Policy::deny_all());
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            cmd_type: CommandType::GET,
-            ..Default::default()
-        };
-        let err = a.send(&cmd, None).unwrap_err();
+    fn deny_all_blocks_every_call() {
+        let a = AuthzEndpoint::new(inner(EndpointType::Gpio), Policy::deny_all());
+        let err = a.read(4).unwrap_err();
         assert_eq!(err, RcpError::NotFound);
         assert!(err.is_relay_not_connected());
     }
@@ -159,48 +160,42 @@ mod tests {
     #[test]
     // fusa:test REQ-AUTHZ-001
     // fusa:test REQ-AUTHZ-005
-    fn partial_allowlist_enforced() {
-        let mut set = std::collections::HashSet::new();
-        set.insert(CommandType::GET.0);
-        let policy = Policy {
-            allowed_cmd_types: set,
-            min_priority: 0,
-            max_priority: 2,
-        };
-        let a = AuthzController::new(inner(), policy);
+    fn partial_allowlist_enforced_by_request_type() {
+        let mut set = HashSet::new();
+        set.insert((EndpointType::Gpio.to_u8(), false)); // reads only
+        let policy = Policy { allowed: set };
+        let a = AuthzEndpoint::new(inner(EndpointType::Gpio), policy);
 
-        let get = Command {
-            zone: Zone::FRONT_LEFT,
-            cmd_type: CommandType::GET,
-            ..Default::default()
-        };
-        let set = Command {
-            zone: Zone::FRONT_LEFT,
-            cmd_type: CommandType::SET,
-            ..Default::default()
-        };
-        a.send(&get, None).unwrap();
-        let err = a.send(&set, None).unwrap_err();
+        a.read(4).unwrap();
+        let err = a.write(b"x").unwrap_err();
+        assert_eq!(err, RcpError::NotFound);
+    }
+
+    #[test]
+    // fusa:test REQ-AUTHZ-001
+    fn partial_allowlist_enforced_by_ep_type() {
+        let mut set = HashSet::new();
+        set.insert((EndpointType::Adc.to_u8(), false));
+        let policy = Policy { allowed: set };
+        let a = AuthzEndpoint::new(inner(EndpointType::Gpio), policy);
+
+        let err = a.read(4).unwrap_err();
         assert_eq!(err, RcpError::NotFound);
     }
 
     #[test]
     // fusa:test REQ-AUTHZ-006
     fn set_policy_takes_effect_immediately() {
-        let a = AuthzController::new(inner(), Policy::deny_all());
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            ..Default::default()
-        };
-        a.send(&cmd, None).unwrap_err();
+        let a = AuthzEndpoint::new(inner(EndpointType::Gpio), Policy::deny_all());
+        a.write(b"x").unwrap_err();
         a.set_policy(Policy::allow_all());
-        a.send(&cmd, None).unwrap();
+        a.write(b"x").unwrap();
     }
 
     #[test]
     // fusa:test REQ-AUTHZ-007
-    fn close_forwarded() {
-        let a = AuthzController::new(inner(), Policy::allow_all());
-        a.close().unwrap();
+    fn ep_type_forwarded() {
+        let a = AuthzEndpoint::new(inner(EndpointType::Gpio), Policy::allow_all());
+        assert_eq!(a.ep_type(), EndpointType::Gpio);
     }
 }

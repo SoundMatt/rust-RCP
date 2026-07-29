@@ -31,10 +31,10 @@ Key security controls:
 | Mutual TLS | `tlstransport` | REQ-TLS-002 |
 | CRC-32 (TC18 safe-point) payload integrity | `e2e` | REQ-CRC-004 |
 | Monotonic sequence check (not yet dispatch-wired) | `request` | REQ-SEQENF-003 |
-| Command ACL | `authz` | REQ-AUTHZ-005 |
+| Endpoint ACL ((ep_type, request-type) allowlist) | `authz` | REQ-AUTHZ-005 |
 | Rate limiting | `ratelimit` | REQ-RL-006 |
 | Payload size cap (65491 B) | `wire` | REQ-WIRE-007 |
-| Priority preemption (Critical exempt) | `ratelimit`, `prioqueue` | REQ-RL-007, REQ-PQ-004 |
+| Priority preemption (`prioqueue` only — `ratelimit` no longer exempts Critical priority, see `.fusa-iec62443.json` T-004) | `prioqueue` | REQ-PQ-004 |
 
 ## Memory Safety
 

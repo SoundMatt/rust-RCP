@@ -11,10 +11,43 @@
 
 //! Adapter layer — converts between RCP and external protocol representations.
 //!
-//! Provides bi-directional mapping between `Command`/`Response` and
+//! Provides bi-directional mapping between endpoint payload bytes and
 //! arbitrary external message formats via the [`Adapter`] trait, and the
 //! RELAY-spec `Adapt()` entry point (§10.3) that wraps a [`Controller`] as a
 //! [`crate::relay::Caller`] using `to_message()`/`from_message()` (§15.7.5).
+//!
+//! `ROADMAP.md` Milestone 9 ("All ADAPT-disposition packages retargeted...")
+//! cutover: per this module's own ADAPT disposition ("the RELAY
+//! `Adapt()`/`to_message()`/`from_message()` pattern itself persists; the
+//! mapping needs to be rebuilt against the new endpoint-addressed `Message`
+//! shape (Milestone 10)"), this item's scope is deliberately split in two,
+//! flagged here per Guiding Principle 5 rather than silently picked:
+//!
+//! - [`Adapter`]/[`AdaptEndpoint`] — the generic "convert an external
+//!   message format to/from RCP" decorator layer, structurally the same
+//!   kind of wrapper `ratelimit`/`proxy`/etc. are — is retargeted now, onto
+//!   [`crate::mock::Endpoint`] in place of `Controller`. Since `Endpoint`
+//!   has no single `send`-shaped call (only distinct `read`/`write`
+//!   verbs), [`AdaptEndpoint::send_msg`] models one external "call" as a
+//!   write-then-read round trip, converting `M` to write-payload bytes and
+//!   converting the subsequent read's bytes back to `M` — this crate's own
+//!   simplification, not a transcription of any real external protocol's
+//!   actual semantics, which the deeper Milestone 10 rebuild below is
+//!   still responsible for defining honestly.
+//! - [`adapt()`]/`RcpAdapter`/[`to_message`]/[`from_message`]/
+//!   [`response_to_message`] — the RELAY §10.3/§15.7.5 binding itself,
+//!   which maps a zone *name* to/from `relay::Message.id` and forwards
+//!   `Status`-keyed `Priority`/`CommandType` metadata neither of which
+//!   `Endpoint` has an analog for — stay bound to the legacy `Controller`/
+//!   `Zone`/`Command`/`Response`/`Status` surface unchanged. Retargeting
+//!   this half honestly requires the endpoint-addressed `Message` shape
+//!   this row's own disposition-table text reserves for Milestone 10 (a
+//!   `StreamId`+`byte_bus_id` addressing scheme in place of a zone name,
+//!   and a resolution for `crate::mock::RcServer`'s still-open "no live
+//!   notification mechanism" gap before `Status`-style `subscribe`
+//!   forwarding has anything real to forward) — inventing one here would
+//!   guess at behavior this crate has not decided, rather than retarget
+//!   existing behavior.
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
@@ -24,60 +57,62 @@ use async_trait::async_trait;
 use chrono::Utc;
 use tokio::sync::{mpsc, Notify};
 
+use crate::mock::Endpoint;
 use crate::relay::{BackPressurePolicy, Context, Message, Protocol, SubscriberOptions, Version};
 use crate::{zone_from_str, Command, CommandType, Controller, Priority, RcpError, Response};
 
 // ── Adapter trait ─────────────────────────────────────────────────────────────
 
-/// Converts between RCP messages and an external format `M`.
+/// Converts between an external message format `M` and endpoint payload
+/// bytes.
 // fusa:req REQ-ADAPT-001
 pub trait Adapter<M>: Send + Sync {
-    /// Convert an external message to an RCP command.
-    fn to_command(&self, msg: M) -> Result<Command, RcpError>;
-    /// Convert an RCP response to the external message type.
-    fn to_message(&self, resp: Response) -> Result<M, RcpError>;
+    /// Convert an external message to endpoint write-payload bytes.
+    fn to_write_payload(&self, msg: M) -> Result<Vec<u8>, RcpError>;
+    /// Convert endpoint read-response bytes to the external message type.
+    fn adapt_read_bytes(&self, bytes: Vec<u8>) -> Result<M, RcpError>;
 }
 
-// ── AdaptController ───────────────────────────────────────────────────────────
+// ── AdaptEndpoint ────────────────────────────────────────────────────────────
 
-/// Controller wrapper that adapts an external message type `M` to RCP.
+/// Endpoint wrapper that adapts an external message type `M` to/from
+/// endpoint payload bytes.
 // fusa:req REQ-ADAPT-002
-pub struct AdaptController<M> {
-    inner: Arc<dyn Controller>,
+pub struct AdaptEndpoint<M> {
+    inner: Arc<dyn Endpoint>,
     adapter: Arc<dyn Adapter<M>>,
 }
 
-impl<M: Send + Sync + 'static> AdaptController<M> {
-    pub fn new(inner: Arc<dyn Controller>, adapter: Arc<dyn Adapter<M>>) -> Self {
-        AdaptController { inner, adapter }
+impl<M: Send + Sync + 'static> AdaptEndpoint<M> {
+    pub fn new(inner: Arc<dyn Endpoint>, adapter: Arc<dyn Adapter<M>>) -> Self {
+        AdaptEndpoint { inner, adapter }
     }
 
-    /// Send using the external message type.
+    /// Write `msg` (adapted to endpoint payload bytes), then read back up
+    /// to `read_size` bytes and adapt the response — see this module's doc
+    /// comment for why this is a write-then-read round trip rather than a
+    /// single `send`-shaped call.
     // fusa:req REQ-ADAPT-003
-    pub fn send_msg(&self, msg: M, timeout: Option<Duration>) -> Result<M, RcpError> {
-        let cmd = self.adapter.to_command(msg)?;
-        let resp = self.inner.send(&cmd, timeout)?;
-        self.adapter.to_message(resp)
+    pub fn send_msg(&self, msg: M, read_size: u8) -> Result<M, RcpError> {
+        let payload = self.adapter.to_write_payload(msg)?;
+        self.inner.write(&payload)?;
+        let bytes = self.inner.read(read_size)?;
+        self.adapter.adapt_read_bytes(bytes)
     }
 }
 
 // ── Passthrough adapter ───────────────────────────────────────────────────────
 
-/// Identity adapter for `Command` → `Command` testing.
+/// Identity adapter for `Vec<u8>` → `Vec<u8>` testing.
 // fusa:req REQ-ADAPT-004
 pub struct PassthroughAdapter;
 
-impl Adapter<Command> for PassthroughAdapter {
-    fn to_command(&self, msg: Command) -> Result<Command, RcpError> {
+impl Adapter<Vec<u8>> for PassthroughAdapter {
+    fn to_write_payload(&self, msg: Vec<u8>) -> Result<Vec<u8>, RcpError> {
         Ok(msg)
     }
-    fn to_message(&self, resp: Response) -> Result<Command, RcpError> {
-        Ok(Command {
-            id: resp.command_id,
-            zone: resp.zone,
-            payload: resp.payload,
-            ..Default::default()
-        })
+    fn adapt_read_bytes(&self, bytes: Vec<u8>) -> Result<Vec<u8>, RcpError> {
+        Ok(bytes)
     }
 }
 
@@ -406,8 +441,9 @@ impl crate::relay::Caller for RcpAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mock::MockController;
-    use crate::{Command, Response, ResponseStatus, Zone};
+    use crate::mock::{MockController, MockEndpoint};
+    use crate::regmap::EndpointType;
+    use crate::{Response, ResponseStatus, Zone};
 
     fn ok_ctrl() -> Arc<dyn Controller> {
         let h: crate::mock::Handler = Box::new(|cmd| Response {
@@ -419,57 +455,50 @@ mod tests {
         MockController::new(Zone::FRONT_LEFT, Some(h)) as Arc<dyn Controller>
     }
 
+    fn ok_endpoint() -> Arc<dyn Endpoint> {
+        MockEndpoint::new(EndpointType::Gpio, vec![0u8; 8]) as Arc<dyn Endpoint>
+    }
+
     #[test]
     // fusa:test REQ-ADAPT-001
     // fusa:test REQ-ADAPT-004
     fn passthrough_adapter_identity() {
-        let ctrl = AdaptController::new(ok_ctrl(), Arc::new(PassthroughAdapter));
-        let cmd = Command {
-            id: 5,
-            zone: Zone::FRONT_LEFT,
-            payload: Some(b"hi".to_vec()),
-            ..Default::default()
-        };
-        let out = ctrl.send_msg(cmd.clone(), None).unwrap();
-        assert_eq!(out.id, 5);
+        let ep = AdaptEndpoint::new(ok_endpoint(), Arc::new(PassthroughAdapter));
+        let out = ep.send_msg(b"hi".to_vec(), 8).unwrap();
+        assert!(out.starts_with(b"hi"));
     }
 
     #[test]
     // fusa:test REQ-ADAPT-002
-    fn zone_forwarded() {
-        let inner = ok_ctrl();
-        let ctrl = AdaptController::new(Arc::clone(&inner), Arc::new(PassthroughAdapter));
-        assert_eq!(ctrl.inner.zone(), Zone::FRONT_LEFT);
+    fn ep_type_forwarded() {
+        let inner = ok_endpoint();
+        let ep = AdaptEndpoint::new(Arc::clone(&inner), Arc::new(PassthroughAdapter));
+        assert_eq!(ep.inner.ep_type(), EndpointType::Gpio);
     }
 
     #[test]
     // fusa:test REQ-ADAPT-003
     fn adapter_error_propagated() {
         struct FailAdapter;
-        impl Adapter<Command> for FailAdapter {
-            fn to_command(&self, _: Command) -> Result<Command, RcpError> {
+        impl Adapter<Vec<u8>> for FailAdapter {
+            fn to_write_payload(&self, _: Vec<u8>) -> Result<Vec<u8>, RcpError> {
                 Err(RcpError::Other("bad msg".into()))
             }
-            fn to_message(&self, _: Response) -> Result<Command, RcpError> {
+            fn adapt_read_bytes(&self, _: Vec<u8>) -> Result<Vec<u8>, RcpError> {
                 unreachable!()
             }
         }
-        let ctrl = AdaptController::new(ok_ctrl(), Arc::new(FailAdapter));
-        let err = ctrl.send_msg(Command::default(), None).unwrap_err();
+        let ep = AdaptEndpoint::new(ok_endpoint(), Arc::new(FailAdapter));
+        let err = ep.send_msg(Vec::new(), 8).unwrap_err();
         assert!(matches!(err, RcpError::Other(_)));
     }
 
     #[test]
     // fusa:test REQ-ADAPT-005
     fn passthrough_preserves_payload() {
-        let ctrl = AdaptController::new(ok_ctrl(), Arc::new(PassthroughAdapter));
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            payload: Some(b"data".to_vec()),
-            ..Default::default()
-        };
-        let out = ctrl.send_msg(cmd, None).unwrap();
-        assert_eq!(out.payload, Some(b"data".to_vec()));
+        let ep = AdaptEndpoint::new(ok_endpoint(), Arc::new(PassthroughAdapter));
+        let out = ep.send_msg(b"data".to_vec(), 8).unwrap();
+        assert!(out.starts_with(b"data"));
     }
 
     // ── to_message / from_message / response_to_message (§15.7.5) ────────────
