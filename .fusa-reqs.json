@@ -5886,6 +5886,60 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-MDIO-001",
+      "title": "MdioAddressingMode round-trips through to_u8/from_u8 across the full 2-bit 0..=3 range",
+      "text": "mdio::MdioAddressingMode::from_u8(mode.to_u8()) reproduces the original mode for all four variants (Clause22, Clause45, Spare2, Spare3), and the four variants' to_u8 values are exactly 0..=3",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-MDIO-002",
+      "title": "MdioAddressingMode::from_u8 rejects any wire byte outside the 2-bit 0..=3 range",
+      "text": "mdio::MdioAddressingMode::from_u8 returns Err(RcpError::InvalidParameter) for any input byte greater than 3, and never panics",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-MDIO-003",
+      "title": "MdioAddressingMode::is_unallocated_slot is true only for Spare2/Spare3 and the type defaults to Clause22",
+      "text": "mdio::MdioAddressingMode::is_unallocated_slot returns true only for Spare2/Spare3 and false for Clause22/Clause45; MdioAddressingMode::default() is Clause22, which is_unallocated_slot reports as false",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-MDIO-004",
+      "title": "MdioFunctionalConfig carries only its addressing_mode field, defaults to Clause22, and its layer tag matches crate::regmap's EndpointType::Mdio cross-layer rule",
+      "text": "mdio::MdioFunctionalConfig::default().addressing_mode is MdioAddressingMode::Clause22; MdioFunctionalConfig::layer_tag produces a crate::regmap::PerEpTypeFunctionalConfig tagged EndpointType::Mdio that satisfies crate::regmap::check_functional_config_matches_ep_type against a generic PerEpConfigBlock of the same ep_type, and is rejected by functional_config_matches_ep_type against a mismatched ep_type",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-MDIO-005",
+      "title": "MdioTransfer's raw byte stream round-trips through encode/decode for any input and never panics",
+      "text": "mdio::MdioTransfer::decode(transfer.encode()) reproduces the original bytes for any byte slice including empty input, and MdioTransfer::decode never panics for any input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-MDIO-006",
+      "title": "MdioTransferResult's raw byte stream round-trips through encode/decode for any input and never panics",
+      "text": "mdio::MdioTransferResult::decode(result.encode()) reproduces the original bytes for any byte slice including empty input, and MdioTransferResult::decode never panics for any input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

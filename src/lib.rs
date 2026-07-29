@@ -114,6 +114,7 @@ pub mod lifecycle;
 pub mod lin;
 pub mod linbr;
 pub mod loan;
+pub mod mdio;
 pub mod mdns;
 pub mod mock;
 pub mod mqttbr;
