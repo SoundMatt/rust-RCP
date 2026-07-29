@@ -1027,9 +1027,13 @@ use crate::regmap::{EndpointType, GeneralRegisters};
 /// notes) — none of them implement this trait yet, and wiring any one of
 /// them onto it is out of scope for this item; it belongs to whichever
 /// later milestone item first needs a live endpoint dispatched through an
-/// RC Server (`canbr`/`linbr`'s own still-open REPLACE rebuilds are the
-/// most likely next callers, per `ROADMAP.md`'s own Progress note for this
-/// bullet). [`MockEndpoint`] is this item's only implementation, standing
+/// RC Server. `canbr`'s own REPLACE rebuild (Milestone 9) has since
+/// completed without wiring `crate::can` onto this trait either, for the
+/// same reason — that rebuild's scope was the legacy `CanBridge`/
+/// `CanSocket` cutover itself, not new dispatch plumbing; `linbr`'s own
+/// still-open REPLACE rebuild remains the most likely next caller, per
+/// `ROADMAP.md`'s own Progress note for this bullet. [`MockEndpoint`] is
+/// this item's only implementation, standing
 /// in for a concrete endpoint the same way [`crate::addressing::EndpointId`]
 /// itself stands in for one.
 ///

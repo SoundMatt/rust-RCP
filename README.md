@@ -79,7 +79,6 @@ assert_eq!(resp.zone, Zone::FRONT_LEFT);
 | `certgap` | Certification gap analysis |
 | `formal` | Runtime-checkable formal invariants |
 | `admin` | Health checks and graceful shutdown |
-| `canbr` | CAN FD bridge |
 | `linbr` | LIN 2.x bridge |
 | `someip` | SOME/IP bridge |
 | `mqttbr` | MQTT bridge |

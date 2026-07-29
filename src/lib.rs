@@ -88,7 +88,6 @@ pub mod authz;
 pub mod avtp;
 pub(crate) mod base64_serde;
 pub mod can;
-pub mod canbr;
 pub mod capi;
 pub mod certgap;
 pub mod codegen;
@@ -569,7 +568,7 @@ pub enum RcpError {
     // `Registry` surface (`ROADMAP.md` Milestone 9's satellite-package
     // migration and Milestone 10's core-surface cutover) — kept unchanged
     // by this item since dozens of still-live satellite packages (`mock`,
-    // `capi`, `canbr`, `linbr`, and others) construct and match on them
+    // `capi`, `linbr`, and others) construct and match on them
     // today. `udp`'s own `wire` REPLACE cutover (Milestone 9) already
     // dropped its use of `ZoneMismatch` — see `src/udp.rs` — but the
     // variant itself stays for the packages that still construct it. Out

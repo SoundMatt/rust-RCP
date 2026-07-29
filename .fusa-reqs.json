@@ -2369,51 +2369,6 @@
       "verificationMethod": "test"
     },
     {
-      "id": "REQ-CANBR-001",
-      "title": "CAN FD max payload",
-      "text": "CAN_FD_MAX_PAYLOAD == 64 bytes",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-CANBR-002",
-      "title": "CanSocket trait",
-      "text": "CanSocket defines send_frame and recv_frame",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-CANBR-003",
-      "title": "CanBridge sends CAN frame",
-      "text": "CanBridge.send() encodes and transmits a CAN frame",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-CANBR-004",
-      "title": "Zone mismatch and payload size checks",
-      "text": "CanBridge rejects wrong zone and oversized payloads",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-CANBR-005",
-      "title": "Close is no-op",
-      "text": "CanBridge.close() returns Ok(())",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
       "id": "REQ-LINBR-001",
       "title": "LIN max data",
       "text": "LIN_MAX_DATA == 8 bytes",
@@ -5665,7 +5620,7 @@
     {
       "id": "REQ-CAN-003",
       "title": "CLASSICAL_CAN_MAX_DATA and CAN_FD_MAX_PAYLOAD match the real classical CAN 2.0 and CAN FD physical data-length ceilings",
-      "text": "can::CLASSICAL_CAN_MAX_DATA == 8 (classical CAN 2.0's own physical ceiling) and can::CAN_FD_MAX_PAYLOAD == 64, defined as crate::canbr::CAN_FD_MAX_PAYLOAD, reusing that value as a physical fact about the bus rather than duplicating a second literal or reusing any of canbr::CanBridge's surrounding Zone/Command-coupled logic",
+      "text": "can::CLASSICAL_CAN_MAX_DATA == 8 and can::CAN_FD_MAX_PAYLOAD == 64, both classical CAN 2.0/CAN FD's own physical ceilings stated directly as this module's own constants (canbr::CAN_FD_MAX_PAYLOAD, the value's original home before the canbr REPLACE cutover deleted that legacy Zone/Command-coupled module in Milestone 9, no longer exists to import from)",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",

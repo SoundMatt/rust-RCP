@@ -64,26 +64,34 @@
 //!   [`crate::avtp`]/[`crate::acf`]/[`crate::addressing`] caller — matching
 //!   the discipline every prior Milestone 1-4/7 entry already established.
 //!
-//! ## Validation against `canbr.rs`
+//! ## Validation against `canbr.rs` (historical — see below for its outcome)
 //!
-//! Per `ROADMAP.md`'s Satellite Package Disposition table, [`crate::canbr`]
-//! becomes this endpoint type; its REPLACE-disposition cutover is
-//! Milestone 9's job, not this item's, so `canbr.rs` itself is examined
-//! here for validation purposes only, not touched. [`crate::canbr::CanBridge`]'s
-//! `can_id = zone_id << 8 | cmd_type` framing and its
-//! [`crate::canbr::CanSocket`] abstraction were read and explicitly not
-//! reused: both derive frame identity from the old `Zone`/`Command` model,
-//! which has no equivalent in the endpoint-addressed model this crate
-//! replaces it with. [`crate::canbr::CAN_FD_MAX_PAYLOAD`] *is* reused below
-//! as [`CAN_FD_MAX_PAYLOAD`], the same way [`crate::lin::LIN_MAX_DATA`]
-//! reused [`crate::linbr::LIN_MAX_DATA`] — it states a genuine CAN FD
-//! physical ceiling (64 data bytes per frame) rather than any
-//! `Zone`/`Command`-coupled behavior, so it is a plain fact about the bus
-//! worth keeping rather than re-deriving as a second literal.
-//! [`CLASSICAL_CAN_MAX_DATA`] is a comparable physical fact about classical
-//! CAN 2.0's own 8-byte data ceiling that `canbr.rs` never separately named
-//! (it only ever carried CAN FD payloads), so it is stated fresh here rather
-//! than imported.
+//! Per `ROADMAP.md`'s Satellite Package Disposition table, the legacy
+//! `canbr.rs` bridge became this endpoint type; at the time this module was
+//! first written (Milestone 7, `v0.10.0-dev`), that REPLACE-disposition
+//! cutover was still Milestone 9's job, so `canbr.rs` was examined then for
+//! validation purposes only, not touched. Its `CanBridge` struct's
+//! `can_id = zone_id << 8 | cmd_type` framing and its `CanSocket`
+//! abstraction were read and explicitly not reused: both derived frame
+//! identity from the old `Zone`/`Command` model, which has no equivalent in
+//! the endpoint-addressed model this crate replaces it with. Its
+//! `CAN_FD_MAX_PAYLOAD` constant *was* reused at that time — the same way
+//! [`crate::lin::LIN_MAX_DATA`] reuses [`crate::linbr::LIN_MAX_DATA`] — since
+//! it stated a genuine CAN FD physical ceiling (64 data bytes per frame)
+//! rather than any `Zone`/`Command`-coupled behavior.
+//!
+//! Milestone 9's own canbr REPLACE cutover has since deleted `canbr.rs`
+//! outright (its `CanBridge`/`CanSocket`/`Zone`-keyed framing had no
+//! surviving analog in this endpoint-addressed model, matching the `wire`/
+//! `e2e` REPLACE cutovers immediately before it), leaving [`CAN_FD_MAX_PAYLOAD`]
+//! below as this crate's one live external caller of the deleted module. Per
+//! Guiding Principle 5, that cross-module dependency is resolved by inlining
+//! the physical-fact literal directly here rather than leaving a stub
+//! module behind purely to hold one constant — [`CAN_FD_MAX_PAYLOAD`] is now
+//! stated fresh, the same way [`CLASSICAL_CAN_MAX_DATA`] already was (a
+//! comparable physical fact about classical CAN 2.0's own 8-byte data
+//! ceiling that `canbr.rs` never separately named, since it only ever
+//! carried CAN FD payloads).
 //!
 //! ## Relationship to [`crate::regmap`]
 //!
@@ -205,16 +213,18 @@ use crate::RcpError;
 /// ceiling of the classical CAN bus, not a spec-defined or otherwise
 /// interpreted value. See this module's doc comment "Validation against
 /// `canbr.rs`" for why this is stated fresh here rather than imported from
-/// [`crate::canbr`].
+/// anywhere else.
 // fusa:req REQ-CAN-003
 pub const CLASSICAL_CAN_MAX_DATA: usize = 8;
 
-/// Maximum CAN FD payload in bytes, reused from
-/// [`crate::canbr::CAN_FD_MAX_PAYLOAD`] as a physical fact about the bus —
-/// see this module's doc comment "Validation against `canbr.rs`" for why
-/// this is the one piece of `canbr.rs` this module reuses.
+/// Maximum CAN FD payload in bytes — a genuine physical ceiling of the CAN
+/// FD bus, not a spec-defined or otherwise interpreted value. Originally
+/// reused from the legacy `canbr::CAN_FD_MAX_PAYLOAD` (see this module's doc
+/// comment "Validation against `canbr.rs`"); stated directly as this
+/// module's own constant since Milestone 9's canbr REPLACE cutover deleted
+/// that module.
 // fusa:req REQ-CAN-003
-pub const CAN_FD_MAX_PAYLOAD: usize = crate::canbr::CAN_FD_MAX_PAYLOAD;
+pub const CAN_FD_MAX_PAYLOAD: usize = 64;
 
 /// Maximum CAN XL payload in bytes, per `ROADMAP.md`'s own stated ceiling
 /// for this checklist bullet.
@@ -600,7 +610,6 @@ mod tests {
     fn physical_fact_constants_match_real_can_ceilings() {
         assert_eq!(CLASSICAL_CAN_MAX_DATA, 8);
         assert_eq!(CAN_FD_MAX_PAYLOAD, 64);
-        assert_eq!(CAN_FD_MAX_PAYLOAD, crate::canbr::CAN_FD_MAX_PAYLOAD);
         assert_eq!(CAN_XL_MAX_PAYLOAD, 2048);
         assert_eq!(CAN_XL_SUB_HEADER_LEN, 6);
         assert_eq!(CAN_STANDARD_ID_MAX, 0x7FF);
