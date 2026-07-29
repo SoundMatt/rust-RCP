@@ -29,7 +29,7 @@ Full machine-readable HARA is in `.fusa-hara.json`.
 | SG-004 | Payload integrity | ASIL-B | 200 | `REQ-E2E-002`, CRC-16/CCITT-FALSE |
 | SG-005 | Watchdog monitoring | ASIL-B | 3000 | `REQ-WDG-*`, per-stream `StreamWatchdogState`/`evaluate_stream_watchdog` |
 | SG-006 | Auth enforcement | ASIL-B | 0 | `REQ-AUTHZ-*`, `AuthzController` |
-| SG-007 | Atomic power transitions | ASIL-A | 500 | `REQ-PWR-*`, `PowerStateController` |
+| SG-007 | Atomic power transitions | ASIL-A | 500 | `REQ-PWR-*`/`REQ-PWRSTART-*`, `try_enter_power_mode`/`try_cold_start`/`try_hot_start` gated by `PowerModeGateInput` |
 | SG-008 | Payload size validation | ASIL-B | 0 | `REQ-WIRE-007`, MAX_PAYLOAD check |
 | SG-009 | Critical preemption | ASIL-B | 100 | `REQ-PQ-004`, `PrioController` |
 | SG-010 | Defined close behaviour | ASIL-A | 200 | `REQ-ERR-007`, `Closed` sentinel |
