@@ -1624,10 +1624,42 @@ concepts into it rather than treating them as unrelated decorators.
       itself, leaving the Safety-request MSB-tagging and `CRC_ERROR`-path
       bullets below (and Milestone 8's real reassembly) to actually invoke
       it against live multi-AVTPDU traffic.
-- [ ] Safety-request MSB-tagging: `0x8F`/`0x8B`/`0x8E` variants; on watchdog
+- [x] Safety-request MSB-tagging: `0x8F`/`0x8B`/`0x8E` variants; on watchdog
       overflow, normal-priority requests are purged while safety-tagged
       requests remain queued and become the mechanism that drives the
-      endpoint through its safe state
+      endpoint through its safe state. Done (v0.9.0-dev): `src/request.rs`
+      gains three new `RequestKind` variants — `SafetyCompound` (`0x8F`),
+      `SafetyCompoundWait` (`0x8B`), `SafetyTriggered` (`0x8E`) — each
+      exactly `0x80 | base` over `Compound`/`CompoundWait`/`Triggered`,
+      with `from_u8`/`to_u8` and the `is_safety_tagged` predicate
+      extended/added to match, and `execution_priority_tier`/
+      `resolve_compound_exec_delay`/`resolve_trigger_exec_delay` widened
+      (as this crate's own working interpretation) to map each
+      safety-tagged variant onto its own untagged base kind's tier/timer,
+      mirroring the same match-widening precedent every prior
+      `RequestKind`-adding Milestone 5 entry already used. The
+      watchdog-overflow purge rule composes two already-built pieces:
+      `check_watchdog_overflow_purge`, a single-request check mirroring
+      `check_clear_non_safestate_cancellation`'s own caller-supplied-`bool`
+      shape and reusing `RcpError::RequestCanceled` rather than a new
+      sentinel, and `purge_normal_priority_on_watchdog_overflow`, a pure
+      partition function over `PendingRequestKey` composing that check
+      across a caller-supplied slice — mirroring `select_next_pending_request`'s
+      own "pure function over a slice, no owned queue" shape. Per Guiding
+      Principle 5, this entry flags the same wire-placement ambiguity
+      every prior `RequestKind`-adjacent Milestone 5 bullet flagged (no
+      checklist text states which byte/field carries the MSB tag) and
+      flags its own working interpretation that a safety-tagged variant's
+      execution-priority tier/exec-delay timer is unchanged from its base
+      kind, since the checklist states only the watchdog-overflow
+      exemption. New `REQ-SAFETY-001`..`REQ-SAFETY-005` added to
+      `.fusa-reqs.json` (a fresh prefix), each with a
+      `// fusa:req`/`// fusa:test` pair. Same "additive standalone
+      plumbing only" discipline as every prior milestone entry: neither
+      new function is wired into a decoder, dispatch loop, or the legacy
+      `watchdog.rs` (REPLACE-dispositioned, read only as background); real
+      watchdog timeout tracking (`rx_wd_enable` et al.) and real safe-state
+      machinery are left to the next two still-unchecked bullets below.
 - [ ] Per-stream safety config: `rx_enforce_e2e`, `rx_wd_enable` +
       `rx_wd_timeout_interval` + `rx_wd_safestate_enable` (replacing the
       old periodic-WATCHDOG-command model in `watchdog.rs` with the spec's

@@ -36,6 +36,11 @@
 // fusa:req REQ-RLC-006
 // fusa:req REQ-BUNDLE-001
 // fusa:req REQ-BUNDLE-002
+// fusa:req REQ-SAFETY-001
+// fusa:req REQ-SAFETY-002
+// fusa:req REQ-SAFETY-003
+// fusa:req REQ-SAFETY-004
+// fusa:req REQ-SAFETY-005
 
 //! Conditional-request taxonomy: compound / compound-wait (`0x0F`/`0x0B`),
 //! triggered (`0x0E`), chained (`0x01`), timed (`0x0A`), the
@@ -886,6 +891,157 @@
 //! specific instance of. [`check_compound_bundle_claim`] therefore reuses
 //! [`RcpError::InvalidParameter`] rather than inventing a new
 //! bundle-gating-specific sentinel of its own.
+//!
+//! ## Safety-request MSB-tagging & watchdog-overflow purge (`ROADMAP.md`
+//! Milestone 6, "Safety-request MSB-tagging" bullet)
+//!
+//! Added on top of the Milestone 5 taxonomy above, still in this same
+//! module per this crate's settled `RequestKind`/taxonomy naming (see the
+//! "Compound/compound-wait was the opening item of Milestone 5..."
+//! paragraph above). Four pieces:
+//!
+//! - [`RequestKind::SafetyCompound`] (`0x8F`), [`RequestKind::
+//!   SafetyCompoundWait`] (`0x8B`), and [`RequestKind::SafetyTriggered`]
+//!   (`0x8E`) — three new variants, each exactly `0x80 | base` over
+//!   [`RequestKind::Compound`], [`RequestKind::CompoundWait`], and
+//!   [`RequestKind::Triggered`] respectively, the only three of this
+//!   checklist bullet's own named hex values that decompose that way
+//!   against this module's already-established nine discriminants. See
+//!   "Provenance note: safety-tagging modeled as three new `RequestKind`
+//!   variants, not a layered-on flag" below for why this extends
+//!   [`RequestKind`] itself instead of introducing a second, orthogonal
+//!   type the way [`crate::lifecycle::LockPolicy`] layers onto
+//!   [`crate::lifecycle::RegisterCategory`].
+//! - [`RequestKind::is_safety_tagged`] — the predicate distinguishing
+//!   these three variants from the other nine.
+//! - [`check_watchdog_overflow_purge`] — the single-request half of the
+//!   watchdog-overflow purge rule this checklist bullet names, mirroring
+//!   [`check_clear_non_safestate_cancellation`]'s own
+//!   caller-supplied-`bool`-gated shape: `Ok(())` (do not purge) unless
+//!   `watchdog_overflowed` is `true` *and* the request's own
+//!   [`RequestKind::is_safety_tagged`] is `false`, in which case it
+//!   returns `Err(RcpError::RequestCanceled)` — reusing, not
+//!   reinventing, this crate's already-established cancellation outcome
+//!   signal (see "Provenance note: `RequestCanceled` as this item's
+//!   outcome signal" above).
+//! - [`purge_normal_priority_on_watchdog_overflow`] — the slice-level
+//!   composition of the above over [`PendingRequestKey`], mirroring
+//!   [`select_next_pending_request`]'s own "pure function over a
+//!   caller-supplied slice, no owned queue" shape: partitions a
+//!   caller-supplied `&[PendingRequestKey]` into the indices kept queued
+//!   and the indices purged. A safety-tagged entry is always kept
+//!   (`watchdog_overflowed` or not); a normal-priority entry is kept only
+//!   when `watchdog_overflowed` is `false`. Because
+//!   [`select_next_pending_request`] and
+//!   [`RequestLifecycleState::try_transition`] already treat every
+//!   [`PendingRequestKey`]/[`RequestKind`] uniformly regardless of its
+//!   safety-tagged status, a safety-tagged request kept queued past a
+//!   purge remains eligible for both — this is how this item reads the
+//!   checklist's "become the mechanism that drives the endpoint through
+//!   its safe state" half of the same sentence, rather than building any
+//!   new, safety-tag-specific execution path. See "Provenance note:
+//!   watchdog overflow as a caller-supplied boolean, not real timer
+//!   state" below for why `watchdog_overflowed` is a plain `bool` input,
+//!   not a value read from any not-yet-built watchdog timer.
+//!
+//! Same "additive standalone plumbing only" discipline as every entry
+//! above and every prior Milestone 1-5 entry: neither
+//! [`check_watchdog_overflow_purge`] nor
+//! [`purge_normal_priority_on_watchdog_overflow`] is called from any
+//! decoder, dispatch loop, or the legacy `src/watchdog.rs` — the latter
+//! is `ROADMAP.md`'s own REPLACE-dispositioned satellite package with no
+//! pending-request-queue or safety-tag concept of its own, read only as
+//! background here, not extended or reused. Deliberately out of scope for
+//! this item, left for the next two still-unchecked Milestone 6 checklist
+//! bullets: real per-stream watchdog configuration/timeout tracking
+//! (`rx_wd_enable`/`rx_wd_timeout_interval`/`rx_wd_safestate_enable`, the
+//! "Per-stream safety config" bullet) that would ever produce a real
+//! `watchdog_overflowed` value, and the real safe-state machinery
+//! (`rx_safety_measure`, `rx_safestate_sequencer`) a kept-queued
+//! safety-tagged request would ultimately drive.
+//!
+//! ## Provenance note: safety-tagging modeled as three new `RequestKind`
+//! variants, not a layered-on flag
+//!
+//! Two shapes were considered for `0x8F`/`0x8B`/`0x8E`: three new
+//! [`RequestKind`] variants (chosen here), or a `RequestKind` plus a
+//! second, orthogonal safety-tag type layered on top — the shape
+//! [`crate::lifecycle::LockPolicy`]/[`crate::lifecycle::lock_policy`] and
+//! [`crate::discovery::DiscoveryAccessKind`]/[`crate::discovery::
+//! check_discovery_access`] both use elsewhere in this crate. Those two
+//! precedents layer a *new* type over a category they do not themselves
+//! own the discriminant space of ([`crate::lifecycle::RegisterCategory`],
+//! a decoded discovery message's own access kind). `RequestKind` is
+//! different: this module already owns `RequestKind`'s own `to_u8`/
+//! `from_u8` round-trip over the wire discriminant byte itself, and
+//! `ROADMAP.md`'s own checklist wording calls `0x8F`/`0x8B`/`0x8E`
+//! "variants" — i.e., three more values for that same discriminant byte,
+//! not a second field alongside it. Every prior Milestone 5 entry that
+//! added a `RequestKind` value ([`RequestKind::Triggered`], [`RequestKind::
+//! Chained`], [`RequestKind::Timed`], the cancellation trio,
+//! [`RequestKind::Standard`]) took the same "extend the one enum, widen
+//! every exhaustive match over it" path rather than introducing a second
+//! type, and this item continues that precedent rather than switching
+//! shapes now. Extending [`RequestKind`] does cost exhaustiveness in
+//! [`execution_priority_tier`], [`resolve_compound_exec_delay`], and
+//! [`resolve_trigger_exec_delay`] — each already widens its own match arm
+//! set for every new variant added since Milestone 5's first entry (see
+//! [`resolve_compound_exec_delay`]'s own doc comment for that precedent
+//! stated explicitly), so this is the same recurring cost those three
+//! functions already pay, not a new one.
+//!
+//! ## Provenance note: the MSB-tagged variants' wire placement
+//!
+//! `ROADMAP.md`'s checklist bullet states only the three hex values
+//! `0x8F`/`0x8B`/`0x8E` themselves, the same way it stated
+//! `0x0F`/`0x0B`/`0x0E`/etc. for the nine base [`RequestKind`] values —
+//! see "Provenance note: `RequestKind`'s wire placement" above, which
+//! this note extends rather than restates. No checklist text says which
+//! byte or field of a request carries this discriminant, or gives
+//! [`crate::acf::ByteMessageInfo`] a bit of its own for the MSB tag; that
+//! struct's fields were all pinned down in Milestone 1 for reasons
+//! unrelated to this milestone's safety-tagging bullet. Per Guiding
+//! Principle 5, [`RequestKind::SafetyCompound`]/[`RequestKind::
+//! SafetyCompoundWait`]/[`RequestKind::SafetyTriggered`] are therefore
+//! modeled with exactly the same standalone-value-type treatment as the
+//! nine base variants: no offset within [`crate::acf::ByteMessageInfo`]
+//! or any other already-built wire shape is guessed here.
+//!
+//! ## Provenance note: execution-priority tier and exec-delay-timer
+//! treatment for the three new variants
+//!
+//! `ROADMAP.md`'s Milestone 6 checklist bullet says nothing about whether
+//! a safety-tagged compound/compound-wait/triggered request's own
+//! execution-priority tier (Milestone 5's "cancellation > triggered >
+//! timed > compound > compound-wait > chained > standard" ordering) or
+//! `*_exec_delay` timer selection differs from its untagged counterpart —
+//! only the watchdog-overflow purge exemption is named. Per Guiding
+//! Principle 5, this item does not invent a difference: [`execution_priority_tier`]
+//! maps each of the three new variants to the exact same
+//! [`ExecutionPriorityTier`] its own untagged base kind already maps to
+//! ([`RequestKind::SafetyCompound`] -> [`ExecutionPriorityTier::Compound`],
+//! [`RequestKind::SafetyCompoundWait`] ->
+//! [`ExecutionPriorityTier::CompoundWait`], [`RequestKind::
+//! SafetyTriggered`] -> [`ExecutionPriorityTier::Triggered`]), and
+//! [`resolve_compound_exec_delay`]/[`resolve_trigger_exec_delay`] resolve
+//! each new variant's timer identically to its own base kind's. Should a
+//! future item learn that safety-tagged requests actually preempt their
+//! untagged counterparts' own tier, this is the value expected to change.
+//!
+//! ## Provenance note: watchdog overflow as a caller-supplied boolean, not
+//! real timer state
+//!
+//! Mirrors [`should_count_trigger_occurrence`]'s own busy/idle `bool`
+//! parameter and [`check_compound_bundle_claim`]'s own three
+//! caller-supplied facts: this crate has no not-yet-built real watchdog
+//! timer/timeout-tracking machinery yet (`ROADMAP.md`'s own next,
+//! still-unchecked "Per-stream safety config" bullet's job — see this
+//! module's "Deliberately out of scope" note in the section above), so
+//! [`check_watchdog_overflow_purge`] and
+//! [`purge_normal_priority_on_watchdog_overflow`] both take "a watchdog
+//! overflow has occurred" as a plain caller-supplied `watchdog_overflowed:
+//! bool`, exactly the same "take the fact, not the machinery that would
+//! produce it" shape used throughout Milestones 1-5.
 
 use crate::regmap::SequencerStateEntry;
 use crate::timestamp::AvtpTimestamp;
@@ -949,6 +1105,18 @@ pub enum RequestKind {
     Triggered = 0x0E,
     /// Compound (`0x0F`): sequencer-gated execution.
     Compound = 0x0F,
+    /// Safety-tagged compound-wait (`0x8B`, `ROADMAP.md` Milestone 6): the
+    /// exact `0x80 | 0x0B` MSB-tagged sibling of [`Self::CompoundWait`] —
+    /// exempt from [`purge_normal_priority_on_watchdog_overflow`]'s purge.
+    /// See this module's doc comment "Safety-request MSB-tagging &
+    /// watchdog-overflow purge" section for the full picture.
+    SafetyCompoundWait = 0x8B,
+    /// Safety-tagged triggered (`0x8E`, `ROADMAP.md` Milestone 6): the
+    /// exact `0x80 | 0x0E` MSB-tagged sibling of [`Self::Triggered`].
+    SafetyTriggered = 0x8E,
+    /// Safety-tagged compound (`0x8F`, `ROADMAP.md` Milestone 6): the
+    /// exact `0x80 | 0x0F` MSB-tagged sibling of [`Self::Compound`].
+    SafetyCompound = 0x8F,
 }
 
 impl RequestKind {
@@ -959,6 +1127,7 @@ impl RequestKind {
     // fusa:req REQ-TIME-001
     // fusa:req REQ-CANCEL-001
     // fusa:req REQ-PRIO-001
+    // fusa:req REQ-SAFETY-001
     pub fn to_u8(self) -> u8 {
         self as u8
     }
@@ -973,6 +1142,7 @@ impl RequestKind {
     // fusa:req REQ-TIME-001
     // fusa:req REQ-CANCEL-001
     // fusa:req REQ-PRIO-001
+    // fusa:req REQ-SAFETY-001
     pub fn from_u8(raw: u8) -> Result<Self, RcpError> {
         match raw {
             0x00 => Ok(Self::Standard),
@@ -984,8 +1154,26 @@ impl RequestKind {
             0x0B => Ok(Self::CompoundWait),
             0x0E => Ok(Self::Triggered),
             0x0F => Ok(Self::Compound),
+            0x8B => Ok(Self::SafetyCompoundWait),
+            0x8E => Ok(Self::SafetyTriggered),
+            0x8F => Ok(Self::SafetyCompound),
             _ => Err(RcpError::InvalidParameter),
         }
+    }
+
+    /// Whether this request kind is one of the three MSB-tagged safety
+    /// variants ([`Self::SafetyCompound`], [`Self::SafetyCompoundWait`],
+    /// [`Self::SafetyTriggered`]) — the checklist's own "safety-tagged
+    /// requests" predicate, consulted by
+    /// [`check_watchdog_overflow_purge`]/
+    /// [`purge_normal_priority_on_watchdog_overflow`] to exempt these three
+    /// from the watchdog-overflow purge. Never panics for any input.
+    // fusa:req REQ-SAFETY-002
+    pub fn is_safety_tagged(self) -> bool {
+        matches!(
+            self,
+            Self::SafetyCompound | Self::SafetyCompoundWait | Self::SafetyTriggered
+        )
     }
 }
 
@@ -1116,11 +1304,13 @@ pub struct CompoundExecDelays {
 /// consumer.
 // fusa:req REQ-CMP-006
 // fusa:req REQ-PRIO-002
+// fusa:req REQ-SAFETY-003
 pub fn resolve_compound_exec_delay(kind: RequestKind, delays: &CompoundExecDelays) -> Option<u32> {
     match kind {
-        RequestKind::Compound => Some(delays.cmp_exec_delay),
-        RequestKind::CompoundWait => Some(delays.cmpw_exec_delay),
+        RequestKind::Compound | RequestKind::SafetyCompound => Some(delays.cmp_exec_delay),
+        RequestKind::CompoundWait | RequestKind::SafetyCompoundWait => Some(delays.cmpw_exec_delay),
         RequestKind::Triggered
+        | RequestKind::SafetyTriggered
         | RequestKind::Chained
         | RequestKind::Timed
         | RequestKind::ClearAll
@@ -1288,11 +1478,14 @@ pub struct TriggerExecDelay(pub u32);
 /// Never panics for any input.
 // fusa:req REQ-TRIG-002
 // fusa:req REQ-PRIO-002
+// fusa:req REQ-SAFETY-003
 pub fn resolve_trigger_exec_delay(kind: RequestKind, delay: TriggerExecDelay) -> Option<u32> {
     match kind {
-        RequestKind::Triggered => Some(delay.0),
+        RequestKind::Triggered | RequestKind::SafetyTriggered => Some(delay.0),
         RequestKind::Compound
+        | RequestKind::SafetyCompound
         | RequestKind::CompoundWait
+        | RequestKind::SafetyCompoundWait
         | RequestKind::Chained
         | RequestKind::Timed
         | RequestKind::ClearAll
@@ -1573,18 +1766,27 @@ pub enum ExecutionPriorityTier {
 }
 
 /// Map a [`RequestKind`] to the [`ExecutionPriorityTier`] it executes
-/// under, collapsing [`RequestKind`]'s nine values down to the checklist's
-/// seven named tiers. Never panics for any input.
+/// under, collapsing [`RequestKind`]'s twelve values down to the
+/// checklist's seven named tiers. Each of the three MSB-tagged safety
+/// variants ([`RequestKind::SafetyCompound`], [`RequestKind::
+/// SafetyCompoundWait`], [`RequestKind::SafetyTriggered`]) maps to the
+/// same tier as its own untagged base kind — see this module's doc
+/// comment "Provenance note: execution-priority tier and exec-delay-timer
+/// treatment for the three new variants" for why. Never panics for any
+/// input.
 // fusa:req REQ-PRIO-003
+// fusa:req REQ-SAFETY-003
 pub fn execution_priority_tier(kind: RequestKind) -> ExecutionPriorityTier {
     match kind {
         RequestKind::ClearAll | RequestKind::ClearNonSafestate | RequestKind::ClearSingle => {
             ExecutionPriorityTier::Cancellation
         }
-        RequestKind::Triggered => ExecutionPriorityTier::Triggered,
+        RequestKind::Triggered | RequestKind::SafetyTriggered => ExecutionPriorityTier::Triggered,
         RequestKind::Timed => ExecutionPriorityTier::Timed,
-        RequestKind::Compound => ExecutionPriorityTier::Compound,
-        RequestKind::CompoundWait => ExecutionPriorityTier::CompoundWait,
+        RequestKind::Compound | RequestKind::SafetyCompound => ExecutionPriorityTier::Compound,
+        RequestKind::CompoundWait | RequestKind::SafetyCompoundWait => {
+            ExecutionPriorityTier::CompoundWait
+        }
         RequestKind::Chained => ExecutionPriorityTier::Chained,
         RequestKind::Standard => ExecutionPriorityTier::Standard,
     }
@@ -2019,13 +2221,76 @@ pub fn check_compound_bundle_claim(
     }
 }
 
+// ── Safety-request MSB-tagging (0x8F/0x8B/0x8E) & watchdog-overflow purge ────
+
+/// The watchdog-overflow purge rule this checklist bullet names, evaluated
+/// for a single request: on watchdog overflow, a normal-priority
+/// (non-safety-tagged) request is purged, while a safety-tagged request
+/// ([`RequestKind::is_safety_tagged`]) is exempt and remains queued.
+///
+/// Returns `Ok(())` (do not purge) when `watchdog_overflowed` is `false`
+/// (no overflow, nothing to purge) or when `kind.is_safety_tagged()` is
+/// `true` (exempt regardless of overflow state), and
+/// `Err(RcpError::RequestCanceled)` — the same outcome signal the
+/// cancellation trio already constructs, see this module's doc comment
+/// "Provenance note: `RequestCanceled` as this item's outcome signal" —
+/// only when `watchdog_overflowed` is `true` and `kind` is not
+/// safety-tagged. Never panics for any input.
+// fusa:req REQ-SAFETY-004
+pub fn check_watchdog_overflow_purge(
+    kind: RequestKind,
+    watchdog_overflowed: bool,
+) -> Result<(), RcpError> {
+    if watchdog_overflowed && !kind.is_safety_tagged() {
+        Err(RcpError::RequestCanceled)
+    } else {
+        Ok(())
+    }
+}
+
+/// Partition `pending`'s entries by [`check_watchdog_overflow_purge`]:
+/// which stay queued, and which are purged, on a watchdog overflow.
+///
+/// Returns `(kept, purged)`, each a `Vec` of indices into `pending`, in
+/// `pending`'s own original relative order. When `watchdog_overflowed` is
+/// `false`, every index lands in `kept` and `purged` is empty. When
+/// `watchdog_overflowed` is `true`, an entry lands in `kept` iff its own
+/// [`PendingRequestKey::kind`] is safety-tagged
+/// ([`RequestKind::is_safety_tagged`]), and in `purged` otherwise. Returns
+/// `(vec![], vec![])` for an empty `pending`. Never panics for any input.
+///
+/// Composes, rather than re-deriving, [`PendingRequestKey`] (Milestone 5's
+/// "Execution priority ordering" pending-request record) and
+/// [`check_watchdog_overflow_purge`] above — mirrors
+/// [`select_next_pending_request`]'s own "pure function over a
+/// caller-supplied slice" shape rather than owning a queue of its own. See
+/// this module's doc comment "Safety-request MSB-tagging &
+/// watchdog-overflow purge" section for how a kept-queued safety-tagged
+/// request composes with the rest of this crate's already-built
+/// pending-request machinery.
+// fusa:req REQ-SAFETY-005
+pub fn purge_normal_priority_on_watchdog_overflow(
+    pending: &[PendingRequestKey],
+    watchdog_overflowed: bool,
+) -> (Vec<usize>, Vec<usize>) {
+    let mut kept = Vec::new();
+    let mut purged = Vec::new();
+    for (index, key) in pending.iter().enumerate() {
+        match check_watchdog_overflow_purge(key.kind, watchdog_overflowed) {
+            Ok(()) => kept.push(index),
+            Err(_) => purged.push(index),
+        }
+    }
+    (kept, purged)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     // ── RequestKind: discriminant round-trip / rejection ────────────────────
 
-    const ALL_REQUEST_KINDS: [RequestKind; 9] = [
+    const ALL_REQUEST_KINDS: [RequestKind; 12] = [
         RequestKind::Standard,
         RequestKind::Chained,
         RequestKind::ClearAll,
@@ -2035,6 +2300,9 @@ mod tests {
         RequestKind::CompoundWait,
         RequestKind::Triggered,
         RequestKind::Compound,
+        RequestKind::SafetyCompoundWait,
+        RequestKind::SafetyTriggered,
+        RequestKind::SafetyCompound,
     ];
 
     #[test]
@@ -2044,6 +2312,7 @@ mod tests {
     // fusa:test REQ-TIME-001
     // fusa:test REQ-CANCEL-001
     // fusa:test REQ-PRIO-001
+    // fusa:test REQ-SAFETY-001
     fn request_kind_round_trips_through_to_u8_from_u8() {
         for kind in ALL_REQUEST_KINDS {
             assert_eq!(RequestKind::from_u8(kind.to_u8()), Ok(kind));
@@ -2057,6 +2326,7 @@ mod tests {
     // fusa:test REQ-TIME-001
     // fusa:test REQ-CANCEL-001
     // fusa:test REQ-PRIO-001
+    // fusa:test REQ-SAFETY-001
     fn request_kind_discriminants_match_roadmap_named_values() {
         assert_eq!(RequestKind::Compound.to_u8(), 0x0F);
         assert_eq!(RequestKind::CompoundWait.to_u8(), 0x0B);
@@ -2072,12 +2342,35 @@ mod tests {
         // anyway so an accidental future renumbering is caught by this
         // test suite.
         assert_eq!(RequestKind::Standard.to_u8(), 0x00);
+        assert_eq!(RequestKind::SafetyCompound.to_u8(), 0x8F);
+        assert_eq!(RequestKind::SafetyCompoundWait.to_u8(), 0x8B);
+        assert_eq!(RequestKind::SafetyTriggered.to_u8(), 0x8E);
+    }
+
+    #[test]
+    // fusa:test REQ-SAFETY-001
+    fn request_kind_safety_variants_are_exactly_0x80_or_their_base_kind() {
+        assert_eq!(
+            RequestKind::SafetyCompound.to_u8(),
+            0x80 | RequestKind::Compound.to_u8()
+        );
+        assert_eq!(
+            RequestKind::SafetyCompoundWait.to_u8(),
+            0x80 | RequestKind::CompoundWait.to_u8()
+        );
+        assert_eq!(
+            RequestKind::SafetyTriggered.to_u8(),
+            0x80 | RequestKind::Triggered.to_u8()
+        );
     }
 
     #[test]
     // fusa:test REQ-CMP-002
+    // fusa:test REQ-SAFETY-001
     fn request_kind_from_u8_rejects_every_other_value() {
-        for raw in [0x02u8, 0x03, 0x04, 0x08, 0x0C, 0x10, 0x7F, 0xFF] {
+        for raw in [
+            0x02u8, 0x03, 0x04, 0x08, 0x0C, 0x10, 0x7F, 0x80, 0x8A, 0x8C, 0x8D, 0xFF,
+        ] {
             assert_eq!(RequestKind::from_u8(raw), Err(RcpError::InvalidParameter));
         }
     }
@@ -2256,6 +2549,27 @@ mod tests {
         assert_eq!(
             resolve_compound_exec_delay(RequestKind::CompoundWait, &delays),
             Some(200)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-SAFETY-003
+    fn resolve_compound_exec_delay_matches_the_safety_tagged_variants_base_kind() {
+        let delays = CompoundExecDelays {
+            cmp_exec_delay: 100,
+            cmpw_exec_delay: 200,
+        };
+        assert_eq!(
+            resolve_compound_exec_delay(RequestKind::SafetyCompound, &delays),
+            resolve_compound_exec_delay(RequestKind::Compound, &delays)
+        );
+        assert_eq!(
+            resolve_compound_exec_delay(RequestKind::SafetyCompoundWait, &delays),
+            resolve_compound_exec_delay(RequestKind::CompoundWait, &delays)
+        );
+        assert_eq!(
+            resolve_compound_exec_delay(RequestKind::SafetyTriggered, &delays),
+            None
         );
     }
 
@@ -2592,6 +2906,24 @@ mod tests {
         assert_eq!(
             resolve_trigger_exec_delay(RequestKind::Triggered, delay),
             Some(42)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-SAFETY-003
+    fn resolve_trigger_exec_delay_matches_the_safety_tagged_variants_base_kind() {
+        let delay = TriggerExecDelay(42);
+        assert_eq!(
+            resolve_trigger_exec_delay(RequestKind::SafetyTriggered, delay),
+            resolve_trigger_exec_delay(RequestKind::Triggered, delay)
+        );
+        assert_eq!(
+            resolve_trigger_exec_delay(RequestKind::SafetyCompound, delay),
+            None
+        );
+        assert_eq!(
+            resolve_trigger_exec_delay(RequestKind::SafetyCompoundWait, delay),
+            None
         );
     }
 
@@ -2995,6 +3327,23 @@ mod tests {
         assert_eq!(
             execution_priority_tier(RequestKind::Standard),
             ExecutionPriorityTier::Standard
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-SAFETY-003
+    fn execution_priority_tier_maps_each_safety_tagged_variant_to_its_base_kinds_tier() {
+        assert_eq!(
+            execution_priority_tier(RequestKind::SafetyCompound),
+            execution_priority_tier(RequestKind::Compound)
+        );
+        assert_eq!(
+            execution_priority_tier(RequestKind::SafetyCompoundWait),
+            execution_priority_tier(RequestKind::CompoundWait)
+        );
+        assert_eq!(
+            execution_priority_tier(RequestKind::SafetyTriggered),
+            execution_priority_tier(RequestKind::Triggered)
         );
     }
 
@@ -3686,6 +4035,215 @@ mod tests {
                         has_clear_non_safestate,
                     );
                 }
+            }
+        }
+    }
+
+    // ── RequestKind::is_safety_tagged ─────────────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-SAFETY-002
+    fn is_safety_tagged_is_true_only_for_the_three_safety_variants() {
+        for kind in [
+            RequestKind::SafetyCompound,
+            RequestKind::SafetyCompoundWait,
+            RequestKind::SafetyTriggered,
+        ] {
+            assert!(kind.is_safety_tagged());
+        }
+        for kind in [
+            RequestKind::Standard,
+            RequestKind::Chained,
+            RequestKind::ClearAll,
+            RequestKind::ClearNonSafestate,
+            RequestKind::ClearSingle,
+            RequestKind::Timed,
+            RequestKind::CompoundWait,
+            RequestKind::Triggered,
+            RequestKind::Compound,
+        ] {
+            assert!(!kind.is_safety_tagged());
+        }
+    }
+
+    // ── check_watchdog_overflow_purge ──────────────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-SAFETY-004
+    fn check_watchdog_overflow_purge_keeps_everything_when_not_overflowed() {
+        for kind in ALL_REQUEST_KINDS {
+            assert_eq!(check_watchdog_overflow_purge(kind, false), Ok(()));
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-SAFETY-004
+    fn check_watchdog_overflow_purge_purges_normal_priority_kinds_on_overflow() {
+        for kind in [
+            RequestKind::Standard,
+            RequestKind::Chained,
+            RequestKind::ClearAll,
+            RequestKind::ClearNonSafestate,
+            RequestKind::ClearSingle,
+            RequestKind::Timed,
+            RequestKind::CompoundWait,
+            RequestKind::Triggered,
+            RequestKind::Compound,
+        ] {
+            assert_eq!(
+                check_watchdog_overflow_purge(kind, true),
+                Err(RcpError::RequestCanceled)
+            );
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-SAFETY-004
+    fn check_watchdog_overflow_purge_exempts_safety_tagged_kinds_on_overflow() {
+        for kind in [
+            RequestKind::SafetyCompound,
+            RequestKind::SafetyCompoundWait,
+            RequestKind::SafetyTriggered,
+        ] {
+            assert_eq!(check_watchdog_overflow_purge(kind, true), Ok(()));
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-SAFETY-004
+    fn check_watchdog_overflow_purge_never_panics_for_any_sampled_input() {
+        for kind in ALL_REQUEST_KINDS {
+            for watchdog_overflowed in [false, true] {
+                let _ = check_watchdog_overflow_purge(kind, watchdog_overflowed);
+            }
+        }
+    }
+
+    // ── purge_normal_priority_on_watchdog_overflow ─────────────────────────────
+
+    #[test]
+    // fusa:test REQ-SAFETY-005
+    fn purge_normal_priority_on_watchdog_overflow_is_a_no_op_for_an_empty_slice() {
+        assert_eq!(
+            purge_normal_priority_on_watchdog_overflow(&[], true),
+            (vec![], vec![])
+        );
+        assert_eq!(
+            purge_normal_priority_on_watchdog_overflow(&[], false),
+            (vec![], vec![])
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-SAFETY-005
+    fn purge_normal_priority_on_watchdog_overflow_keeps_everything_without_overflow() {
+        let pending = [
+            PendingRequestKey {
+                kind: RequestKind::Standard,
+                arrival_seq: 0,
+            },
+            PendingRequestKey {
+                kind: RequestKind::SafetyCompound,
+                arrival_seq: 1,
+            },
+            PendingRequestKey {
+                kind: RequestKind::Triggered,
+                arrival_seq: 2,
+            },
+        ];
+        assert_eq!(
+            purge_normal_priority_on_watchdog_overflow(&pending, false),
+            (vec![0, 1, 2], vec![])
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-SAFETY-005
+    fn purge_normal_priority_on_watchdog_overflow_purges_normal_keeps_safety_tagged() {
+        let pending = [
+            PendingRequestKey {
+                kind: RequestKind::Standard,
+                arrival_seq: 0,
+            },
+            PendingRequestKey {
+                kind: RequestKind::SafetyCompound,
+                arrival_seq: 1,
+            },
+            PendingRequestKey {
+                kind: RequestKind::Triggered,
+                arrival_seq: 2,
+            },
+            PendingRequestKey {
+                kind: RequestKind::SafetyTriggered,
+                arrival_seq: 3,
+            },
+            PendingRequestKey {
+                kind: RequestKind::ClearAll,
+                arrival_seq: 4,
+            },
+            PendingRequestKey {
+                kind: RequestKind::SafetyCompoundWait,
+                arrival_seq: 5,
+            },
+        ];
+        assert_eq!(
+            purge_normal_priority_on_watchdog_overflow(&pending, true),
+            (vec![1, 3, 5], vec![0, 2, 4])
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-SAFETY-005
+    fn purge_normal_priority_on_watchdog_overflow_all_safety_tagged_keeps_all() {
+        let pending = [
+            PendingRequestKey {
+                kind: RequestKind::SafetyCompound,
+                arrival_seq: 0,
+            },
+            PendingRequestKey {
+                kind: RequestKind::SafetyCompoundWait,
+                arrival_seq: 1,
+            },
+            PendingRequestKey {
+                kind: RequestKind::SafetyTriggered,
+                arrival_seq: 2,
+            },
+        ];
+        assert_eq!(
+            purge_normal_priority_on_watchdog_overflow(&pending, true),
+            (vec![0, 1, 2], vec![])
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-SAFETY-005
+    fn purge_normal_priority_on_watchdog_overflow_all_normal_purges_all() {
+        let pending = [
+            PendingRequestKey {
+                kind: RequestKind::Standard,
+                arrival_seq: 0,
+            },
+            PendingRequestKey {
+                kind: RequestKind::Compound,
+                arrival_seq: 1,
+            },
+        ];
+        assert_eq!(
+            purge_normal_priority_on_watchdog_overflow(&pending, true),
+            (vec![], vec![0, 1])
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-SAFETY-005
+    fn purge_normal_priority_on_watchdog_overflow_never_panics_for_any_sampled_input() {
+        for kind in ALL_REQUEST_KINDS {
+            for watchdog_overflowed in [false, true] {
+                let pending = [PendingRequestKey {
+                    kind,
+                    arrival_seq: 0,
+                }];
+                let _ = purge_normal_priority_on_watchdog_overflow(&pending, watchdog_overflowed);
             }
         }
     }
