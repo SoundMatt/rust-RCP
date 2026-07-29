@@ -34,7 +34,7 @@ This plan covers security incidents affecting the rust-RCP library or any deploy
 
 1. Identify affected versions and deployment scope.
 2. For confirmed RCE or safety impact: recommend immediate update or isolation.
-3. Disable affected features if possible via `AuthzController` policy hot-swap.
+3. Disable affected features if possible via `AuthzEndpoint` policy hot-swap.
 
 ### 3. Analysis and Fix
 

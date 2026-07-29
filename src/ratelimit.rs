@@ -4,18 +4,36 @@
 // fusa:req REQ-RL-004
 // fusa:req REQ-RL-005
 // fusa:req REQ-RL-006
-// fusa:req REQ-RL-007
 // fusa:req REQ-RL-008
 
-//! Token-bucket rate limiter controller.
+//! Token-bucket rate limiter endpoint decorator.
 //!
-//! Commands that cannot be immediately served return `Err(RcpError::Busy)`.
-//! Critical commands bypass the bucket when `exempt_critical = true`.
+//! Requests that cannot be immediately served return `Err(RcpError::Busy)`.
+//!
+//! `ROADMAP.md` Milestone 9 ("All ADAPT-disposition packages retargeted...")
+//! cutover: per this module's own ADAPT disposition ("generic token-bucket
+//! decorator; retarget to whatever new endpoint-request dispatch trait
+//! replaces `Controller`"), [`RateLimitEndpoint`] replaces the legacy
+//! `RateLimitController`, wrapping [`crate::mock::Endpoint`] instead of
+//! `Controller`. The bucket is now consumed uniformly by every
+//! [`crate::mock::Endpoint::read`]/[`crate::mock::Endpoint::write`] call:
+//! the old `exempt_critical` carve-out has no surviving analog, since
+//! `Endpoint` requests carry no `Priority` (that field lived on the
+//! deleted `Command` shape a caller addressed a zone controller with, not
+//! on anything the register-map/endpoint model defines) — a scope
+//! narrowing flagged here per Guiding Principle 5 rather than silently
+//! dropped. `REQ-RL-007` ("Critical exempt from rate limit"), which
+//! described only that dropped carve-out with no surviving analog, is
+//! retired in `.fusa-reqs.json` rather than force-retargeted, per this
+//! bullet's own "retarget in place, or explicitly retire if no equivalent
+//! behavior exists" instruction.
 
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
-use crate::{Command, Controller, Priority, RcpError, Response, Subscription, Zone};
+use crate::mock::Endpoint;
+use crate::regmap::EndpointType;
+use crate::RcpError;
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -23,21 +41,18 @@ use crate::{Command, Controller, Priority, RcpError, Response, Subscription, Zon
 // fusa:req REQ-RL-001
 #[derive(Clone, Debug)]
 pub struct Config {
-    /// Sustained command rate (commands per second).
+    /// Sustained request rate (calls per second).
     pub rate: f64,
-    /// Maximum burst capacity (number of commands).
+    /// Maximum burst capacity (number of calls).
     pub burst: f64,
-    /// When `true`, Critical-priority commands bypass the rate limiter.
-    pub exempt_critical: bool,
 }
 
-/// Returns the default rate-limiter config: 100 cmd/s, 20-command burst, Critical exempt.
+/// Returns the default rate-limiter config: 100 calls/s, 20-call burst.
 // fusa:req REQ-RL-002
 pub fn default_config() -> Config {
     Config {
         rate: 100.0,
         burst: 20.0,
-        exempt_critical: true,
     }
 }
 
@@ -77,61 +92,58 @@ impl Bucket {
     }
 }
 
-// ── RateLimitController ───────────────────────────────────────────────────────
+// ── RateLimitEndpoint ────────────────────────────────────────────────────────
 
-/// Rate-limiting wrapper around an inner [`Controller`].
+/// Rate-limiting wrapper around an inner [`Endpoint`].
 // fusa:req REQ-RL-003
-pub struct RateLimitController {
-    inner: Arc<dyn Controller>,
+pub struct RateLimitEndpoint {
+    inner: Arc<dyn Endpoint>,
     bucket: Mutex<Bucket>,
-    exempt_critical: bool,
 }
 
-impl RateLimitController {
-    /// Create a new `RateLimitController` with the given configuration.
+impl RateLimitEndpoint {
+    /// Create a new `RateLimitEndpoint` with the given configuration.
     // fusa:req REQ-RL-004
-    pub fn new(inner: Arc<dyn Controller>, cfg: Config) -> Self {
-        let exempt = cfg.exempt_critical;
-        RateLimitController {
+    pub fn new(inner: Arc<dyn Endpoint>, cfg: Config) -> Self {
+        RateLimitEndpoint {
             inner,
             bucket: Mutex::new(Bucket::new(&cfg)),
-            exempt_critical: exempt,
         }
     }
 
     /// Create with the default configuration.
-    pub fn new_default(inner: Arc<dyn Controller>) -> Self {
+    pub fn new_default(inner: Arc<dyn Endpoint>) -> Self {
         Self::new(inner, default_config())
+    }
+
+    /// Consume one token, or return `Err(RcpError::Busy)` if the bucket is
+    /// empty.
+    fn consume(&self) -> Result<(), RcpError> {
+        let mut bucket = self.bucket.lock().unwrap();
+        if !bucket.try_consume() {
+            return Err(RcpError::Busy);
+        }
+        Ok(())
     }
 }
 
-impl Controller for RateLimitController {
-    fn zone(&self) -> Zone {
-        self.inner.zone()
+impl Endpoint for RateLimitEndpoint {
+    fn ep_type(&self) -> EndpointType {
+        self.inner.ep_type()
     }
 
     // fusa:req REQ-RL-005
     // fusa:req REQ-RL-006
-    // fusa:req REQ-RL-007
-    fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
-        let is_critical = cmd.priority == Priority::CRITICAL;
-
-        if !is_critical || !self.exempt_critical {
-            let mut bucket = self.bucket.lock().unwrap();
-            if !bucket.try_consume() {
-                return Err(RcpError::Busy);
-            }
-        }
-
-        self.inner.send(cmd, timeout)
+    fn read(&self, read_size: u8) -> Result<Vec<u8>, RcpError> {
+        self.consume()?;
+        self.inner.read(read_size)
     }
 
-    fn subscribe(&self) -> Result<Subscription, RcpError> {
-        self.inner.subscribe()
-    }
-
-    fn close(&self) -> Result<(), RcpError> {
-        self.inner.close()
+    // fusa:req REQ-RL-005
+    // fusa:req REQ-RL-006
+    fn write(&self, payload: &[u8]) -> Result<(), RcpError> {
+        self.consume()?;
+        self.inner.write(payload)
     }
 }
 
@@ -141,26 +153,16 @@ impl Controller for RateLimitController {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mock::MockController;
-    use crate::{Command, Priority, Response, ResponseStatus, Zone};
+    use crate::mock::MockEndpoint;
+    use std::time::Duration;
 
-    fn ok_controller() -> Arc<dyn Controller> {
-        let h: crate::mock::Handler = Box::new(|cmd| Response {
-            command_id: cmd.id,
-            zone: cmd.zone,
-            status: ResponseStatus::OK,
-            payload: None,
-        });
-        MockController::new(Zone::FRONT_LEFT, Some(h)) as Arc<dyn Controller>
+    fn ok_endpoint() -> Arc<dyn Endpoint> {
+        MockEndpoint::new(EndpointType::Gpio, vec![0u8; 4]) as Arc<dyn Endpoint>
     }
 
-    fn rl(rate: f64, burst: f64, exempt_critical: bool) -> RateLimitController {
-        let cfg = Config {
-            rate,
-            burst,
-            exempt_critical,
-        };
-        RateLimitController::new(ok_controller(), cfg)
+    fn rl(rate: f64, burst: f64) -> RateLimitEndpoint {
+        let cfg = Config { rate, burst };
+        RateLimitEndpoint::new(ok_endpoint(), cfg)
     }
 
     // ── Default config ────────────────────────────────────────────────────────
@@ -171,7 +173,6 @@ mod tests {
         let cfg = default_config();
         assert_eq!(cfg.rate, 100.0);
         assert_eq!(cfg.burst, 20.0);
-        assert!(cfg.exempt_critical);
     }
 
     // ── Burst allowed ─────────────────────────────────────────────────────────
@@ -180,17 +181,12 @@ mod tests {
     // fusa:test REQ-RL-001
     // fusa:test REQ-RL-005
     fn burst_capacity_is_honoured() {
-        let rl = rl(1.0, 5.0, false); // 1 cmd/s, burst=5
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            ..Default::default()
-        };
-
+        let rl = rl(1.0, 5.0); // 1 call/s, burst=5
         for _ in 0..5 {
-            rl.send(&cmd, None).unwrap();
+            rl.write(b"x").unwrap();
         }
         // 6th should be rejected
-        let err = rl.send(&cmd, None).unwrap_err();
+        let err = rl.write(b"x").unwrap_err();
         assert_eq!(err, RcpError::Busy);
     }
 
@@ -199,93 +195,48 @@ mod tests {
     #[test]
     // fusa:test REQ-RL-006
     fn bucket_exhaustion_returns_busy() {
-        let rl = rl(0.0, 0.0, false); // zero tokens — always Busy
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            ..Default::default()
-        };
-        let err = rl.send(&cmd, None).unwrap_err();
+        let rl = rl(0.0, 0.0); // zero tokens — always Busy
+        let err = rl.write(b"x").unwrap_err();
         assert_eq!(err, RcpError::Busy);
     }
 
     #[test]
     // fusa:test REQ-RL-006
-    fn burst_exhaustion_across_multiple_sends_returns_busy() {
-        let rl = rl(0.0, 3.0, false); // 3 burst, no refill
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            ..Default::default()
-        };
+    fn burst_exhaustion_across_multiple_calls_returns_busy() {
+        let rl = rl(0.0, 3.0); // 3 burst, no refill
         for _ in 0..3 {
-            rl.send(&cmd, None).unwrap();
+            rl.read(1).unwrap();
         }
         // 4th must be rejected — bucket is empty
-        assert_eq!(rl.send(&cmd, None).unwrap_err(), RcpError::Busy);
+        assert_eq!(rl.read(1).unwrap_err(), RcpError::Busy);
     }
 
-    // ── Critical exempt ───────────────────────────────────────────────────────
-
-    #[test]
-    // fusa:test REQ-RL-007
-    fn critical_bypasses_empty_bucket() {
-        let rl = rl(0.0, 0.0, true); // zero tokens, Critical exempt
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            priority: Priority::CRITICAL,
-            ..Default::default()
-        };
-        rl.send(&cmd, None).unwrap(); // must succeed despite empty bucket
-    }
-
-    #[test]
-    // fusa:test REQ-RL-007
-    fn critical_not_exempt_when_disabled() {
-        let rl = rl(0.0, 0.0, false); // zero tokens, Critical NOT exempt
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            priority: Priority::CRITICAL,
-            ..Default::default()
-        };
-        let err = rl.send(&cmd, None).unwrap_err();
-        assert_eq!(err, RcpError::Busy);
-    }
-
-    // ── Normal and High obey bucket ───────────────────────────────────────────
+    // ── Read and write both obey bucket ───────────────────────────────────────
 
     #[test]
     // fusa:test REQ-RL-005
-    fn normal_priority_obeys_bucket() {
-        let rl = rl(0.0, 0.0, true); // Critical exempt, but normal is not
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            priority: Priority::NORMAL,
-            ..Default::default()
-        };
-        let err = rl.send(&cmd, None).unwrap_err();
+    fn read_obeys_bucket() {
+        let rl = rl(0.0, 0.0);
+        let err = rl.read(1).unwrap_err();
         assert_eq!(err, RcpError::Busy);
     }
 
     #[test]
     // fusa:test REQ-RL-005
-    fn high_priority_obeys_bucket() {
-        let rl = rl(0.0, 0.0, true);
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            priority: Priority::HIGH,
-            ..Default::default()
-        };
-        let err = rl.send(&cmd, None).unwrap_err();
+    fn write_obeys_bucket() {
+        let rl = rl(0.0, 0.0);
+        let err = rl.write(b"x").unwrap_err();
         assert_eq!(err, RcpError::Busy);
     }
 
-    // ── Zone forwarded ────────────────────────────────────────────────────────
+    // ── ep_type forwarded ────────────────────────────────────────────────────
 
     #[test]
     // fusa:test REQ-RL-003
-    fn zone_matches_inner() {
-        let inner = MockController::new(Zone::REAR_LEFT, None) as Arc<dyn Controller>;
-        let rl = RateLimitController::new_default(inner);
-        assert_eq!(rl.zone(), Zone::REAR_LEFT);
+    fn ep_type_matches_inner() {
+        let inner = MockEndpoint::new(EndpointType::Adc, vec![]) as Arc<dyn Endpoint>;
+        let rl = RateLimitEndpoint::new_default(inner);
+        assert_eq!(rl.ep_type(), EndpointType::Adc);
     }
 
     // ── Token replenishment ───────────────────────────────────────────────────
@@ -293,15 +244,11 @@ mod tests {
     #[test]
     // fusa:test REQ-RL-004
     fn tokens_replenish_over_time() {
-        let rl = rl(1000.0, 1.0, false); // very fast replenishment, burst=1
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            ..Default::default()
-        };
-        rl.send(&cmd, None).unwrap(); // consume the one token
-                                      // Wait for replenishment
+        let rl = rl(1000.0, 1.0); // very fast replenishment, burst=1
+        rl.write(b"x").unwrap(); // consume the one token
+                                 // Wait for replenishment
         std::thread::sleep(Duration::from_millis(5));
-        rl.send(&cmd, None).unwrap(); // should succeed after replenishment
+        rl.write(b"x").unwrap(); // should succeed after replenishment
     }
 
     // ── Busy is a relay timeout sentinel ─────────────────────────────────────
@@ -314,14 +261,5 @@ mod tests {
             err.is_relay_timeout(),
             "Busy must satisfy is_relay_timeout()"
         );
-    }
-
-    // ── Close forwarded ───────────────────────────────────────────────────────
-
-    #[test]
-    // fusa:test REQ-RL-003
-    fn close_is_forwarded_to_inner() {
-        let rl = rl(100.0, 10.0, true);
-        rl.close().unwrap();
     }
 }

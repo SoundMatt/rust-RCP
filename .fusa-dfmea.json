@@ -79,8 +79,8 @@
       "effect": "DoS allows unlimited commands to flood a controller",
       "severity": "S2",
       "cause": "Token bucket logic error; tokens underflow or not checked",
-      "detection": "RateLimitController returns Err(Busy) when tokens < 1.0",
-      "mitigation": "REQ-RL-006 Busy sentinel + REQ-RL-007 CRITICAL exempt from rate limit",
+      "detection": "RateLimitEndpoint returns Err(Busy) when tokens < 1.0",
+      "mitigation": "REQ-RL-006 Busy sentinel; the old exempt_critical carve-out (REQ-RL-007) was retired by Milestone 9's ADAPT retarget since Endpoint requests carry no Priority \u2014 see .fusa-iec62443.json T-004 for how DoS-vs-critical-priority mitigation is handled now",
       "residual_risk": "low"
     },
     {

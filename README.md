@@ -56,42 +56,42 @@ assert_eq!(resp.zone, Zone::FRONT_LEFT);
 | `wire` | Binary wire-frame encoder/decoder (RELAY spec §10) |
 | `e2e` | End-to-end protection: OPEN Alliance TC18 safe-point CRC-32 |
 | `prioqueue` | Priority-queue controller (Critical > High > Normal) |
-| `ratelimit` | Token-bucket rate limiter |
-| `sim` | Deterministic simulation controller |
+| `ratelimit` | Token-bucket rate limiter (`RateLimitEndpoint`, over `mock::Endpoint`) |
+| `sim` | Deterministic simulation endpoint (`SimEndpoint`) |
 | `watchdog` | Periodic WATCHDOG command dispatcher |
-| `deadline` | Hard response deadline enforcement |
+| `deadline` | Endpoint call-deadline enforcement (`DeadlineEndpoint`) |
 | `powerstate` | SLEEP/WAKE power state machine |
-| `faultinject` | Deterministic fault injection for testing |
-| `loan` | Zero-copy payload pool (LoanPoolController) |
+| `faultinject` | Deterministic fault injection for testing (`FaultInjectEndpoint`) |
+| `loan` | Zero-copy payload pool (`LoanPoolEndpoint`) |
 | `zonegroup` | Broadcast commands to multiple zones in parallel |
-| `proxy` | Hot-swappable proxy controller |
-| `redundancy` | 1-of-2 hot-standby failover controller |
-| `observe` | Latency histogram and event hooks |
+| `proxy` | Hot-swappable proxy endpoint (`ProxyEndpoint`) |
+| `redundancy` | 1-of-2 hot-standby failover endpoint (`RedundancyEndpoint`) |
+| `observe` | Latency histogram and event hooks (`ObserveEndpoint`) |
 | `tsn` | IEEE 802.1Qav traffic-class tagging |
-| `authz` | Command ACL policy enforcement |
+| `authz` | (endpoint-type, request-type) ACL policy enforcement (`AuthzEndpoint`) |
 | `firmware` | Chunked firmware update sequencer |
-| `record` | Command/response audit logger |
-| `federation` | Multi-vehicle registry router |
+| `record` | Read/write call audit logger (`RecordEndpoint`) |
+| `federation` | Multi-vehicle routing over each peer's own `DiscoveryCache` |
 | `dyndata` | Runtime key/value parameter store |
 | `config` | JSON/YAML configuration loader and validator |
 | `codegen` | Rust struct code generator from JSON schema |
 | `iso21434` | ISO 21434 TARA threat and risk types |
 | `certgap` | Certification gap analysis |
 | `formal` | Runtime-checkable formal invariants |
-| `admin` | Health checks and graceful shutdown |
+| `admin` | Discovered-peer health/staleness reporting and graceful shutdown (`AdminServer`, over `discovery::DiscoveryCache`) |
 | `someip` | SOME/IP bridge |
 | `mqttbr` | MQTT bridge |
 | `ddsbr` | DDS / AUTOSAR Adaptive bridge |
 | `udp` | UDP unicast transport (`UdpTransport`, client) + RC-Server-endpoint dispatch with discovery integration (`UdpRcServer`, server) |
-| `shmem` | Shared-memory IPC bridge |
-| `mdns` | mDNS/DNS-SD service discovery |
+| `shmem` | Shared-memory IPC bridge, `StreamId`-addressed (`ShmBridge`) |
+| `mdns` | mDNS/DNS-SD pre-discovery rendezvous helper |
 | `tlstransport` | TLS 1.2+ secured transport |
 | `grpcbridge` | gRPC stub bridge |
 | `restbridge` | REST/HTTP bridge |
 | `udsbr` | UDS (ISO 14229) bridge |
 | `doipbr` | DoIP (ISO 13400-2) bridge |
 | `capi` | C FFI types and error codes |
-| `adapt` | External message format adapter, and the RELAY `Adapt()`/`to_message()`/`from_message()` entry point (§10.3, §15.7.5) |
+| `adapt` | External message format adapter over `mock::Endpoint` (`AdaptEndpoint`), and the still-`Controller`-bound RELAY `Adapt()`/`to_message()`/`from_message()` entry point (§10.3, §15.7.5), pending its own Milestone 10 endpoint-addressed rebuild |
 | `relay` | Vendored RELAY protocol types — `Message`, `Node`, `Caller`, error sentinels (§18.3) |
 | `base64_serde` | Base64 serde helpers for `Message`/`Command`/`Response`/`Status` payload fields |
 

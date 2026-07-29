@@ -5,75 +5,77 @@
 // fusa:req REQ-PROXY-005
 // fusa:req REQ-PROXY-006
 
-//! Transparent proxy controller — delegates to an interchangeable inner
-//! controller, allowing hot-swap without changing the call site.
+//! Transparent proxy endpoint — delegates to an interchangeable inner
+//! endpoint, allowing hot-swap without changing the call site.
+//!
+//! `ROADMAP.md` Milestone 9 ("All ADAPT-disposition packages retargeted...")
+//! cutover: per this module's own ADAPT disposition ("fully generic
+//! hot-swap decorator; trivially retargeted to any new base trait"),
+//! [`ProxyEndpoint`] replaces the legacy `ProxyController`, wrapping
+//! [`crate::mock::Endpoint`] instead of `Controller`. [`Self::ep_type`] is
+//! captured once, from the original inner endpoint at construction, and
+//! never re-queried on [`Self::swap`] — the same "identity survives a
+//! swap" discipline the old type's `zone` field already established.
 
 use std::sync::{Arc, RwLock};
-use std::time::Duration;
 
-use crate::{Command, Controller, RcpError, Response, Subscription, Zone};
+use crate::mock::Endpoint;
+use crate::regmap::EndpointType;
+use crate::RcpError;
 
-// ── ProxyController ───────────────────────────────────────────────────────────
+// ── ProxyEndpoint ─────────────────────────────────────────────────────────────
 
-/// A proxy that forwards all calls to a replaceable inner controller.
+/// A proxy that forwards all calls to a replaceable inner endpoint.
 // fusa:req REQ-PROXY-001
-pub struct ProxyController {
-    zone: Zone,
-    inner: RwLock<Option<Arc<dyn Controller>>>,
+pub struct ProxyEndpoint {
+    ep_type: EndpointType,
+    inner: RwLock<Option<Arc<dyn Endpoint>>>,
 }
 
-impl ProxyController {
+impl ProxyEndpoint {
     /// Create a proxy backed by `inner`.
     // fusa:req REQ-PROXY-002
-    pub fn new(inner: Arc<dyn Controller>) -> Self {
-        let zone = inner.zone();
-        ProxyController {
-            zone,
+    pub fn new(inner: Arc<dyn Endpoint>) -> Self {
+        let ep_type = inner.ep_type();
+        ProxyEndpoint {
+            ep_type,
             inner: RwLock::new(Some(inner)),
         }
     }
 
-    /// Replace the inner controller atomically.
+    /// Replace the inner endpoint atomically.
     // fusa:req REQ-PROXY-005
-    pub fn swap(&self, new_inner: Arc<dyn Controller>) {
+    pub fn swap(&self, new_inner: Arc<dyn Endpoint>) {
         *self.inner.write().unwrap() = Some(new_inner);
     }
 
-    /// Detach the inner controller; subsequent calls return `Err(RcpError::NotConnected)`.
+    /// Detach the inner endpoint; subsequent calls return `Err(RcpError::NotConnected)`.
     // fusa:req REQ-PROXY-006
     pub fn detach(&self) {
         *self.inner.write().unwrap() = None;
     }
 }
 
-impl Controller for ProxyController {
-    fn zone(&self) -> Zone {
-        self.zone
+impl Endpoint for ProxyEndpoint {
+    fn ep_type(&self) -> EndpointType {
+        self.ep_type
     }
 
     // fusa:req REQ-PROXY-003
-    fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
+    fn read(&self, read_size: u8) -> Result<Vec<u8>, RcpError> {
         let guard = self.inner.read().unwrap();
         match guard.as_ref() {
-            Some(ctrl) => ctrl.send(cmd, timeout),
+            Some(ep) => ep.read(read_size),
             None => Err(RcpError::NotConnected),
         }
     }
 
     // fusa:req REQ-PROXY-004
-    fn subscribe(&self) -> Result<Subscription, RcpError> {
+    fn write(&self, payload: &[u8]) -> Result<(), RcpError> {
         let guard = self.inner.read().unwrap();
         match guard.as_ref() {
-            Some(ctrl) => ctrl.subscribe(),
+            Some(ep) => ep.write(payload),
             None => Err(RcpError::NotConnected),
-        }
-    }
-
-    fn close(&self) -> Result<(), RcpError> {
-        let guard = self.inner.read().unwrap();
-        match guard.as_ref() {
-            Some(ctrl) => ctrl.close(),
-            None => Ok(()),
         }
     }
 }
@@ -84,84 +86,62 @@ impl Controller for ProxyController {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mock::MockController;
-    use crate::{Command, Response, ResponseStatus, Zone};
+    use crate::mock::MockEndpoint;
 
-    fn ok_ctrl(zone: Zone) -> Arc<dyn Controller> {
-        let h: crate::mock::Handler = Box::new(move |cmd| Response {
-            command_id: cmd.id,
-            zone: cmd.zone,
-            status: ResponseStatus::OK,
-            payload: None,
-        });
-        MockController::new(zone, Some(h)) as Arc<dyn Controller>
+    fn ok_ep(ep_type: EndpointType) -> Arc<dyn Endpoint> {
+        MockEndpoint::new(ep_type, vec![0u8; 4]) as Arc<dyn Endpoint>
     }
 
     #[test]
     // fusa:test REQ-PROXY-001
     // fusa:test REQ-PROXY-003
-    fn forwards_send_to_inner() {
-        let proxy = ProxyController::new(ok_ctrl(Zone::FRONT_LEFT));
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            ..Default::default()
-        };
-        proxy.send(&cmd, None).unwrap();
+    fn forwards_calls_to_inner() {
+        let proxy = ProxyEndpoint::new(ok_ep(EndpointType::Gpio));
+        proxy.write(b"x").unwrap();
+        proxy.read(4).unwrap();
     }
 
     #[test]
     // fusa:test REQ-PROXY-002
-    fn zone_matches_original_inner() {
-        let proxy = ProxyController::new(ok_ctrl(Zone::REAR_LEFT));
-        assert_eq!(proxy.zone(), Zone::REAR_LEFT);
+    fn ep_type_matches_original_inner() {
+        let proxy = ProxyEndpoint::new(ok_ep(EndpointType::Adc));
+        assert_eq!(proxy.ep_type(), EndpointType::Adc);
     }
 
     #[test]
     // fusa:test REQ-PROXY-005
     fn swap_replaces_inner() {
-        let proxy = ProxyController::new(ok_ctrl(Zone::FRONT_LEFT));
-        // Close the original inner so it would return Err(Closed)
-        let closed = ok_ctrl(Zone::FRONT_LEFT);
-        closed.close().unwrap();
-        proxy.swap(Arc::clone(&closed));
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            ..Default::default()
-        };
-        let err = proxy.send(&cmd, None).unwrap_err();
-        assert_eq!(err, RcpError::Closed);
+        let proxy = ProxyEndpoint::new(ok_ep(EndpointType::Gpio));
+        // Detach-and-reattach a fresh endpoint to observe the swap taking
+        // effect: swap to an endpoint holding different data.
+        let replacement = MockEndpoint::new(EndpointType::Gpio, vec![9u8; 2]);
+        proxy.swap(replacement as Arc<dyn Endpoint>);
+        let got = proxy.read(2).unwrap();
+        assert_eq!(got, vec![9u8; 2]);
     }
 
     #[test]
     // fusa:test REQ-PROXY-006
     fn detach_returns_not_connected() {
-        let proxy = ProxyController::new(ok_ctrl(Zone::FRONT_LEFT));
+        let proxy = ProxyEndpoint::new(ok_ep(EndpointType::Gpio));
         proxy.detach();
-        let err = proxy
-            .send(
-                &Command {
-                    zone: Zone::FRONT_LEFT,
-                    ..Default::default()
-                },
-                None,
-            )
-            .unwrap_err();
+        let err = proxy.write(b"x").unwrap_err();
         assert_eq!(err, RcpError::NotConnected);
     }
 
     #[test]
     // fusa:test REQ-PROXY-004
-    fn subscribe_forwarded() {
-        let proxy = ProxyController::new(ok_ctrl(Zone::FRONT_LEFT));
-        proxy.subscribe().unwrap();
+    fn read_forwarded() {
+        let proxy = ProxyEndpoint::new(ok_ep(EndpointType::Gpio));
+        proxy.read(4).unwrap();
     }
 
     #[test]
     // fusa:test REQ-PROXY-006
-    fn subscribe_detached_returns_not_connected() {
-        let proxy = ProxyController::new(ok_ctrl(Zone::FRONT_LEFT));
+    fn read_detached_returns_not_connected() {
+        let proxy = ProxyEndpoint::new(ok_ep(EndpointType::Gpio));
         proxy.detach();
-        let err = proxy.subscribe().err().unwrap();
+        let err = proxy.read(4).err().unwrap();
         assert_eq!(err, RcpError::NotConnected);
     }
 }

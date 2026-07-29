@@ -29,8 +29,8 @@
       "id": "T-004",
       "category": "denial-of-service",
       "description": "Attacker floods RCP with low-priority commands to delay critical ones",
-      "countermeasures": ["REQ-RL-007", "REQ-PQ-004"],
-      "residual_risk": "low"
+      "countermeasures": ["REQ-RL-006", "REQ-PQ-004"],
+      "residual_risk": "medium — ratelimit::RateLimitEndpoint's own token bucket (REQ-RL-006) now applies uniformly to every read/write call with no Critical-priority exemption (Milestone 9's ADAPT retarget retired the old REQ-RL-007 carve-out, since Endpoint requests carry no Priority field at all); DoS-vs-critical-priority mitigation now depends entirely on prioqueue::PrioController's dispatch ordering (REQ-PQ-004), a DEPRECATE-disposition package itself slated for removal by this same milestone's next checklist bullet, with no priority-aware replacement decided yet"
     },
     {
       "id": "T-005",

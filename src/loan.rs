@@ -9,13 +9,32 @@
 //! Pool-based zero-copy payload loaning.
 //!
 //! `LoanPool` maintains a set of pre-allocated buffers; callers obtain a
-//! [`crate::Loan`] from the pool, fill it, and pass it to `send_loaned`.
-//! On completion the buffer is automatically returned to the pool.
+//! [`crate::Loan`] from the pool, fill it, and pass it to
+//! [`LoanPoolEndpoint::write_loaned`]. On completion the buffer is
+//! automatically returned to the pool.
+//!
+//! `ROADMAP.md` Milestone 9 ("All ADAPT-disposition packages retargeted...")
+//! cutover: per this module's own ADAPT disposition ("zero-copy
+//! buffer-pool concept remains useful for endpoint payload buffers
+//! (SPI/UART/CAN); retarget to the new API"), [`LoanPoolEndpoint`] replaces
+//! the legacy `LoanPoolController`, wrapping [`crate::mock::Endpoint`]
+//! instead of `Controller`. [`crate::Loan`]/[`LoanPool`] themselves are
+//! unchanged — plain `Vec<u8>`-buffer pool machinery with no `Controller`
+//! coupling of its own — only the endpoint being loaned into changes.
+//! [`crate::LoaningController`] (the old trait `LoanPoolController`
+//! implemented) is left in place, unused by this module now, the same way
+//! `Controller`/`Registry` themselves are left in place by this bullet;
+//! removing it is `lib.rs`'s own core-surface cutover, Milestone 10's job.
+//! [`LoanPoolEndpoint`] instead exposes [`Self::loan`]/[`Self::write_loaned`]
+//! as its own inherent methods rather than implementing that trait, since
+//! `LoaningController: Controller` cannot be implemented by a type that no
+//! longer implements `Controller`.
 
 use std::sync::{Arc, Condvar, Mutex};
-use std::time::Duration;
 
-use crate::{Command, Controller, Loan, LoaningController, RcpError, Response, Subscription, Zone};
+use crate::mock::Endpoint;
+use crate::regmap::EndpointType;
+use crate::{Loan, RcpError};
 
 // ── LoanPool ──────────────────────────────────────────────────────────────────
 
@@ -82,59 +101,56 @@ impl LoanPool {
     }
 }
 
-// ── LoanPoolController ────────────────────────────────────────────────────────
+// ── LoanPoolEndpoint ─────────────────────────────────────────────────────────
 
-/// A controller backed by a `LoanPool` for zero-copy sends.
+/// An endpoint decorator backed by a `LoanPool` for zero-copy writes.
 // fusa:req REQ-LOAN-005
-pub struct LoanPoolController {
-    inner: Arc<dyn Controller>,
+pub struct LoanPoolEndpoint {
+    inner: Arc<dyn Endpoint>,
     pool: Arc<LoanPool>,
 }
 
-impl LoanPoolController {
-    pub fn new(inner: Arc<dyn Controller>, pool: Arc<LoanPool>) -> Self {
-        LoanPoolController { inner, pool }
-    }
-}
-
-impl Controller for LoanPoolController {
-    fn zone(&self) -> Zone {
-        self.inner.zone()
+impl LoanPoolEndpoint {
+    pub fn new(inner: Arc<dyn Endpoint>, pool: Arc<LoanPool>) -> Self {
+        LoanPoolEndpoint { inner, pool }
     }
 
-    fn send(&self, cmd: &Command, timeout: Option<Duration>) -> Result<Response, RcpError> {
-        self.inner.send(cmd, timeout)
-    }
-
-    fn subscribe(&self) -> Result<Subscription, RcpError> {
-        self.inner.subscribe()
-    }
-
-    fn close(&self) -> Result<(), RcpError> {
-        self.inner.close()
-    }
-}
-
-impl LoaningController for LoanPoolController {
+    /// Obtain a loaned buffer of `size` bytes.
+    ///
+    /// Returns `Err(RcpError::PayloadTooLarge)` if `size` exceeds the
+    /// pool's buffer size.
     // fusa:req REQ-LOAN-006
-    fn loan(&self, size: usize) -> Result<Loan, RcpError> {
+    pub fn loan(&self, size: usize) -> Result<Loan, RcpError> {
         if size > self.pool.buffer_size() {
             return Err(RcpError::PayloadTooLarge);
         }
         Ok(self.pool.acquire())
     }
 
+    /// Write a previously loaned buffer's payload to the inner endpoint.
+    ///
+    /// The buffer is returned to the pool once this call completes (the
+    /// `loan` is dropped either way).
     // fusa:req REQ-LOAN-007
-    fn send_loaned(
-        &self,
-        loan: Loan,
-        mut cmd: Command,
-        timeout: Option<Duration>,
-    ) -> Result<Response, RcpError> {
-        cmd.payload = Some(loan.payload.clone());
+    pub fn write_loaned(&self, loan: Loan) -> Result<(), RcpError> {
+        let payload = loan.payload.clone();
         // Buffer returned to pool on drop (loan's release fn fires).
         drop(loan);
-        self.inner.send(&cmd, timeout)
+        self.inner.write(&payload)
+    }
+}
+
+impl Endpoint for LoanPoolEndpoint {
+    fn ep_type(&self) -> EndpointType {
+        self.inner.ep_type()
+    }
+
+    fn read(&self, read_size: u8) -> Result<Vec<u8>, RcpError> {
+        self.inner.read(read_size)
+    }
+
+    fn write(&self, payload: &[u8]) -> Result<(), RcpError> {
+        self.inner.write(payload)
     }
 }
 
@@ -144,11 +160,10 @@ impl LoaningController for LoanPoolController {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mock::MockController;
-    use crate::Zone;
+    use crate::mock::MockEndpoint;
 
-    fn inner() -> Arc<dyn Controller> {
-        MockController::new(Zone::FRONT_LEFT, None) as Arc<dyn Controller>
+    fn inner() -> Arc<dyn Endpoint> {
+        MockEndpoint::new(EndpointType::Spi, vec![]) as Arc<dyn Endpoint>
     }
 
     #[test]
@@ -191,55 +206,61 @@ mod tests {
     // fusa:test REQ-LOAN-006
     fn loan_rejects_oversized_request() {
         let pool = Arc::new(LoanPool::new(2, 64));
-        let ctrl = LoanPoolController::new(inner(), Arc::clone(&pool));
-        let err = ctrl.loan(65).unwrap_err();
+        let ep = LoanPoolEndpoint::new(inner(), Arc::clone(&pool));
+        let err = ep.loan(65).unwrap_err();
         assert_eq!(err, RcpError::PayloadTooLarge);
     }
 
     #[test]
     // fusa:test REQ-LOAN-007
-    fn send_loaned_forwards_payload() {
+    fn write_loaned_forwards_payload() {
         let received = Arc::new(std::sync::Mutex::new(vec![]));
         let recv2 = Arc::clone(&received);
-        let h: crate::mock::Handler = Box::new(move |cmd| {
-            recv2
-                .lock()
-                .unwrap()
-                .push(cmd.payload.clone().unwrap_or_default());
-            crate::Response {
-                command_id: cmd.id,
-                zone: cmd.zone,
-                status: crate::ResponseStatus::OK,
-                payload: None,
+        let inner = crate::mock::MockEndpoint::new(EndpointType::Spi, vec![]);
+        // Wrap in a small pass-through Endpoint that also records writes.
+        struct Recording {
+            inner: Arc<dyn Endpoint>,
+            log: Arc<Mutex<Vec<Vec<u8>>>>,
+        }
+        impl Endpoint for Recording {
+            fn ep_type(&self) -> EndpointType {
+                self.inner.ep_type()
             }
-        });
-        let inner = MockController::new(Zone::FRONT_LEFT, Some(h)) as Arc<dyn Controller>;
-        let pool = Arc::new(LoanPool::new(1, 8));
-        let ctrl = LoanPoolController::new(inner, Arc::clone(&pool));
+            fn read(&self, read_size: u8) -> Result<Vec<u8>, RcpError> {
+                self.inner.read(read_size)
+            }
+            fn write(&self, payload: &[u8]) -> Result<(), RcpError> {
+                self.log.lock().unwrap().push(payload.to_vec());
+                self.inner.write(payload)
+            }
+        }
+        let recording = Arc::new(Recording {
+            inner: inner as Arc<dyn Endpoint>,
+            log: recv2,
+        }) as Arc<dyn Endpoint>;
 
-        let mut loan = ctrl.loan(4).unwrap();
+        let pool = Arc::new(LoanPool::new(1, 8));
+        let ep = LoanPoolEndpoint::new(recording, Arc::clone(&pool));
+
+        let mut loan = ep.loan(4).unwrap();
         loan.payload[..4].copy_from_slice(b"test");
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            ..Default::default()
-        };
-        ctrl.send_loaned(loan, cmd, None).unwrap();
+        ep.write_loaned(loan).unwrap();
 
         let got = received.lock().unwrap();
         assert!(got[0].starts_with(b"test"), "payload must be forwarded");
-        // Buffer should now be returned (send_loaned drops the loan)
+        // Buffer should now be returned (write_loaned drops the loan)
         assert_eq!(
             pool.available(),
             1,
-            "buffer must be returned after send_loaned"
+            "buffer must be returned after write_loaned"
         );
     }
 
     #[test]
     // fusa:test REQ-LOAN-005
-    fn loan_controller_zone_matches_inner() {
+    fn loan_endpoint_ep_type_matches_inner() {
         let pool = Arc::new(LoanPool::new(1, 64));
-        let ctrl = LoanPoolController::new(inner(), pool);
-        assert_eq!(ctrl.zone(), Zone::FRONT_LEFT);
+        let ep = LoanPoolEndpoint::new(inner(), pool);
+        assert_eq!(ep.ep_type(), EndpointType::Spi);
     }
 }
