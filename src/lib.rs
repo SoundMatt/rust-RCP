@@ -109,6 +109,7 @@ pub mod grpcbridge;
 pub mod i2c;
 pub mod iso21434;
 pub mod lifecycle;
+pub mod lin;
 pub mod linbr;
 pub mod loan;
 pub mod mdns;
