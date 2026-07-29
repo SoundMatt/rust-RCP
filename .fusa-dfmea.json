@@ -51,12 +51,12 @@
     {
       "id": "FM-005",
       "function": "Watchdog monitoring",
-      "failure_mode": "Unresponsive controller not detected",
+      "failure_mode": "Unresponsive stream not detected",
       "effect": "ECU failure goes undetected; vehicle subsystem silently fails",
       "severity": "S3",
-      "cause": "Watchdog thread not running or miss counter not incrementing",
-      "detection": "WatchdogMonitor polls at configured interval; unhealthy flag set after miss_window misses",
-      "mitigation": "REQ-WDG-003 background poll thread + REQ-WDG-004 health flag",
+      "cause": "A stream's rx_wd_timeout_interval elapses with no request resetting its liveness, but rx_wd_enable is not evaluated or the expiry check is skipped",
+      "detection": "evaluate_stream_watchdog resets liveness on every request received (StreamWatchdogState::reset_on_request) and reports ExpiredNoSafestate/ExpiredSafestate once rx_wd_timeout_interval elapses without one",
+      "mitigation": "REQ-WDG-002 per-request liveness reset + REQ-WDG-004/REQ-WDG-005 expiry-and-safestate gating",
       "residual_risk": "low"
     },
     {

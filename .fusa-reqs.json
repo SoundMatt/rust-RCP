@@ -1433,78 +1433,6 @@
       "verificationMethod": "test"
     },
     {
-      "id": "REQ-WDG-001",
-      "title": "Watchdog default config",
-      "text": "WatchdogConfig::default() returns interval=1s, miss_window=3, close_on_miss=false",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-WDG-002",
-      "title": "Closed controller accumulates misses",
-      "text": "WatchdogMonitor accumulates miss_count when controller is unresponsive",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-WDG-003",
-      "title": "Background thread starts on new",
-      "text": "WatchdogMonitor::start() spawns a background thread immediately",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-WDG-004",
-      "title": "Healthy when responsive",
-      "text": "is_healthy() returns true when controller responds to WATCHDOG commands",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-WDG-005",
-      "title": "Miss count is zero on responsive controller",
-      "text": "miss_count() returns 0 when controller is responsive",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-WDG-006",
-      "title": "stop terminates monitor",
-      "text": "stop() terminates the watchdog thread without deadlock",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-WDG-007",
-      "title": "Zone getter",
-      "text": "WatchdogMonitor.zone() returns the monitored zone",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-WDG-008",
-      "title": "Unhealthy after miss window exceeded",
-      "text": "is_healthy() returns false after miss_window consecutive misses",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
       "id": "REQ-DL-001",
       "title": "DeadlineController enforces latency",
       "text": "DeadlineController sends with a maximum response deadline",
@@ -5477,6 +5405,204 @@
       "id": "REQ-SAFETY-005",
       "title": "purge_normal_priority_on_watchdog_overflow partitions a pending-request slice into kept and purged indices on watchdog overflow",
       "text": "purge_normal_priority_on_watchdog_overflow(pending, watchdog_overflowed) returns (vec![], vec![]) for an empty pending slice; returns every index in kept and an empty purged when watchdog_overflowed is false; when watchdog_overflowed is true, returns the indices of every safety-tagged entry in kept and every normal-priority entry in purged, in pending's own original relative order, correctly handling an all-safety-tagged slice (nothing purged) and an all-normal-priority slice (everything purged); never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-WDG-001",
+      "title": "StreamWatchdogTimeout mirrors rx_wd_timeout_interval's width",
+      "text": "StreamWatchdogTimeout wraps a u16 clock-tick count matching RequestStreamConfigEntry::rx_wd_timeout_interval's own encoded width; is_stream_watchdog_expired never panics for any (state, now_tick, timeout) input, including a now_tick preceding the last reset tick (saturating arithmetic)",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-WDG-002",
+      "title": "StreamWatchdogState liveness reset on every request",
+      "text": "StreamWatchdogState::new(now_tick) records now_tick as the last reset tick; StreamWatchdogState::reset_on_request(now_tick) overwrites the previously recorded last reset tick with now_tick, modeling the per-stream 'reset on every request received' liveness rule rather than a periodic poll",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-WDG-003",
+      "title": "is_stream_watchdog_expired elapsed-ticks-vs-timeout check",
+      "text": "is_stream_watchdog_expired(state, now_tick, timeout) returns false while now_tick - state.last_reset_tick() is less than timeout.0, true once it is at least timeout.0 (inclusive boundary), and correctly reflects a StreamWatchdogState::reset_on_request call pushing expiry back out; never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-WDG-004",
+      "title": "evaluate_stream_watchdog is Alive when disabled or unexpired",
+      "text": "evaluate_stream_watchdog returns StreamWatchdogOutcome::Alive when rx_wd_enable is false regardless of elapsed ticks, and when rx_wd_enable is true but the watchdog has not yet expired",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-WDG-005",
+      "title": "evaluate_stream_watchdog splits an expired watchdog by rx_wd_safestate_enable",
+      "text": "evaluate_stream_watchdog returns StreamWatchdogOutcome::ExpiredSafestate when the watchdog has expired and rx_wd_safestate_enable is true, and StreamWatchdogOutcome::ExpiredNoSafestate when it has expired and rx_wd_safestate_enable is false",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-WDG-006",
+      "title": "StreamWatchdogOutcome::watchdog_overflowed is true for either expired variant",
+      "text": "StreamWatchdogOutcome::watchdog_overflowed() returns false for Alive and true for both ExpiredNoSafestate and ExpiredSafestate, matching the plain bool check_watchdog_overflow_purge/purge_normal_priority_on_watchdog_overflow already take as watchdog_overflowed",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-WDG-007",
+      "title": "StreamWatchdogOutcome::drives_safestate is true only for ExpiredSafestate",
+      "text": "StreamWatchdogOutcome::drives_safestate() returns true only for ExpiredSafestate and false for Alive and ExpiredNoSafestate",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-WDG-008",
+      "title": "evaluate_stream_watchdog never panics for any sampled input",
+      "text": "evaluate_stream_watchdog does not panic across a sampled cross-product of reset ticks, now ticks, timeouts (including 0 and u16::MAX), and both bool flags",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-E2EENF-001",
+      "title": "e2e_failure_scope selects DropRequest/LatchStream by rx_enforce_e2e",
+      "text": "e2e_failure_scope(rx_enforce_e2e) returns E2eFailureScope::DropRequest when rx_enforce_e2e is false and E2eFailureScope::LatchStream when rx_enforce_e2e is true",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-E2EENF-002",
+      "title": "check_rx_enforce_e2e compares crc32_tc18(coverage_buffer) against expected_crc and reports scope on mismatch",
+      "text": "check_rx_enforce_e2e(coverage_buffer, expected_crc, rx_enforce_e2e) returns Ok(()) when crc32_tc18(coverage_buffer) equals expected_crc for any rx_enforce_e2e value, and Err((RcpError::CrcMismatch, e2e_failure_scope(rx_enforce_e2e))) when it does not; never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SAFEMEAS-001",
+      "title": "resolve_safe_state_mechanism selects HiZAllPins/SequencerDriven by rx_safety_measure",
+      "text": "resolve_safe_state_mechanism(rx_safety_measure, rx_safestate_sequencer, rx_safe_sequencer_state) returns SafeStateMechanism::HiZAllPins when rx_safety_measure is false, and SafeStateMechanism::SequencerDriven wrapping safe_state_sequencer_gate(rx_safestate_sequencer, rx_safe_sequencer_state) when rx_safety_measure is true",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SAFEMEAS-002",
+      "title": "safe_state_sequencer_gate builds a CompoundGateConfig from rx_safestate_sequencer/rx_safe_sequencer_state",
+      "text": "safe_state_sequencer_gate(rx_safestate_sequencer, rx_safe_sequencer_state) returns a CompoundGateConfig whose sequencer_num equals rx_safestate_sequencer and whose start_state equals SequencerState(rx_safe_sequencer_state)",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SAFEMEAS-003",
+      "title": "enter_sequencer_driven_safe_state writes a SequencerBank's named sequencer to its target state",
+      "text": "enter_sequencer_driven_safe_state(bank, gate) writes bank's gate.sequencer_num entry to gate.start_state via SequencerBank::force_state and returns Ok(()) for an in-bounds sequencer_num, Err(RcpError::SequencerNotKnown) for an out-of-bounds one; never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SAFEMEAS-004",
+      "title": "SequencerBank::force_state writes unconditionally, bypassing the start-state race guard",
+      "text": "SequencerBank::force_state(sequencer_num, new_state) overwrites the stored SequencerState at sequencer_num regardless of its current value (unlike advance_if_still_in_start_state, which only advances when the observed state still matches a gate's start_state), and returns Err(RcpError::SequencerNotKnown) for sequencer_num at or beyond svr_sequencers_max",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-OVRFLW-001",
+      "title": "OverflowOutcome models no-overflow / overflow-without-safestate / overflow-with-safestate",
+      "text": "OverflowOutcome has exactly three variants (NoOverflow, OverflowNoSafestate, OverflowSafestate) constructed by evaluate_request_storage_overflow",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-OVRFLW-002",
+      "title": "OverflowOutcome::is_overflow/drives_safestate predicates agree with variant identity",
+      "text": "OverflowOutcome::is_overflow() is false only for NoOverflow and true for both overflow variants; OverflowOutcome::drives_safestate() is true only for OverflowSafestate",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-OVRFLW-003",
+      "title": "evaluate_request_storage_overflow selects by storage_overflowed and rx_ovrflw_safestate_enable",
+      "text": "evaluate_request_storage_overflow(storage_overflowed, rx_ovrflw_safestate_enable) returns OverflowOutcome::NoOverflow when storage_overflowed is false regardless of rx_ovrflw_safestate_enable, OverflowOutcome::OverflowSafestate when storage_overflowed is true and rx_ovrflw_safestate_enable is true, and OverflowOutcome::OverflowNoSafestate when storage_overflowed is true and rx_ovrflw_safestate_enable is false",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SEQENF-001",
+      "title": "SequenceEnforcementOutcome models accepted / rejected-without-safestate / rejected-with-safestate",
+      "text": "SequenceEnforcementOutcome has exactly three variants (Accepted, RejectedNoSafestate, RejectedSafestate) constructed by evaluate_rx_enforce_seq",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SEQENF-002",
+      "title": "SequenceEnforcementOutcome::is_rejected/drives_safestate predicates agree with variant identity",
+      "text": "SequenceEnforcementOutcome::is_rejected() is false only for Accepted and true for both rejected variants; SequenceEnforcementOutcome::drives_safestate() is true only for RejectedSafestate",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SEQENF-003",
+      "title": "evaluate_rx_enforce_seq requires a strictly increasing sequence number when enabled",
+      "text": "evaluate_rx_enforce_seq(last_accepted_seq, candidate_seq, rx_enforce_seq, rx_seq_safestate_enable) returns SequenceEnforcementOutcome::Accepted when rx_enforce_seq is false regardless of ordering, or when candidate_seq is strictly greater than last_accepted_seq; otherwise returns RejectedSafestate when rx_seq_safestate_enable is true and RejectedNoSafestate when it is false; never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SAFEACT-001",
+      "title": "SafeStateAction models none / force-hi-Z / force-sequencer-state",
+      "text": "SafeStateAction has exactly three variants (None, ForceHiZAllPins, ForceSequencerState(CompoundGateConfig)) constructed by resolve_safe_state_action",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SAFEACT-002",
+      "title": "resolve_safe_state_action combines should_enter_safe_state with a resolved SafeStateMechanism",
+      "text": "resolve_safe_state_action(should_enter_safe_state, mechanism) returns SafeStateAction::None when should_enter_safe_state is false regardless of mechanism; otherwise returns SafeStateAction::ForceHiZAllPins for SafeStateMechanism::HiZAllPins and SafeStateAction::ForceSequencerState(gate) for SafeStateMechanism::SequencerDriven(gate); never panics for any sampled input",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",

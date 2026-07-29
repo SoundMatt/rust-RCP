@@ -246,8 +246,8 @@
       "asset": "A-003",
       "property": "Availability",
       "stride": "Denial of Service",
-      "description": "An attacker selectively drops or delays Watchdog commands/responses on the transport so that watchdog::WatchdogController never observes enough misses to flag a zone as unhealthy, masking a real failure or an ongoing attack on that zone.",
-      "attackPath": "Attacker with transport-level interception capability (see T-RCP-02) selectively filters Watchdog-type frames while allowing other traffic through, keeping miss_count below WatchdogConfig's unhealthy threshold.",
+      "description": "Per the per-stream liveness-reset-on-every-request watchdog model (watchdog::StreamWatchdogState/evaluate_stream_watchdog, ROADMAP.md Milestone 6), an attacker injects or replays forged requests against a stream at less than its rx_wd_timeout_interval cadence, keeping StreamWatchdogState::reset_on_request firing and evaluate_stream_watchdog reporting StreamWatchdogOutcome::Alive even though the stream's real endpoint(s) have failed.",
+      "attackPath": "Attacker with transport-level injection capability (see T-RCP-02) sends forged or replayed requests on the target stream's own identifier at a rate that keeps resetting its watchdog liveness, suppressing the ExpiredNoSafestate/ExpiredSafestate outcome evaluate_stream_watchdog would otherwise report.",
       "impact": {
         "safety": "Severe",
         "financial": "Low",
@@ -265,8 +265,8 @@
       "feasibilityRating": "Medium",
       "cal": "CAL-3",
       "cybersecurityGoal": "CSG-RCP-04",
-      "mitigations": ["REQ-WDG-002", "REQ-WDG-008", "REQ-TLS-001"],
-      "residualRisk": "Medium — selective frame dropping is a transport-layer attack outside rust-RCP's own visibility; running the watchdog path over an authenticated, integrity-protected transport (TLS bridge) is the primary mitigation, since the library cannot itself detect absence of traffic caused by a third party"
+      "mitigations": ["REQ-WDG-002", "REQ-WDG-005", "REQ-TLS-001", "REQ-TLS-002"],
+      "residualRisk": "Medium — forging traffic that resets a stream's liveness timer is a transport-layer attack outside rust-RCP's own visibility; running the watchdog path over an authenticated, integrity-protected transport (TLS bridge, mutual auth) is the primary mitigation, since the library cannot itself distinguish a genuine request from a forged one without it"
     }
   ],
 
@@ -294,10 +294,10 @@
     },
     {
       "id": "CSG-RCP-04",
-      "description": "rust-RCP shall provide an authorization allowlist that integrators can compose in front of any Controller to restrict which command types a caller may dispatch, and a watchdog mechanism whose miss-count threshold is independently verifiable.",
+      "description": "rust-RCP shall provide an authorization allowlist that integrators can compose in front of any Controller to restrict which command types a caller may dispatch, and a per-stream watchdog mechanism whose liveness-reset and safe-state-on-expiry behavior is independently verifiable.",
       "cal": "CAL-3",
       "threats": ["T-RCP-05", "T-RCP-08"],
-      "requirements": ["REQ-AUTHZ-001", "REQ-AUTHZ-005", "REQ-AUTHZ-006", "REQ-WDG-002", "REQ-WDG-008"]
+      "requirements": ["REQ-AUTHZ-001", "REQ-AUTHZ-005", "REQ-AUTHZ-006", "REQ-WDG-002", "REQ-WDG-005"]
     },
     {
       "id": "CSG-RCP-05",

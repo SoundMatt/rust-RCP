@@ -1660,13 +1660,78 @@ concepts into it rather than treating them as unrelated decorators.
       `watchdog.rs` (REPLACE-dispositioned, read only as background); real
       watchdog timeout tracking (`rx_wd_enable` et al.) and real safe-state
       machinery are left to the next two still-unchecked bullets below.
-- [ ] Per-stream safety config: `rx_enforce_e2e`, `rx_wd_enable` +
+- [x] Per-stream safety config: `rx_enforce_e2e`, `rx_wd_enable` +
       `rx_wd_timeout_interval` + `rx_wd_safestate_enable` (replacing the
       old periodic-WATCHDOG-command model in `watchdog.rs` with the spec's
       real per-stream liveness-reset-on-every-request design),
       `rx_safety_measure` (hi-Z vs. sequencer-driven safe sequence),
       `rx_safestate_sequencer`/`rx_safe_sequencer_state`,
-      `rx_ovrflw_safestate_enable`, `rx_enforce_seq`/`rx_seq_safestate_enable`
+      `rx_ovrflw_safestate_enable`, `rx_enforce_seq`/`rx_seq_safestate_enable`.
+      Done (v0.9.0-dev): `src/watchdog.rs` is REPLACEd outright — its old
+      `Zone`/`Controller`/`Command{cmd_type: CommandType::WATCHDOG}`
+      background-poll-thread model is deleted, not adapted — with the
+      spec's real per-stream liveness model: `StreamWatchdogState`, whose
+      `reset_on_request` is the "every request resets liveness" rule
+      itself (no periodic poll message at all), `is_stream_watchdog_expired`
+      (elapsed ticks vs. `rx_wd_timeout_interval`), and
+      `evaluate_stream_watchdog`/`StreamWatchdogOutcome`, gated by
+      `rx_wd_enable` and split by `rx_wd_safestate_enable` into
+      `ExpiredNoSafestate`/`ExpiredSafestate` —
+      `StreamWatchdogOutcome::watchdog_overflowed` is the real
+      `watchdog_overflowed` source `src/request.rs`'s own prior entry
+      named as its eventual supplier. The other four field groups extend
+      `src/request.rs`'s existing "Safety-request MSB-tagging" section
+      instead (per this milestone's own "additive standalone plumbing
+      only" discipline, extending an existing module rather than
+      multiplying new ones): `check_rx_enforce_e2e`/`E2eFailureScope`
+      (`rx_enforce_e2e`, composing `crate::e2e::crc32_tc18` rather than
+      re-deriving it) selects drop-one-request vs. latch-the-stream on a
+      CRC mismatch; `resolve_safe_state_mechanism`/`SafeStateMechanism`/
+      `safe_state_sequencer_gate` (`rx_safety_measure`,
+      `rx_safestate_sequencer`, `rx_safe_sequencer_state`) select
+      hi-Z-all-pins or a sequencer-driven safety sequence, the latter
+      reusing `CompoundGateConfig` — this item's own working
+      interpretation that the sequencer/target-state pair identifies a
+      gate `check_compound_gate` already knows how to satisfy, not a
+      second sequencer mechanism — and composing with the existing
+      `SequencerBank` via a new unconditional `SequencerBank::force_state`
+      (added alongside the existing race-guarded
+      `advance_if_still_in_start_state`, since entering a safe state must
+      not be blocked by that guard); `evaluate_request_storage_overflow`/
+      `OverflowOutcome` (`rx_ovrflw_safestate_enable`) and
+      `evaluate_rx_enforce_seq`/`SequenceEnforcementOutcome`
+      (`rx_enforce_seq`/`rx_seq_safestate_enable`) mirror
+      `StreamWatchdogOutcome`'s own three-variant "no event / event, no
+      consequence / event, with consequence" shape. `resolve_safe_state_action`/
+      `SafeStateAction` is the unifying composition every one of those
+      outcome types' `drives_safestate` predicate (or, for
+      `rx_enforce_e2e`, an `E2eFailureScope::LatchStream` scope) funnels
+      into together with a resolved `SafeStateMechanism`. Per Guiding
+      Principle 5, this entry flags two working interpretations rather
+      than silently resolving them: the sequencer-driven safe state as a
+      gate write (above), and the enforced sequence number itself as a
+      plain caller-supplied `u32` not tied to any already-decoded field,
+      since neither relationship is stated by the checklist wording. New
+      `REQ-E2EENF-001`..`002`, `REQ-SAFEMEAS-001`..`004`,
+      `REQ-OVRFLW-001`..`003`, `REQ-SEQENF-001`..`003`,
+      `REQ-SAFEACT-001`..`002` added to `.fusa-reqs.json` (fresh prefixes,
+      one per field group, matching this module's existing
+      CANCEL/CHAIN/TIME/CMP/SEQ/PRIO granularity), each with a
+      `// fusa:req`/`// fusa:test` pair; the old `REQ-WDG-001`..`008`
+      entries — describing the now-deleted background-poll-thread model —
+      are replaced in place by eight new `REQ-WDG-*` entries describing
+      the real per-stream liveness model, rather than coexisting alongside
+      it, since (unlike the CRC32/CRC-16 migration) the old
+      `watchdog.rs` implementation they described no longer exists.
+      `.fusa-dfmea.json`'s `FM-005` and `tara.json`'s `CSG-RCP-04`/
+      `T-RCP-08` are updated in the same change to describe the new
+      liveness-reset-based failure mode and threat model rather than the
+      deleted miss-counter one. Same "additive standalone plumbing only"
+      discipline as every prior milestone entry: nothing above is wired
+      into a decoder, dispatch loop, or into each other end-to-end — a
+      `StreamWatchdogOutcome`/`OverflowOutcome`/`SequenceEnforcementOutcome`/
+      `E2eFailureScope` still has to be composed into
+      `resolve_safe_state_action` by a future caller, not by this item.
 - [ ] `CRC_ERROR` error path
 - [ ] Real power-mode model backing the safe-state work: Normal / StandBy /
       Sleep / Unpowered, cold-start vs. hot-start, and the

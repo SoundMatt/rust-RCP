@@ -27,7 +27,7 @@ Full machine-readable HARA is in `.fusa-hara.json`.
 | SG-002 | No silent command drop | ASIL-B | 100 | `REQ-CTRL-*`, error propagation |
 | SG-003 | Replay detection | ASIL-B | 500 | `REQ-E2E-005`, `ReplayGuard` |
 | SG-004 | Payload integrity | ASIL-B | 200 | `REQ-E2E-002`, CRC-16/CCITT-FALSE |
-| SG-005 | Watchdog monitoring | ASIL-B | 3000 | `REQ-WDG-*`, `WatchdogMonitor` |
+| SG-005 | Watchdog monitoring | ASIL-B | 3000 | `REQ-WDG-*`, per-stream `StreamWatchdogState`/`evaluate_stream_watchdog` |
 | SG-006 | Auth enforcement | ASIL-B | 0 | `REQ-AUTHZ-*`, `AuthzController` |
 | SG-007 | Atomic power transitions | ASIL-A | 500 | `REQ-PWR-*`, `PowerStateController` |
 | SG-008 | Payload size validation | ASIL-B | 0 | `REQ-WIRE-007`, MAX_PAYLOAD check |

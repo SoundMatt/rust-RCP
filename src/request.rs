@@ -1042,6 +1042,132 @@
 //! overflow has occurred" as a plain caller-supplied `watchdog_overflowed:
 //! bool`, exactly the same "take the fact, not the machinery that would
 //! produce it" shape used throughout Milestones 1-5.
+//!
+//! ## Per-stream safety config (`ROADMAP.md` Milestone 6, "Per-stream
+//! safety config" bullet)
+//!
+//! The second of the "next two still-unchecked Milestone 6 checklist
+//! bullets" the section above names — the first,
+//! [`crate::watchdog`]'s new per-stream liveness model, is a sibling
+//! module rather than this one, since `ROADMAP.md`'s own checklist wording
+//! names `watchdog.rs` itself as the file `rx_wd_enable`/
+//! `rx_wd_timeout_interval`/`rx_wd_safestate_enable` replace it in. This
+//! section covers the checklist bullet's other four field groups, all of
+//! which stay in this module: they are per-request/per-stream dispatch
+//! rules that read naturally as extensions of the "Safety-request
+//! MSB-tagging" section above, and two of them ([`resolve_safe_state_mechanism`],
+//! [`SequencerBank::force_state`]) compose directly against
+//! [`SequencerBank`], already defined in this module.
+//!
+//! - [`E2eFailureScope`] / [`e2e_failure_scope`] / [`check_rx_enforce_e2e`]
+//!   — `rx_enforce_e2e`: whether an E2E-CRC failure at one request only
+//!   drops that request ([`E2eFailureScope::DropRequest`]) or latches the
+//!   whole stream into a fault/safe state
+//!   ([`E2eFailureScope::LatchStream`]). [`check_rx_enforce_e2e`] composes,
+//!   rather than re-derives, [`crate::e2e::crc32_tc18`] — it runs the CRC
+//!   over a caller-supplied coverage buffer (presumed built by
+//!   [`crate::e2e::build_crc32_coverage_buffer`] or
+//!   [`crate::e2e::build_crc32_coverage_buffer_for_fragment_train`]) and
+//!   compares against the wire-carried `expected_crc`, returning
+//!   `Err((RcpError::CrcMismatch, scope))` on mismatch with `scope` telling
+//!   the caller how far the consequence reaches.
+//! - [`SafeStateMechanism`] / [`resolve_safe_state_mechanism`] /
+//!   [`safe_state_sequencer_gate`] — `rx_safety_measure`,
+//!   `rx_safestate_sequencer`, `rx_safe_sequencer_state`: which safe-state
+//!   mechanism a stream uses, hi-Z-all-pins
+//!   ([`SafeStateMechanism::HiZAllPins`]) or a sequencer-driven safety
+//!   sequence ([`SafeStateMechanism::SequencerDriven`]). The
+//!   sequencer-driven branch reads `rx_safestate_sequencer`/
+//!   `rx_safe_sequencer_state` as a [`CompoundGateConfig`]
+//!   ([`safe_state_sequencer_gate`]) — the same gate shape
+//!   [`check_compound_gate`] already reads for ordinary compound-request
+//!   gating — under this item's own working interpretation that entering
+//!   this safe state means writing the named sequencer to the named target
+//!   state, which then satisfies that same gate for any compound/
+//!   compound-wait "safety sequence" requests pre-configured against it;
+//!   see "Provenance note: the sequencer-driven safe state as a gate
+//!   write, not a new mechanism" below for why no second, safe-state-only
+//!   sequencer concept is introduced. [`SequencerBank::force_state`] is
+//!   this branch's own unconditional write, added alongside
+//!   [`enter_sequencer_driven_safe_state`] specifically because entering a
+//!   safe state must not be blocked by [`SequencerBank::
+//!   advance_if_still_in_start_state`]'s existing start-state race guard —
+//!   see that method's own doc comment for why the guard exists for
+//!   ordinary execution and why this item deliberately bypasses it here.
+//! - [`OverflowOutcome`] / [`evaluate_request_storage_overflow`] —
+//!   `rx_ovrflw_safestate_enable`: whether a request-storage overflow
+//!   (this crate's existing [`RcpError::ReqStorageOvfl`] sentinel) also
+//!   drives the stream's endpoints to safe state
+//!   ([`OverflowOutcome::OverflowSafestate`]) or is left as a plain
+//!   overflow with no safe-state consequence
+//!   ([`OverflowOutcome::OverflowNoSafestate`]), mirroring
+//!   [`crate::watchdog::StreamWatchdogOutcome`]'s own three-variant
+//!   "no event / event, no consequence / event, with consequence" shape.
+//! - [`SequenceEnforcementOutcome`] / [`evaluate_rx_enforce_seq`] —
+//!   `rx_enforce_seq`/`rx_seq_safestate_enable`: whether a candidate
+//!   request's sequence number must strictly exceed the last accepted one
+//!   before being queued at all, and whether a violation also drives the
+//!   stream to safe state. See "Provenance note: the enforced sequence
+//!   number's own wire field and width" below for why the sequence number
+//!   itself is a caller-supplied, unsourced `u32`.
+//! - [`SafeStateAction`] / [`resolve_safe_state_action`] — the unifying
+//!   composition every "...`_enable`" outcome type above funnels into:
+//!   given "should this stream enter safe state right now" (any of
+//!   [`crate::watchdog::StreamWatchdogOutcome::drives_safestate`],
+//!   [`OverflowOutcome::drives_safestate`],
+//!   [`SequenceEnforcementOutcome::drives_safestate`], or
+//!   `matches!(scope, E2eFailureScope::LatchStream)`) and a resolved
+//!   [`SafeStateMechanism`], produces the concrete
+//!   [`SafeStateAction`] a caller should take.
+//!
+//! Same "additive standalone plumbing only" discipline as every entry
+//! above: none of this is called from a decoder, dispatch loop, or
+//! [`crate::watchdog`]. [`check_rx_enforce_e2e`] is the only function here
+//! that reaches into another module's behavior
+//! ([`crate::e2e::crc32_tc18`]), and even it takes the coverage buffer and
+//! expected CRC as plain caller-supplied values rather than reading a live
+//! frame itself.
+//!
+//! ## Provenance note: the sequencer-driven safe state as a gate write, not
+//! a new mechanism
+//!
+//! `ROADMAP.md`'s checklist bullet states `rx_safestate_sequencer`/
+//! `rx_safe_sequencer_state` name "which sequencer number and target state
+//! kicks off the safety sequence," but not the mechanics of how a
+//! sequencer number and target state "kick off" anything — that relationship
+//! is defined nowhere this item can read except by analogy to the one
+//! sequencer mechanism this crate already has: [`CompoundGateConfig`] /
+//! [`is_gate_satisfied`] / [`check_compound_gate`], where a request
+//! executes once its named sequencer holds its named target state. This
+//! item's working interpretation reuses that same relationship rather than
+//! inventing a second one: [`safe_state_sequencer_gate`] builds exactly the
+//! [`CompoundGateConfig`] shape [`check_compound_gate`] already consumes,
+//! and entering the sequencer-driven safe state
+//! ([`enter_sequencer_driven_safe_state`]) is modeled as writing
+//! [`SequencerBank`]'s named sequencer to that same target state — after
+//! which any pre-configured "safety sequence" compound/compound-wait
+//! requests gated on that sequencer/state pair become eligible to run via
+//! the ordinary, already-built gate check, with no new sequencer-only
+//! safe-state code path required. Flagged per Guiding Principle 5 for
+//! reconciliation against real TC18 behavior, never against spec prose.
+//!
+//! ## Provenance note: the enforced sequence number's own wire field and
+//! width
+//!
+//! `ROADMAP.md`'s checklist bullet names `rx_enforce_seq` only as
+//! "monotonically increasing sequence numbers," without stating which
+//! already-decoded field carries that sequence number. This crate has
+//! several candidates that are not obviously the same thing — [`crate::e2e`]'s
+//! own `seqNum` (a `u32`, but scoped to the CRC-16 replay-guard model
+//! `ROADMAP.md`'s own Satellite Package Disposition table separately
+//! REPLACE-dispositions), and [`crate::acf::ByteMessageInfo::
+//! transaction_num`] (a `u8`, but named for matching a response to its
+//! request, not for detecting gaps/reordering) — and per Guiding Principle
+//! 5 this item does not guess which one `rx_enforce_seq` actually means.
+//! [`evaluate_rx_enforce_seq`] instead takes `last_accepted_seq`/
+//! `candidate_seq` as plain caller-supplied `u32` values, wide enough to
+//! hold either existing candidate without truncation, flagged here for
+//! reconciliation against real TC18 behavior once that field is settled.
 
 use crate::regmap::SequencerStateEntry;
 use crate::timestamp::AvtpTimestamp;
@@ -1454,6 +1580,28 @@ impl SequencerBank {
     pub fn check_compound_gate(&self, gate: &CompoundGateConfig) -> Result<(), RcpError> {
         let current_state = self.read(gate.sequencer_num)?;
         check_compound_gate(current_state, gate, self.svr_sequencers_max())
+    }
+
+    /// Unconditionally write `sequencer_num`'s persistent state to
+    /// `new_state`, bypassing [`Self::advance_if_still_in_start_state`]'s
+    /// start-state race guard.
+    ///
+    /// Added for the "Per-stream safety config" checklist bullet's
+    /// sequencer-driven safe-state entry ([`enter_sequencer_driven_safe_state`]):
+    /// unlike an ordinary compound-request advance, entering a safe state
+    /// is not conditional on any prior observed state — it must happen
+    /// regardless of what the sequencer currently holds. Returns
+    /// `Err(RcpError::SequencerNotKnown)` for an out-of-bounds
+    /// `sequencer_num`. Never panics for any input.
+    // fusa:req REQ-SAFEMEAS-004
+    pub fn force_state(
+        &mut self,
+        sequencer_num: u8,
+        new_state: SequencerState,
+    ) -> Result<(), RcpError> {
+        check_sequencer_num_in_bounds(sequencer_num, self.svr_sequencers_max())?;
+        self.states[sequencer_num as usize] = new_state;
+        Ok(())
     }
 }
 
@@ -2282,6 +2430,293 @@ pub fn purge_normal_priority_on_watchdog_overflow(
         }
     }
     (kept, purged)
+}
+
+// ── Per-stream safety config: rx_enforce_e2e ─────────────────────────────────
+
+/// The consequence scope of an E2E-CRC failure on one request within a
+/// stream, selected by `rx_enforce_e2e`: see [`e2e_failure_scope`]/
+/// [`check_rx_enforce_e2e`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// fusa:req REQ-E2EENF-001
+pub enum E2eFailureScope {
+    /// Drop the one bad request; the rest of the stream is unaffected.
+    DropRequest,
+    /// Latch the whole stream into a fault/safe state until explicitly
+    /// released.
+    LatchStream,
+}
+
+/// Select the [`E2eFailureScope`] `rx_enforce_e2e` names: [`Self::LatchStream`]
+/// when `rx_enforce_e2e` is `true`, [`Self::DropRequest`] otherwise. Never
+/// panics for any input.
+// fusa:req REQ-E2EENF-001
+pub fn e2e_failure_scope(rx_enforce_e2e: bool) -> E2eFailureScope {
+    if rx_enforce_e2e {
+        E2eFailureScope::LatchStream
+    } else {
+        E2eFailureScope::DropRequest
+    }
+}
+
+/// The full `rx_enforce_e2e` rule: compare a computed CRC-32
+/// ([`crate::e2e::crc32_tc18`], run over `coverage_buffer`) against
+/// `expected_crc`, and — on mismatch — report [`e2e_failure_scope`]'s
+/// scope alongside the failure.
+///
+/// Returns `Ok(())` when the computed and expected CRCs match. Returns
+/// `Err((RcpError::CrcMismatch, scope))` on mismatch, where `scope` is
+/// [`e2e_failure_scope(rx_enforce_e2e)`](e2e_failure_scope). Never panics
+/// for any input; `coverage_buffer` is presumed built by
+/// [`crate::e2e::build_crc32_coverage_buffer`] or
+/// [`crate::e2e::build_crc32_coverage_buffer_for_fragment_train`], but
+/// this function does not itself validate that provenance.
+// fusa:req REQ-E2EENF-002
+pub fn check_rx_enforce_e2e(
+    coverage_buffer: &[u8],
+    expected_crc: u32,
+    rx_enforce_e2e: bool,
+) -> Result<(), (RcpError, E2eFailureScope)> {
+    let computed_crc = crate::e2e::crc32_tc18(coverage_buffer);
+    if computed_crc == expected_crc {
+        Ok(())
+    } else {
+        Err((RcpError::CrcMismatch, e2e_failure_scope(rx_enforce_e2e)))
+    }
+}
+
+// ── Per-stream safety config: rx_safety_measure / rx_safestate_sequencer /
+//    rx_safe_sequencer_state ───────────────────────────────────────────────
+
+/// The safe-state mechanism a stream uses when driven to safe state,
+/// selected by `rx_safety_measure`: see [`resolve_safe_state_mechanism`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// fusa:req REQ-SAFEMEAS-001
+pub enum SafeStateMechanism {
+    /// Force every I/O pin on the stream's endpoints to high-impedance.
+    HiZAllPins,
+    /// Run a configured sequencer-based safety request sequence, gated by
+    /// the wrapped [`CompoundGateConfig`] — see [`safe_state_sequencer_gate`].
+    SequencerDriven(CompoundGateConfig),
+}
+
+/// Build the [`CompoundGateConfig`] identifying a stream's sequencer-driven
+/// safe-state trigger from `rx_safestate_sequencer`/`rx_safe_sequencer_state`.
+///
+/// See this module's doc comment "Provenance note: the sequencer-driven
+/// safe state as a gate write, not a new mechanism" for why this reuses
+/// [`CompoundGateConfig`] rather than a safe-state-only type. Never panics
+/// for any input.
+// fusa:req REQ-SAFEMEAS-002
+pub fn safe_state_sequencer_gate(
+    rx_safestate_sequencer: u8,
+    rx_safe_sequencer_state: u8,
+) -> CompoundGateConfig {
+    CompoundGateConfig {
+        sequencer_num: rx_safestate_sequencer,
+        start_state: SequencerState(rx_safe_sequencer_state),
+    }
+}
+
+/// Select the [`SafeStateMechanism`] `rx_safety_measure` names:
+/// [`SafeStateMechanism::SequencerDriven`] (wrapping
+/// [`safe_state_sequencer_gate`]'s result) when `rx_safety_measure` is
+/// `true`, [`SafeStateMechanism::HiZAllPins`] otherwise. Never panics for
+/// any input.
+// fusa:req REQ-SAFEMEAS-001
+pub fn resolve_safe_state_mechanism(
+    rx_safety_measure: bool,
+    rx_safestate_sequencer: u8,
+    rx_safe_sequencer_state: u8,
+) -> SafeStateMechanism {
+    if rx_safety_measure {
+        SafeStateMechanism::SequencerDriven(safe_state_sequencer_gate(
+            rx_safestate_sequencer,
+            rx_safe_sequencer_state,
+        ))
+    } else {
+        SafeStateMechanism::HiZAllPins
+    }
+}
+
+/// Enter a sequencer-driven safe state: unconditionally write `gate`'s
+/// sequencer to `gate`'s target state, via [`SequencerBank::force_state`]
+/// rather than the race-guarded [`SequencerBank::
+/// advance_if_still_in_start_state`].
+///
+/// Returns `Err(RcpError::SequencerNotKnown)` for an out-of-bounds
+/// `gate.sequencer_num`. Never panics for any input.
+// fusa:req REQ-SAFEMEAS-003
+pub fn enter_sequencer_driven_safe_state(
+    bank: &mut SequencerBank,
+    gate: &CompoundGateConfig,
+) -> Result<(), RcpError> {
+    bank.force_state(gate.sequencer_num, gate.start_state)
+}
+
+// ── Per-stream safety config: rx_ovrflw_safestate_enable ────────────────────
+
+/// The result of evaluating a request-storage overflow against
+/// `rx_ovrflw_safestate_enable`: see [`evaluate_request_storage_overflow`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// fusa:req REQ-OVRFLW-001
+pub enum OverflowOutcome {
+    /// No overflow occurred.
+    NoOverflow,
+    /// Storage overflowed, and `rx_ovrflw_safestate_enable` is `false` — no
+    /// safe-state consequence configured.
+    OverflowNoSafestate,
+    /// Storage overflowed, and `rx_ovrflw_safestate_enable` is `true` —
+    /// drive every endpoint on this stream to safe state.
+    OverflowSafestate,
+}
+
+impl OverflowOutcome {
+    /// True for either overflow variant. Never panics for any input.
+    // fusa:req REQ-OVRFLW-002
+    pub fn is_overflow(&self) -> bool {
+        !matches!(self, Self::NoOverflow)
+    }
+
+    /// True only for [`Self::OverflowSafestate`]. Never panics for any
+    /// input.
+    // fusa:req REQ-OVRFLW-002
+    pub fn drives_safestate(&self) -> bool {
+        matches!(self, Self::OverflowSafestate)
+    }
+}
+
+/// The full `rx_ovrflw_safestate_enable` rule: whether a request-storage
+/// overflow ([`RcpError::ReqStorageOvfl`]'s own already-established
+/// condition) also drives the stream's endpoints to safe state.
+///
+/// Returns [`OverflowOutcome::NoOverflow`] when `storage_overflowed` is
+/// `false`, regardless of `rx_ovrflw_safestate_enable`. Otherwise returns
+/// [`OverflowOutcome::OverflowSafestate`] or
+/// [`OverflowOutcome::OverflowNoSafestate`], selected by
+/// `rx_ovrflw_safestate_enable`. Never panics for any input.
+// fusa:req REQ-OVRFLW-003
+pub fn evaluate_request_storage_overflow(
+    storage_overflowed: bool,
+    rx_ovrflw_safestate_enable: bool,
+) -> OverflowOutcome {
+    if !storage_overflowed {
+        OverflowOutcome::NoOverflow
+    } else if rx_ovrflw_safestate_enable {
+        OverflowOutcome::OverflowSafestate
+    } else {
+        OverflowOutcome::OverflowNoSafestate
+    }
+}
+
+// ── Per-stream safety config: rx_enforce_seq / rx_seq_safestate_enable ──────
+
+/// The result of evaluating a candidate request's sequence number against
+/// `rx_enforce_seq`/`rx_seq_safestate_enable`: see
+/// [`evaluate_rx_enforce_seq`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// fusa:req REQ-SEQENF-001
+pub enum SequenceEnforcementOutcome {
+    /// Enforcement is disabled, or the candidate sequence number strictly
+    /// exceeds the last accepted one: queue the request.
+    Accepted,
+    /// Enforcement is enabled and violated, and `rx_seq_safestate_enable`
+    /// is `false` — reject the request, no safe-state consequence.
+    RejectedNoSafestate,
+    /// Enforcement is enabled and violated, and `rx_seq_safestate_enable`
+    /// is `true` — reject the request and drive every endpoint on this
+    /// stream to safe state.
+    RejectedSafestate,
+}
+
+impl SequenceEnforcementOutcome {
+    /// True for either rejected variant. Never panics for any input.
+    // fusa:req REQ-SEQENF-002
+    pub fn is_rejected(&self) -> bool {
+        !matches!(self, Self::Accepted)
+    }
+
+    /// True only for [`Self::RejectedSafestate`]. Never panics for any
+    /// input.
+    // fusa:req REQ-SEQENF-002
+    pub fn drives_safestate(&self) -> bool {
+        matches!(self, Self::RejectedSafestate)
+    }
+}
+
+/// The full `rx_enforce_seq`/`rx_seq_safestate_enable` rule: whether
+/// `candidate_seq` may be queued for execution at all, and whether a
+/// violation also drives the stream's endpoints to safe state.
+///
+/// Returns [`SequenceEnforcementOutcome::Accepted`] when `rx_enforce_seq`
+/// is `false` (an unconditional exemption), or when `candidate_seq` is
+/// strictly greater than `last_accepted_seq`. Otherwise (enforcement
+/// enabled and `candidate_seq` does not strictly increase) returns
+/// [`SequenceEnforcementOutcome::RejectedSafestate`] or
+/// [`SequenceEnforcementOutcome::RejectedNoSafestate`], selected by
+/// `rx_seq_safestate_enable`. Never panics for any input. See this
+/// module's doc comment "Provenance note: the enforced sequence number's
+/// own wire field and width" for why `last_accepted_seq`/`candidate_seq`
+/// are plain caller-supplied `u32` values.
+// fusa:req REQ-SEQENF-003
+pub fn evaluate_rx_enforce_seq(
+    last_accepted_seq: u32,
+    candidate_seq: u32,
+    rx_enforce_seq: bool,
+    rx_seq_safestate_enable: bool,
+) -> SequenceEnforcementOutcome {
+    if !rx_enforce_seq || candidate_seq > last_accepted_seq {
+        return SequenceEnforcementOutcome::Accepted;
+    }
+    if rx_seq_safestate_enable {
+        SequenceEnforcementOutcome::RejectedSafestate
+    } else {
+        SequenceEnforcementOutcome::RejectedNoSafestate
+    }
+}
+
+// ── Per-stream safety config: the unifying safe-state action ────────────────
+
+/// The concrete action a caller should take once some rule above has
+/// decided a stream should enter safe state: see
+/// [`resolve_safe_state_action`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// fusa:req REQ-SAFEACT-001
+pub enum SafeStateAction {
+    /// No safe-state entry is called for.
+    None,
+    /// Force every I/O pin on the stream's endpoints to high-impedance.
+    ForceHiZAllPins,
+    /// Drive the wrapped sequencer/target-state gate — see
+    /// [`enter_sequencer_driven_safe_state`].
+    ForceSequencerState(CompoundGateConfig),
+}
+
+/// Combine "should this stream enter safe state right now"
+/// (`should_enter_safe_state` — the caller-computed OR of, e.g.,
+/// [`crate::watchdog::StreamWatchdogOutcome::drives_safestate`],
+/// [`OverflowOutcome::drives_safestate`],
+/// [`SequenceEnforcementOutcome::drives_safestate`], or an
+/// [`E2eFailureScope::LatchStream`] scope) with a resolved
+/// [`SafeStateMechanism`] into one concrete [`SafeStateAction`].
+///
+/// Returns [`SafeStateAction::None`] when `should_enter_safe_state` is
+/// `false`, regardless of `mechanism`. Otherwise returns
+/// [`SafeStateAction::ForceHiZAllPins`] or
+/// [`SafeStateAction::ForceSequencerState`], mirroring `mechanism`. Never
+/// panics for any input.
+// fusa:req REQ-SAFEACT-002
+pub fn resolve_safe_state_action(
+    should_enter_safe_state: bool,
+    mechanism: SafeStateMechanism,
+) -> SafeStateAction {
+    if !should_enter_safe_state {
+        return SafeStateAction::None;
+    }
+    match mechanism {
+        SafeStateMechanism::HiZAllPins => SafeStateAction::ForceHiZAllPins,
+        SafeStateMechanism::SequencerDriven(gate) => SafeStateAction::ForceSequencerState(gate),
+    }
 }
 
 #[cfg(test)]
@@ -4244,6 +4679,282 @@ mod tests {
                     arrival_seq: 0,
                 }];
                 let _ = purge_normal_priority_on_watchdog_overflow(&pending, watchdog_overflowed);
+            }
+        }
+    }
+
+    // ── Per-stream safety config: rx_enforce_e2e ─────────────────────────────
+
+    #[test]
+    // fusa:test REQ-E2EENF-001
+    fn e2e_failure_scope_selects_by_rx_enforce_e2e() {
+        assert_eq!(e2e_failure_scope(false), E2eFailureScope::DropRequest);
+        assert_eq!(e2e_failure_scope(true), E2eFailureScope::LatchStream);
+    }
+
+    #[test]
+    // fusa:test REQ-E2EENF-002
+    fn check_rx_enforce_e2e_accepts_matching_crc() {
+        let buffer = b"safe-point coverage bytes";
+        let expected = crate::e2e::crc32_tc18(buffer);
+        assert_eq!(check_rx_enforce_e2e(buffer, expected, false), Ok(()));
+        assert_eq!(check_rx_enforce_e2e(buffer, expected, true), Ok(()));
+    }
+
+    #[test]
+    // fusa:test REQ-E2EENF-002
+    fn check_rx_enforce_e2e_reports_scope_on_mismatch() {
+        let buffer = b"safe-point coverage bytes";
+        let wrong = crate::e2e::crc32_tc18(buffer).wrapping_add(1);
+        assert_eq!(
+            check_rx_enforce_e2e(buffer, wrong, false),
+            Err((RcpError::CrcMismatch, E2eFailureScope::DropRequest))
+        );
+        assert_eq!(
+            check_rx_enforce_e2e(buffer, wrong, true),
+            Err((RcpError::CrcMismatch, E2eFailureScope::LatchStream))
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-E2EENF-002
+    fn check_rx_enforce_e2e_never_panics_for_any_sampled_input() {
+        for buffer in [&b""[..], &b"x"[..], &[0u8; 64][..]] {
+            for expected in [0u32, 1, u32::MAX] {
+                for rx_enforce_e2e in [false, true] {
+                    let _ = check_rx_enforce_e2e(buffer, expected, rx_enforce_e2e);
+                }
+            }
+        }
+    }
+
+    // ── Per-stream safety config: rx_safety_measure / rx_safestate_sequencer /
+    //    rx_safe_sequencer_state ────────────────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-SAFEMEAS-002
+    fn safe_state_sequencer_gate_carries_both_fields_through() {
+        let gate = safe_state_sequencer_gate(3, 7);
+        assert_eq!(gate.sequencer_num, 3);
+        assert_eq!(gate.start_state, SequencerState(7));
+    }
+
+    #[test]
+    // fusa:test REQ-SAFEMEAS-001
+    fn resolve_safe_state_mechanism_selects_by_rx_safety_measure() {
+        assert_eq!(
+            resolve_safe_state_mechanism(false, 3, 7),
+            SafeStateMechanism::HiZAllPins
+        );
+        assert_eq!(
+            resolve_safe_state_mechanism(true, 3, 7),
+            SafeStateMechanism::SequencerDriven(safe_state_sequencer_gate(3, 7))
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-SAFEMEAS-004
+    fn force_state_writes_unconditionally_even_outside_start_state() {
+        let mut bank = SequencerBank::new(4);
+        let gate = CompoundGateConfig {
+            sequencer_num: 1,
+            start_state: SequencerState(9),
+        };
+        // The sequencer is at its power-on default, not `gate.start_state` —
+        // an ordinary advance would refuse; `force_state` must not.
+        assert_ne!(bank.read(1).unwrap(), gate.start_state);
+        assert_eq!(bank.force_state(1, SequencerState(9)), Ok(()));
+        assert_eq!(bank.read(1).unwrap(), SequencerState(9));
+    }
+
+    #[test]
+    // fusa:test REQ-SAFEMEAS-004
+    fn force_state_rejects_out_of_bounds_sequencer() {
+        let mut bank = SequencerBank::new(2);
+        assert_eq!(
+            bank.force_state(2, SequencerState(1)),
+            Err(RcpError::SequencerNotKnown)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-SAFEMEAS-003
+    fn enter_sequencer_driven_safe_state_composes_force_state() {
+        let mut bank = SequencerBank::new(4);
+        let gate = safe_state_sequencer_gate(2, 5);
+        assert_eq!(enter_sequencer_driven_safe_state(&mut bank, &gate), Ok(()));
+        assert_eq!(bank.read(2).unwrap(), SequencerState(5));
+    }
+
+    #[test]
+    // fusa:test REQ-SAFEMEAS-003
+    fn enter_sequencer_driven_safe_state_never_panics_for_any_sampled_input() {
+        for svr_sequencers_max in [0u8, 1, 4] {
+            for sequencer_num in [0u8, 1, 4, u8::MAX] {
+                let mut bank = SequencerBank::new(svr_sequencers_max);
+                let gate = safe_state_sequencer_gate(sequencer_num, 5);
+                let _ = enter_sequencer_driven_safe_state(&mut bank, &gate);
+            }
+        }
+    }
+
+    // ── Per-stream safety config: rx_ovrflw_safestate_enable ─────────────────
+
+    #[test]
+    // fusa:test REQ-OVRFLW-001
+    // fusa:test REQ-OVRFLW-003
+    fn evaluate_request_storage_overflow_no_overflow_ignores_safestate_flag() {
+        assert_eq!(
+            evaluate_request_storage_overflow(false, false),
+            OverflowOutcome::NoOverflow
+        );
+        assert_eq!(
+            evaluate_request_storage_overflow(false, true),
+            OverflowOutcome::NoOverflow
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-OVRFLW-003
+    fn evaluate_request_storage_overflow_selects_by_safestate_flag() {
+        assert_eq!(
+            evaluate_request_storage_overflow(true, false),
+            OverflowOutcome::OverflowNoSafestate
+        );
+        assert_eq!(
+            evaluate_request_storage_overflow(true, true),
+            OverflowOutcome::OverflowSafestate
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-OVRFLW-002
+    fn overflow_outcome_predicates_agree_with_variant_identity() {
+        assert!(!OverflowOutcome::NoOverflow.is_overflow());
+        assert!(!OverflowOutcome::NoOverflow.drives_safestate());
+        assert!(OverflowOutcome::OverflowNoSafestate.is_overflow());
+        assert!(!OverflowOutcome::OverflowNoSafestate.drives_safestate());
+        assert!(OverflowOutcome::OverflowSafestate.is_overflow());
+        assert!(OverflowOutcome::OverflowSafestate.drives_safestate());
+    }
+
+    // ── Per-stream safety config: rx_enforce_seq / rx_seq_safestate_enable ───
+
+    #[test]
+    // fusa:test REQ-SEQENF-001
+    // fusa:test REQ-SEQENF-003
+    fn evaluate_rx_enforce_seq_accepts_when_disabled_regardless_of_ordering() {
+        assert_eq!(
+            evaluate_rx_enforce_seq(10, 5, false, false),
+            SequenceEnforcementOutcome::Accepted
+        );
+        assert_eq!(
+            evaluate_rx_enforce_seq(10, 5, false, true),
+            SequenceEnforcementOutcome::Accepted
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-SEQENF-003
+    fn evaluate_rx_enforce_seq_accepts_strictly_increasing_sequence() {
+        assert_eq!(
+            evaluate_rx_enforce_seq(5, 6, true, true),
+            SequenceEnforcementOutcome::Accepted
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-SEQENF-003
+    fn evaluate_rx_enforce_seq_rejects_equal_or_decreasing_sequence() {
+        assert_eq!(
+            evaluate_rx_enforce_seq(5, 5, true, false),
+            SequenceEnforcementOutcome::RejectedNoSafestate
+        );
+        assert_eq!(
+            evaluate_rx_enforce_seq(5, 4, true, false),
+            SequenceEnforcementOutcome::RejectedNoSafestate
+        );
+        assert_eq!(
+            evaluate_rx_enforce_seq(5, 5, true, true),
+            SequenceEnforcementOutcome::RejectedSafestate
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-SEQENF-002
+    fn sequence_enforcement_outcome_predicates_agree_with_variant_identity() {
+        assert!(!SequenceEnforcementOutcome::Accepted.is_rejected());
+        assert!(!SequenceEnforcementOutcome::Accepted.drives_safestate());
+        assert!(SequenceEnforcementOutcome::RejectedNoSafestate.is_rejected());
+        assert!(!SequenceEnforcementOutcome::RejectedNoSafestate.drives_safestate());
+        assert!(SequenceEnforcementOutcome::RejectedSafestate.is_rejected());
+        assert!(SequenceEnforcementOutcome::RejectedSafestate.drives_safestate());
+    }
+
+    #[test]
+    // fusa:test REQ-SEQENF-003
+    fn evaluate_rx_enforce_seq_never_panics_for_any_sampled_input() {
+        let seqs = [0u32, 1, 5, u32::MAX];
+        for &last in &seqs {
+            for &candidate in &seqs {
+                for rx_enforce_seq in [false, true] {
+                    for rx_seq_safestate_enable in [false, true] {
+                        let _ = evaluate_rx_enforce_seq(
+                            last,
+                            candidate,
+                            rx_enforce_seq,
+                            rx_seq_safestate_enable,
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Per-stream safety config: the unifying safe-state action ─────────────
+
+    #[test]
+    // fusa:test REQ-SAFEACT-001
+    // fusa:test REQ-SAFEACT-002
+    fn resolve_safe_state_action_is_none_when_not_entering_safe_state() {
+        assert_eq!(
+            resolve_safe_state_action(false, SafeStateMechanism::HiZAllPins),
+            SafeStateAction::None
+        );
+        assert_eq!(
+            resolve_safe_state_action(
+                false,
+                SafeStateMechanism::SequencerDriven(safe_state_sequencer_gate(1, 2))
+            ),
+            SafeStateAction::None
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-SAFEACT-002
+    fn resolve_safe_state_action_mirrors_the_mechanism_when_entering() {
+        assert_eq!(
+            resolve_safe_state_action(true, SafeStateMechanism::HiZAllPins),
+            SafeStateAction::ForceHiZAllPins
+        );
+        let gate = safe_state_sequencer_gate(1, 2);
+        assert_eq!(
+            resolve_safe_state_action(true, SafeStateMechanism::SequencerDriven(gate)),
+            SafeStateAction::ForceSequencerState(gate)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-SAFEACT-002
+    fn resolve_safe_state_action_never_panics_for_any_sampled_input() {
+        let mechanisms = [
+            SafeStateMechanism::HiZAllPins,
+            SafeStateMechanism::SequencerDriven(safe_state_sequencer_gate(0, 0)),
+            SafeStateMechanism::SequencerDriven(safe_state_sequencer_gate(u8::MAX, u8::MAX)),
+        ];
+        for should_enter_safe_state in [false, true] {
+            for mechanism in mechanisms {
+                let _ = resolve_safe_state_action(should_enter_safe_state, mechanism);
             }
         }
     }
