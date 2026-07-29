@@ -6039,6 +6039,96 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-MOCKSRV-001",
+      "title": "RcServer starts HW_UNCONFIGURED with no root client",
+      "text": "RcServer::new constructs a server at RcServerState::INITIAL (HW_UNCONFIGURED), with no root client designated and no endpoints registered, holding the caller-supplied GeneralRegisters as its initial snapshot",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-MOCKSRV-002",
+      "title": "RcServer::try_transition delegates to RcServerState::try_transition",
+      "text": "RcServer::try_transition updates the server's stored lifecycle state to target on Ok, and leaves it unchanged on Err, mirroring RcServerState::try_transition's own success/failure contract",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-MOCKSRV-003",
+      "title": "register_endpoint assigns unique ids and rejects duplicate (stream_id, byte_bus_id) pairs",
+      "text": "RcServer::register_endpoint assigns each successfully registered endpoint a fresh, distinct EndpointId, and returns Err(RcpError::EpError) without allocating an id or storing the endpoint when (stream_id, byte_bus_id) is already registered",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-MOCKSRV-004",
+      "title": "EP0-addressed requests are gated by check_ep0_access_for_stream",
+      "text": "RcServer::handle_abb routes a byte_bus_id equal to ep0::EP0_BYTE_BUS_ID to the General-register EP0 path, reachable from every RcServerState for reads, and rejecting a write from any stream other than the designated root client with Err(RcpError::UnauthorizedAccess)",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-MOCKSRV-005",
+      "title": "EP0 read returns the GeneralRegisters snapshot; EP0 write is locked",
+      "text": "RcServer::handle_abb answers an EP0 read with the current GeneralRegisters::encode snapshot verbatim; an EP0 write is rejected with Err(RcpError::LockedMemAccess) once past the root-client check, since lifecycle::lock_policy assigns RegisterCategory::General no LockPolicy at all (never writable), for the root client exactly as for any other stream",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-MOCKSRV-006",
+      "title": "Device-endpoint requests dispatch through EndpointTable, stream-scoped",
+      "text": "RcServer::handle_abb resolves a non-EP0 byte_bus_id through EndpointTable::lookup for the requesting stream_id, returns Err(RcpError::EpNotFound) when no endpoint is registered under that exact (stream_id, byte_bus_id) pair (including when it is registered only under a different stream_id), and otherwise dispatches to the registered Endpoint's read or write",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-MOCKSRV-007",
+      "title": "Every RcServer response echoes the request's byte_bus_id",
+      "text": "Every AcfAbbMessage response RcServer::handle_abb builds carries response.info.byte_bus_id equal to the request's byte_bus_id and response.info.rsp set true, and passes acf::verify_echo_back against the request",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-MOCKSRV-008",
+      "title": "handle_ntscf_frame round-trips a whole on-wire request",
+      "text": "RcServer::handle_ntscf_frame decodes an NTSCF-framed ACF_ABB request with avtp::decode_ntscf_frame/acf::decode_acf_abb, dispatches it through handle_abb, and re-encodes the response with acf::encode_acf_abb/avtp::encode_ntscf_frame, never panicking for any input including truncated or arbitrary garbage frames",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-MOCKSRV-009",
+      "title": "MockEndpoint::write replaces its buffer wholesale",
+      "text": "MockEndpoint::write replaces the endpoint's held buffer with the supplied payload verbatim, and a subsequent MockEndpoint::read of at least that many bytes returns exactly what was last written",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-MOCKSRV-010",
+      "title": "MockEndpoint::read never panics regardless of requested size vs. buffer length",
+      "text": "MockEndpoint::read never panics for any read_size value, including one exceeding the held buffer's current length or a request against an empty buffer, returning at most as many bytes as are actually held",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

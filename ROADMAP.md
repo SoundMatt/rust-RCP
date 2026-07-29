@@ -2170,9 +2170,9 @@ package-by-package audit below, now that the core protocol (Milestones 1–8)
 exists to migrate them onto.
 
 - [ ] All **REPLACE**-disposition packages rebuilt against the new core
-      Progress (v0.12.0-dev): 4 of 10 done. `watchdog`/`powerstate` were
+      Progress (v0.12.0-dev): 5 of 10 done. `watchdog`/`powerstate` were
       already REPLACEd ahead of schedule inside Milestones 6/7 (see their
-      own "Done" notes above); `wire` and now `e2e` are done too. `src/
+      own "Done" notes above); `wire` and `e2e` are done too. `src/
       wire.rs` — the legacy 16-byte private frame — is deleted outright,
       its role fully absorbed by the already-built Milestone 1 AVTPDU/ACF
       stack: `src/avtp.rs` gains two new composition functions,
@@ -2249,8 +2249,51 @@ exists to migrate them onto.
       `fuzz/fuzz_targets/fuzz_e2e_unwrap.rs` is repointed at
       `e2e::crc32_tc18` rather than deleted, the same way
       `fuzz_wire_decode.rs` was repointed at `avtp::decode_ntscf_frame`.
-      Remaining REPLACE packages: `mock`, `config`, `capi`, `canbr`,
-      `linbr`, and `udp`'s own deeper rebuild.
+
+      `mock`'s row is now done too, and — unlike `wire`/`e2e` — this one is
+      genuinely new construction rather than a cutover: no prior Milestone
+      1-8 item ever assembled AVTPDU decode, EP0/register-map gating, and
+      endpoint dispatch into one live path, so `src/mock.rs` gains
+      [`RcServer`], an in-memory OPEN Alliance TC18 RC Server test double
+      keyed by `(StreamId, byte_bus_id)` and gated by `RcServerState`
+      rather than by `Zone`, plus a minimal `Endpoint` trait and a
+      byte-buffer-backed `MockEndpoint` implementation of it for
+      device-endpoint dispatch. `RcServer::handle_abb` composes
+      `ep0::route_byte_bus_id`/`check_ep0_access_for_stream` (against
+      `RegisterCategory::General` only — `HwConfig`/`RcpConfig` register
+      storage is not modeled by this item) and `addressing::EndpointTable`
+      to answer a request; `RcServer::handle_ntscf_frame` wraps that in
+      `avtp::decode_ntscf_frame`/`encode_ntscf_frame` and
+      `acf::decode_acf_abb`/`encode_acf_abb` so a caller can drive the
+      whole on-wire round trip without touching any intermediate decoded
+      type, reusing every one of `wire`'s own composition functions rather
+      than duplicating them. Every response echoes its request's
+      `byte_bus_id` via `acf::build_response_info`, verified against
+      `acf::verify_echo_back`. The pre-existing `MockController`/
+      `MockRegistry`/`Handler` test double for the *old*
+      `Controller`/`Registry`/`Zone`/`Command`/`Response`/`Status` API is
+      kept, unmodified, rather than deleted outright — a deliberately
+      narrower scope than a clean REPLACE, recorded in `src/mock.rs`'s own
+      module doc comment: seventeen still-`ADAPT`-disposition satellite
+      packages' own unit tests (`ratelimit`, `deadline`, `faultinject`,
+      `proxy`, `redundancy`, `observe`, `authz`, `record`, `prioqueue`,
+      `zonegroup`, `adapt`, `loan`, `admin`, `federation`, `tsn`,
+      `firmware`) plus `src/bin/rcp.rs` all construct
+      `MockController`/`MockRegistry` today against a `Controller`/
+      `Registry` trait this item does not remove, and retargeting those
+      seventeen files is this milestone's own separate, not-yet-started
+      "ADAPT-disposition packages retargeted" bullet's job, not this one's
+      — deleting the legacy mock now would break every one of them for no
+      corresponding benefit. `.fusa-reqs.json`'s `REQ-CTRL-*`/`REQ-REG-*`/
+      `REQ-RESP-*`/`REQ-STAT-*`/`REQ-ERR-011` therefore stay exactly as
+      they were (still describing live, still-tested code) rather than
+      being retargeted or retired; ten new `REQ-MOCKSRV-001`..`010`
+      requirements are added instead, covering only the new `RcServer`/
+      `Endpoint`/`MockEndpoint` behavior, each with a `// fusa:req`/
+      `// fusa:test` pair in `src/mock.rs`.
+
+      Remaining REPLACE packages: `config`, `capi`, `canbr`, `linbr`, and
+      `udp`'s own deeper rebuild.
 - [ ] All **ADAPT**-disposition packages retargeted to whatever new
       endpoint/RC-Server trait surface replaces `Controller`/`Registry`
 - [ ] All **DEPRECATE**-disposition packages removed, with a migration note
