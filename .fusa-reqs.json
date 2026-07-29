@@ -5409,6 +5409,33 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CRC-008",
+      "title": "Only the fragment train's final fragment (ms == false) carries a CRC",
+      "text": "fragment_crc_expectation(ms) returns NotExpected for ms == true and Expected for ms == false; check_fragment_crc_placement(ms, crc_present) returns Ok(()) when ms == true and crc_present == false, and when ms == false and crc_present == true, and returns Err(RcpError::InvalidParameter) for the two invalid combinations (a CRC present on a non-final fragment, or absent on the final fragment) rather than silently ignoring either",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CRC-009",
+      "title": "CombinedFragmentPayload::assemble concatenates a fragment train's per-segment payloads in caller-supplied order",
+      "text": "CombinedFragmentPayload::assemble(segments) returns the verbatim concatenation of segments in the order given, returns an empty combined payload for an empty segments slice, and never panics for any sampled segment slice, including a single-segment slice",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CRC-010",
+      "title": "Fragment-train CRC coverage is computed across the combined payload, using the final fragment's own header fields",
+      "text": "build_crc32_coverage_buffer_for_fragment_train(header, final_fragment, segments) produces the same buffer as calling build_crc32_coverage_buffer with final_fragment's header fields and a payload manually concatenated from segments in order, is sensitive to changes in any individual segment, carries the final fragment's own message_timestamp through for AcfCoverageMessage::Gbb, and propagates the same Err(RcpError::InvalidSize) build_crc32_coverage_buffer itself returns for a length-field overflow after pre-adjustment; crc32_tc18_for_fragment_train(header, final_fragment, segments) equals crc32_tc18 applied to that same buffer",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
