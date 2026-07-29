@@ -2725,8 +2725,56 @@ exists to migrate them onto.
       traced; `bash scripts/cyber-gap-check.sh` reports 6/6 threats with
       tested countermeasures; `rsfusa check`/`qualify`/`release` all pass
       locally with zero ERROR findings; `relay conform --strict` passes.
-- [ ] All **KEEP-AS-IS** packages given a regression pass to confirm they
+- [x] All **KEEP-AS-IS** packages given a regression pass to confirm they
       are genuinely unaffected
+      Done (v0.12.0-dev): all 7 of 7 checked individually, not just by a
+      passing `cargo test`. `src/dyndata.rs`, `src/codegen.rs`, `src/
+      iso21434.rs`, `src/certgap.rs`, `src/formal.rs`, `src/relay.rs`, and
+      `src/base64_serde.rs` were each grepped for `Zone`/`Command`/
+      `CommandType`/`Response`/`Status`/`Controller`/`Registry` and for any
+      `use` import of a sibling in-crate module: none of the seven has a
+      single hit against the legacy core types, and none imports anything
+      beyond `std`/its own third-party deps (`relay.rs` alone pulls in
+      `async_trait`/`chrono`/`serde`/`thiserror`/`tokio`, all pre-existing
+      and RELAY-spec-driven, not RCP-core-driven). `base64_serde.rs`'s
+      module doc mentions `rcp::{Command,Response,Status}.payload` in prose
+      describing what currently calls it, but the module itself imports
+      neither type — that's the caller's coupling (`lib.rs`'s `with =
+      "base64_serde::opt"` field attributes on `Command`/`Response`/
+      `Status`), not this package's, and it stays accurate as long as those
+      structs exist pending their Milestone 10 rebuild.
+
+      Cross-module callers were checked crate-wide (`grep -rn` for each
+      package's `::` path across `src/` and `src/bin/`), not merely
+      asserted: `dyndata`, `codegen`, `iso21434`, `certgap`, and
+      `base64_serde`'s own path (as opposed to attribute usage) have zero
+      external callers anywhere in the crate today. `formal` has no `use`
+      import anywhere outside its own file — `src/lifecycle.rs` only
+      *mentions* `crate::formal::Invariant` in two doc comments as a
+      design-pattern comparison, so `formal` is more orthogonal than even
+      the disposition table's own "consumed nowhere yet" framing implied.
+      `relay` is consumed by `src/adapt.rs` (the RELAY §10.3/§15.7.5
+      `Adapt()`/`to_message()`/`from_message()` binding, explicitly
+      reserved for its own Milestone 10 rebuild per this milestone's ADAPT
+      bullet above) and by `src/lib.rs`'s `RcpError` variant doc comments —
+      both pre-existing, expected couplings to the vendored RELAY-spec
+      surface itself, never to the old `Zone`/`Command` core.
+
+      `cargo build --all-targets`, `cargo clippy --all-targets -- -D
+      warnings`, `cargo test --all-targets` (1056 tests, including each of
+      the seven packages' own unit tests run in isolation:
+      `dyndata::` 6, `codegen::` 4, `iso21434::` 6, `certgap::` 9,
+      `formal::` 5, `relay::` 10, `base64_serde::` 3 — all passing), and
+      `cargo fmt --check` are clean; `bash scripts/fusa-gap-check.sh`
+      reports 621/621 (100%) requirements traced; `bash scripts/
+      cyber-gap-check.sh` reports 6/6 threats with tested countermeasures —
+      identical counts to the DEPRECATE bullet immediately above, since
+      this item changes no code and adds no requirements. No file under
+      `src/` was modified by this item; the "regression pass" is this
+      verification record itself; the previously-asserted-but-unchecked
+      KEEP-AS-IS calls in the Satellite Package Disposition table are now
+      confirmed rather than merely claimed. This closes Milestone 9 in
+      full.
 
 Success Criteria:
 No module under `src/` still references the old `Zone`/`Command`/

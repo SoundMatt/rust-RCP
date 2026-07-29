@@ -64,3 +64,23 @@ references in `.fusa-iec62443.json` (`T-004`, `SC-006`), `tara.json`
 table are updated to describe the packages as actually removed, rather
 than merely slated for removal, with residual risk raised honestly where
 no live replacement mechanism exists.
+
+### Verified
+
+All 7 **KEEP-AS-IS**-disposition satellite packages named in `ROADMAP.md`'s
+Satellite Package Disposition table — `dyndata`, `codegen`, `iso21434`,
+`certgap`, `formal`, `relay`, `base64_serde` — completed a regression pass
+confirming they are genuinely unaffected by the Milestone 9 core migration.
+Each was checked individually for any coupling to the legacy `Zone`/
+`Command`/`Response`/`Status`/`Controller`/`Registry` core (none found) and
+for its actual cross-module callers crate-wide (also confirmed: `dyndata`,
+`codegen`, `iso21434`, `certgap`, and `base64_serde`'s own path have none;
+`formal` is only mentioned in `src/lifecycle.rs` doc comments, not
+imported; `relay` is consumed by `src/adapt.rs` and `src/lib.rs`, both
+pre-existing RELAY-spec bindings, not RCP-core ones). No source file was
+modified — this entry records the verification itself. `cargo build
+--all-targets`, `cargo clippy --all-targets -- -D warnings`, `cargo test
+--all-targets` (1056 tests), and `cargo fmt --check` are clean; `bash
+scripts/fusa-gap-check.sh` reports 621/621 (100%) requirements traced;
+`bash scripts/cyber-gap-check.sh` reports 6/6 threats with tested
+countermeasures. This closes Milestone 9 in full.
