@@ -1936,12 +1936,45 @@ types deferred out of Milestone 4.
       already does, tagged the already-reserved `EndpointType::Iseled`.
       New `REQ-ISELED-001`..`REQ-ISELED-010` added to `.fusa-reqs.json`,
       each with a `// fusa:req`/`// fusa:test` pair in `src/iseled.rs`.
-- [ ] **MDIO** (`ep_type 0x0D`): Clause-22/45 addressing modes
+- [x] **MDIO** (`ep_type 0x0D`): Clause-22/45 addressing modes
       (`mdio_mode` 2-bit selector); minimal functional config (no
       clock-divider or mode-select fields beyond the universal common
       block). Note: MDIO is fully normative in the register map's `ep_type`
       enumeration despite being absent from the spec's own informative
-      "ten interfaces" scope statement — build it anyway
+      "ten interfaces" scope statement — build it anyway. Done
+      (v0.10.0-dev): new `src/mdio.rs` — this milestone's fourth entry, and
+      additive standalone plumbing only, matching `src/lin.rs`/`src/can.rs`/
+      `src/iseled.rs`'s own discipline. Like ISELED, MDIO has no old-protocol
+      satellite bridge module in this crate (no `mdiobr.rs`) to validate
+      against or migrate away from, so every piece here is new modeling
+      rather than a read-and-reject exercise. Per this bullet's own explicit
+      note, and continuing the thread Guiding Principle 5 already flags
+      (MDIO's absence from the spec's own informative "ten interfaces"
+      scope-list prose despite being fully normative in the register map's
+      `ep_type` enumeration), this crate trusts the normative enumeration and
+      builds MDIO support rather than treating the scope-list omission as
+      license to skip it — flagged in `mdio.rs`'s own doc comment. Adds
+      [`MdioAddressingMode`], the `mdio_mode` 2-bit selector, with
+      `Clause22`/`Clause45` as the two named IEEE 802.3 addressing modes and
+      its remaining two 2-bit values left as explicitly, neutrally named
+      `Spare2`/`Spare3` variants — this checklist bullet states no meaning
+      for them — mirroring `spi::SpiChannelSelect::Spare6`/`Spare7`'s own
+      unresolved-slot precedent, with `MdioAddressingMode::is_unallocated_slot`
+      letting a caller detect them; and `MdioFunctionalConfig`, carrying
+      exactly that one `addressing_mode` field and nothing further — no
+      clock-divider or additional mode-select field, per this bullet's own
+      "minimal" instruction — composing against
+      `regmap::check_functional_config_matches_ep_type` via `layer_tag`
+      exactly as every prior entry's own config type already does, tagged
+      the already-reserved `EndpointType::Mdio`. Since this bullet names no
+      register-access wire framing of its own beyond the mode selector, this
+      entry also adds `MdioTransfer`/`MdioTransferResult`, an opaque raw
+      byte-stream request/response pair mirroring
+      `i2c::I2cByteTransfer`/`i2c::I2cByteTransferResult`'s own
+      address-plus-data pass-through modeling, carrying no PHY-address/
+      register-address/device-type parsing of its own. New
+      `REQ-MDIO-001`..`REQ-MDIO-006` added to `.fusa-reqs.json`, each with a
+      `// fusa:req`/`// fusa:test` pair in `src/mdio.rs`.
 - [ ] **Wakeup control** (`ep_type 0x01`): fixed `SleepCMD` (`0xA5`) request
       distinct from the generic request taxonomy; wake-source pin
       monitoring; wired into the Normal/StandBy/Sleep/Unpowered model from
