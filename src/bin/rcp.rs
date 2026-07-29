@@ -77,6 +77,9 @@ fn main() {
 
         // ── §12.2 capabilities ────────────────────────────────────────────────
         // fusa:req REQ-CLI-007
+        // "fragmentation" reflects ROADMAP.md Milestone 8's "go" decision:
+        // crate::fragment::FragmentReassemblyBuffer implements ms/segment_num
+        // multi-AVTPDU reassembly bounded by rx_stream_max_request_size.
         "capabilities" => {
             println!(
                 concat!(
@@ -89,7 +92,7 @@ fn main() {
                     "    \"spec_version\": \"{spec}\",\n",
                     "    \"commands\": [\"version\",\"capabilities\",\"status\",\"convert\",\"send\",\"zones\"],\n",
                     "    \"transports\": [],\n",
-                    "    \"features\": [\"loaning\"],\n",
+                    "    \"features\": [\"loaning\",\"fragmentation\"],\n",
                     "    \"interfaces\": [\"Controller\",\"Registry\"],\n",
                     "    \"optional_interfaces\": [\"LoaningController\"],\n",
                     "    \"adapt\": true\n",

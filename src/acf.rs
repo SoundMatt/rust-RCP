@@ -115,7 +115,14 @@
 //!   [`ReadSizeOrSegmentNum`] models the field as a single raw byte with
 //!   two same-bit accessor views (see its own doc comment) instead of
 //!   silently committing to one interpretation or inventing an unconfirmed
-//!   selector bit.
+//!   selector bit. `ROADMAP.md` Milestone 8's `crate::fragment` module
+//!   narrows this — but does not resolve it — for its own single question
+//!   of how a fragment train orders its segments: within a message whose
+//!   `ms` flag marks it as part of a train, `crate::fragment` reads this
+//!   field via [`ReadSizeOrSegmentNum::as_segment_num`] as a consistency
+//!   check against gaps/duplicates/reordering. Whatever this field means
+//!   outside a fragment train (i.e. the `read_size` interpretation) is
+//!   untouched by that and stays exactly as ambiguous as stated above.
 //! - Treating `acf_msg_type` as a standalone full leading byte (rather than
 //!   bit-packing it alongside `pad`/part of `acf_msg_length`, the way real
 //!   IEEE 1722 ACF common-header framing is understood to do) is a

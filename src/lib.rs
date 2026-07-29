@@ -105,6 +105,7 @@ pub mod faultinject;
 pub mod federation;
 pub mod firmware;
 pub mod formal;
+pub mod fragment;
 pub mod gpio;
 pub mod grpcbridge;
 pub mod i2c;
