@@ -1463,9 +1463,56 @@ per-endpoint scheduler, since the spec defines that ordering natively.
       separate, uncomposed pieces for now). New `REQ-RLC-001`..`REQ-RLC-006`
       (in `src/request.rs`) added to `.fusa-reqs.json`, each with a
       `// fusa:req`/`// fusa:test` pair.
-- [ ] Feature-bundle gating: claiming "compound request support" requires
+- [x] Feature-bundle gating: claiming "compound request support" requires
       shipping compound-wait, ≥4 sequencers, *and* clear-non-safestate
-      together — not compound message parsing alone
+      together — not compound message parsing alone. Done (v0.8.0-dev):
+      `src/request.rs` gains `check_compound_bundle_claim`, composing the
+      three prerequisite facts this milestone's own first eight bullets
+      already established — compound-wait support
+      (`RequestKind::CompoundWait`), a sequencer bank sized for at least
+      `MIN_SEQUENCERS_FOR_COMPOUND_BUNDLE` (`4`) sequencers
+      (`SequencerBank`/`svr_sequencers_max`), and clear-non-safestate
+      cancellation support (`check_clear_non_safestate_cancellation`) —
+      into the single honesty check this checklist bullet names: all three
+      together, not compound-message parsing alone. This is deliberately a
+      composing, not a discovering, item — every fact it consults already
+      exists from prior Milestone 5 work; this item's own job is only the
+      gating rule tying the three together. `check_compound_bundle_claim`
+      takes its three prerequisite facts as plain caller-supplied
+      parameters (`has_compound_wait: bool`, `svr_sequencers_max: u8`,
+      `has_clear_non_safestate: bool`) rather than reading them off a live
+      `crate::regmap::GeneralRegisters`, mirroring `SequencerState`,
+      `root_client`, and `is_safestate_related` all being taken the same
+      way earlier in this milestone, and returns
+      `Err(crate::RcpError::InvalidParameter)` — one of the eleven
+      confirmed TC18 spec error codes, reused rather than a new
+      sentinel of its own — for any claim missing one or more of the
+      three. `src/regmap.rs` gains `GeneralRegisters::
+      claims_compound_wait_bundle`, the first named per-bit accessor onto
+      the previously-fully-undecomposed `svr_implemented_options`
+      bitmask: this item is the "later item" that module's own provenance
+      note deferred a first named per-bit accessor to, needing to know
+      which bit the "compound request support" bundle occupies to pair
+      naturally with `check_compound_bundle_claim`. Two points flagged per
+      Guiding Principle 5: (1) the extraction records the bitmask's five
+      option-bundle names (compound&wait / triggered / chained /
+      time-sync&timed / enhanced-cancel) but no bit-position assignment
+      for any of them, so this crate assigns them to bits `0`-`4` in the
+      extraction's own listed order — a crate-local placeholder, not a
+      confirmed spec bit position, reconciled against a real RC Server
+      (never against spec prose) before being relied on for interop; (2)
+      `check_compound_bundle_claim` is scoped to the one "compound request
+      support" bundle this checklist bullet names — it takes no position
+      on what an honest claim for any of the other four bundles would
+      require. Same "additive standalone plumbing only" discipline as
+      every prior Milestone 1-5 entry: `check_compound_bundle_claim` is a
+      pure function over caller-supplied inputs, not wired into any
+      decoder, dispatch loop, or not-yet-built RC Server instance that
+      would decide what to set `svr_implemented_options` to.
+      New `REQ-BUNDLE-001`, `REQ-BUNDLE-002` (in `src/request.rs`) and
+      `REQ-RMAP-030` (in `src/regmap.rs`) added to `.fusa-reqs.json`, each
+      with a `// fusa:req`/`// fusa:test` pair. This closes out Milestone
+      5's nine-bullet checklist in full.
 
 Success Criteria:
 All five request kinds and three cancellation kinds execute with correct
