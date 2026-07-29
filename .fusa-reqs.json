@@ -5940,6 +5940,78 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-WAKE-001",
+      "title": "SleepCmdRequest's fixed 0xA5 discriminant round-trips through encode/decode",
+      "text": "wakeup::SleepCmdRequest::encode always produces the single byte 0xA5 (wakeup::SleepCmdRequest::DISCRIMINANT), and wakeup::SleepCmdRequest::decode reproduces the original value from that byte",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-WAKE-002",
+      "title": "SleepCmdRequest::decode rejects short input and any non-0xA5 first byte",
+      "text": "wakeup::SleepCmdRequest::decode returns Err(RcpError::ShortFrame) for an empty slice and Err(RcpError::InvalidParameter) for any first byte other than 0xA5, and never panics for any input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-WAKE-003",
+      "title": "WakeSourcePinMask round-trips through encode/decode and rejects short input",
+      "text": "wakeup::WakeSourcePinMask::decode(mask.encode()) reproduces the original mask for any u32 value, ignores trailing bytes beyond the first four, returns Err(RcpError::ShortFrame) for input shorter than WAKE_SOURCE_PIN_MASK_LEN, and never panics for any input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-WAKE-004",
+      "title": "WakeupTriggerConfig round-trips through encode/decode, rejects short input, and defaults to no armed pins",
+      "text": "wakeup::WakeupTriggerConfig::decode(config.encode()) reproduces the original config, returns Err(RcpError::ShortFrame) for input shorter than WAKE_SOURCE_PIN_MASK_LEN, and WakeupTriggerConfig::default().wake_enable is WakeSourcePinMask(0)",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-WAKE-005",
+      "title": "evaluate_wake_source_signals reports only wake-source pins that are both armed and observed",
+      "text": "wakeup::evaluate_wake_source_signals returns a WakeSourceSignals whose fired mask equals config.wake_enable bitwise-AND observed, WakeSourceSignals::any_fired is true only when that mask is nonzero, and the function never panics for any input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-WAKE-006",
+      "title": "WakeupFunctionalConfig defaults to no armed pins and its layer tag matches crate::regmap's EndpointType::Wakeup cross-layer rule",
+      "text": "wakeup::WakeupFunctionalConfig::default().trigger is WakeupTriggerConfig::default(); WakeupFunctionalConfig::layer_tag produces a crate::regmap::PerEpTypeFunctionalConfig tagged EndpointType::Wakeup that satisfies crate::regmap::check_functional_config_matches_ep_type against a generic PerEpConfigBlock of the same ep_type, and is rejected by functional_config_matches_ep_type against a mismatched ep_type",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-WAKE-007",
+      "title": "request_sleep_via_sleep_cmd composes a decoded SleepCmdRequest with crate::powerstate::try_enter_power_mode without duplicating its transition or gate logic",
+      "text": "wakeup::request_sleep_via_sleep_cmd(SleepCmdRequest, from, to, gate) returns exactly what crate::powerstate::try_enter_power_mode(from, to, gate) returns for every sampled (from, to, gate) combination, and never panics",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-WAKE-008",
+      "title": "wake_source_signals_trigger_handshake composes a fired WakeSourceSignals with crate::powerstate::send_wakeup_request, rejecting when nothing fired",
+      "text": "wakeup::wake_source_signals_trigger_handshake returns Err(RcpError::RequestRejected) when WakeSourceSignals::any_fired is false regardless of handshake state, and otherwise delegates to crate::powerstate::send_wakeup_request(state), advancing WakeUpHandshakeState::Idle to RequestSent and rejecting every other starting state; never panics for any input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

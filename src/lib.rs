@@ -140,6 +140,7 @@ pub mod tsn;
 pub mod uart;
 pub mod udp;
 pub mod udsbr;
+pub mod wakeup;
 pub mod watchdog;
 pub mod wire;
 pub mod zonegroup;
