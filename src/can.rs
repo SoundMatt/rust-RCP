@@ -76,9 +76,12 @@
 //! identity from the old `Zone`/`Command` model, which has no equivalent in
 //! the endpoint-addressed model this crate replaces it with. Its
 //! `CAN_FD_MAX_PAYLOAD` constant *was* reused at that time — the same way
-//! [`crate::lin::LIN_MAX_DATA`] reuses [`crate::linbr::LIN_MAX_DATA`] — since
-//! it stated a genuine CAN FD physical ceiling (64 data bytes per frame)
-//! rather than any `Zone`/`Command`-coupled behavior.
+//! [`crate::lin::LIN_MAX_DATA`] originally reused the legacy
+//! `linbr::LIN_MAX_DATA` (since deleted by Milestone 9's own `linbr`
+//! REPLACE cutover, the same way this module's own canbr cutover deleted
+//! `canbr.rs` below) — since it stated a genuine CAN FD physical ceiling
+//! (64 data bytes per frame) rather than any `Zone`/`Command`-coupled
+//! behavior.
 //!
 //! Milestone 9's own canbr REPLACE cutover has since deleted `canbr.rs`
 //! outright (its `CanBridge`/`CanSocket`/`Zone`-keyed framing had no
