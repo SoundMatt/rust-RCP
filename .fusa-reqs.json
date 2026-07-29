@@ -2919,8 +2919,8 @@
     },
     {
       "id": "REQ-CAPI-001",
-      "title": "CCommand is repr(C)",
-      "text": "CCommand uses #[repr(C)] with C-compatible field types",
+      "title": "CStreamId and the CAbbRequest/CAbbResponse headers are repr(C)",
+      "text": "CStreamId uses #[repr(C)] with C-compatible field types mirroring avtp::StreamId; CAbbRequest/CAbbResponse each pair a CStreamId with a CByteMessageInfo",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -2928,8 +2928,8 @@
     },
     {
       "id": "REQ-CAPI-002",
-      "title": "CResponse is repr(C)",
-      "text": "CResponse uses #[repr(C)] with C-compatible field types",
+      "title": "CByteMessageInfo is repr(C)",
+      "text": "CByteMessageInfo uses #[repr(C)] with C-compatible field types, flattening acf::ByteMessageInfo's evt/read_size_segment_num sub-fields",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -2937,8 +2937,8 @@
     },
     {
       "id": "REQ-CAPI-003",
-      "title": "Command/CCommand conversion",
-      "text": "From<&Command> for CCommand and From<&CCommand> for Command are inverses",
+      "title": "StreamId/ByteMessageInfo conversions round-trip",
+      "text": "From<StreamId> for CStreamId / From<CStreamId> for StreamId are inverses, From<ByteMessageInfo> for CByteMessageInfo / From<CByteMessageInfo> for ByteMessageInfo are inverses, and CAbbRequest::new/CAbbResponse::new round-trip through stream_id()/info()",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -2947,7 +2947,7 @@
     {
       "id": "REQ-CAPI-004",
       "title": "CError maps RcpError",
-      "text": "From<&RcpError> for CError maps all RcpError variants to CError codes",
+      "text": "From<&RcpError> for CError maps every current RcpError variant to a CError code, including all eleven TC18 spec error codes, the RELAY mandatory sentinels, ShortFrame, the chained-request and CRC_ERROR codes, and collapsing the legacy Zone/Controller/Registry sentinels plus Other(String) to CError::Other",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
