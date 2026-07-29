@@ -2109,35 +2109,8 @@
     },
     {
       "id": "REQ-CFG-001",
-      "title": "RcpConfig default is valid",
-      "text": "RcpConfig::default() passes validate()",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-CFG-002",
-      "title": "ControllerConfig per-controller",
-      "text": "ControllerConfig holds zone, timeout_ms, max_payload_bytes",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-CFG-003",
-      "title": "WatchdogConfig defaults",
-      "text": "WatchdogConfig::default() returns interval_ms=1000, window=3",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-CFG-004",
-      "title": "RateLimitConfig defaults",
-      "text": "RateLimitConfig::default() returns rate=100, burst=20, exempt_critical=true",
+      "title": "RcServerConfig default is valid",
+      "text": "RcServerConfig::default() passes validate() with initial_state HW_UNCONFIGURED",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -2146,7 +2119,7 @@
     {
       "id": "REQ-CFG-005",
       "title": "JSON and YAML parsing",
-      "text": "from_json() and from_yaml() parse RcpConfig from text",
+      "text": "from_json() and from_yaml() parse RcServerConfig (GeneralRegisters, the five §3.7-§3.11 config-table row lists, and initial_state) from text",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -2154,8 +2127,26 @@
     },
     {
       "id": "REQ-CFG-006",
-      "title": "Validation rejects invalid values",
-      "text": "validate() returns Err for zone > 5, negative rate, zero watchdog window, oversized payload",
+      "title": "Validation rejects table rows exceeding declared capacity",
+      "text": "validate() returns Err(InvalidParameter) when hw_pin_mapping, request_streams, ep_bytebus_id_map, or response_streams holds more rows than its GeneralRegisters TableDescriptor capacity field declares",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CFG-007",
+      "title": "Validation rejects sequencer_state exceeding svr_sequencers_max",
+      "text": "validate() returns Err(InvalidParameter) when sequencer_state holds more rows than GeneralRegisters::svr_sequencers_max, the pointer-only table's own row-count bound",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CFG-008",
+      "title": "Validation rejects RcpConfig-category tables unreachable in initial_state",
+      "text": "validate() returns Err(UnauthorizedAccess) when request_streams, ep_bytebus_id_map, response_streams, or sequencer_state is populated while initial_state is HW_UNCONFIGURED, matching lifecycle::is_register_reachable's RcpConfig-category gating",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",

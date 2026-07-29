@@ -2170,7 +2170,7 @@ package-by-package audit below, now that the core protocol (Milestones 1–8)
 exists to migrate them onto.
 
 - [ ] All **REPLACE**-disposition packages rebuilt against the new core
-      Progress (v0.12.0-dev): 5 of 10 done. `watchdog`/`powerstate` were
+      Progress (v0.12.0-dev): 6 of 10 done. `watchdog`/`powerstate` were
       already REPLACEd ahead of schedule inside Milestones 6/7 (see their
       own "Done" notes above); `wire` and `e2e` are done too. `src/
       wire.rs` — the legacy 16-byte private frame — is deleted outright,
@@ -2292,8 +2292,50 @@ exists to migrate them onto.
       `Endpoint`/`MockEndpoint` behavior, each with a `// fusa:req`/
       `// fusa:test` pair in `src/mock.rs`.
 
-      Remaining REPLACE packages: `config`, `capi`, `canbr`, `linbr`, and
-      `udp`'s own deeper rebuild.
+      `config`'s row is now done too. Its old [`RcpConfig`] loader (a flat
+      `controllers: HashMap<String, ControllerConfig>` keyed by `Zone`, plus
+      a standalone `WatchdogConfig`/`RateLimitConfig` pair, validated
+      against invented bounds — `zone <= 5`, `max_payload_bytes <= 65491`,
+      `rate_limit.rate > 0`, `watchdog.window > 0` — with no referent in the
+      real spec) is deleted outright and replaced with `RcServerConfig`, a
+      loadable/serializable unit that *composes* the register-map/lifecycle
+      pieces Milestone 2 already built — `regmap::GeneralRegisters` (`§3.6`),
+      the five `§3.7`-`§3.11` child config-table row types, and
+      `lifecycle::RcServerState` — rather than reinventing them. Those
+      existing types gained purely additive `Serialize`/`Deserialize`
+      derives (`src/regmap.rs`, `src/lifecycle.rs`) so `config` could compose
+      them directly instead of duplicating their field lists in a parallel
+      shape. `from_json`/`from_yaml` keep the same two-format-loader shape
+      the old loader established; `validate()` is rebuilt from scratch
+      against real constraints instead of the old invented bounds: each of
+      the four `TableDescriptor`-backed child tables must have enough
+      declared `capacity` for its config's own row count, `sequencer_state`'s
+      row count is bounded by `svr_sequencers_max` (the one child table whose
+      pointer field, `svr_sequencer_state_ptr`, has no paired capacity field
+      of its own), and every `RcpConfig`-category table populated in the
+      config must be reachable given the config's own `initial_state`, per
+      `lifecycle::is_register_reachable`. Field-width bounds are deliberately
+      left unchecked here, since `GeneralRegisters`/each row type's own
+      `encode`/`decode` already enforce them structurally through Rust's
+      integer types. Like `wire`/`e2e` before it, `config::` had zero callers
+      anywhere else in `src/` before this item (confirmed by inspection) and
+      still has none after it, so this is a self-contained cutover with no
+      other file's callers to fix. `.fusa-reqs.json`'s `REQ-CFG-001`,
+      `REQ-CFG-005`, and `REQ-CFG-006` are retargeted in place (same IDs) to
+      describe the new type/loader/capacity-validation behavior;
+      `REQ-CFG-002`..`004` (`ControllerConfig`'s `zone` field,
+      `WatchdogConfig`/`RateLimitConfig` defaults) describe only the deleted
+      `Zone`-keyed/ad-hoc-watchdog/ad-hoc-rate-limit shapes with no
+      surviving analog in the register-map model, so — per this item's own
+      "retarget in place, or explicitly retire if no equivalent behavior
+      exists" instruction — they are retired (removed) rather than
+      force-mapped onto unrelated behavior; new `REQ-CFG-007`..`008` cover
+      the two new validation rules (`svr_sequencers_max` consistency,
+      `RcpConfig`-category reachability) that have no counterpart among the
+      retargeted three.
+
+      Remaining REPLACE packages: `capi`, `canbr`, `linbr`, and `udp`'s own
+      deeper rebuild.
 - [ ] All **ADAPT**-disposition packages retargeted to whatever new
       endpoint/RC-Server trait surface replaces `Controller`/`Registry`
 - [ ] All **DEPRECATE**-disposition packages removed, with a migration note

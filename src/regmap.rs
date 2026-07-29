@@ -406,6 +406,20 @@
 //! A real RC Server's actual per-table byte layout must be reconciled
 //! against this crate's own working guesses (never against spec prose)
 //! before any of these encode/decode forms are relied on for interop.
+//!
+//! ## `Serialize`/`Deserialize` derives (`ROADMAP.md` Milestone 9, `config`
+//! ## REPLACE cutover)
+//!
+//! [`TableDescriptor`], [`GeneralRegisters`], and the five `§3.7`-`§3.11`
+//! row types additionally derive `serde`'s `Serialize`/`Deserialize` here,
+//! rather than [`crate::config`] duplicating their field lists in a
+//! parallel loader-only shape. This is purely additive — no encode/decode
+//! byte layout, wire behavior, or existing derive changes; it only gives
+//! this module's own types a JSON/YAML-loadable surface for
+//! [`crate::config`] to compose. See [`crate::config`]'s own doc comment
+//! for what that composition builds on top of it.
+
+use serde::{Deserialize, Serialize};
 
 use crate::lifecycle::RegisterCategory;
 use crate::RcpError;
@@ -762,7 +776,7 @@ pub fn check_functional_config_matches_ep_type(
 ///
 /// See this module's doc comment "`GeneralRegisters` provenance note" for
 /// which `§3.6` rows this shape applies to (and which don't).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 // fusa:req REQ-RMAP-007
 pub struct TableDescriptor {
     /// Register-map address of the child table's first entry.
@@ -808,7 +822,7 @@ impl TableDescriptor {
 /// what this models and "`GeneralRegisters` provenance note" for the
 /// byte-layout and bitmask inferences [`Self::encode`]/[`Self::decode`]
 /// depend on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 // fusa:req REQ-RMAP-008
 pub struct GeneralRegisters {
     /// Fixed constant this crate's own decoder can use to recognize an OA
@@ -1130,7 +1144,7 @@ pub fn decode_rows<T: ConfigTableRow>(bytes: &[u8]) -> Result<Vec<T>, RcpError> 
 /// cross-referenced against [`GeneralRegisters::svr_io_pin_count`]) and
 /// "Config tables provenance note" for [`Self::hw_pin_props`]'s undecomposed
 /// byte.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 // fusa:req REQ-RMAP-012
 pub struct HwPinMappingEntry {
     /// Endpoint slot number this pin is assigned to.
@@ -1197,7 +1211,7 @@ impl ConfigTableRow for HwPinMappingEntry {
 /// `capacity`, cross-referenced against
 /// [`GeneralRegisters::svr_req_stream_max`]) and "Config tables provenance
 /// note" for why each on/off behavior is its own byte-aligned field.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 // fusa:req REQ-RMAP-015
 pub struct RequestStreamConfigEntry {
     /// 64-bit stream identifier this entry is bound to; a sentinel default
@@ -1397,7 +1411,7 @@ impl ConfigTableRow for RequestStreamConfigEntry {
 /// **no** row-ordering validation — that is the writing client's
 /// responsibility, per `ROADMAP.md`'s own parenthetical for this checklist
 /// item.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 // fusa:req REQ-RMAP-018
 pub struct EpByteBusIdMapEntry {
     /// Which request stream this mapping applies to.
@@ -1482,7 +1496,7 @@ impl ConfigTableRow for EpByteBusIdMapEntry {
 /// row-count source ([`GeneralRegisters::svr_response_stream_cfg`]'s
 /// `capacity`, cross-referenced against
 /// [`GeneralRegisters::svr_responder_streams_max`]).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 // fusa:req REQ-RMAP-021
 pub struct ResponseStreamConfigEntry {
     /// 16 least-significant bits of this queue's destination stream
@@ -1565,7 +1579,7 @@ impl ConfigTableRow for ResponseStreamConfigEntry {
 /// table of the five with no paired `capacity` field on its
 /// [`GeneralRegisters`] pointer, since [`GeneralRegisters::svr_sequencer_state_ptr`]
 /// is pointer-only).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 // fusa:req REQ-RMAP-024
 pub struct SequencerStateEntry {
     /// This sequencer's current persistent state.
