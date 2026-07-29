@@ -2369,8 +2369,64 @@ exists to migrate them onto.
       — unlike `config`'s `REQ-CFG-002`..`004`, every one of the four has a
       direct working analog in the new types, so nothing is retired.
 
-      Remaining REPLACE packages: `canbr`, `linbr`, and `udp`'s own deeper
-      rebuild.
+      `canbr`'s row is now done too, and — unlike `wire`/`e2e`/`config`/
+      `capi` — its replacement, `src/can.rs`, was already fully built ahead
+      of schedule inside Milestone 7 (`v0.10.0-dev`), the same way
+      `watchdog`/`powerstate` were REPLACEd ahead of schedule inside
+      Milestones 6/7. This item's job is therefore the bookkeeping cutover
+      Milestone 7's own "Done" note explicitly deferred: `src/canbr.rs`'s
+      legacy `Controller`-trait `CanBridge`, its `CanSocket` transport
+      abstraction, its `Zone`-keyed `can_id = zone_id << 8 | cmd_type`
+      framing, and their test module are deleted outright — no external
+      caller depended on any of them outside `src/canbr.rs` itself
+      (confirmed by inspection), matching the `wire`/`e2e` cutovers'
+      discipline of deleting rather than adapting a legacy `Zone`/
+      `Controller`-coupled surface with no equivalent in the endpoint-
+      addressed model. The one genuine cross-module dependency —
+      `src/can.rs`'s `CAN_FD_MAX_PAYLOAD` constant, defined as
+      `crate::canbr::CAN_FD_MAX_PAYLOAD` — is resolved by inlining the
+      physical-fact literal (`64`) directly into `can.rs` as its own
+      constant rather than leaving a stub `canbr.rs` behind purely to hold
+      one value; `can.rs`'s own "Validation against `canbr.rs`" doc-comment
+      section and its test module's now-dangling `crate::canbr::
+      CAN_FD_MAX_PAYLOAD` equality assertion are updated to match. No new
+      CAN hardware I/O transport binding is built to replace the old
+      `CanSocket` abstraction: every other endpoint-type module this crate
+      has built since Milestone 4 (`adc`, `pwm`, `gpio`, `crate::can`
+      itself, etc.) is additive standalone plumbing only, deliberately not
+      wired into any live decoder, dispatch loop, or transport, so building
+      one transport binding for CAN alone here — the one judgment call this
+      item's own scope left open — would be inconsistent with that
+      established discipline rather than an extension of it; a real
+      hardware binding remains a later, not-yet-scoped item for whichever
+      milestone first wires any endpoint type into live dispatch.
+      `.fusa-reqs.json`'s `REQ-CANBR-001`..`005` describe only the deleted
+      `CanBridge`/`CanSocket`/`Zone`-keyed behavior: `REQ-CANBR-001`'s
+      `CAN_FD_MAX_PAYLOAD == 64` fact is already covered by the existing
+      `REQ-CAN-003` (retargeted below), and `REQ-CANBR-002`/`003`/`004`/
+      `005` (the `CanSocket` trait shape, `CanBridge::send`, zone-mismatch/
+      oversized-payload rejection, and no-op `close()`) have no surviving
+      analog in `crate::can`'s data-shape-only model — so, per this item's
+      own "retarget in place, or explicitly retire if no equivalent
+      behavior exists" instruction, all five are retired (removed) rather
+      than force-mapped onto unrelated behavior. `REQ-CAN-003`'s own text
+      is retargeted to drop its now-stale `crate::canbr::CAN_FD_MAX_PAYLOAD`
+      import reference, describing the constant as `can.rs`'s own directly-
+      stated physical fact instead. `.fusa-iec62443.json`'s `T-005` threat
+      countermeasure list swaps the retired `REQ-CANBR-004` for
+      `REQ-CAN-005` (`CanDataFrame::decode`'s own oversized-payload
+      rejection, the closest surviving analog to `CanBridge`'s old
+      payload-size check — the zone-mismatch half of `REQ-CANBR-004` has no
+      analog at all, `Zone` having no equivalent here), with its residual-
+      risk note flagging that this endpoint-level check, like the rest of
+      `crate::can`, is not yet dispatch-wired — the same caveat `T-003`'s
+      own note already applies to `REQ-SEQENF-003`. `README.md`'s module
+      index drops its now-inaccurate `canbr` row outright, since the module
+      it described no longer exists (mirroring how `e2e`'s row was updated
+      in place when its own REPLACE cutover landed, rather than left
+      stale).
+
+      Remaining REPLACE packages: `linbr` and `udp`'s own deeper rebuild.
 - [ ] All **ADAPT**-disposition packages retargeted to whatever new
       endpoint/RC-Server trait surface replaces `Controller`/`Registry`
 - [ ] All **DEPRECATE**-disposition packages removed, with a migration note

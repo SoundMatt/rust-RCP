@@ -36,8 +36,8 @@
       "id": "T-005",
       "category": "elevation-of-privilege",
       "description": "Attacker crafts oversized payload to overflow allocator",
-      "countermeasures": ["REQ-WIRE-007", "REQ-CANBR-004"],
-      "residual_risk": "negligible"
+      "countermeasures": ["REQ-WIRE-007", "REQ-CAN-005"],
+      "residual_risk": "negligible — REQ-WIRE-007's NTSCF envelope size limit is live and dispatch-wired (crate::mock::RcServer's own decode path); REQ-CAN-005's CanDataFrame::decode payload-ceiling check retargets the retired REQ-CANBR-004 (Milestone 9's canbr REPLACE cutover deleted the old Zone/Command-coupled CanBridge check with no direct analog) but, like the rest of crate::can, is additive standalone plumbing not yet wired into a live decode/dispatch path"
     },
     {
       "id": "T-006",
