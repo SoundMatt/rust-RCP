@@ -167,6 +167,62 @@ rcp.rs` tests, up from 19), and `cargo fmt --all -- --check` are clean;
 traced; `bash scripts/cyber-gap-check.sh` reports 6/6 threats with tested
 countermeasures.
 
+### Removed — legacy Zone/Command/Controller/Registry API
+
+`src/lib.rs`'s pre-Milestone-10 `Zone`/`Priority`/`CommandType`/
+`ResponseStatus`/`Command`/`Response`/`Status`/`Subscription`/`Controller`/
+`LoaningController`/`Registry` types and `zone_from_str` — kept in place
+through Milestone 9 only because the CLI (the item immediately above this
+one) and `Adapt()` cutovers still depended on them — are deleted outright,
+with no compatibility shim, now that neither does. `src/mock.rs`'s
+parallel `MockController`/`MockRegistry`/`Handler` test double for that
+API, and `src/base64_serde.rs`'s `opt` submodule (which existed only to
+serve `Command`/`Response`/`Status`'s optional payload field), are deleted
+with it. `RcpError`'s four sentinels this legacy API originated
+(`NotFound`/`AlreadyExists`/`Busy`/`ZoneMismatch`) are kept — `capi`/
+`authz`/`federation` and others construct and match on them for meanings
+unrelated to the removed `Zone` type — and that enum's doc-comment section
+is retitled from "Legacy Zone/Controller/Registry sentinels" to
+"General-purpose sentinels" to say so. `src/lib.rs`'s crate-level doc
+comment is rewritten to describe the TC18 core in place of the old
+Zone/Command/Registry model it still described.
+
+`.fusa-reqs.json` drops the 77 requirement entries (`REQ-ZONE-*`/
+`REQ-PRI-001..003`/`REQ-CMD-001..006`/`REQ-CMDSTRUCT-*`/`REQ-STATUS-*`/
+`REQ-CTRL-*`/`REQ-REG-*`/`REQ-RESP-*`/`REQ-STAT-001..005`/
+`REQ-RELAY-010`/`REQ-RELAY-011`/`REQ-MSG-*`) that described only the
+deleted API; `tara.json`'s scope note is updated to record that the legacy
+surface it already anticipated deleting has in fact now been deleted.
+
+### Added — public API stability guarantees
+
+`docs/SEMVER.md` (`ROADMAP.md` Milestone 10, "Public API stability
+guarantees") declares this crate's versioning scheme and a three-tier
+stability classification of every `pub mod`. `RcpError` and
+`regmap::EndpointType` gain `#[non_exhaustive]`, each a live growth
+surface tied to a specification-defined value space with room left for
+future codes; `avtp::HeaderVariant` and `lifecycle::RcServerState` are
+surveyed and deliberately left exhaustive, since both mirror small,
+spec-fixed, closed sets.
+
+A new `api-stability` CI job runs `scripts/api-snapshot-check.sh`, which
+diffs `cargo public-api --simplified`'s current output against the
+committed `docs/PUBLIC_API.txt` snapshot and fails the build on drift.
+`README.md`'s Quick Start example (uncompilable since Milestone 9's `mock`
+REPLACE — it still showed the removed `MockController`/`Command`/
+`Controller`/`Zone` API) and Module Index are rewritten against the
+current module set; `CONTRIBUTING.md`'s Versioning section points at
+`docs/SEMVER.md` and the `docs/PUBLIC_API.txt` regeneration step.
+
+`cargo build --all-targets`, `cargo clippy --all-targets --all-features --
+-D warnings`, `cargo test --all-targets` (978 lib tests, down from 1062 —
+84 tests for the deleted legacy API removed, no others changed; 27
+unchanged `src/bin/rcp.rs` tests), and `cargo fmt --all -- --check` are
+clean; `bash scripts/fusa-gap-check.sh` reports 545/545 (100%)
+requirements traced; `bash scripts/cyber-gap-check.sh` reports 6/6 threats
+with tested countermeasures; `bash scripts/api-snapshot-check.sh` reports
+the public API surface matches `docs/PUBLIC_API.txt`.
+
 ## v0.12.0-dev (Milestone 9) — closed
 
 ### Removed

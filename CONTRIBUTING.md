@@ -39,11 +39,19 @@ cargo fmt --check
 
 ## Versioning
 
-Semantic versioning: `MAJOR.MINOR.PATCH`
+Semantic versioning: `MAJOR.MINOR.PATCH`. See [docs/SEMVER.md](docs/SEMVER.md)
+for the full policy, including:
 
-- MAJOR: breaking API change
-- MINOR: backward-compatible new feature
-- PATCH: backward-compatible bug fix
+- Which modules carry a stability guarantee at all (not every `pub` item
+  does pre-`v1.0.0` — see that document's stability tiers), and the
+  repo-specific rule that `Cargo.toml`'s version does not move until the
+  OPEN Alliance TC18 uplift (`ROADMAP.md` Milestones 1-10) reaches
+  `v1.0.0`.
+- The `#[non_exhaustive]` policy for enums expected to grow.
+- If your change adds, removes, or renames a `pub` item, regenerate
+  `docs/PUBLIC_API.txt` (`cargo +nightly public-api --simplified >
+  docs/PUBLIC_API.txt`) and commit it in the same PR — CI's
+  `api-stability` job fails otherwise.
 
 ## Reporting Issues
 

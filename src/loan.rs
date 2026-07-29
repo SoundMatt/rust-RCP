@@ -18,17 +18,17 @@
 //! buffer-pool concept remains useful for endpoint payload buffers
 //! (SPI/UART/CAN); retarget to the new API"), [`LoanPoolEndpoint`] replaces
 //! the legacy `LoanPoolController`, wrapping [`crate::mock::Endpoint`]
-//! instead of `Controller`. [`crate::Loan`]/[`LoanPool`] themselves are
-//! unchanged — plain `Vec<u8>`-buffer pool machinery with no `Controller`
-//! coupling of its own — only the endpoint being loaned into changes.
-//! [`crate::LoaningController`] (the old trait `LoanPoolController`
-//! implemented) is left in place, unused by this module now, the same way
-//! `Controller`/`Registry` themselves are left in place by this bullet;
-//! removing it is `lib.rs`'s own core-surface cutover, Milestone 10's job.
-//! [`LoanPoolEndpoint`] instead exposes [`Self::loan`]/[`Self::write_loaned`]
-//! as its own inherent methods rather than implementing that trait, since
-//! `LoaningController: Controller` cannot be implemented by a type that no
-//! longer implements `Controller`.
+//! instead of the removed `Controller` trait. [`crate::Loan`]/[`LoanPool`]
+//! themselves are unchanged — plain `Vec<u8>`-buffer pool machinery with no
+//! `Controller` coupling of its own — only the endpoint being loaned into
+//! changes. [`LoanPoolEndpoint`] exposes [`Self::loan`]/
+//! [`Self::write_loaned`] as its own inherent methods rather than
+//! implementing a trait for them: the old `LoanPoolController` trait this
+//! module's pre-Milestone-9 code implemented (`LoaningController` in
+//! `lib.rs`) required `Controller`, so it could never have been
+//! implemented here in the first place, and `ROADMAP.md` Milestone 10's
+//! core-surface cutover has since removed both `Controller` and
+//! `LoaningController` outright.
 
 use std::sync::{Arc, Condvar, Mutex};
 

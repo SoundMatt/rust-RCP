@@ -22,10 +22,10 @@
 //! additional inherent methods [`DeadlineEndpoint::read_with_deadline`]/
 //! [`DeadlineEndpoint::write_with_deadline`], the same "extend the base
 //! trait with extra methods a caller must reach for explicitly" shape
-//! [`crate::LoaningController`] already established for [`crate::Loan`]ed
-//! sends. A flagged consequence of this crate's `Endpoint` model being
-//! purely synchronous, in-process dispatch with no real I/O wait of its
-//! own (see `src/mock.rs`'s own doc comment): the zero-timeout-is-already-
+//! [`crate::loan::LoanPoolEndpoint`] already established for
+//! [`crate::Loan`]ed sends. A flagged consequence of this crate's `Endpoint`
+//! model being purely synchronous, in-process dispatch with no real I/O
+//! wait of its own (see `src/mock.rs`'s own doc comment): the zero-timeout-is-already-
 //! expired check remains fully observable, but the `min(caller, deadline)`
 //! effective-timeout computation has nothing left to bound once computed,
 //! since neither `read` nor `write` can actually block past it. This is

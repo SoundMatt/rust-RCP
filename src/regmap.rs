@@ -431,8 +431,17 @@ use crate::RcpError;
 ///
 /// See this module's doc comment for why EP0 has no variant here, and for
 /// [`EndpointType::Dac`]'s reserved status.
+///
+/// `#[non_exhaustive]` (`ROADMAP.md` Milestone 10, "Public API stability
+/// guarantees"): the `ep_type` byte's value space (`0x01..=0x0D` covered
+/// here) is a specification-defined enumeration this crate's own
+/// spec-extraction pass reads as still having unassigned codes above
+/// `0x0D` — a future OPEN Alliance TC18 revision assigning one is not a
+/// change this crate controls. Matching on this enum from outside this
+/// crate MUST include a wildcard arm; see `docs/SEMVER.md`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
+#[non_exhaustive]
 // fusa:req REQ-RMAP-001
 pub enum EndpointType {
     /// `ep_type 0x01`. Wakeup control (`ROADMAP.md` Milestone 7).

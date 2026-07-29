@@ -47,8 +47,8 @@
 //!   TC18 spec error codes (the eleven [`crate::RcpError::
 //!   is_tc18_error_code`] members) plus every other still-live variant,
 //!   instead of the old `Closed`/`NotFound`/`ZoneMismatch`/etc. set (see
-//!   [`crate::RcpError`]'s own "Legacy Zone/Controller/Registry sentinels"
-//!   doc-comment section for why `NotFound`/`AlreadyExists`/`Busy`/
+//!   [`crate::RcpError`]'s own "General-purpose sentinels" doc-comment
+//!   section for why `NotFound`/`AlreadyExists`/`Busy`/
 //!   `ZoneMismatch` specifically have no TC18 analog and collapse to
 //!   [`CError::Other`] below, the same as `RcpError::Other(_)`).
 //!

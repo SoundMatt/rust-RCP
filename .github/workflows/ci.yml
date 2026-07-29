@@ -80,6 +80,21 @@ jobs:
       - name: run gap check
         run: bash scripts/fusa-gap-check.sh
 
+  # ── Public API stability (ROADMAP.md Milestone 10) ───────────────────────
+  # See docs/SEMVER.md for the stability policy this snapshot enforces.
+  api-stability:
+    name: Public API stability (cargo public-api)
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - name: install cargo-public-api
+        run: cargo install cargo-public-api --locked
+      - name: check public API surface against committed snapshot
+        run: bash scripts/api-snapshot-check.sh
+
   # ── Fuzz (short) ─────────────────────────────────────────────────────────
   fuzz:
     name: Fuzz (30s smoke)
