@@ -20,12 +20,17 @@
 // fusa:req REQ-CANCEL-002
 // fusa:req REQ-CANCEL-003
 // fusa:req REQ-CANCEL-004
+// fusa:req REQ-SEQ-001
+// fusa:req REQ-SEQ-002
+// fusa:req REQ-SEQ-003
+// fusa:req REQ-SEQ-004
 
 //! Conditional-request taxonomy: compound / compound-wait (`0x0F`/`0x0B`),
-//! triggered (`0x0E`), chained (`0x01`), timed (`0x0A`), and the
+//! triggered (`0x0E`), chained (`0x01`), timed (`0x0A`), the
 //! cancellation trio clear-all / clear-non-safestate / clear-single
-//! (`0x05`/`0x06`/`0x07`) — `ROADMAP.md` Milestone 5 ("Conditional Requests
-//! & Sequencers"), first through fifth checklist bullets. The first bullet
+//! (`0x05`/`0x06`/`0x07`), and the persistent sequencer-state register bank
+//! — `ROADMAP.md` Milestone 5 ("Conditional Requests & Sequencers"), first
+//! through sixth checklist bullets. The first bullet
 //! covers sequencer-gated
 //! execution and wait, with `cmp_exec_delay`/`cmpw_exec_delay` timers and
 //! the "advance sequencer only if still in start state" rule. The second
@@ -46,7 +51,15 @@
 //! request except one actively driving an endpoint toward its configured
 //! safe state), and clear-single (optional, cancels exactly one pending
 //! request identified by a `clear_transaction_num` matched against the
-//! already-decoded [`crate::acf::ByteMessageInfo::transaction_num`]).
+//! already-decoded [`crate::acf::ByteMessageInfo::transaction_num`]). The
+//! sixth covers the persistent 8-bit sequencer-state register bank itself:
+//! one [`SequencerState`] per sequencer number, initialized at construction
+//! to the power-on default state `1`, live-bounded by a `svr_sequencers_max`
+//! value mirroring [`crate::regmap::GeneralRegisters::svr_sequencers_max`],
+//! finally giving [`check_compound_gate`] and
+//! [`advance_sequencer_if_still_in_start_state`] a genuine backing store to
+//! compose against instead of requiring every caller to supply a
+//! [`SequencerState`] by hand.
 //!
 //! Compound/compound-wait was the opening item of Milestone 5, and the
 //! first thing to land in `src/request.rs` — the module name the
@@ -55,20 +68,22 @@
 //! milestone's request-kind/taxonomy work, mirroring `fragment.rs`'s own
 //! reservation for Milestone 8. Triggered is the second, added there.
 //! Chained is the third, added there. Timed is the fourth, added there.
-//! Cancellation is the fifth, added here. The "Standard"/unconditional
-//! kind implied by the spec's own execution-priority ordering is still
-//! expected to extend [`RequestKind`]; none of that is attempted here —
-//! see this module's own doc comment "Deliberately out of scope" section
-//! below. Same "additive standalone plumbing only" discipline as every
-//! prior Milestone 1-4 entry, and as the compound/compound-wait,
-//! triggered, chained, and timed work above: nothing here is wired into a
+//! Cancellation is the fifth, added there. [`SequencerBank`] is the sixth,
+//! added here. The "Standard"/unconditional kind implied by the spec's own
+//! execution-priority ordering is still expected to extend [`RequestKind`];
+//! none of that is attempted here — see this module's own doc comment
+//! "Deliberately out of scope" section below. Same "additive standalone
+//! plumbing only" discipline as every prior Milestone 1-5 entry, and as the
+//! compound/compound-wait, triggered, chained, timed, and cancellation work
+//! above: [`SequencerBank`] is constructed and read/advanced only by
+//! whatever later item chooses to hold one — nothing here is wired into a
 //! decoder, dispatch loop, or request-lifecycle state machine. The old
 //! `src/prioqueue.rs` `Zone`/`Command`/`Controller`/`Priority` decorator
 //! this milestone's own Goal text names as the eventual absorption target
 //! for "picking which pending request runs next" is read only as
 //! background for this change, not extended or touched.
 //!
-//! Sixteen named pieces are in scope, all implemented here or in the four
+//! Twenty named pieces are in scope, all implemented here or in the five
 //! prior entries this one extends:
 //!
 //! - [`RequestKind`] — the request-type discriminant, now covering eight
@@ -85,8 +100,22 @@
 //!   [`check_compound_gate`] — the sequencer-gating rule: a compound(-wait)
 //!   request executes only if the sequencer it names currently holds the
 //!   request's configured start state. See "Provenance note: `start_state`
-//!   and the not-yet-built sequencer-state machine" below for how this
-//!   relates to [`crate::regmap::SequencerStateEntry`].
+//!   and the sequencer-state machine" below for how this relates to
+//!   [`crate::regmap::SequencerStateEntry`] and [`SequencerBank`].
+//! - [`SequencerBank`] — the persistent 8-bit sequencer-state register bank
+//!   itself: [`SequencerBank::new`] sizes and initializes one
+//!   [`SequencerState`] per sequencer number, bounded by a caller-supplied
+//!   `svr_sequencers_max`, to the power-on default state `1`
+//!   ([`crate::regmap::SequencerStateEntry::power_on_default`]'s own
+//!   already-confirmed value); [`SequencerBank::read`] reads a sequencer's
+//!   current state; [`SequencerBank::advance_if_still_in_start_state`]
+//!   composes [`advance_sequencer_if_still_in_start_state`]'s existing pure
+//!   race-guard against this bank's live, mutable store; and
+//!   [`SequencerBank::check_compound_gate`] composes [`SequencerBank::read`]
+//!   with the free-function [`check_compound_gate`], giving it a genuine
+//!   backing store to read `current_state` from instead of requiring the
+//!   caller to supply one. See "Provenance note: `SequencerBank`'s
+//!   reset-trigger scope" below for what "power-on" is read to mean here.
 //! - [`CompoundExecDelays`] / [`resolve_compound_exec_delay`] — the
 //!   `cmp_exec_delay`/`cmpw_exec_delay` execution-delay timers, one field
 //!   per request kind, selected by [`RequestKind`]. See "Provenance note:
@@ -173,18 +202,24 @@
 //!   priority ordering. [`RequestKind`] intentionally leaves room for it
 //!   but does not add it.
 //! - The persistent 8-bit sequencer-state register machine itself
-//!   (`ROADMAP.md` Milestone 5's own "Sequencers" checklist bullet, not yet
-//!   built). Every function here that needs a sequencer's current state
-//!   takes it as a caller-supplied [`SequencerState`] value, mirroring
+//!   (`ROADMAP.md` Milestone 5's own "Sequencers" checklist bullet) is now
+//!   built as [`SequencerBank`] — but every free function that needs a
+//!   sequencer's current state ([`is_gate_satisfied`],
+//!   [`check_compound_gate`], [`advance_sequencer_if_still_in_start_state`])
+//!   keeps taking it as a caller-supplied [`SequencerState`] value rather
+//!   than being retrofitted to require a [`SequencerBank`], mirroring
 //!   [`crate::lifecycle::RcServerState::try_transition`]'s `is_consistent`
 //!   closure and [`crate::ep0::check_ep0_access_for_stream`]'s
 //!   `root_client` parameter — neither of those blocked on a sibling item
-//!   building the thing they read, and neither does this. Triggered
-//!   execution's own busy/idle independence needs no such state at all;
-//!   see [`should_count_trigger_occurrence`] above.
-//! - Wiring any of the below into an actual decoder, dispatch loop, or
-//!   request-lifecycle state machine (`ROADMAP.md`'s own "Request
-//!   lifecycle state machine" checklist bullet, later in this milestone).
+//!   building the thing they read, and neither did these when they were
+//!   added. [`SequencerBank::check_compound_gate`] is the new bank-backed
+//!   alternative that composes the free functions instead of replacing
+//!   them. Triggered execution's own busy/idle independence needs no such
+//!   state at all; see [`should_count_trigger_occurrence`] above.
+//! - Wiring [`SequencerBank`] or any of the below into an actual decoder,
+//!   dispatch loop, or request-lifecycle state machine (`ROADMAP.md`'s own
+//!   "Request lifecycle state machine" checklist bullet, later in this
+//!   milestone).
 //! - The old `src/prioqueue.rs` model this milestone's Goal text names as
 //!   the eventual absorption target for "picking which pending request
 //!   runs next" — that absorption is the separate "Execution priority
@@ -211,23 +246,27 @@
 //! [`RequestKind::ClearNonSafestate`]/[`RequestKind::ClearSingle`] trio;
 //! each is simply one more value under the same still-open question.
 //!
-//! ## Provenance note: `start_state` and the not-yet-built sequencer-state
-//! machine
+//! ## Provenance note: `start_state` and the sequencer-state machine
 //!
 //! The gating rule this checklist bullet names — "sequencer-gated
 //! execution" — requires comparing a compound(-wait) request's configured
-//! start state against a sequencer's actual current state. The persistent
-//! state register that would hold that "current state" is `ROADMAP.md`
-//! Milestone 5's own next checklist bullet ("Sequencers"), not yet built in
-//! this crate: only [`crate::regmap::SequencerStateEntry`]'s row *shape*
-//! (power-on default `1`, single-byte encoding) exists so far, from
-//! Milestone 2's config-table work. This module assumes a sequencer's
-//! current state is representable as the same single unstructured byte
-//! [`crate::regmap::SequencerStateEntry::seq_state`] already models,
-//! wrapped here as [`SequencerState`] — but takes every current-state value
-//! as a caller-supplied parameter rather than reading it from a register
-//! this crate cannot yet provide. Which specific sequencer a request names
-//! is likewise modeled as a plain `u8` sequencer number
+//! start state against a sequencer's actual current state. When this note
+//! was first written, the persistent state register that would hold that
+//! "current state" was `ROADMAP.md` Milestone 5's own next checklist bullet
+//! ("Sequencers"), not yet built in this crate: only
+//! [`crate::regmap::SequencerStateEntry`]'s row *shape* (power-on default
+//! `1`, single-byte encoding) existed, from Milestone 2's config-table work.
+//! [`SequencerBank`] is that checklist bullet, now built — see "Provenance
+//! note: `SequencerBank`'s reset-trigger scope" below — but the reasoning
+//! that follows, about [`SequencerState`] itself and about the free
+//! functions ([`is_gate_satisfied`], [`check_compound_gate`],
+//! [`advance_sequencer_if_still_in_start_state`]) taking a current-state
+//! value as a caller-supplied parameter rather than an implicit global, is
+//! unchanged: this module assumes a sequencer's current state is
+//! representable as the same single unstructured byte
+//! [`crate::regmap::SequencerStateEntry::seq_state`] already models, wrapped
+//! here as [`SequencerState`]. Which specific sequencer a request names is
+//! likewise modeled as a plain `u8` sequencer number
 //! ([`CompoundGateConfig::sequencer_num`]), mirroring
 //! [`crate::regmap::RequestStreamConfigEntry::rx_safestate_sequencer`]'s
 //! own established "sequencer number is a plain byte" precedent — not a
@@ -238,10 +277,31 @@
 //! says only that the sequencer advances, not to which value (unlike
 //! [`crate::regmap::RequestStreamConfigEntry::rx_safe_sequencer_state`]'s
 //! own named target-state field for a different, safe-state-entry
-//! purpose). So [`advance_sequencer_if_still_in_start_state`] takes the
-//! target state as an explicit caller-supplied parameter too, rather than
-//! this crate inventing an increment-by-one or other advancement
+//! purpose). So [`advance_sequencer_if_still_in_start_state`] — and, by
+//! composition, [`SequencerBank::advance_if_still_in_start_state`] — takes
+//! the target state as an explicit caller-supplied parameter too, rather
+//! than this crate inventing an increment-by-one or other advancement
 //! convention.
+//!
+//! ## Provenance note: `SequencerBank`'s reset-trigger scope
+//!
+//! `ROADMAP.md`'s checklist bullet names one reset trigger for the
+//! power-on default state `1`: "power-on", full stop. It does not state
+//! whether that default also applies on some other reset condition this
+//! crate has not yet modeled (e.g. whatever `RcServerState` transition
+//! [`crate::lifecycle`] eventually names as a warm reset, if any turns out
+//! to be distinct from power-on) or whether a live [`SequencerBank`] is
+//! ever expected to be reset back to all-defaults after having already
+//! advanced some of its sequencers. Per Guiding Principle 5, [`SequencerBank`]
+//! is deliberately narrow about this: [`SequencerBank::new`] is the *only*
+//! way to obtain an all-defaults bank, modeling "power-on" as "the moment a
+//! [`SequencerBank`] is constructed" and nothing broader — there is no
+//! separate `reset`/`power_on_reset` method that reinitializes an
+//! already-live bank in place, since this crate has no confirmed trigger
+//! condition to name such a method after. A caller that needs to model a
+//! reset distinct from initial construction can simply construct a fresh
+//! [`SequencerBank`] and discard the old one; nothing here prevents that,
+//! and nothing here assumes it either.
 //!
 //! ## Provenance note: exec-delay timer width and units
 //!
@@ -464,6 +524,7 @@
 //! [`crate::RcpError::RequestCanceled`] for a request they select for
 //! cancellation, retiring it as a reserved-but-unconstructed placeholder.
 
+use crate::regmap::SequencerStateEntry;
 use crate::timestamp::AvtpTimestamp;
 use crate::RcpError;
 
@@ -714,6 +775,113 @@ pub fn advance_sequencer_if_still_in_start_state(
         Some(next_state)
     } else {
         None
+    }
+}
+
+// ── SequencerBank: the persistent 8-bit sequencer-state register bank ───────
+
+/// The persistent 8-bit sequencer-state register bank this checklist bullet
+/// names: one [`SequencerState`] per sequencer number, live-bounded by a
+/// `svr_sequencers_max` value mirroring
+/// [`crate::regmap::GeneralRegisters::svr_sequencers_max`].
+///
+/// See this module's doc comment "Provenance note: `SequencerBank`'s
+/// reset-trigger scope" for why [`Self::new`] is the only way to obtain an
+/// all-defaults bank, and "Provenance note: `start_state` and the
+/// sequencer-state machine" for how this relates to
+/// [`crate::regmap::SequencerStateEntry`] and to the free functions
+/// ([`is_gate_satisfied`], [`check_compound_gate`],
+/// [`advance_sequencer_if_still_in_start_state`]) this type composes rather
+/// than replaces.
+#[derive(Debug, Clone, PartialEq, Eq)]
+// fusa:req REQ-SEQ-001
+pub struct SequencerBank {
+    states: Vec<SequencerState>,
+}
+
+impl SequencerBank {
+    /// Build a fresh bank sized for `svr_sequencers_max` sequencers, each
+    /// initialized to the power-on default state
+    /// ([`crate::regmap::SequencerStateEntry::power_on_default`]'s own
+    /// already-confirmed `1`, reused here rather than re-derived).
+    ///
+    /// A `svr_sequencers_max` of `0` yields an empty bank — mirroring
+    /// [`check_sequencer_num_in_bounds`]'s own "`0` means no sequencers
+    /// exist" reading, so every [`Self::read`]/advance call against it
+    /// returns `Err(RcpError::SequencerNotKnown)`. Never panics for any
+    /// input.
+    // fusa:req REQ-SEQ-001
+    pub fn new(svr_sequencers_max: u8) -> Self {
+        let power_on_state = SequencerState(SequencerStateEntry::power_on_default().seq_state);
+        Self {
+            states: vec![power_on_state; svr_sequencers_max as usize],
+        }
+    }
+
+    /// This bank's live sequencer-count bound — the `svr_sequencers_max`
+    /// value it was constructed with via [`Self::new`].
+    // fusa:req REQ-SEQ-001
+    pub fn svr_sequencers_max(&self) -> u8 {
+        // `Self::new` takes `svr_sequencers_max` as a `u8`, so `states.len()`
+        // never exceeds `u8::MAX` and this cast never truncates.
+        self.states.len() as u8
+    }
+
+    /// Read a sequencer's current persistent state.
+    ///
+    /// Returns `Err(RcpError::SequencerNotKnown)` for a `sequencer_num` at
+    /// or beyond this bank's bound, reusing
+    /// [`check_sequencer_num_in_bounds`]'s existing bound check rather than
+    /// re-deriving it. Never panics for any input.
+    // fusa:req REQ-SEQ-002
+    pub fn read(&self, sequencer_num: u8) -> Result<SequencerState, RcpError> {
+        check_sequencer_num_in_bounds(sequencer_num, self.svr_sequencers_max())?;
+        Ok(self.states[sequencer_num as usize])
+    }
+
+    /// Attempt to advance `gate.sequencer_num`'s persistent state to
+    /// `next_state`, composing [`advance_sequencer_if_still_in_start_state`]'s
+    /// existing pure "advance only if still in start state" race guard
+    /// against this bank's live, mutable store instead of duplicating that
+    /// rule.
+    ///
+    /// Returns `Err(RcpError::SequencerNotKnown)` for an out-of-bounds
+    /// `gate.sequencer_num`. Otherwise returns `Ok(true)` and updates this
+    /// bank's stored state to `next_state` if the sequencer was still in
+    /// `gate.start_state` at the moment of the attempt; returns `Ok(false)`
+    /// (this bank is left unchanged) if some other request raced ahead and
+    /// moved the sequencer out of that state first. Never panics for any
+    /// input.
+    // fusa:req REQ-SEQ-003
+    pub fn advance_if_still_in_start_state(
+        &mut self,
+        gate: &CompoundGateConfig,
+        next_state: SequencerState,
+    ) -> Result<bool, RcpError> {
+        check_sequencer_num_in_bounds(gate.sequencer_num, self.svr_sequencers_max())?;
+        let observed_state = self.states[gate.sequencer_num as usize];
+        match advance_sequencer_if_still_in_start_state(observed_state, gate, next_state) {
+            Some(advanced) => {
+                self.states[gate.sequencer_num as usize] = advanced;
+                Ok(true)
+            }
+            None => Ok(false),
+        }
+    }
+
+    /// The full sequencer-gating check against this bank's own live state:
+    /// composes [`Self::read`] with the free-function [`check_compound_gate`],
+    /// finally giving it a genuine backing store to read `current_state`
+    /// from instead of requiring the caller to supply it.
+    ///
+    /// Returns `Err(RcpError::SequencerNotKnown)` for an out-of-bounds
+    /// `gate.sequencer_num`, or `Err(RcpError::RequestRejected)` if the
+    /// sequencer is known but not currently in `gate.start_state`. Never
+    /// panics for any input.
+    // fusa:req REQ-SEQ-004
+    pub fn check_compound_gate(&self, gate: &CompoundGateConfig) -> Result<(), RcpError> {
+        let current_state = self.read(gate.sequencer_num)?;
+        check_compound_gate(current_state, gate, self.svr_sequencers_max())
     }
 }
 
@@ -1296,6 +1464,215 @@ mod tests {
                     &gate,
                     SequencerState(next),
                 );
+            }
+        }
+    }
+
+    // ── SequencerBank ─────────────────────────────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-SEQ-001
+    fn sequencer_bank_new_sizes_the_bank_to_svr_sequencers_max() {
+        for max in [0u8, 1, 4, 255] {
+            let bank = SequencerBank::new(max);
+            assert_eq!(bank.svr_sequencers_max(), max);
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-SEQ-001
+    fn sequencer_bank_new_initializes_every_sequencer_to_the_power_on_default_state() {
+        let bank = SequencerBank::new(4);
+        for sequencer_num in 0..4u8 {
+            assert_eq!(bank.read(sequencer_num), Ok(SequencerState(1)));
+        }
+        assert_eq!(
+            SequencerStateEntry::power_on_default().seq_state,
+            1,
+            "SequencerBank::new is documented as reusing this exact value"
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-SEQ-001
+    fn sequencer_bank_new_with_zero_max_yields_an_empty_bank() {
+        let bank = SequencerBank::new(0);
+        assert_eq!(bank.svr_sequencers_max(), 0);
+        assert_eq!(bank.read(0), Err(RcpError::SequencerNotKnown));
+    }
+
+    // ── SequencerBank::read ──────────────────────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-SEQ-002
+    fn sequencer_bank_read_rejects_sequencer_num_at_or_above_the_bound() {
+        let bank = SequencerBank::new(4);
+        for sequencer_num in [4u8, 5, 255] {
+            assert_eq!(bank.read(sequencer_num), Err(RcpError::SequencerNotKnown));
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-SEQ-002
+    fn sequencer_bank_read_never_panics_for_any_sampled_input() {
+        let bank = SequencerBank::new(4);
+        for sequencer_num in [0u8, 3, 4, 255] {
+            let _ = bank.read(sequencer_num);
+        }
+        let empty_bank = SequencerBank::new(0);
+        for sequencer_num in [0u8, 255] {
+            let _ = empty_bank.read(sequencer_num);
+        }
+    }
+
+    // ── SequencerBank::advance_if_still_in_start_state ───────────────────────
+
+    #[test]
+    // fusa:test REQ-SEQ-003
+    fn sequencer_bank_advance_mutates_the_store_when_still_in_start_state() {
+        let mut bank = SequencerBank::new(4);
+        let gate = CompoundGateConfig {
+            sequencer_num: 2,
+            start_state: SequencerState(1),
+        };
+        assert_eq!(
+            bank.advance_if_still_in_start_state(&gate, SequencerState(9)),
+            Ok(true)
+        );
+        assert_eq!(bank.read(2), Ok(SequencerState(9)));
+        // Every other sequencer in the bank is untouched.
+        assert_eq!(bank.read(0), Ok(SequencerState(1)));
+        assert_eq!(bank.read(1), Ok(SequencerState(1)));
+        assert_eq!(bank.read(3), Ok(SequencerState(1)));
+    }
+
+    #[test]
+    // fusa:test REQ-SEQ-003
+    fn sequencer_bank_advance_leaves_the_store_unchanged_when_race_lost() {
+        let mut bank = SequencerBank::new(4);
+        // First advance moves sequencer 2 out of start_state 1.
+        let gate = CompoundGateConfig {
+            sequencer_num: 2,
+            start_state: SequencerState(1),
+        };
+        assert_eq!(
+            bank.advance_if_still_in_start_state(&gate, SequencerState(9)),
+            Ok(true)
+        );
+        // A second attempt against the same stale start_state now loses the
+        // race and must not mutate the store further.
+        assert_eq!(
+            bank.advance_if_still_in_start_state(&gate, SequencerState(42)),
+            Ok(false)
+        );
+        assert_eq!(bank.read(2), Ok(SequencerState(9)));
+    }
+
+    #[test]
+    // fusa:test REQ-SEQ-003
+    fn sequencer_bank_advance_rejects_out_of_bounds_sequencer_num() {
+        let mut bank = SequencerBank::new(2);
+        let gate = CompoundGateConfig {
+            sequencer_num: 2,
+            start_state: SequencerState(1),
+        };
+        assert_eq!(
+            bank.advance_if_still_in_start_state(&gate, SequencerState(9)),
+            Err(RcpError::SequencerNotKnown)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-SEQ-003
+    fn sequencer_bank_advance_never_panics_for_any_sampled_input() {
+        let mut bank = SequencerBank::new(4);
+        for sequencer_num in [0u8, 3, 4, 255] {
+            let gate = CompoundGateConfig {
+                sequencer_num,
+                start_state: SequencerState(1),
+            };
+            for next in [0u8, 3, 255] {
+                let _ = bank.advance_if_still_in_start_state(&gate, SequencerState(next));
+            }
+        }
+    }
+
+    // ── SequencerBank::check_compound_gate ───────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-SEQ-004
+    fn sequencer_bank_check_compound_gate_ok_when_default_state_matches_gate() {
+        let bank = SequencerBank::new(4);
+        let gate = CompoundGateConfig {
+            sequencer_num: 1,
+            start_state: SequencerState(1),
+        };
+        assert_eq!(bank.check_compound_gate(&gate), Ok(()));
+    }
+
+    #[test]
+    // fusa:test REQ-SEQ-004
+    fn sequencer_bank_check_compound_gate_rejects_mismatched_state() {
+        let bank = SequencerBank::new(4);
+        let gate = CompoundGateConfig {
+            sequencer_num: 1,
+            start_state: SequencerState(2),
+        };
+        assert_eq!(
+            bank.check_compound_gate(&gate),
+            Err(RcpError::RequestRejected)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-SEQ-004
+    fn sequencer_bank_check_compound_gate_rejects_out_of_bounds_sequencer() {
+        let bank = SequencerBank::new(2);
+        let gate = CompoundGateConfig {
+            sequencer_num: 2,
+            start_state: SequencerState(1),
+        };
+        assert_eq!(
+            bank.check_compound_gate(&gate),
+            Err(RcpError::SequencerNotKnown)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-SEQ-004
+    fn sequencer_bank_check_compound_gate_reflects_a_prior_advance() {
+        let mut bank = SequencerBank::new(4);
+        let gate = CompoundGateConfig {
+            sequencer_num: 1,
+            start_state: SequencerState(1),
+        };
+        assert_eq!(
+            bank.advance_if_still_in_start_state(&gate, SequencerState(5)),
+            Ok(true)
+        );
+        // The gate no longer matches this bank's live state.
+        assert_eq!(
+            bank.check_compound_gate(&gate),
+            Err(RcpError::RequestRejected)
+        );
+        let advanced_gate = CompoundGateConfig {
+            sequencer_num: 1,
+            start_state: SequencerState(5),
+        };
+        assert_eq!(bank.check_compound_gate(&advanced_gate), Ok(()));
+    }
+
+    #[test]
+    // fusa:test REQ-SEQ-004
+    fn sequencer_bank_check_compound_gate_never_panics_for_any_sampled_input() {
+        let bank = SequencerBank::new(4);
+        for sequencer_num in [0u8, 3, 4, 255] {
+            for start_state in [0u8, 1, 255] {
+                let gate = CompoundGateConfig {
+                    sequencer_num,
+                    start_state: SequencerState(start_state),
+                };
+                let _ = bank.check_compound_gate(&gate);
             }
         }
     }

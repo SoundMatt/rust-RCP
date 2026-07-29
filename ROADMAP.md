@@ -1332,8 +1332,44 @@ per-endpoint scheduler, since the spec defines that ordering natively.
       the request-lifecycle state machine. New `REQ-CANCEL-001`..
       `REQ-CANCEL-004` (in `src/request.rs`) added to `.fusa-reqs.json`,
       each with a `// fusa:req`/`// fusa:test` pair.
-- [ ] Sequencers: persistent 8-bit state registers, power-on default state
-      `1`, bounded by `svr_sequencers_max`
+- [x] Sequencers: persistent 8-bit state registers, power-on default state
+      `1`, bounded by `svr_sequencers_max`. Done (v0.8.0-dev): `src/request.rs`
+      gains `SequencerBank`, the persistent 8-bit sequencer-state register
+      bank this checklist bullet names: one `SequencerState` per sequencer
+      number, sized and live-bounded by a `svr_sequencers_max: u8` value
+      mirroring `GeneralRegisters::svr_sequencers_max`. `SequencerBank::new`
+      builds a fresh bank, initializing every sequencer to the power-on
+      default state `1` by reusing `SequencerStateEntry::power_on_default`'s
+      already-confirmed value rather than re-deriving it (a
+      `svr_sequencers_max` of `0` yields an empty bank, mirroring
+      `check_sequencer_num_in_bounds`'s existing "`0` means no sequencers
+      exist" reading); `SequencerBank::read` reads a sequencer's current
+      state, reusing `check_sequencer_num_in_bounds` for the bound check;
+      `SequencerBank::advance_if_still_in_start_state` composes the
+      already-built `advance_sequencer_if_still_in_start_state` pure race
+      guard against this bank's own live, mutable store instead of
+      duplicating that rule; and `SequencerBank::check_compound_gate`
+      composes `SequencerBank::read` with the existing free-function
+      `check_compound_gate`, finally giving it a genuine backing store to
+      read `current_state` from instead of requiring every caller to supply
+      one by hand. The pre-existing free functions
+      (`is_gate_satisfied`/`check_compound_gate`/
+      `advance_sequencer_if_still_in_start_state`) are unchanged and still
+      take `SequencerState` as a caller-supplied parameter — `SequencerBank`
+      composes them rather than replacing them, so nothing built on top of
+      them in the four prior Milestone 5 entries breaks. One point flagged
+      per Guiding Principle 5: the checklist text names only one reset
+      trigger ("power-on") for the default state and states nothing about
+      any other reset condition or about resetting an already-live bank in
+      place, so `SequencerBank::new` is deliberately the *only* way to
+      obtain an all-defaults bank (no separate `reset`/`power_on_reset`
+      method is added) — see `src/request.rs`'s own doc comment "Provenance
+      note: `SequencerBank`'s reset-trigger scope". Same "additive
+      standalone plumbing only" discipline as every prior Milestone 1-5
+      entry — `SequencerBank` is not wired into any decoder, dispatch loop,
+      or the request-lifecycle state machine (the next checklist bullet).
+      New `REQ-SEQ-001`..`REQ-SEQ-004` (in `src/request.rs`) added to
+      `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair.
 - [ ] Execution priority ordering: cancellation > triggered > timed >
       compound > compound-wait > chained > standard, FIFO within a tier
 - [ ] Request lifecycle state machine: pending → started → under-execution

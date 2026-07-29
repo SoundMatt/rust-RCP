@@ -5193,6 +5193,42 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SEQ-001",
+      "title": "SequencerBank::new builds a persistent sequencer-state bank bounded by svr_sequencers_max, defaulting to power-on state 1",
+      "text": "SequencerBank::new(svr_sequencers_max) allocates one SequencerState per sequencer number, sized to svr_sequencers_max (0 yielding an empty bank, mirroring check_sequencer_num_in_bounds's own 'no sequencers exist' reading), with every sequencer initialized to regmap::SequencerStateEntry::power_on_default's already-confirmed state 1 rather than re-deriving that value; SequencerBank::svr_sequencers_max() reports the bound the bank was constructed with; never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SEQ-002",
+      "title": "SequencerBank::read returns a sequencer's live persistent state or SequencerNotKnown for an out-of-bounds sequencer number",
+      "text": "SequencerBank::read(sequencer_num) returns Ok(SequencerState) for any sequencer_num within this bank's svr_sequencers_max bound, reusing check_sequencer_num_in_bounds's existing bound check, and Err(RcpError::SequencerNotKnown) for any sequencer_num at or beyond that bound, including against a bank constructed with svr_sequencers_max of 0; never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SEQ-003",
+      "title": "SequencerBank::advance_if_still_in_start_state composes the advance-only-if-still-in-start-state race guard against this bank's own live, mutable store",
+      "text": "SequencerBank::advance_if_still_in_start_state(gate, next_state) returns Err(RcpError::SequencerNotKnown) for an out-of-bounds gate.sequencer_num; otherwise it reads this bank's own stored state for gate.sequencer_num and delegates to advance_sequencer_if_still_in_start_state, returning Ok(true) and updating the stored state to next_state when the sequencer was still in gate.start_state, or Ok(false) with the store left unchanged when a race moved it out of that state first; never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SEQ-004",
+      "title": "SequencerBank::check_compound_gate composes SequencerBank::read with the free-function check_compound_gate against this bank's own live state",
+      "text": "SequencerBank::check_compound_gate(gate) reads gate.sequencer_num's current state from this bank via SequencerBank::read and passes it to the free-function check_compound_gate together with this bank's own svr_sequencers_max, returning Err(RcpError::SequencerNotKnown) for an out-of-bounds sequencer, Err(RcpError::RequestRejected) when the sequencer is known but not in gate.start_state, and Ok(()) when the gate is satisfied, giving check_compound_gate a genuine backing store instead of a caller-supplied current_state; never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
