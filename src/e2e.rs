@@ -13,6 +13,9 @@
 // fusa:req REQ-CRC-005
 // fusa:req REQ-CRC-006
 // fusa:req REQ-CRC-007
+// fusa:req REQ-CRC-008
+// fusa:req REQ-CRC-009
+// fusa:req REQ-CRC-010
 
 //! End-to-end protection: CRC-16/CCITT-FALSE header + replay guard, plus
 //! (as of `ROADMAP.md` Milestone 6) the standalone OPEN Alliance TC18
@@ -85,6 +88,55 @@
 //! This entry does not take a position on which requests/streams actually
 //! get CRC-protected in the first place — that is `ROADMAP.md` Milestone
 //! 6's later "Per-stream safety config" bullet's job, not this one's.
+//!
+//! ## Fragmentation interaction (`ROADMAP.md` Milestone 6, "Fragmentation
+//! interaction" bullet)
+//!
+//! [`CombinedFragmentPayload`], [`build_crc32_coverage_buffer_for_fragment_train`],
+//! and [`crc32_tc18_for_fragment_train`] extend the single-message coverage
+//! rule above to a message split across multiple ACF frames (a "fragment
+//! train"): the CRC is computed once, across the concatenated payload of
+//! every fragment in the train, and only the train's final fragment (the
+//! one whose [`acf::ByteMessageInfo::ms`] is `false`) carries it on the
+//! wire. [`fragment_crc_expectation`]/[`check_fragment_crc_placement`]
+//! state and validate that placement rule itself, independent of how the
+//! combined-payload CRC is computed.
+//!
+//! This crate has no live multi-AVTPDU reassembly buffer yet (that is
+//! `ROADMAP.md` Milestone 8's job) — matching every Milestone 5/6 entry's
+//! precedent of taking not-yet-built state as a caller-supplied fact (e.g.
+//! `crate::request`'s `SequencerState`/`root_client`), this section takes a
+//! fragment train's per-segment payloads as a caller-supplied, already-
+//! ordered `&[&[u8]]` rather than reading `acf::ReadSizeOrSegmentNum`
+//! itself to determine ordering. That is a deliberate, additional instance
+//! of Guiding Principle 5: `acf::ReadSizeOrSegmentNum`'s own provenance
+//! note already flags that this crate has not resolved which bit(s), if
+//! any, select its `read_size` vs. `segment_num` interpretation, so this
+//! module treats "this is a fragment train, and this is its segment order"
+//! as a fact the caller establishes out of band, rather than silently
+//! resolving that open ambiguity here.
+//!
+//! ### Working interpretation: non-payload coverage fields come from the
+//! final fragment's own header (Guiding Principle 5)
+//!
+//! The roadmap states the CRC is "computed across the combined payload"
+//! but does not say whether the coverage buffer's non-payload region
+//! (`stream_id`, `avtp_timestamp`, and the ACF header's own fields other
+//! than the payload) should likewise be drawn from each fragment
+//! individually (and, if so, how they would be combined — concatenated,
+//! required to match, or something else) or taken once from a single
+//! fragment. Since only the final fragment carries the CRC at all, and an
+//! intermediate fragment's own `byte_message_info`/`message_timestamp`
+//! describe *that fragment*, not the reassembled message,
+//! [`build_crc32_coverage_buffer_for_fragment_train`] takes the entire
+//! non-payload region from the caller-supplied final fragment's own
+//! [`AcfCoverageMessage`] — mirroring [`build_crc32_coverage_buffer`]'s
+//! existing single-message behavior with the payload field alone replaced
+//! by the train's combined payload — rather than inventing a multi-
+//! fragment header-combination rule the roadmap text does not state. This
+//! is this crate's own working interpretation, flagged here for
+//! reconciliation against real TC18 behavior (never against spec prose)
+//! before being relied on for interop.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
@@ -258,6 +310,147 @@ pub fn build_crc32_coverage_buffer(
     }
 
     Ok(buf)
+}
+
+// ── Fragmentation interaction ────────────────────────────────────────────────
+
+/// The combined payload of a multi-segment "fragment train", assembled by
+/// concatenating each fragment's own payload in the order the caller
+/// supplies them.
+///
+/// This crate has no live multi-AVTPDU reassembly buffer to read segment
+/// order from yet (`ROADMAP.md` Milestone 8), so segment order is a
+/// caller-supplied fact rather than something derived from
+/// `acf::ReadSizeOrSegmentNum::as_segment_num` here — see this module's
+/// doc comment "Fragmentation interaction" section for why.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct CombinedFragmentPayload(pub Vec<u8>);
+
+impl CombinedFragmentPayload {
+    /// Assembles a fragment train's combined payload by concatenating
+    /// `segments` verbatim, in the order given. An empty `segments` slice
+    /// yields an empty combined payload; this function never panics for
+    /// any input, including empty per-segment payloads.
+    // fusa:req REQ-CRC-009
+    pub fn assemble(segments: &[&[u8]]) -> Self {
+        let mut combined = Vec::new();
+        for segment in segments {
+            combined.extend_from_slice(segment);
+        }
+        CombinedFragmentPayload(combined)
+    }
+}
+
+/// Assembles the CRC coverage buffer for a fragment train: identical to
+/// [`build_crc32_coverage_buffer`], except the payload region is the
+/// train's [`CombinedFragmentPayload`] (assembled from `segments`) rather
+/// than `final_fragment`'s own single-fragment payload.
+///
+/// `header` and `final_fragment` supply every non-payload field of the
+/// coverage buffer — `stream_id`, `avtp_timestamp`, and the full ACF
+/// header (including, for [`AcfCoverageMessage::Gbb`], `message_timestamp`)
+/// — from the train's final fragment (the one whose `ms` is `false`); see
+/// this module's doc comment for why the final fragment's own header is
+/// used rather than combining every fragment's header fields. The same
+/// length-field pre-adjustment [`build_crc32_coverage_buffer`] applies is
+/// applied here too, and this function returns the same
+/// `Err(RcpError::InvalidSize)` that call would return for an out-of-range
+/// header.
+///
+/// Additive standalone plumbing, matching every prior Milestone 1-6 entry's
+/// discipline: composes [`build_crc32_coverage_buffer`] rather than
+/// re-deriving its buffer-assembly logic, and is not wired into
+/// `crc32_tc18`, `wrap`/`unwrap`, or [`E2eController`].
+// fusa:req REQ-CRC-010
+pub fn build_crc32_coverage_buffer_for_fragment_train(
+    header: &HeaderVariant,
+    final_fragment: &AcfCoverageMessage,
+    segments: &[&[u8]],
+) -> Result<Vec<u8>, RcpError> {
+    let combined = CombinedFragmentPayload::assemble(segments);
+    match final_fragment {
+        AcfCoverageMessage::Abb(msg) => {
+            let combined_msg = AcfAbbMessage {
+                info: msg.info,
+                payload: combined.0,
+            };
+            build_crc32_coverage_buffer(header, &AcfCoverageMessage::Abb(&combined_msg))
+        }
+        AcfCoverageMessage::Gbb(msg) => {
+            let combined_msg = AcfGbbMessage {
+                info: msg.info,
+                message_timestamp: msg.message_timestamp,
+                payload: combined.0,
+            };
+            build_crc32_coverage_buffer(header, &AcfCoverageMessage::Gbb(&combined_msg))
+        }
+    }
+}
+
+/// Computes the safe-point CRC-32 for a fragment train: composes
+/// [`build_crc32_coverage_buffer_for_fragment_train`] and [`crc32_tc18`]
+/// rather than re-deriving either. This is the value the train's *final*
+/// fragment carries on the wire per the "only the last fragment carries
+/// the CRC" rule — see [`fragment_crc_expectation`]/
+/// [`check_fragment_crc_placement`] for that placement rule itself.
+// fusa:req REQ-CRC-010
+pub fn crc32_tc18_for_fragment_train(
+    header: &HeaderVariant,
+    final_fragment: &AcfCoverageMessage,
+    segments: &[&[u8]],
+) -> Result<u32, RcpError> {
+    let buf = build_crc32_coverage_buffer_for_fragment_train(header, final_fragment, segments)?;
+    Ok(crc32_tc18(&buf))
+}
+
+/// Whether a CRC32 safe-point value is expected to accompany a given
+/// fragment of a fragment train, keyed only on that fragment's own `ms`
+/// ("more segments") flag.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FragmentCrcExpectation {
+    /// `ms == true`: more segments follow this one. No CRC field is
+    /// expected to accompany this fragment.
+    NotExpected,
+    /// `ms == false`: this is the fragment train's final fragment. A CRC
+    /// field, computed across the train's combined payload (see
+    /// [`crc32_tc18_for_fragment_train`]), is expected to accompany it.
+    Expected,
+}
+
+/// Derives [`FragmentCrcExpectation`] from a fragment's `ms` flag alone,
+/// per the "only the last fragment carries the CRC" rule.
+// fusa:req REQ-CRC-008
+pub fn fragment_crc_expectation(ms: bool) -> FragmentCrcExpectation {
+    if ms {
+        FragmentCrcExpectation::NotExpected
+    } else {
+        FragmentCrcExpectation::Expected
+    }
+}
+
+/// Validates a fragment's actual CRC-presence state against
+/// [`fragment_crc_expectation`]'s rule, rather than silently ignoring a
+/// violation of it.
+///
+/// Returns `Ok(())` when `ms == true` and `crc_present == false` (an
+/// intermediate fragment correctly carrying no CRC), or when `ms == false`
+/// and `crc_present == true` (the final fragment correctly carrying one).
+/// Returns `Err(RcpError::InvalidParameter)` for either invalid
+/// combination: a CRC present on a non-final fragment, or absent on the
+/// final one — mirroring this crate's existing convention (see
+/// `crate::request::check_compound_bundle_claim`) of reporting caller-
+/// supplied state that fails a shape/consistency check as
+/// `InvalidParameter`, rather than inventing a new sentinel for this one
+/// rule ahead of the later "`CRC_ERROR` error path" checklist item, which
+/// is scoped to the wire-level error code a received `CRC_ERROR` produces,
+/// not to this placement rule.
+// fusa:req REQ-CRC-008
+pub fn check_fragment_crc_placement(ms: bool, crc_present: bool) -> Result<(), RcpError> {
+    match (fragment_crc_expectation(ms), crc_present) {
+        (FragmentCrcExpectation::NotExpected, false) => Ok(()),
+        (FragmentCrcExpectation::Expected, true) => Ok(()),
+        _ => Err(RcpError::InvalidParameter),
+    }
 }
 
 // ── Wrap / Unwrap ─────────────────────────────────────────────────────────────
@@ -670,6 +863,191 @@ mod tests {
         let b1 = build_crc32_coverage_buffer(&h1, &acf).unwrap();
         let b2 = build_crc32_coverage_buffer(&h2, &acf).unwrap();
         assert_ne!(crc32_tc18(&b1), crc32_tc18(&b2));
+    }
+
+    // ── Fragmentation interaction ────────────────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-CRC-009
+    fn combined_fragment_payload_concatenates_in_given_order() {
+        let segments: [&[u8]; 3] = [b"ab", b"cd", b"ef"];
+        let combined = CombinedFragmentPayload::assemble(&segments);
+        assert_eq!(combined.0, b"abcdef".to_vec());
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-009
+    fn combined_fragment_payload_empty_segments_yields_empty() {
+        let segments: [&[u8]; 0] = [];
+        let combined = CombinedFragmentPayload::assemble(&segments);
+        assert!(combined.0.is_empty());
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-009
+    fn combined_fragment_payload_single_segment_matches_it_verbatim() {
+        let segments: [&[u8]; 1] = [b"solo"];
+        let combined = CombinedFragmentPayload::assemble(&segments);
+        assert_eq!(combined.0, b"solo".to_vec());
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-008
+    fn fragment_crc_expectation_not_expected_when_more_segments_follow() {
+        assert_eq!(
+            fragment_crc_expectation(true),
+            FragmentCrcExpectation::NotExpected
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-008
+    fn fragment_crc_expectation_expected_on_final_fragment() {
+        assert_eq!(
+            fragment_crc_expectation(false),
+            FragmentCrcExpectation::Expected
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-008
+    fn check_fragment_crc_placement_accepts_no_crc_on_intermediate_fragment() {
+        assert_eq!(check_fragment_crc_placement(true, false), Ok(()));
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-008
+    fn check_fragment_crc_placement_accepts_crc_on_final_fragment() {
+        assert_eq!(check_fragment_crc_placement(false, true), Ok(()));
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-008
+    fn check_fragment_crc_placement_rejects_crc_on_intermediate_fragment() {
+        assert_eq!(
+            check_fragment_crc_placement(true, true),
+            Err(RcpError::InvalidParameter)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-008
+    fn check_fragment_crc_placement_rejects_missing_crc_on_final_fragment() {
+        assert_eq!(
+            check_fragment_crc_placement(false, false),
+            Err(RcpError::InvalidParameter)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-010
+    fn coverage_buffer_for_fragment_train_matches_manual_concatenation() {
+        let header = HeaderVariant::Ntscf(avtp::NtscfHeader {
+            stream_id: 0x0102_0304_0506_0708,
+            ..Default::default()
+        });
+        let segments: [&[u8]; 3] = [b"seg-one-", b"seg-two-", b"seg-three"];
+        let final_info = acf::ByteMessageInfo {
+            acf_msg_length: 0x20,
+            ms: false,
+            ..Default::default()
+        };
+        // The final fragment's own payload field is irrelevant to the
+        // train buffer — only its header fields (info) are consulted; the
+        // payload region comes from `segments` instead.
+        let final_fragment_msg = AcfAbbMessage {
+            info: final_info,
+            payload: b"ignored-final-fragment-payload".to_vec(),
+        };
+        let final_fragment = AcfCoverageMessage::Abb(&final_fragment_msg);
+
+        let via_train_fn =
+            build_crc32_coverage_buffer_for_fragment_train(&header, &final_fragment, &segments)
+                .unwrap();
+
+        let manual_combined_msg = AcfAbbMessage {
+            info: final_info,
+            payload: b"seg-one-seg-two-seg-three".to_vec(),
+        };
+        let manual =
+            build_crc32_coverage_buffer(&header, &AcfCoverageMessage::Abb(&manual_combined_msg))
+                .unwrap();
+
+        assert_eq!(via_train_fn, manual);
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-010
+    fn coverage_buffer_for_fragment_train_changes_when_any_segment_differs() {
+        let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
+        let final_fragment_msg = sample_abb_message(0, b"unused");
+        let final_fragment = AcfCoverageMessage::Abb(&final_fragment_msg);
+
+        let segments_a: [&[u8]; 2] = [b"aaaa", b"bbbb"];
+        let segments_b: [&[u8]; 2] = [b"aaaa", b"cccc"];
+
+        let buf_a =
+            build_crc32_coverage_buffer_for_fragment_train(&header, &final_fragment, &segments_a)
+                .unwrap();
+        let buf_b =
+            build_crc32_coverage_buffer_for_fragment_train(&header, &final_fragment, &segments_b)
+                .unwrap();
+        assert_ne!(buf_a, buf_b);
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-010
+    fn coverage_buffer_for_fragment_train_gbb_carries_final_fragment_timestamp() {
+        let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
+        let final_fragment_msg = sample_gbb_message(0, 0x1122_3344_5566_7788, b"unused");
+        let final_fragment = AcfCoverageMessage::Gbb(&final_fragment_msg);
+        let segments: [&[u8]; 2] = [b"part-a", b"part-b"];
+
+        let buf =
+            build_crc32_coverage_buffer_for_fragment_train(&header, &final_fragment, &segments)
+                .unwrap();
+
+        assert_eq!(buf[12], acf::ACF_GBB_MSG_TYPE);
+        let ts_start = 12 + 1 + acf::BYTE_MESSAGE_INFO_LEN;
+        let ts_end = ts_start + 8;
+        assert_eq!(
+            &buf[ts_start..ts_end],
+            &0x1122_3344_5566_7788u64.to_be_bytes()
+        );
+        assert_eq!(&buf[buf.len() - 12..], b"part-apart-b");
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-010
+    fn coverage_buffer_for_fragment_train_propagates_length_overflow_error() {
+        let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
+        let final_fragment_msg = sample_abb_message(acf::BYTE_MESSAGE_INFO_11BIT_MAX, b"unused");
+        let final_fragment = AcfCoverageMessage::Abb(&final_fragment_msg);
+        let segments: [&[u8]; 1] = [b"x"];
+        assert_eq!(
+            build_crc32_coverage_buffer_for_fragment_train(&header, &final_fragment, &segments),
+            Err(RcpError::InvalidSize)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-010
+    fn crc32_tc18_for_fragment_train_matches_manual_computation() {
+        let header = HeaderVariant::Tscf(avtp::TscfHeader {
+            stream_id: 0x0203_0405_0607_0809,
+            avtp_timestamp: 0x1234_5678,
+            ..Default::default()
+        });
+        let final_fragment_msg = sample_abb_message(0, b"unused");
+        let final_fragment = AcfCoverageMessage::Abb(&final_fragment_msg);
+        let segments: [&[u8]; 2] = [b"hello-", b"world"];
+
+        let via_helper =
+            crc32_tc18_for_fragment_train(&header, &final_fragment, &segments).unwrap();
+        let buf =
+            build_crc32_coverage_buffer_for_fragment_train(&header, &final_fragment, &segments)
+                .unwrap();
+        assert_eq!(via_helper, crc32_tc18(&buf));
     }
 
     // ── Header length ─────────────────────────────────────────────────────────

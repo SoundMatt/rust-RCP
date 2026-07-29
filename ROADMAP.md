@@ -1587,8 +1587,43 @@ concepts into it rather than treating them as unrelated decorators.
       the buffer a caller would pass to `crc32_tc18`, leaving the
       Fragmentation-interaction, Safety-request MSB-tagging, and
       CRC_ERROR-path bullets below to actually invoke it.
-- [ ] Fragmentation interaction: only the *last* fragment of a multi-segment
-      message carries the CRC, computed across the combined payload
+- [x] Fragmentation interaction: only the *last* fragment of a multi-segment
+      message carries the CRC, computed across the combined payload. Done
+      (v0.9.0-dev): `src/e2e.rs` gains `CombinedFragmentPayload` (assembling
+      a fragment train's combined payload by concatenating a caller-
+      supplied, already-ordered `&[&[u8]]` of per-fragment payloads),
+      `build_crc32_coverage_buffer_for_fragment_train`/
+      `crc32_tc18_for_fragment_train` (composing, not re-deriving,
+      `build_crc32_coverage_buffer`/`crc32_tc18` — the combined payload
+      replaces a single fragment's payload region while every other
+      coverage field is taken from the caller-supplied final fragment's own
+      header), and `fragment_crc_expectation`/`check_fragment_crc_placement`
+      (the "only the last fragment carries the CRC" placement rule itself,
+      stated as an explicit, queryable type rather than left implicit — the
+      latter rejects both invalid states, a CRC present on a non-final
+      fragment or absent on the final one, with `RcpError::InvalidParameter`
+      rather than silently ignoring either). Per Guiding Principle 5, since
+      this crate has no live multi-AVTPDU reassembly buffer yet (Milestone
+      8's job) and has not resolved which bit(s) of
+      `acf::ReadSizeOrSegmentNum` would select a `segment_num` reading, a
+      fragment train's segment order is taken as a caller-supplied fact
+      (the ordered `&[&[u8]]` itself) rather than derived from
+      `ReadSizeOrSegmentNum::as_segment_num` here; likewise, since the
+      roadmap does not state whether the coverage buffer's non-payload
+      region should be drawn from each fragment individually or from one
+      fragment alone, this entry takes the entire non-payload region (
+      `stream_id`, `avtp_timestamp`, and the full ACF header incl.
+      `message_timestamp` for ACF_GBB) from the final fragment's own
+      header — both flagged in `src/e2e.rs`'s doc comment for
+      reconciliation against real TC18 behavior, never against spec prose.
+      New `REQ-CRC-008`..`REQ-CRC-010` added to `.fusa-reqs.json`, each with
+      a `// fusa:req`/`// fusa:test` pair. Same "additive standalone
+      plumbing only" discipline as every prior milestone entry: none of
+      this is wired into `wrap`/`unwrap`, `E2eController`, or the not-yet-
+      built reassembly buffer — it only states and implements the rule
+      itself, leaving the Safety-request MSB-tagging and `CRC_ERROR`-path
+      bullets below (and Milestone 8's real reassembly) to actually invoke
+      it against live multi-AVTPDU traffic.
 - [ ] Safety-request MSB-tagging: `0x8F`/`0x8B`/`0x8E` variants; on watchdog
       overflow, normal-priority requests are purged while safety-tagged
       requests remain queued and become the mechanism that drives the
