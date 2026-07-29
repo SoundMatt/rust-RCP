@@ -5285,6 +5285,15 @@
       "verificationMethod": "test"
     },
     {
+      "id": "REQ-RMAP-031",
+      "title": "check_ep_type_supported gives EndpointType::is_reserved a structural consequence, closing ROADMAP.md Milestone 7's DAC decision",
+      "text": "check_ep_type_supported(ep_type) returns Err(RcpError::UnsupportedCmd) for every EndpointType with is_reserved() true (EndpointType::Dac only) and Ok(()) for every other EndpointType, independently of and without altering check_functional_config_matches_ep_type's own REQ-RMAP-004 match behavior for a same-EndpointType PerEpConfigBlock/PerEpTypeFunctionalConfig pair; never panics for any EndpointType",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
       "id": "REQ-BUNDLE-001",
       "title": "check_compound_bundle_claim requires compound-wait support, \u22654 sequencers, and clear-non-safestate support together before accepting a \"compound request support\" claim",
       "text": "check_compound_bundle_claim(has_compound_wait, svr_sequencers_max, has_clear_non_safestate) returns Ok(()) only when has_compound_wait is true, svr_sequencers_max is greater than or equal to MIN_SEQUENCERS_FOR_COMPOUND_BUNDLE, and has_clear_non_safestate is true, all three simultaneously; returns Err(RcpError::InvalidParameter) whenever any one of the three does not hold, including when none of them hold; never panics for any sampled input",
