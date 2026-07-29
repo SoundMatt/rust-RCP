@@ -5643,6 +5643,60 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-LIN-001",
+      "title": "LIN_MAX_DATA matches the real LIN 2.x per-frame data ceiling reused from linbr",
+      "text": "lin::LIN_MAX_DATA == 8 and is defined as crate::linbr::LIN_MAX_DATA, reusing that value as a physical fact about the bus rather than duplicating a second literal or reusing any of linbr::LinBridge::send's surrounding PID-derivation logic",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-LIN-002",
+      "title": "LinFrameTransfer round-trips PID+data bytes through encode/decode and never panics",
+      "text": "LinFrameTransfer::encode/LinFrameTransfer::decode round-trip any client-supplied pid byte and data bytes (up to LIN_MAX_DATA bytes), carrying both unparsed and unvalidated for parity or checksum content, and decode never panics for any input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-LIN-003",
+      "title": "LinFrameTransfer::decode rejects an empty slice with no PID byte present",
+      "text": "LinFrameTransfer::decode returns Err(RcpError::ShortFrame) for an empty byte slice, since no PID byte is present to decode",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-LIN-004",
+      "title": "LinFrameTransfer::decode rejects data bytes exceeding LIN_MAX_DATA and accepts exactly LIN_MAX_DATA",
+      "text": "LinFrameTransfer::decode returns Err(RcpError::PayloadTooLarge) when the bytes following the PID byte exceed LIN_MAX_DATA in length, and succeeds when they equal LIN_MAX_DATA exactly, matching the real LIN 2.x per-frame data ceiling linbr::LinBridge::send already enforced",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-LIN-005",
+      "title": "LinFrameTransferResult round-trips response data bytes through encode/decode, enforces LIN_MAX_DATA, and never panics",
+      "text": "LinFrameTransferResult::encode/LinFrameTransferResult::decode round-trip any data byte sequence up to and including LIN_MAX_DATA bytes without interpreting its contents, decode returns Err(RcpError::PayloadTooLarge) for longer input, and decode never panics for any input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-LIN-006",
+      "title": "LinFunctionalConfig's layer tag matches crate::regmap's EndpointType::Lin cross-layer rule",
+      "text": "LinFunctionalConfig::layer_tag produces a crate::regmap::PerEpTypeFunctionalConfig tagged EndpointType::Lin that satisfies crate::regmap::check_functional_config_matches_ep_type against a generic PerEpConfigBlock of the same ep_type, and is rejected by functional_config_matches_ep_type against a mismatched ep_type",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

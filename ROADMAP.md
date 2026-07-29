@@ -1826,11 +1826,42 @@ Goal:
 Complete the endpoint-type roster: the bus-protocol and power-management
 types deferred out of Milestone 4.
 
-- [ ] **LIN commander** (`ep_type 0x06`): raw byte pass-through only — the
+- [x] **LIN commander** (`ep_type 0x06`): raw byte pass-through only — the
       spec defines no PID/checksum/schedule-table smarts at the protocol
       level. Explicitly validate this against `linbr.rs`'s current ad-hoc
       PID-generation assumptions before reusing any of its logic; expect the
-      new implementation to push that responsibility to the client
+      new implementation to push that responsibility to the client. Done
+      (v0.10.0-dev): new `src/lin.rs` — this milestone's first entry, and
+      additive standalone plumbing only, matching Milestone 4's six
+      endpoint-type modules' own discipline — adds [`LinFrameTransfer`] /
+      [`LinFrameTransferResult`], an opaque client-PID-plus-data-bytes
+      request paired with a data-only response, mirroring
+      `spi::SpiByteTransfer`/`i2c::I2cByteTransfer`'s raw-pass-through
+      modeling, and [`LinFunctionalConfig`], an intentionally empty
+      placeholder (this checklist bullet names no LIN-specific config
+      content) whose `layer_tag` composes against
+      `regmap::check_functional_config_matches_ep_type` unchanged, matching
+      every prior Milestone 4 entry's precedent. Per this bullet's own
+      instruction, `linbr::LinBridge::send`'s existing PID formula
+      (`(self.zone.0 << 2) | (cmd.cmd_type.0 as u8 & 0x03)`) and its
+      first-byte OK/ERROR response inference were read and explicitly not
+      reused: both tie protocol-level behavior to the old `Zone`/`Command`
+      model and to interpretation this checklist bullet's pass-through
+      behavior does not call for. The one piece of `linbr.rs` this module
+      does reuse is `LIN_MAX_DATA` itself (`lin::LIN_MAX_DATA =
+      crate::linbr::LIN_MAX_DATA`) — LIN 2.x's real 8-byte per-frame data
+      ceiling, a physical fact about the bus rather than surrounding bridge
+      logic — enforced as `Err(RcpError::PayloadTooLarge)` on both the
+      request and response byte streams. Per Guiding Principle 5, this
+      entry flags its own working interpretation of an otherwise
+      unspecified wire layout: a request is one leading client-computed PID
+      byte followed by up to `LIN_MAX_DATA` data bytes, carrying whatever
+      checksum content the client chose to include in `data` unparsed and
+      unvalidated; a response carries only the data bytes read back off the
+      bus, with no PID field of its own. `linbr.rs` itself is untouched —
+      its REPLACE-disposition cutover remains Milestone 9's job. New
+      `REQ-LIN-001`..`REQ-LIN-006` added to `.fusa-reqs.json`, each with a
+      `// fusa:req`/`// fusa:test` pair in `src/lin.rs`.
 - [ ] **CAN controller** (`ep_type 0x0B`): Classical/FD/XL `FrameFormat`
       selection (CBFF/CEFF/FBFF/FEFF/XL-classical/XL-new); CAN XL's 6-byte
       sub-header plus up to 2048-byte payload (needs fragmentation — see
