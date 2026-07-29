@@ -4869,6 +4869,60 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CONF-001",
+      "title": "NTSCF header golden vector",
+      "text": "conformance::golden::NTSCF_GOLDEN_BYTES is a frozen literal byte array; avtp::encode_ntscf_header(conformance::golden::ntscf_header_fields()) must equal it, and avtp::decode_ntscf_header of it must recover ntscf_header_fields() unchanged",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CONF-002",
+      "title": "TSCF header golden vector with non-degenerate avtp_timestamp",
+      "text": "conformance::golden::TSCF_GOLDEN_BYTES is a frozen literal byte array for a TscfHeader whose avtp_timestamp is non-zero; avtp::encode_tscf_header(conformance::golden::tscf_header_fields()) must equal it, and avtp::decode_tscf_header of it must recover tscf_header_fields() unchanged",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CONF-003",
+      "title": "ACF_ABB message golden vector",
+      "text": "conformance::golden::ACF_ABB_GOLDEN_BYTES is a frozen literal byte array; acf::encode_acf_abb(conformance::golden::acf_abb_fields()) must equal it, and acf::decode_acf_abb of it must recover acf_abb_fields() unchanged",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CONF-004",
+      "title": "ACF_GBB message golden vector with non-zero message_timestamp",
+      "text": "conformance::golden::ACF_GBB_GOLDEN_BYTES is a frozen literal byte array for an AcfGbbMessage whose message_timestamp is non-zero; acf::encode_acf_gbb(conformance::golden::acf_gbb_fields()) must equal it, and acf::decode_acf_gbb of it must recover acf_gbb_fields() unchanged",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CONF-005",
+      "title": "Composed NTSCF+ACF_ABB frame golden vector",
+      "text": "conformance::golden::NTSCF_ACF_ABB_FRAME_GOLDEN_BYTES is a frozen literal byte array combining ntscf_header_fields() and the encoded acf_abb_fields() message via avtp::encode_ntscf_frame; encoding must equal it, and avtp::decode_ntscf_frame of it must split back into the original header and ACF_ABB payload bytes",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CONF-006",
+      "title": "go-RCP interop cross-check divergence is documented and pinned",
+      "text": "conformance::go_rcp_crosscheck's byte constants, captured from SoundMatt/go-RCP's avtp/acf packages at commit bdc760fb057f067cfb68199b6c3d0edab9e0c671 for field values logically analogous to the golden vectors, must remain provably non-identical to this crate's own golden vector bytes at the header/message level (documenting the header-length, data-length-field-packing, timestamp-status-marker, message-kind-discriminant, and byte_bus_id-width divergences found), while the stream_id sender-MAC/suffix byte layout must remain identical between the two implementations",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

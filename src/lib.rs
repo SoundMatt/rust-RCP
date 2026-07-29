@@ -80,6 +80,11 @@ pub mod capi;
 pub mod certgap;
 pub mod codegen;
 pub mod config;
+// Not `pub`, unlike every other module here: `ROADMAP.md` Milestone 10's
+// conformance-vectors item, test-only by nature. See its own doc comment's
+// "Why `#[cfg(test)]` rather than `pub mod`" section.
+#[cfg(test)]
+mod conformance;
 pub mod deadline;
 pub mod discovery;
 pub mod dyndata;

@@ -3083,9 +3083,74 @@ Ship a stable, TC18-conformant rust-RCP.
       clean; `bash scripts/fusa-gap-check.sh` reports 622/622 (100%)
       requirements traced; `bash scripts/cyber-gap-check.sh` reports 6/6
       threats with tested countermeasures.
-- [ ] Conformance test vectors / interop verification against at least one
+- [x] Conformance test vectors / interop verification against at least one
       sibling x-RCP implementation once it has also uplifted, or
       self-referential wire-format golden vectors if none is ready yet
+
+      Done (v0.13.0-dev): `src/conformance.rs` (test-only —
+      `#[cfg(test)] mod conformance;` in `lib.rs`, deliberately not `pub`
+      like every other module here, since it is not part of this crate's
+      protocol surface; see its own doc comment's "Why `#[cfg(test)]` rather
+      than `pub mod`" section) pins five self-referential wire-format golden
+      vectors as frozen literal byte arrays (not recomputed from the encoder
+      under test, so an accidental future regression is caught even if
+      encode/decode stayed internally consistent with each other): an NTSCF
+      header, a TSCF header with a non-degenerate `avtp_timestamp`
+      (`0x1A2B3C4D`), an ACF_ABB message, an ACF_GBB message with a non-zero
+      `message_timestamp` (`0x0102030405060708`), and a composed
+      NTSCF+ACF_ABB frame exercising Milestone 9's frame-composition step.
+
+      `go-RCP` is the one sibling x-RCP implementation that has also
+      uplifted to a real TC18 core and shipped `v1.0.0` (its own
+      `ROADMAP.md` item 59, "TC18 Conformance Cutover & RELAY
+      Re-Certification", commit
+      `bdc760fb057f067cfb68199b6c3d0edab9e0c671`), so this item took the
+      roadmap's preferred interop-verification path rather than the
+      self-referential-only fallback: a standalone Go program (not
+      committed to this repository) called go-RCP's own
+      `avtp.EncodeHeader`/`acf.EncodeMessage` for field values logically
+      analogous to each golden vector, and the resulting bytes are recorded
+      in `conformance::go_rcp_crosscheck` for direct comparison. Result:
+      **not byte-identical**, at every vector type — go-RCP's header/message
+      lengths, its flat 16-bit `data_length` field versus this crate's
+      11-bit split-across-two-bytes packing, its explicit 2-bit
+      timestamp-status marker (which this crate's `TscfHeader` has no
+      equivalent field for at all), its `1`/`2` message-kind discriminants
+      versus this crate's `0x0E`/`0x0D`, and its flat single-byte
+      `ByteBusID` versus this crate's 11-bit packed `byte_bus_id` all
+      diverge from `crate::avtp`/`crate::acf`'s own interpretation. Per
+      Guiding Principle 5, this divergence is recorded in `conformance.rs`'s
+      module doc comment and pinned by a dedicated test
+      (`go_rcp_bytes_diverge_from_this_crates_own_encoding`) rather than
+      silently resolved by rewriting either implementation to match the
+      other — reconciling rust-RCP's byte-level choices in `crate::avtp`/
+      `crate::acf` against go-RCP's independently-arrived-at choices, or
+      directly against the OPEN Alliance TC18 Remote Control Protocol
+      Specification's own described behavior, remains out of this item's
+      scope and is left for a follow-up. One point of genuine agreement is
+      recorded alongside the divergence rather than omitted: both
+      implementations split the 64-bit `stream_id` the same way (6-byte
+      sender MAC high, 2-byte locally-assigned suffix low), confirmed
+      byte-identical.
+
+      `.fusa-reqs.json` gains six new `REQ-CONF-001..006` requirements
+      covering the five golden vectors and the pinned cross-check
+      divergence. `cargo build --all-targets`, `cargo clippy --all-targets
+      --all-features -- -D warnings`, `cargo test --all-targets` (986 lib
+      tests, up from 978; 27 unchanged `src/bin/rcp.rs` tests), and `cargo
+      fmt --all -- --check` are clean; `bash scripts/fusa-gap-check.sh`
+      reports 551/551 (100%) requirements traced; `bash
+      scripts/cyber-gap-check.sh` reports 6/6 threats with tested
+      countermeasures.
+
+      This was the last unchecked item in this milestone's checklist. With
+      it landed, `ROADMAP.md` Milestone 10 is complete; the crate is ready
+      to tag and publish as `v1.0.0` per the version-freeze policy
+      `CHANGELOG.md` and `docs/SEMVER.md` both state — that actual version
+      bump (`Cargo.toml` still reads `0.3.0` as of this entry), tag, and
+      `crates.io` publish are a deliberately separate release step, not
+      folded into this item (and `crates.io` publishing depends on the
+      still-open `CARGO_REGISTRY_TOKEN` gap tracked by issue #12).
 
 Success Criteria:
 rust-RCP's wire format, RC Server model, and endpoint set are demonstrably
