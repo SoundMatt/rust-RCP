@@ -1172,78 +1172,6 @@
       "verificationMethod": "test"
     },
     {
-      "id": "REQ-E2E-001",
-      "title": "E2E wrap prepends seqNum",
-      "text": "wrap() prepends a 4-byte big-endian sequence number",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-E2E-002",
-      "title": "CRC covers seqNum and payload",
-      "text": "CRC-16/CCITT-FALSE is computed over [seqNum bytes ++ payload]",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-E2E-003",
-      "title": "CRC mismatch rejected",
-      "text": "unwrap() returns Err(CrcMismatch) when CRC does not match",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-E2E-004",
-      "title": "E2eController auto-increments seq",
-      "text": "E2eController atomically increments sequence number per send",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-E2E-005",
-      "title": "ReplayGuard rejects replayed seq",
-      "text": "ReplayGuard.check() returns Err(Replay) for previously seen seq numbers",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-E2E-006",
-      "title": "E2E header is 6 bytes",
-      "text": "E2E header length is 4 (seqNum) + 2 (CRC) = 6 bytes",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-E2E-007",
-      "title": "wrap/unwrap are inverse",
-      "text": "unwrap(wrap(seq, payload)) == Ok((seq, payload))",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-E2E-008",
-      "title": "Single-bit corruption detected",
-      "text": "Flipping any bit in payload or seqNum causes CRC mismatch",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
       "id": "REQ-PQ-001",
       "title": "PrioController wraps inner",
       "text": "PrioController delegates commands to an inner Controller",
@@ -5556,8 +5484,8 @@
     },
     {
       "id": "REQ-CRC-011",
-      "title": "RcpError gains CrcError as a new variant for the CRC_ERROR error path, distinct from the legacy CrcMismatch sentinel",
-      "text": "RcpError::CrcError is added as a new variant (not collapsed onto RcpError::CrcMismatch or any of the eleven Milestone 2 TC18 error codes), is distinct from RcpError::CrcMismatch under equality, its Display text embeds the roadmap-named CRC_ERROR code following the enum's established \"rcp/error: <CODE> - ...\" message convention, and check_rx_enforce_e2e constructs it (in place of RcpError::CrcMismatch) on a TC18 safe-point CRC-32 mismatch",
+      "title": "RcpError gains CrcError as a new variant for the CRC_ERROR error path, originally kept distinct from the now-retired legacy CrcMismatch sentinel",
+      "text": "RcpError::CrcError is added as a new variant (not collapsed onto any of the eleven Milestone 2 TC18 error codes, nor onto the legacy CrcMismatch sentinel that motivated keeping it distinct at the time, since retired outright by Milestone 9's e2e REPLACE cutover), is distinct from other RcpError variants under equality, its Display text embeds the roadmap-named CRC_ERROR code following the enum's established \"rcp/error: <CODE> - ...\" message convention, and check_rx_enforce_e2e constructs it on a TC18 safe-point CRC-32 mismatch",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",

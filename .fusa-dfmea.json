@@ -12,7 +12,7 @@
       "severity": "S3",
       "cause": "Zone field corrupted in transit or mis-set by caller",
       "detection": "Zone mismatch check in every controller send()",
-      "mitigation": "REQ-CTRL-003 zone validation + REQ-E2E-003 CRC integrity",
+      "mitigation": "REQ-CTRL-003 zone validation + REQ-CRC-004 CRC-32 safe-point integrity",
       "residual_risk": "low"
     },
     {
@@ -21,21 +21,23 @@
       "failure_mode": "Corrupted payload accepted as valid",
       "effect": "Incorrect actuation data applied to ECU",
       "severity": "S3",
-      "cause": "Single or multi-bit error in payload bytes",
-      "detection": "CRC-16/CCITT-FALSE over seqNum+payload (REQ-E2E-003)",
-      "mitigation": "REQ-E2E-002 CRC covers both seq and payload bytes",
-      "residual_risk": "low"
+      "cause": "Bit error(s) inside the CRC-32 coverage region of a safe-point AVTPDU/ACF frame",
+      "detection": "check_rx_enforce_e2e compares the TC18 safe-point crc32_tc18 against the wire-carried expected_crc and constructs RcpError::CrcError on mismatch (REQ-CRC-011, REQ-E2EENF-002)",
+      "mitigation": "REQ-CRC-004 CRC-32 coverage buffer assembly + REQ-CRC-003 single-bit-flip sensitivity",
+      "residual_risk": "low",
+      "note": "Milestone 9's e2e REPLACE cutover (ROADMAP.md) removed the prior CRC-16/CCITT-FALSE mechanism this failure mode described (crate::e2e::wrap/unwrap); this row now describes the surviving CRC-32 safe-point mechanism, per the same retargeting discipline used for FM-005/watchdog"
     },
     {
       "id": "FM-003",
-      "function": "Anti-replay guard",
-      "failure_mode": "Replayed command accepted after window eviction",
+      "function": "Anti-replay protection",
+      "failure_mode": "Replayed command accepted",
       "effect": "Stale command re-executed",
       "severity": "S2",
-      "cause": "Sliding window too small or eviction not preceding acceptance check",
-      "detection": "Evict-before-check logic in ReplayGuard::check()",
-      "mitigation": "REQ-E2E-005 32-entry window with correct eviction order",
-      "residual_risk": "low"
+      "cause": "No live anti-replay mechanism is wired into a request-acceptance path",
+      "detection": "None currently live; evaluate_rx_enforce_seq (REQ-SEQENF-003) exists as caller-invocable, standalone plumbing but is not called from any decoder or dispatch loop",
+      "mitigation": "REQ-SEQENF-003 monotonic rx_enforce_seq check, once wired into a live request path; until then, running RCP over the mutually authenticated TLS bridge is the only real-world mitigation against a network-capable attacker",
+      "residual_risk": "medium",
+      "note": "Milestone 9's e2e REPLACE cutover (ROADMAP.md) deleted the legacy ReplayGuard sliding-window guard this failure mode originally described, with no live replacement built yet; residual_risk is raised from its prior 'low' rating to reflect that honestly rather than retargeting onto a not-yet-wired mechanism at the same confidence level"
     },
     {
       "id": "FM-004",

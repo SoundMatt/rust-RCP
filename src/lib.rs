@@ -535,14 +535,17 @@ pub struct Status {
 /// [`ChainError`](Self::ChainError) above are both chain/timing-specific,
 /// not CRC-specific). [`crate::request::check_rx_enforce_e2e`] constructs
 /// it on a TC18 safe-point CRC-32 mismatch, replacing that function's
-/// earlier, explicitly-provisional reuse of
-/// [`CrcMismatch`](Self::CrcMismatch) — the unrelated, still-live legacy
-/// CRC-16 sentinel [`crate::e2e`]'s `wrap`/`unwrap` path continues to
-/// return unchanged. See [`crate::request`]'s own doc comment "Provenance
-/// note: `CrcError` as a new variant, distinct from the legacy
-/// `CrcMismatch` sentinel" for the full reasoning behind adding a new
-/// variant here rather than collapsing onto `CrcMismatch` or any of the
-/// eleven TC18 codes above. Per the same pattern as
+/// earlier, explicitly-provisional reuse of `CrcMismatch` — the legacy
+/// CRC-16 sentinel [`crate::e2e`]'s own `wrap`/`unwrap` path used to
+/// return. `CrcMismatch` (along with `Replay`) has since been retired
+/// entirely by Milestone 9's `e2e` REPLACE cutover, the same way
+/// `BadMagic`/`BadVersion` were retired by the `wire` REPLACE cutover
+/// immediately before it — see this enum's "Wire / E2E errors" section
+/// below. See [`crate::request`]'s own doc comment "Provenance note:
+/// `CrcError` as a new variant, distinct from the legacy `CrcMismatch`
+/// sentinel" for the full reasoning behind adding a new variant here
+/// rather than collapsing onto `CrcMismatch` or any of the eleven TC18
+/// codes above. Per the same pattern as
 /// [`ChainAborted`](Self::ChainAborted)/[`ChainError`](Self::ChainError),
 /// [`CrcError`](Self::CrcError) is kept out of the eleven-member
 /// [`is_tc18_error_code`](Self::is_tc18_error_code) group.
@@ -585,27 +588,24 @@ pub enum RcpError {
     ZoneMismatch,
 
     // ── Wire / E2E errors ────────────────────────────────────────────────
-    // `CrcMismatch`/`Replay` are likewise legacy 16-byte-frame-specific (see
-    // `e2e`'s own REPLACE disposition in `ROADMAP.md`'s satellite table)
-    // and kept unchanged pending that item. `BadMagic`/`BadVersion` — the
-    // `wire`-specific counterparts this comment used to name alongside them
-    // — are retired by Milestone 9's `wire` REPLACE cutover: `src/wire.rs`
-    // (their only constructor) is deleted, and no other module ever
-    // constructed or matched on either variant, so nothing is left for them
-    // to serve. `ShortFrame` is not legacy-only — every TC18 AVTPDU/ACF
-    // decoder added in Milestone 1 (`avtp`, `acf`) and the Register Map
-    // config-table decoders added earlier in this milestone
-    // (`regmap`) also return it for undersized input, so it stays as
-    // a general-purpose, non-spec-code sentinel rather than being folded
-    // into the TC18 error-code group below.
+    // `CrcMismatch`/`Replay` were likewise legacy 16-byte-frame-specific
+    // (see `e2e`'s own REPLACE disposition in `ROADMAP.md`'s satellite
+    // table) and were kept unchanged pending that item — this comment
+    // previously said so. That item has now landed: `src/e2e.rs`'s
+    // `wrap`/`unwrap` (the CRC-16 frame `CrcMismatch` reported a mismatch
+    // for) and `ReplayGuard` (`Replay`'s only constructor) are deleted
+    // outright, and no other module ever constructed or matched on either
+    // variant, so — mirroring `BadMagic`/`BadVersion`'s own retirement by
+    // the immediately preceding `wire` REPLACE cutover — both `CrcMismatch`
+    // and `Replay` are removed here too, rather than left as inert,
+    // never-constructed sentinels. `ShortFrame` is not legacy-only —
+    // every TC18 AVTPDU/ACF decoder added in Milestone 1 (`avtp`, `acf`)
+    // and the Register Map config-table decoders added earlier in this
+    // milestone (`regmap`) also return it for undersized input, so it
+    // stays as a general-purpose, non-spec-code sentinel rather than being
+    // folded into the TC18 error-code group below.
     #[error("rcp/wire: frame too short")]
     ShortFrame,
-
-    #[error("rcp/e2e: CRC mismatch")]
-    CrcMismatch,
-
-    #[error("rcp/e2e: replayed sequence number")]
-    Replay,
 
     // ── TC18 RCP spec error codes ───────────────────────────────────────
     // See this enum's own doc comment for the full provenance/mapping

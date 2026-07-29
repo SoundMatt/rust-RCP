@@ -2,7 +2,7 @@
   "project": "rust-RCP",
   "standard": "ISO/SAE 21434:2021",
   "createdAt": "2026-07-27T00:00:00Z",
-  "scope": "rust-RCP is a software library component used in road-vehicle zonal-architecture ECUs. This TARA covers cybersecurity threats arising from rust-RCP's Command/Response/Status control-plane surface (wire framing, E2E CRC/replay protection, authorization policy, rate limiting, priority scheduling, and the UDP/TLS transport bridges) when integrated into a central HPC or zone controller that exchanges RCP frames over an in-vehicle network. System-level CAL may differ after architectural decomposition per ISO/SAE 21434 clause 15.",
+  "scope": "rust-RCP is a software library component used in road-vehicle zonal-architecture ECUs. This TARA covers cybersecurity threats arising from rust-RCP's Command/Response/Status control-plane surface (wire framing, E2E safe-point CRC-32 integrity, authorization policy, rate limiting, priority scheduling, and the UDP/TLS transport bridges) when integrated into a central HPC or zone controller that exchanges RCP frames over an in-vehicle network. System-level CAL may differ after architectural decomposition per ISO/SAE 21434 clause 15.",
 
   "assets": [
     {
@@ -13,8 +13,8 @@
     },
     {
       "id": "A-002",
-      "name": "E2E-protected command/response/status authenticity",
-      "description": "Guarantee that a Command/Response/Status accepted via e2e::unwrap() originates from a genuine, non-replayed sender with correct sequence and payload",
+      "name": "E2E safe-point CRC-32 payload integrity",
+      "description": "Guarantee that a safe-point AVTPDU/ACF frame accepted after crate::request::check_rx_enforce_e2e's TC18 CRC-32 (crate::e2e::crc32_tc18) comparison carries an unmodified payload. Note: as of Milestone 9's e2e REPLACE cutover (ROADMAP.md), this crate no longer has a live anti-replay mechanism (the legacy ReplayGuard sliding window was removed, and evaluate_rx_enforce_seq/REQ-SEQENF-003 is not yet wired into a request-acceptance path), so this asset no longer includes a non-replayed-sender guarantee",
       "cybersecurityProperty": "Integrity"
     },
     {
@@ -97,8 +97,8 @@
       "feasibilityRating": "Medium",
       "cal": "CAL-3",
       "cybersecurityGoal": "CSG-RCP-02",
-      "mitigations": ["REQ-TLS-001", "REQ-TLS-002", "REQ-E2E-003"],
-      "residualRisk": "Medium on plain UDP — deployments carrying safety-relevant commands MUST use the TLS bridge (mutual auth, TLS >= 1.2); UDP-only deployments rely solely on the non-cryptographic E2E CRC"
+      "mitigations": ["REQ-TLS-001", "REQ-TLS-002", "REQ-CRC-004"],
+      "residualRisk": "Medium on plain UDP — deployments carrying safety-relevant commands MUST use the TLS bridge (mutual auth, TLS >= 1.2); UDP-only deployments rely solely on the non-cryptographic E2E CRC-32 safe-point check"
     },
     {
       "id": "T-RCP-03",
@@ -106,7 +106,7 @@
       "asset": "A-002",
       "property": "Integrity",
       "stride": "Spoofing",
-      "description": "An attacker records a previously valid, E2E-wrapped Command frame (e.g. Wake or Reset) and re-transmits it later to re-trigger the action outside its intended context.",
+      "description": "An attacker records a previously valid safe-point frame (e.g. a Wake- or Reset-carrying request) and re-transmits it later to re-trigger the action outside its intended context.",
       "attackPath": "Attacker passively captures a genuine wire frame from the transport; re-sends the identical bytes at a time of their choosing.",
       "impact": {
         "safety": "Severe",
@@ -125,8 +125,8 @@
       "feasibilityRating": "High",
       "cal": "CAL-3",
       "cybersecurityGoal": "CSG-RCP-02",
-      "mitigations": ["REQ-E2E-004", "REQ-E2E-005"],
-      "residualRisk": "Low — ReplayGuard rejects any seqNum already observed within the replay window (REQ-E2E-005); window eviction is bounded (REPLAY_WINDOW = 32)"
+      "mitigations": ["REQ-SEQENF-003", "REQ-TLS-001", "REQ-TLS-002"],
+      "residualRisk": "Medium — this crate's legacy seqNum/ReplayGuard replay window was removed outright by Milestone 9's e2e REPLACE cutover (ROADMAP.md Satellite Package Disposition), and crate::request::evaluate_rx_enforce_seq/REQ-SEQENF-003's rx_enforce_seq monotonic-sequence check is, as of this item, additive standalone plumbing rather than a mechanism wired into a live request-acceptance path — so no rust-RCP-internal replay protection is currently enforced end-to-end; running RCP over the mutually authenticated TLS bridge (REQ-TLS-001/002) is the primary real-world mitigation until a live rx_enforce_seq integration lands"
     },
     {
       "id": "T-RCP-04",
@@ -218,8 +218,8 @@
       "asset": "A-002",
       "property": "Integrity",
       "stride": "Tampering",
-      "description": "The E2E header uses CRC-16/CCITT-FALSE, which is a safety control against random bit errors, not a keyed cryptographic MAC. An attacker who can modify a frame in transit can recompute a valid CRC-16 over the tampered seqNum+payload, defeating the check.",
-      "attackPath": "Attacker intercepts a wire frame (see T-RCP-02); modifies the payload; recomputes CRC-16/CCITT-FALSE over the new seqNum+payload bytes (no key material required — the algorithm and polynomial are public); re-injects the forged frame.",
+      "description": "The E2E safe-point check uses the OPEN Alliance TC18 CRC-32 (polynomial 0xF4ACFB13), which is a safety control against random bit errors, not a keyed cryptographic MAC. An attacker who can modify a frame in transit can recompute a valid CRC-32 over the tampered coverage buffer, defeating the check.",
+      "attackPath": "Attacker intercepts a wire frame (see T-RCP-02); modifies the payload; recomputes the CRC-32 safe-point value over the new coverage buffer bytes (no key material required — the algorithm and polynomial are public, per the OPEN Alliance TC18 Remote Control Protocol Specification); re-injects the forged frame.",
       "impact": {
         "safety": "Severe",
         "financial": "Moderate",
@@ -238,7 +238,7 @@
       "cal": "CAL-3",
       "cybersecurityGoal": "CSG-RCP-02",
       "mitigations": ["REQ-TLS-001", "REQ-TLS-002"],
-      "residualRisk": "Medium-High without transport-layer authentication — e2e::wrap/unwrap MUST be documented as a safety control (random error detection) only, not a security control; deployments exposed to an adversarial network MUST run RCP over the TLS bridge (mutually authenticated) rather than relying on CRC-16 alone"
+      "residualRisk": "Medium-High without transport-layer authentication — the e2e::crc32_tc18-based safe-point check MUST be documented as a safety control (random error detection) only, not a security control; deployments exposed to an adversarial network MUST run RCP over the TLS bridge (mutually authenticated) rather than relying on the CRC-32 safe-point check alone"
     },
     {
       "id": "T-RCP-08",
@@ -280,10 +280,10 @@
     },
     {
       "id": "CSG-RCP-02",
-      "description": "rust-RCP shall provide mechanisms to detect replayed or corrupted Command/Response/Status frames, and shall document that cryptographic integrity/authenticity against an active attacker requires running RCP over the mutually authenticated TLS bridge rather than the CRC-16 E2E header alone.",
+      "description": "rust-RCP shall provide a mechanism to detect corrupted safe-point Command/Response/Status frames (the TC18 CRC-32 safe-point check), and shall document that neither it nor rx_enforce_seq's monotonic-sequence check (not yet wired into a live request path) provide replay protection or cryptographic integrity/authenticity against an active attacker — that requires running RCP over the mutually authenticated TLS bridge.",
       "cal": "CAL-3",
       "threats": ["T-RCP-02", "T-RCP-03", "T-RCP-07"],
-      "requirements": ["REQ-E2E-003", "REQ-E2E-004", "REQ-E2E-005", "REQ-TLS-001", "REQ-TLS-002"]
+      "requirements": ["REQ-CRC-004", "REQ-SEQENF-003", "REQ-TLS-001", "REQ-TLS-002"]
     },
     {
       "id": "CSG-RCP-03",
