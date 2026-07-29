@@ -5436,6 +5436,51 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SAFETY-001",
+      "title": "RequestKind's three MSB-tagged safety variants (0x8F/0x8B/0x8E) round-trip and equal 0x80 | their base kind",
+      "text": "RequestKind::SafetyCompound, RequestKind::SafetyCompoundWait, and RequestKind::SafetyTriggered encode to 0x8F, 0x8B, and 0x8E respectively via to_u8, each exactly equal to 0x80 | the corresponding base kind's own to_u8 (RequestKind::Compound, RequestKind::CompoundWait, RequestKind::Triggered), round-trip through from_u8(kind.to_u8()) back to the same kind for all twelve RequestKind values, and from_u8 rejects nearby non-tagged bytes (0x80, 0x8A, 0x8C, 0x8D) with RcpError::InvalidParameter",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SAFETY-002",
+      "title": "RequestKind::is_safety_tagged is true only for the three MSB-tagged variants",
+      "text": "RequestKind::is_safety_tagged() returns true for RequestKind::SafetyCompound, RequestKind::SafetyCompoundWait, and RequestKind::SafetyTriggered, and false for all nine other RequestKind values",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SAFETY-003",
+      "title": "Each safety-tagged variant resolves to the same execution-priority tier and exec-delay-timer selection as its own untagged base kind",
+      "text": "execution_priority_tier(RequestKind::SafetyCompound) equals execution_priority_tier(RequestKind::Compound), execution_priority_tier(RequestKind::SafetyCompoundWait) equals execution_priority_tier(RequestKind::CompoundWait), and execution_priority_tier(RequestKind::SafetyTriggered) equals execution_priority_tier(RequestKind::Triggered); resolve_compound_exec_delay and resolve_trigger_exec_delay likewise resolve each safety-tagged variant identically to its own base kind, and never panic for any RequestKind value including the three new variants",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SAFETY-004",
+      "title": "check_watchdog_overflow_purge exempts safety-tagged requests and purges normal-priority requests only on overflow",
+      "text": "check_watchdog_overflow_purge(kind, watchdog_overflowed) returns Ok(()) when watchdog_overflowed is false for every RequestKind, and when watchdog_overflowed is true and kind.is_safety_tagged() is true; returns Err(RcpError::RequestCanceled) when watchdog_overflowed is true and kind.is_safety_tagged() is false, for every one of the nine normal-priority RequestKind values; never panics for any sampled (kind, watchdog_overflowed) pair",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-SAFETY-005",
+      "title": "purge_normal_priority_on_watchdog_overflow partitions a pending-request slice into kept and purged indices on watchdog overflow",
+      "text": "purge_normal_priority_on_watchdog_overflow(pending, watchdog_overflowed) returns (vec![], vec![]) for an empty pending slice; returns every index in kept and an empty purged when watchdog_overflowed is false; when watchdog_overflowed is true, returns the indices of every safety-tagged entry in kept and every normal-priority entry in purged, in pending's own original relative order, correctly handling an all-safety-tagged slice (nothing purged) and an all-normal-priority slice (everything purged); never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
