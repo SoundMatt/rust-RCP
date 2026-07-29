@@ -29,8 +29,8 @@ Key security controls:
 | Control | Module | Requirement |
 |---|---|---|
 | Mutual TLS | `tlstransport` | REQ-TLS-002 |
-| CRC-16 payload integrity | `e2e` | REQ-E2E-002 |
-| Anti-replay window | `e2e` | REQ-E2E-005 |
+| CRC-32 (TC18 safe-point) payload integrity | `e2e` | REQ-CRC-004 |
+| Monotonic sequence check (not yet dispatch-wired) | `request` | REQ-SEQENF-003 |
 | Command ACL | `authz` | REQ-AUTHZ-005 |
 | Rate limiting | `ratelimit` | REQ-RL-006 |
 | Payload size cap (65491 B) | `wire` | REQ-WIRE-007 |

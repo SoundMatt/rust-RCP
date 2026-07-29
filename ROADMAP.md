@@ -2170,12 +2170,12 @@ package-by-package audit below, now that the core protocol (Milestones 1–8)
 exists to migrate them onto.
 
 - [ ] All **REPLACE**-disposition packages rebuilt against the new core
-      Progress (v0.12.0-dev): 3 of 10 done. `watchdog`/`powerstate` were
+      Progress (v0.12.0-dev): 4 of 10 done. `watchdog`/`powerstate` were
       already REPLACEd ahead of schedule inside Milestones 6/7 (see their
-      own "Done" notes above); `wire` is now done too. `src/wire.rs` — the
-      legacy 16-byte private frame — is deleted outright, its role fully
-      absorbed by the already-built Milestone 1 AVTPDU/ACF stack: `src/
-      avtp.rs` gains two new composition functions,
+      own "Done" notes above); `wire` and now `e2e` are done too. `src/
+      wire.rs` — the legacy 16-byte private frame — is deleted outright,
+      its role fully absorbed by the already-built Milestone 1 AVTPDU/ACF
+      stack: `src/avtp.rs` gains two new composition functions,
       `encode_ntscf_frame`/`decode_ntscf_frame`, wrapping an
       already-encoded ACF_ABB/ACF_GBB payload (`src/acf.rs`) in its NTSCF
       envelope — the "combine one whole on-wire AVTPDU" step every prior
@@ -2190,10 +2190,7 @@ exists to migrate them onto.
       zone lookup; `src/tlstransport.rs`'s `TlsBridge` (ADAPT disposition)
       keeps its TLS-wrapping mechanics and mutual-auth posture unchanged
       per its own scope, with only its encode/decode calls retargeted the
-      same way. This item closes only `wire`'s row — `udp`'s own REPLACE
-      disposition (a real RC-Server-endpoint-level rebuild: register-map-
-      driven dispatch, discovery integration) remains open and is tracked
-      separately. `fuzz/fuzz_targets/fuzz_wire_decode.rs` is repointed at
+      same way. `fuzz/fuzz_targets/fuzz_wire_decode.rs` is repointed at
       `avtp::decode_ntscf_frame` rather than deleted, carrying its
       never-panics discipline forward. `RcpError::BadMagic`/`BadVersion` —
       the two sentinels `wire.rs` alone constructed — are removed from
@@ -2204,9 +2201,56 @@ exists to migrate them onto.
       `REQ-WDG-*`) to describe the new NTSCF frame composition instead of
       the deleted frame; `REQ-UDP-001`..`005` and `REQ-TLS-004` are
       likewise retargeted to `UdpTransport`/`TlsBridge`'s new framing; new
-      `REQ-UDP-006`..`007` cover `resolve_endpoint`. Remaining REPLACE
-      packages: `e2e`, `mock`, `config`, `capi`, `canbr`, `linbr`, and
-      `udp`'s own deeper rebuild.
+      `REQ-UDP-006`..`007` cover `resolve_endpoint`. `udp`'s own REPLACE
+      disposition (a real RC-Server-endpoint-level rebuild: register-map-
+      driven dispatch, discovery integration) remains open and is tracked
+      separately.
+
+      `e2e`'s row is now done too. Milestone 6 had already additively
+      grown the real TC18 safe-point CRC-32 machinery (`crc32_tc18`,
+      `build_crc32_coverage_buffer`, the fragment-train coverage
+      functions) alongside the pre-existing, structurally unrelated legacy
+      surface this row's own disposition-table reason names: a CRC-16 +
+      replay-guard frame (`wrap`/`unwrap`, `ReplayGuard`) wrapped in a
+      `Zone`/`Controller`-keyed decorator (`E2eController`). This item
+      deletes that legacy trio outright — no external caller depended on
+      `E2eController`, `e2e::wrap`, `e2e::unwrap`, or `ReplayGuard` outside
+      `src/e2e.rs` itself, confirmed by inspection before removal, so no
+      other module needed a corresponding change (unlike `wire`'s cutover,
+      which needed `src/udp.rs`/`src/tlstransport.rs` changes too).
+      `RcpError::CrcMismatch`/`RcpError::Replay` — the two sentinels that
+      legacy trio alone constructed — are removed from `src/lib.rs` the
+      same way `BadMagic`/`BadVersion` were removed by the `wire` cutover
+      immediately before it; `crate::request`'s `check_rx_enforce_e2e`
+      already constructed `RcpError::CrcError` instead of `CrcMismatch`
+      (Milestone 6's "`CRC_ERROR` error path" item), so no live caller was
+      affected. `.fusa-reqs.json`'s `REQ-E2E-001`..`008` describe only
+      the deleted CRC-16/replay-guard/`E2eController` behavior with no
+      surviving analog, so — per this item's own "retarget in place, or
+      explicitly retire if no equivalent behavior exists" instruction —
+      they are retired (removed) rather than force-retargeted onto
+      unrelated existing CRC-32 coverage; `REQ-CRC-011`'s text is
+      retargeted to drop its now-invalid "distinct from `RcpError::
+      CrcMismatch`" clause. Cross-references in `.fusa-dfmea.json`
+      (`FM-002`/`FM-003`), `tara.json` (`A-002`, `T-RCP-02`/`03`/`07`,
+      `CSG-RCP-02`), `HARA.md` (`SG-003`/`SG-004`), and
+      `.fusa-iec62443.json` (`T-002`/`T-003`, `SC-002`/`SC-003`) are
+      retargeted the same way the `watchdog` REPLACE item retargeted
+      `FM-005`/`CSG-RCP-04`/`T-RCP-08`: the CRC-32 safe-point mechanism has
+      a real, honest replacement (`REQ-CRC-004` et al.), but the legacy
+      `ReplayGuard` sliding window does not — this crate has no live
+      anti-replay mechanism today. `crate::request::evaluate_rx_enforce_seq`
+      (`REQ-SEQENF-003`, Milestone 6's monotonic `rx_enforce_seq` check) is
+      the closest surviving candidate, but it is additive standalone
+      plumbing, not wired into any decoder or dispatch loop, so every
+      retargeted cross-reference says so explicitly and raises the
+      affected residual-risk ratings accordingly rather than quietly
+      reusing a "low" rating a live mechanism would justify.
+      `fuzz/fuzz_targets/fuzz_e2e_unwrap.rs` is repointed at
+      `e2e::crc32_tc18` rather than deleted, the same way
+      `fuzz_wire_decode.rs` was repointed at `avtp::decode_ntscf_frame`.
+      Remaining REPLACE packages: `mock`, `config`, `capi`, `canbr`,
+      `linbr`, and `udp`'s own deeper rebuild.
 - [ ] All **ADAPT**-disposition packages retargeted to whatever new
       endpoint/RC-Server trait surface replaces `Controller`/`Registry`
 - [ ] All **DEPRECATE**-disposition packages removed, with a migration note

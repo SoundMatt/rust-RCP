@@ -54,7 +54,7 @@ assert_eq!(resp.zone, Zone::FRONT_LEFT);
 |---|---|
 | `mock` | In-process mock controller and registry for testing |
 | `wire` | Binary wire-frame encoder/decoder (RELAY spec §10) |
-| `e2e` | End-to-end protection: CRC-16/CCITT-FALSE + replay guard |
+| `e2e` | End-to-end protection: OPEN Alliance TC18 safe-point CRC-32 |
 | `prioqueue` | Priority-queue controller (Critical > High > Normal) |
 | `ratelimit` | Token-bucket rate limiter |
 | `sim` | Deterministic simulation controller |

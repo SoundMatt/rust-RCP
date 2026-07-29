@@ -15,15 +15,15 @@
       "id": "T-002",
       "category": "tampering",
       "description": "Attacker flips bits in transit to cause erroneous actuation",
-      "countermeasures": ["REQ-E2E-003", "REQ-E2E-007", "REQ-WIRE-004"],
+      "countermeasures": ["REQ-CRC-003", "REQ-CRC-004", "REQ-WIRE-004"],
       "residual_risk": "low"
     },
     {
       "id": "T-003",
       "category": "replay",
       "description": "Attacker replays captured command frames",
-      "countermeasures": ["REQ-E2E-005"],
-      "residual_risk": "low"
+      "countermeasures": ["REQ-SEQENF-003"],
+      "residual_risk": "medium — REQ-SEQENF-003's rx_enforce_seq monotonic-sequence check is additive standalone plumbing (crate::request::evaluate_rx_enforce_seq), not yet wired into a live request-acceptance path, since Milestone 9's e2e REPLACE cutover removed the legacy ReplayGuard sliding-window mechanism with no live replacement built yet"
     },
     {
       "id": "T-004",
@@ -49,8 +49,8 @@
   ],
   "security_controls": [
     { "id": "SC-001", "name": "Mutual TLS", "requirement": "REQ-TLS-002", "sl_provided": "SL-2" },
-    { "id": "SC-002", "name": "CRC-16 integrity", "requirement": "REQ-E2E-002", "sl_provided": "SL-1" },
-    { "id": "SC-003", "name": "Replay guard", "requirement": "REQ-E2E-005", "sl_provided": "SL-2" },
+    { "id": "SC-002", "name": "CRC-32 (TC18 safe-point) integrity", "requirement": "REQ-CRC-004", "sl_provided": "SL-1" },
+    { "id": "SC-003", "name": "Monotonic sequence check (not yet dispatch-wired)", "requirement": "REQ-SEQENF-003", "sl_provided": "SL-1" },
     { "id": "SC-004", "name": "Command ACL", "requirement": "REQ-AUTHZ-005", "sl_provided": "SL-2" },
     { "id": "SC-005", "name": "Rate limiting", "requirement": "REQ-RL-006", "sl_provided": "SL-1" },
     { "id": "SC-006", "name": "Priority preemption", "requirement": "REQ-PQ-004", "sl_provided": "SL-1" },

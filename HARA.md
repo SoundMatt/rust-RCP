@@ -25,8 +25,8 @@ Full machine-readable HARA is in `.fusa-hara.json`.
 |---|---|---|---|---|
 | SG-001 | Correct zone delivery | ASIL-B | 200 | `REQ-ZONE-*`, zone mismatch check |
 | SG-002 | No silent command drop | ASIL-B | 100 | `REQ-CTRL-*`, error propagation |
-| SG-003 | Replay detection | ASIL-B | 500 | `REQ-E2E-005`, `ReplayGuard` |
-| SG-004 | Payload integrity | ASIL-B | 200 | `REQ-E2E-002`, CRC-16/CCITT-FALSE |
+| SG-003 | Replay detection | ASIL-B | 500 | `REQ-SEQENF-003`, `evaluate_rx_enforce_seq` (not yet wired into a live request-acceptance path — see `tara.json` T-RCP-03) |
+| SG-004 | Payload integrity | ASIL-B | 200 | `REQ-CRC-004`, TC18 safe-point CRC-32 (`crc32_tc18`) |
 | SG-005 | Watchdog monitoring | ASIL-B | 3000 | `REQ-WDG-*`, per-stream `StreamWatchdogState`/`evaluate_stream_watchdog` |
 | SG-006 | Auth enforcement | ASIL-B | 0 | `REQ-AUTHZ-*`, `AuthzController` |
 | SG-007 | Atomic power transitions | ASIL-A | 500 | `REQ-PWR-*`/`REQ-PWRSTART-*`/`REQ-WAKE-*`, `try_enter_power_mode`/`try_cold_start`/`try_hot_start` gated by `PowerModeGateInput`, driven at the Wakeup endpoint by `wakeup::request_sleep_via_sleep_cmd`/`wakeup::wake_source_signals_trigger_handshake` |

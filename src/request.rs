@@ -1069,7 +1069,7 @@
 //!   [`crate::e2e::build_crc32_coverage_buffer`] or
 //!   [`crate::e2e::build_crc32_coverage_buffer_for_fragment_train`]) and
 //!   compares against the wire-carried `expected_crc`, returning
-//!   `Err((RcpError::CrcMismatch, scope))` on mismatch with `scope` telling
+//!   `Err((RcpError::CrcError, scope))` on mismatch with `scope` telling
 //!   the caller how far the consequence reaches.
 //! - [`SafeStateMechanism`] / [`resolve_safe_state_mechanism`] /
 //!   [`safe_state_sequencer_gate`] — `rx_safety_measure`,
@@ -1156,13 +1156,15 @@
 //!
 //! `ROADMAP.md`'s checklist bullet names `rx_enforce_seq` only as
 //! "monotonically increasing sequence numbers," without stating which
-//! already-decoded field carries that sequence number. This crate has
-//! several candidates that are not obviously the same thing — [`crate::e2e`]'s
-//! own `seqNum` (a `u32`, but scoped to the CRC-16 replay-guard model
-//! `ROADMAP.md`'s own Satellite Package Disposition table separately
-//! REPLACE-dispositions), and [`crate::acf::ByteMessageInfo::
-//! transaction_num`] (a `u8`, but named for matching a response to its
-//! request, not for detecting gaps/reordering) — and per Guiding Principle
+//! already-decoded field carries that sequence number. At the time this
+//! item was written, this crate had a second, not obviously equivalent
+//! candidate besides the one named below: `crate::e2e`'s own `seqNum` (a
+//! `u32` from the CRC-16 + replay-guard frame `ROADMAP.md`'s own Satellite
+//! Package Disposition table separately REPLACE-dispositioned) — since
+//! removed outright by Milestone 9's `e2e` REPLACE cutover, leaving
+//! [`crate::acf::ByteMessageInfo::transaction_num`] (a `u8`, but named for
+//! matching a response to its request, not for detecting gaps/reordering)
+//! as this crate's only remaining decoded candidate. Per Guiding Principle
 //! 5 this item does not guess which one `rx_enforce_seq` actually means.
 //! [`evaluate_rx_enforce_seq`] instead takes `last_accepted_seq`/
 //! `candidate_seq` as plain caller-supplied `u32` values, wide enough to
@@ -1181,7 +1183,7 @@
 //! already built by "Per-stream safety config" above — is this item's only
 //! touch point: it now constructs [`crate::RcpError::CrcError`] on a CRC32
 //! safe-point mismatch instead of its earlier, explicitly-provisional reuse
-//! of [`crate::RcpError::CrcMismatch`]. See "Provenance note: `CrcError` as
+//! of `RcpError::CrcMismatch`. See "Provenance note: `CrcError` as
 //! a new variant, distinct from the legacy `CrcMismatch` sentinel" directly
 //! below for the full reasoning, and [`crate::e2e::check_fragment_crc_placement`]'s
 //! own doc comment for why that function's unrelated `InvalidParameter`
@@ -1196,18 +1198,18 @@
 //! [`check_rx_enforce_e2e`], landed ahead of this item as part of
 //! "Per-stream safety config" above, already needed some [`crate::RcpError`]
 //! sentinel for a CRC32 safe-point mismatch. Absent an item-specific code at
-//! the time, it reused [`crate::RcpError::CrcMismatch`] — this crate's
+//! the time, it reused `RcpError::CrcMismatch` — this crate's
 //! existing wire/E2E sentinel — and that function's own doc comment flagged
 //! the reuse as provisional, naming this exact checklist bullet as the item
 //! that would revisit it. Per Guiding Principle 5, this item checked whether
 //! a dedicated `CrcError` code should instead collapse onto `CrcMismatch`,
 //! the way several Milestone 2 provisional sentinels collapsed onto
-//! spec-named codes — but `CrcMismatch` is not that kind of placeholder: it
-//! is the real, still-live sentinel for a structurally different mechanism
-//! (a CRC-16 computed over a fixed 16-byte legacy frame by
-//! [`crate::e2e::wrap`]/[`crate::e2e::unwrap`], independent of TC18's
-//! safe-point CRC-32), and folding `CrcError` onto it would make
-//! [`crate::e2e::unwrap`]'s CRC-16 failures and [`check_rx_enforce_e2e`]'s
+//! spec-named codes — but `CrcMismatch` was not that kind of placeholder at
+//! the time: it was the real, then-still-live sentinel for a structurally
+//! different mechanism (a CRC-16 computed over a fixed 16-byte legacy frame
+//! by `crate::e2e::wrap`/`crate::e2e::unwrap`, independent of TC18's
+//! safe-point CRC-32), and folding `CrcError` onto it would have made
+//! `crate::e2e::unwrap`'s CRC-16 failures and [`check_rx_enforce_e2e`]'s
 //! CRC-32 safe-point failures indistinguishable to any caller matching on
 //! the returned [`crate::RcpError`]. This crate reads that as the same
 //! shape of problem Milestone 5 solved by adding
@@ -1215,10 +1217,10 @@
 //! variants rather than folding them onto
 //! [`crate::RcpError::RequestRejected`] — see this module's own "Provenance
 //! note: `CHAIN_ABORTED`/`CHAIN_ERROR` as new variants..." above for that
-//! precedent — so [`crate::RcpError::CrcError`] is added as a new variant,
-//! [`check_rx_enforce_e2e`] is updated to construct it instead of
-//! [`crate::RcpError::CrcMismatch`], and [`crate::RcpError::CrcMismatch`]
-//! itself is left untouched, still returned unchanged by the CRC-16
+//! precedent — so [`crate::RcpError::CrcError`] was added as a new variant,
+//! and [`check_rx_enforce_e2e`] was updated to construct it instead of
+//! `RcpError::CrcMismatch`, with `RcpError::CrcMismatch` itself
+//! left untouched at the time, still returned unchanged by the CRC-16
 //! `wrap`/`unwrap` path. Per the same Guiding Principle 5 discipline this
 //! crate's other provenance notes use: whether TC18's real wire-level
 //! `CRC_ERROR` code also covers failure modes beyond the one
@@ -1230,6 +1232,18 @@
 //! text saying otherwise, is "leave [`crate::e2e::check_fragment_crc_placement`]
 //! returning [`crate::RcpError::InvalidParameter`] as-is," matching that
 //! function's own doc comment note on the same question.
+//!
+//! **Update (`ROADMAP.md` Milestone 9, `e2e` REPLACE cutover):** the CRC-16
+//! `wrap`/`unwrap` frame, `ReplayGuard`, and `E2eController` this note
+//! describes have since been deleted outright from `crate::e2e`, and
+//! `RcpError::CrcMismatch`/`RcpError::Replay` — the sentinels that pair of
+//! mechanisms constructed — were retired along with them (see
+//! [`crate::RcpError`]'s own "Wire / E2E errors" section). None of that
+//! changes this note's reasoning for why `CrcError` was kept a distinct
+//! variant rather than collapsed onto `CrcMismatch`: it records why the two
+//! were distinct sentinels for two structurally different mechanisms at the
+//! time both existed, which remains the accurate history even though only
+//! `CrcError` is still constructible today.
 
 use crate::regmap::SequencerStateEntry;
 use crate::timestamp::AvtpTimestamp;
@@ -2534,12 +2548,14 @@ pub fn e2e_failure_scope(rx_enforce_e2e: bool) -> E2eFailureScope {
 /// [`crate::e2e::build_crc32_coverage_buffer_for_fragment_train`], but
 /// this function does not itself validate that provenance.
 ///
-/// Constructs [`RcpError::CrcError`], not the legacy
-/// [`RcpError::CrcMismatch`] sentinel [`crate::e2e`]'s unrelated CRC-16
-/// `wrap`/`unwrap` path still returns — see this module's doc comment
-/// "Provenance note: `CrcError` as a new variant, distinct from the legacy
-/// `CrcMismatch` sentinel" for why (`ROADMAP.md` Milestone 6, "`CRC_ERROR`
-/// error path").
+/// Constructs [`RcpError::CrcError`] — the dedicated TC18 safe-point
+/// sentinel — rather than the legacy `RcpError::CrcMismatch` an earlier
+/// revision of this function provisionally reused; `CrcMismatch` and the
+/// CRC-16 `wrap`/`unwrap` path it once paired with have both since been
+/// removed by Milestone 9's `e2e` REPLACE cutover. See this module's doc
+/// comment "Provenance note: `CrcError` as a new variant, distinct from the
+/// legacy `CrcMismatch` sentinel" for the full history (`ROADMAP.md`
+/// Milestone 6, "`CRC_ERROR` error path").
 // fusa:req REQ-E2EENF-002
 // fusa:req REQ-CRC-011
 pub fn check_rx_enforce_e2e(
@@ -4803,8 +4819,14 @@ mod tests {
 
     #[test]
     // fusa:test REQ-CRC-011
-    fn crc_error_is_distinct_from_the_legacy_crc_mismatch_sentinel() {
-        assert_ne!(RcpError::CrcError, RcpError::CrcMismatch);
+    fn crc_error_is_distinct_from_other_rcperror_variants() {
+        // The legacy `RcpError::CrcMismatch` sentinel this variant was
+        // originally kept distinct from (see this module's "Provenance
+        // note: CrcError as a new variant..." doc comment) was itself
+        // retired by Milestone 9's `e2e` REPLACE cutover, so this test now
+        // checks CrcError's distinctness against a still-live variant
+        // instead.
+        assert_ne!(RcpError::CrcError, RcpError::ChainError);
         assert_eq!(RcpError::CrcError, RcpError::CrcError);
     }
 
