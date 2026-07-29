@@ -1975,10 +1975,65 @@ types deferred out of Milestone 4.
       register-address/device-type parsing of its own. New
       `REQ-MDIO-001`..`REQ-MDIO-006` added to `.fusa-reqs.json`, each with a
       `// fusa:req`/`// fusa:test` pair in `src/mdio.rs`.
-- [ ] **Wakeup control** (`ep_type 0x01`): fixed `SleepCMD` (`0xA5`) request
+- [x] **Wakeup control** (`ep_type 0x01`): fixed `SleepCMD` (`0xA5`) request
       distinct from the generic request taxonomy; wake-source pin
       monitoring; wired into the Normal/StandBy/Sleep/Unpowered model from
-      Milestone 6
+      Milestone 6. Done (v0.10.0-dev): new `src/wakeup.rs` — this
+      milestone's fifth entry, and additive standalone plumbing only,
+      matching `src/lin.rs`/`src/can.rs`/`src/iseled.rs`/`src/mdio.rs`'s own
+      discipline. Unlike every prior Milestone 7 entry, this one composes
+      with an already-built dependency rather than only `crate::regmap`'s
+      functional-config taxonomy: `powerstate.rs`'s own doc comment names
+      this exact checklist bullet, verbatim, as the item its
+      `WakeUpHandshakeState` machinery exists to unblock but does not
+      itself implement. Adds [`SleepCmdRequest`], a zero-field marker type
+      carrying the fixed `0xA5` discriminant, deliberately not a tenth
+      `request::RequestKind` member — the checklist bullet's own "distinct
+      from the generic request taxonomy" wording read literally as "its own
+      type, not an enum variant"; [`WakeSourcePinMask`] /
+      [`WakeupTriggerConfig`] / [`WakeSourceSignals`] /
+      [`evaluate_wake_source_signals`], wake-source pin monitoring mirroring
+      `gpio::GpioBitmask`/`gpio::GpioTriggerConfig`/
+      `gpio::GpioTriggerSignals`/`gpio::evaluate_gpio_triggers`'s own
+      config-plus-evaluator shape, but a level check against one observed
+      sample rather than GPIO's own three-way changed/rising/falling edge
+      detection — this checklist bullet states no edge-vs-level semantics
+      for wake sources the way Milestone 4's GPIO bullet did, so this entry
+      does not transcribe GPIO's edge model onto an unconfirmed mechanism;
+      and `WakeupFunctionalConfig`, carrying that trigger arming and
+      composing against `regmap::check_functional_config_matches_ep_type`
+      via `layer_tag` exactly as every prior entry's own config type
+      already does, tagged the already-reserved `EndpointType::Wakeup`. The
+      Milestone-6 wiring itself is two composition functions, each
+      delegating to (never duplicating) `powerstate`'s own machinery rather
+      than inventing an endpoint-specific power-mode machine:
+      `request_sleep_via_sleep_cmd` reads a decoded `SleepCmdRequest` as the
+      event that requests a power-down move, composing with
+      `powerstate::try_enter_power_mode`; `wake_source_signals_trigger_handshake`
+      reads a fired `WakeSourceSignals` as the event that begins the
+      hot-start-from-Sleep WakeUp handshake, composing with
+      `powerstate::send_wakeup_request`. Neither function advances the
+      handshake's acknowledgment half — this checklist bullet names
+      wake-source pin monitoring as what begins a wake, not what
+      acknowledges one — leaving that composition, and any real WakeUp
+      message encoder/decoder, to a future transport-level item, per
+      `powerstate.rs`'s own doc comment on the handshake's still-unknown
+      wire encoding. Per Guiding Principle 5, this entry flags four working
+      interpretations rather than silently resolving them: `SleepCmdRequest`
+      carries no ACF/AVTPDU-level framing or byte offset of its own beyond
+      its one discriminant byte; `WakeSourcePinMask` reuses
+      `gpio::GpioBitmask`'s own 4-byte/32-bit width as a consistency choice,
+      not a transcribed wake-source pin count; wake-source pin identity
+      (which bit is which physical pin) stays out of scope, left to
+      `regmap::HwPinMappingEntry`'s existing generic, endpoint-agnostic pin
+      binding; and neither `WakeupTriggerConfig` nor
+      `evaluate_wake_source_signals` commits to push (endpoint reports) or
+      poll (client reads) — the evaluator is a pure function over a
+      caller-supplied observed sample, composing equally well with either
+      future mechanism. New `REQ-WAKE-001`..`REQ-WAKE-008` added to
+      `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair in
+      `src/wakeup.rs`; `HARA.md`'s `SG-007` row updated to name the new
+      composition functions.
 - [ ] **DAC** (`ep_type 0x0A`): explicit decision — **treated as reserved
       and out of scope for this cycle.** The type code and a `DAC_OUT` pin
       signal exist in the register-map enumeration, but no functional-config
