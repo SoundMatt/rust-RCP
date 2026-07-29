@@ -5229,6 +5229,42 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-PRIO-001",
+      "title": "RequestKind gains a ninth Standard variant, with its own crate-local (spec-unconfirmed) 0x00 discriminant, round-tripping through to_u8/from_u8",
+      "text": "RequestKind::Standard models the unconditional request kind ROADMAP.md's execution-priority ordering names as its lowest tier; to_u8()/from_u8() round-trip RequestKind::Standard through the crate-local placeholder discriminant 0x00, which is not a transcription of any confirmed OPEN Alliance TC18 wire value (see src/request.rs's own 'Provenance note: RequestKind::Standard's discriminant'); never panics for any input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-PRIO-002",
+      "title": "resolve_compound_exec_delay and resolve_trigger_exec_delay both widen to stay exhaustive over RequestKind::Standard, returning None",
+      "text": "resolve_compound_exec_delay(RequestKind::Standard, _) and resolve_trigger_exec_delay(RequestKind::Standard, _) both return None, since RequestKind::Standard has no cmp_exec_delay/cmpw_exec_delay/trigger_exec_delay timer of its own, matching the None precedent already set for every other non-owning RequestKind variant; never panics for any input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-PRIO-003",
+      "title": "ExecutionPriorityTier/execution_priority_tier collapse RequestKind's nine values down to the roadmap's seven named priority tiers, in the stated order",
+      "text": "execution_priority_tier(kind) maps every RequestKind value to one of seven ExecutionPriorityTier variants ordered cancellation > triggered > timed > compound > compound-wait > chained > standard, the exact order ROADMAP.md's 'Execution priority ordering' checklist bullet states; RequestKind::ClearAll, RequestKind::ClearNonSafestate, and RequestKind::ClearSingle all collapse onto the single ExecutionPriorityTier::Cancellation tier; ExecutionPriorityTier's derived Ord orders a higher-priority tier as strictly less than every lower-priority tier; never panics for any input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-PRIO-004",
+      "title": "select_next_pending_request selects the highest-priority-tier pending request, breaking same-tier ties by earliest arrival_seq (FIFO)",
+      "text": "select_next_pending_request(pending) returns None for an empty slice, and otherwise returns the index of the PendingRequestKey entry whose execution_priority_tier is highest priority, breaking ties among same-tier entries by the lowest (earliest) arrival_seq -- the checklist's own 'FIFO within a tier' rule; arrival_seq is a caller-supplied, presumed-monotonically-increasing marker rather than a value this crate reads from an owned queue, since no unified pending-request queue type exists yet; never panics for any input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

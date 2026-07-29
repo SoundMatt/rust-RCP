@@ -1370,8 +1370,50 @@ per-endpoint scheduler, since the spec defines that ordering natively.
       or the request-lifecycle state machine (the next checklist bullet).
       New `REQ-SEQ-001`..`REQ-SEQ-004` (in `src/request.rs`) added to
       `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair.
-- [ ] Execution priority ordering: cancellation > triggered > timed >
-      compound > compound-wait > chained > standard, FIFO within a tier
+- [x] Execution priority ordering: cancellation > triggered > timed >
+      compound > compound-wait > chained > standard, FIFO within a tier.
+      Done (v0.8.0-dev): `src/request.rs` gains `RequestKind::Standard`, a
+      ninth variant alongside the eight prior kinds, giving the checklist's
+      own lowest-priority "standard" tier a `RequestKind` of its own, with
+      `to_u8`/`from_u8` extended to match; `ExecutionPriorityTier`, the
+      seven named priority tiers in the checklist's own stated order, and
+      `execution_priority_tier` collapsing all nine `RequestKind` values
+      down to them (the three cancellation variants — `ClearAll`/
+      `ClearNonSafestate`/`ClearSingle` — all collapsing onto one
+      `ExecutionPriorityTier::Cancellation` tier); and `PendingRequestKey`
+      / `select_next_pending_request`, a pure selection function choosing
+      which of a caller-supplied set of pending requests runs next —
+      highest tier first, FIFO (earliest `arrival_seq`) within a tier.
+      `resolve_compound_exec_delay`/`resolve_trigger_exec_delay` both widen
+      to return `None` for `RequestKind::Standard` to stay exhaustive over
+      the now nine-variant `RequestKind` (not yet called from anywhere in
+      this crate, so this is a safe additive-stage widening). Two points
+      flagged per Guiding Principle 5: (1) unlike every other `RequestKind`
+      variant, no checklist text anywhere in this crate's roadmap gives
+      "standard" a numeric discriminant at all; `RequestKind::Standard`'s
+      assigned byte (`0x00`) is a crate-local placeholder chosen only so
+      `#[repr(u8)]`'s `to_u8` cast compiles, not a transcription of any
+      confirmed TC18 wire value — see `src/request.rs`'s own doc comment
+      "Provenance note: `RequestKind::Standard`'s discriminant"; (2) the
+      checklist names no error/rejection behavior for a pending request
+      that never gets a turn (queue overflow, starvation), and does not
+      state whether priority is evaluated per-endpoint or per-stream/
+      server-wide — `select_next_pending_request` takes no position on
+      either, operating purely over whatever caller-supplied slice of
+      pending requests it is given. This is the "Execution priority
+      ordering" checklist bullet the milestone's own Goal text points at as
+      the eventual absorption target for the old `src/prioqueue.rs`
+      decorator's job — `select_next_pending_request` is this item's own
+      from-scratch, spec-native implementation of that job, but
+      `src/prioqueue.rs` itself is still not touched, extended, or migrated
+      onto it; that KEEP/DEPRECATE-style migration is Milestone 9's job
+      (`prioqueue` is DEPRECATE-dispositioned in that milestone's satellite
+      table). Same "additive standalone plumbing only" discipline as every
+      prior Milestone 1-5 entry — not wired into any decoder, dispatch
+      loop, or the request-lifecycle state machine (the next checklist
+      bullet, still not built). New `REQ-PRIO-001`..`REQ-PRIO-004` (in
+      `src/request.rs`) added to `.fusa-reqs.json`, each with a
+      `// fusa:req`/`// fusa:test` pair.
 - [ ] Request lifecycle state machine: pending → started → under-execution
       → finalized, with the type-specific sub-behavior at each transition
       (§3.14)
