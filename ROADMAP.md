@@ -2034,12 +2034,39 @@ types deferred out of Milestone 4.
       `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair in
       `src/wakeup.rs`; `HARA.md`'s `SG-007` row updated to name the new
       composition functions.
-- [ ] **DAC** (`ep_type 0x0A`): explicit decision — **treated as reserved
+- [x] **DAC** (`ep_type 0x0A`): explicit decision — **treated as reserved
       and out of scope for this cycle.** The type code and a `DAC_OUT` pin
       signal exist in the register-map enumeration, but no functional-config
       chapter or request semantics are defined anywhere in the spec. Track
       as a follow-up pending an OPEN Alliance clarification or later spec
-      revision; do not guess at a register layout for it
+      revision; do not guess at a register layout for it. Done
+      (v0.10.0-dev): `EndpointType::Dac` (`src/regmap.rs`, Milestone 2) and
+      `EndpointType::is_reserved` already gave this decision a queryable
+      form; this bullet's own gap was that `is_reserved` was a pure, inert
+      predicate nothing in the crate ever called — `PerEpConfigBlock::new`,
+      `PerEpTypeFunctionalConfig::new`, and
+      `check_functional_config_matches_ep_type` all happily
+      constructed/validated a fully-formed config pair tagged `Dac` exactly
+      as if it were an ordinary, implemented endpoint type. New
+      `regmap::check_ep_type_supported(ep_type)` closes that gap: it
+      returns `Err(RcpError::UnsupportedCmd)` for every reserved
+      `EndpointType` (`Dac` only, today) and `Ok(())` otherwise, reusing
+      this crate's own established idiom for "recognized on the wire but
+      not supported by this crate" — the same convention
+      `gpio::GpioWriteSemantics::Unnamed8th`,
+      `adc::AdcSamplingMode::Continuous`, and `fragment`'s zero-
+      `rx_stream_max_request_size` sentinel already use — rather than
+      inventing a distinct rejection path or a register layout for DAC.
+      Deliberately kept as its own function rather than folded into
+      `check_functional_config_matches_ep_type`: that function's own
+      existing `REQ-RMAP-004` contract already covers a matching `Dac`/`Dac`
+      pair unconditionally, and narrowing it for `Dac` specifically would
+      silently change an existing, already-tested requirement instead of
+      adding a new one. No `src/dac.rs` module was added, and none should
+      be, per this bullet's own "do not guess at a register layout"
+      instruction — this is a non-implementation decision, not a deferred
+      implementation. New `REQ-RMAP-031` added to `.fusa-reqs.json`, with a
+      `// fusa:req`/`// fusa:test` pair in `src/regmap.rs`.
 
 Success Criteria:
 All thirteen defined endpoint types (EP0 + Wakeup + eleven device-facing

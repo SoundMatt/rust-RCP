@@ -165,7 +165,12 @@
 //! register-map enumeration" even though it names the type "reserved and
 //! out of scope for this cycle" — [`EndpointType::is_reserved`] gives that
 //! explicit decision a structural, queryable form rather than leaving
-//! `Dac`'s special status an unremarked comment.
+//! `Dac`'s special status an unremarked comment, and [`check_ep_type_supported`]
+//! (Milestone 7's own closing DAC bullet) goes one step further, giving
+//! `is_reserved` a real structural consequence for the three functions that
+//! would otherwise construct/validate a `Dac`-tagged config indistinguishably
+//! from any implemented endpoint type — see [`EndpointType::Dac`]'s own doc
+//! comment for the full closing narrative.
 //!
 //! [`PerEpConfigBlock`], [`CommonFunctionalConfig`], and
 //! [`PerEpTypeFunctionalConfig`] are this crate's own structural reading of
@@ -434,7 +439,25 @@ pub enum EndpointType {
     Adc = 0x09,
     /// `ep_type 0x0A`. DAC. Reserved and out of scope for the current
     /// replacement cycle per `ROADMAP.md` Milestone 7 — see
-    /// [`EndpointType::is_reserved`].
+    /// [`EndpointType::is_reserved`] and [`check_ep_type_supported`].
+    ///
+    /// Done (v0.10.0-dev): closes `ROADMAP.md` Milestone 7's DAC bullet.
+    /// The type code and a `DAC_OUT` pin signal exist in the register-map
+    /// enumeration this crate's own spec-extraction pass recovered, but no
+    /// functional-config chapter or request semantics for DAC turned up
+    /// anywhere in that pass — an actual gap in what has been specified,
+    /// not a gap in this crate's reading of it. Per Guiding Principle 5,
+    /// this crate records that as an explicit decision rather than
+    /// inventing a plausible-sounding register layout to fill it: `Dac`
+    /// stays enumerated (the code itself is real), [`EndpointType::is_reserved`]
+    /// flags it, and [`check_ep_type_supported`] gives that flag a
+    /// structural consequence — every caller that reaches config
+    /// construction/validation through it is rejected with
+    /// `RcpError::UnsupportedCmd` rather than silently accepted as if DAC
+    /// were an ordinary, implemented endpoint type. Tracked as a follow-up
+    /// pending an OPEN Alliance TC18 clarification or a later spec
+    /// revision; no `src/dac.rs` module exists and none should be added
+    /// until that clarification lands.
     Dac = 0x0A,
     /// `ep_type 0x0B`. CAN controller (`ROADMAP.md` Milestone 7).
     Can = 0x0B,
@@ -486,6 +509,45 @@ impl EndpointType {
     // fusa:req REQ-RMAP-001
     pub fn is_reserved(self) -> bool {
         matches!(self, Self::Dac)
+    }
+}
+
+/// Does this crate support constructing/validating config for `ep_type`?
+///
+/// Returns `Err(RcpError::UnsupportedCmd)` for every [`EndpointType`] with
+/// [`EndpointType::is_reserved`] true — today, [`EndpointType::Dac`] only —
+/// and `Ok(())` otherwise. Never panics for any input.
+///
+/// This is the structural enforcement [`EndpointType::is_reserved`] itself
+/// does not provide on its own: without this function,
+/// [`PerEpConfigBlock::new`], [`PerEpTypeFunctionalConfig::new`], and
+/// [`check_functional_config_matches_ep_type`] all happily construct/accept
+/// a fully-formed config pair tagged [`EndpointType::Dac`], indistinguishable
+/// from any ordinary, implemented endpoint type. `ROADMAP.md`'s own DAC
+/// bullet explicitly forbids inventing a register layout for it, so a
+/// caller that reaches this function with a reserved `ep_type` gets the
+/// same "recognized on the wire but not supported by this crate" rejection
+/// [`crate::gpio::GpioWriteSemantics::Unnamed8th`],
+/// [`crate::adc::AdcSamplingMode::Continuous`], and
+/// [`crate::fragment`]'s zero-`rx_stream_max_request_size` sentinel already
+/// use for the same shape of situation, rather than a distinct, one-off
+/// error path.
+///
+/// Deliberately kept separate from [`check_functional_config_matches_ep_type`]
+/// rather than folded into it: that function's own existing contract
+/// (REQ-RMAP-004 — returns `Ok(())` whenever `generic`/`per_type` carry the
+/// same `EndpointType`, `Err(RcpError::InvalidParameter)` otherwise) already
+/// covers a same-`EndpointType` pair unconditionally, including a matching
+/// pair of `Dac`-tagged layers; changing that function's behavior for `Dac`
+/// would silently narrow an existing, already-tested requirement instead of
+/// adding a new one. Callers that need both checks call this function
+/// alongside [`check_functional_config_matches_ep_type`], not instead of it.
+// fusa:req REQ-RMAP-031
+pub fn check_ep_type_supported(ep_type: EndpointType) -> Result<(), RcpError> {
+    if ep_type.is_reserved() {
+        Err(RcpError::UnsupportedCmd)
+    } else {
+        Ok(())
     }
 }
 
@@ -1635,6 +1697,59 @@ mod tests {
         for ep_type in ALL_ENDPOINT_TYPES {
             assert_eq!(ep_type.is_reserved(), ep_type == EndpointType::Dac);
         }
+    }
+
+    // ── check_ep_type_supported: structural DAC rejection ─────────────────
+
+    #[test]
+    // fusa:test REQ-RMAP-031
+    fn check_ep_type_supported_rejects_only_dac() {
+        for ep_type in ALL_ENDPOINT_TYPES {
+            let result = check_ep_type_supported(ep_type);
+            if ep_type == EndpointType::Dac {
+                assert_eq!(result, Err(RcpError::UnsupportedCmd));
+            } else {
+                assert_eq!(result, Ok(()));
+            }
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-031
+    fn check_ep_type_supported_agrees_with_is_reserved() {
+        for ep_type in ALL_ENDPOINT_TYPES {
+            assert_eq!(
+                check_ep_type_supported(ep_type).is_err(),
+                ep_type.is_reserved()
+            );
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-031
+    fn check_ep_type_supported_never_panics_for_any_ep_type() {
+        for ep_type in ALL_ENDPOINT_TYPES {
+            let _ = check_ep_type_supported(ep_type);
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-RMAP-031
+    fn check_ep_type_supported_does_not_change_functional_config_matching() {
+        // check_ep_type_supported is additive, composed alongside
+        // check_functional_config_matches_ep_type, never folded into it —
+        // a matching Dac/Dac pair still matches per REQ-RMAP-004 even
+        // though check_ep_type_supported separately rejects Dac.
+        let generic = PerEpConfigBlock::new(EndpointType::Dac);
+        let per_type = PerEpTypeFunctionalConfig::new(EndpointType::Dac);
+        assert_eq!(
+            check_functional_config_matches_ep_type(&generic, &per_type),
+            Ok(())
+        );
+        assert_eq!(
+            check_ep_type_supported(generic.ep_type),
+            Err(RcpError::UnsupportedCmd)
+        );
     }
 
     // ── EndpointType: rejection of unrecognized encodings ────────────────
