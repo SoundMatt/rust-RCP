@@ -1528,9 +1528,35 @@ Replace the ad-hoc CRC-16/CCITT-FALSE + replay-guard wrapper (`e2e.rs`) with
 the spec's real safety mechanism, and wire the watchdog and power-state
 concepts into it rather than treating them as unrelated decorators.
 
-- [ ] CRC32 safe-point implementation: poly `0xF4ACFB13`, init/final XOR
+- [x] CRC32 safe-point implementation: poly `0xF4ACFB13`, init/final XOR
       `0xFFFFFFFF`, reflected input and output — a genuinely different
-      algorithm from the current CRC-16, not a width change
+      algorithm from the current CRC-16, not a width change. Done
+      (v0.9.0-dev): `src/e2e.rs` gains `crc32_tc18`, a standalone reflected
+      CRC-32 (poly `0xF4ACFB13`, init/xorout `0xFFFFFFFF`, reflected input
+      and output) implemented as an LSB-first shifting register against the
+      polynomial's bit-reversal, structurally distinct from the file's
+      pre-existing MSB-first non-reflected `crc16_ccitt_false`. Since the
+      four stated parameters fully determine one specific CRC-32 variant
+      and `0xF4ACFB13` is not a named/published variant with an externally
+      citable check value, correctness is established by cross-checking
+      `crc32_tc18` against a second, independently-structured
+      reference implementation of the same definition (reflect-per-byte +
+      unreversed-polynomial MSB-first engine) across the standard
+      `"123456789"` corpus, all-zero/all-`0xFF` boundary inputs, and
+      several other varied inputs, plus never-panics and
+      input-sensitivity coverage — see `src/e2e.rs`'s own provenance note
+      for the reasoning. New `REQ-CRC-001`..`REQ-CRC-003` added to
+      `.fusa-reqs.json` (a fresh prefix, since `REQ-E2E-*` already names
+      the CRC-16 requirements this milestone is superseding), each with a
+      `// fusa:req`/`// fusa:test` pair. Same "additive standalone
+      plumbing only" discipline as every prior milestone entry:
+      `crc32_tc18` is not wired into `wrap`/`unwrap` or any caller yet —
+      determining which bytes of a safe-point frame it covers is this
+      milestone's next ("Coverage rule") checklist bullet, which needs the
+      AVTPDU/ACF framing types this bullet deliberately does not touch.
+      This entry also does not address which requests/streams get
+      CRC-protected in the first place (the later "Per-stream safety
+      config" bullet's job).
 - [ ] Coverage rule: CRC spans `stream_id` + `avtp_timestamp` (zeroed under
       NTSCF) + the full ACF header + payload; length-field pre-adjustment
       (+1 quadlet / +4 octets) before computing it
