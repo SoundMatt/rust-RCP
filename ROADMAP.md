@@ -1757,12 +1757,60 @@ concepts into it rather than treating them as unrelated decorators.
       discipline as every prior milestone entry: `check_rx_enforce_e2e`
       remains standalone, non-decoder-wired plumbing; only the sentinel it
       returns changed.
-- [ ] Real power-mode model backing the safe-state work: Normal / StandBy /
+- [x] Real power-mode model backing the safe-state work: Normal / StandBy /
       Sleep / Unpowered, cold-start vs. hot-start, and the
       hot-start-from-Sleep WakeUp-message handshake (replacing the ad-hoc
       Active/Sleep/Standby model in `powerstate.rs`) — implemented here
       because entry/exit gating shares the same "all endpoints idle, no
-      pending response" conditions as safe-state entry
+      pending response" conditions as safe-state entry.
+      Done (v0.9.0-dev): `src/powerstate.rs` is REPLACEd outright — its old
+      `Zone`/`Controller`/`Command{cmd_type: CommandType::SLEEP/WAKE}`
+      three-state `Active`/`Sleep`/`Standby` decorator is deleted, not
+      adapted — with the spec's real four-mode model: `PowerMode::{Normal,
+      StandBy, Sleep, Unpowered}`. `is_power_mode_transition_defined`
+      names the two ordinary powered-mode pairs (`Normal`<->`StandBy`,
+      `StandBy`<->`Sleep`); `PowerModeGateInput`/
+      `is_power_mode_gate_satisfied` is the shared "all endpoints idle, no
+      pending response" precondition this item is sequenced into this
+      milestone for, and `try_enter_power_mode` composes both into the
+      full ordinary-transition rule. `shutdown_to_unpowered` is the
+      involuntary, ungated move to `Unpowered` (mirroring
+      `RcServerState::try_transition`'s own unconditional demotion path).
+      Cold-start and hot-start are modeled as two distinct paths per
+      `StartupPath`: `try_cold_start` (`Unpowered` -> `Normal`, no
+      handshake) and `try_hot_start` (`Sleep` -> `Normal`, additionally
+      gated by the WakeUp handshake below). The hot-start-from-Sleep
+      WakeUp handshake itself is modeled as a real two-step message
+      exchange rather than a flag flip: `WakeUpHandshakeState::{Idle,
+      RequestSent, Acknowledged}`, advanced by `send_wakeup_request`/
+      `acknowledge_wakeup_request` and read by
+      `is_wakeup_handshake_complete`.
+      `power_mode_gate_from_request_states` composes, rather than
+      re-derives, `crate::request::RequestLifecycleState` — the safe-state
+      entry machinery's own request-progress type from this same
+      milestone's "Per-stream safety config" bullet — reading "every
+      endpoint idle, no response pending" as "every request has reached
+      `RequestLifecycleState::Finalized`."
+      Per Guiding Principle 5, this entry flags four working
+      interpretations rather than silently resolving them: the four
+      modes' relative depth and which pairs are directly reachable from
+      which; `Unpowered`'s own software-model semantics (a value an
+      external supervisor or this same process records, not a state a
+      live process runs "in"); "idle" and "no pending response" as the
+      same underlying `RequestLifecycleState::Finalized` fact; and the
+      WakeUp handshake's own wire encoding, left unspecified pending real
+      transport-level work this item does not attempt. New
+      `REQ-PWR-001`..`008` (replacing, not coexisting alongside, the old
+      `Active`/`Sleep`/`Standby`-era entries) and
+      `REQ-PWRSTART-001`..`003` added to `.fusa-reqs.json`, each with a
+      `// fusa:req`/`// fusa:test` pair; `HARA.md`'s `SG-007` row updated
+      to name the new types. Same "additive standalone plumbing only"
+      discipline as every prior milestone entry: nothing above owns a real
+      power domain, spawns a thread, sends or receives a real WakeUp
+      message over any transport, or is wired into a decoder, CLI, or
+      dispatch loop — this is exactly the dependency Milestone 7's
+      "Wakeup control" endpoint-type bullet needs wired into it, left to
+      that future item.
 
 Success Criteria:
 A stream configured for CRC-secured "safe mode" rejects tampered requests
