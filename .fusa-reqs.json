@@ -2119,7 +2119,7 @@
     {
       "id": "REQ-CFG-005",
       "title": "JSON and YAML parsing",
-      "text": "from_json() and from_yaml() parse RcServerConfig (GeneralRegisters, the five §3.7-§3.11 config-table row lists, and initial_state) from text",
+      "text": "from_json() and from_yaml() parse RcServerConfig (GeneralRegisters, the five \u00a73.7-\u00a73.11 config-table row lists, and initial_state) from text",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -6035,6 +6035,51 @@
       "id": "REQ-MOCKSRV-010",
       "title": "MockEndpoint::read never panics regardless of requested size vs. buffer length",
       "text": "MockEndpoint::read never panics for any read_size value, including one exceeding the held buffer's current length or a request against an empty buffer, returning at most as many bytes as are actually held",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-UDP-008",
+      "title": "UdpRcServer dispatches non-discovery requests through RcServer::handle_abb",
+      "text": "UdpRcServer::serve_one decodes an inbound NTSCF/ACF_ABB datagram, derives the requesting StreamId from the decoded NTSCF header (not a caller-supplied value), and dispatches any non-discovery-shaped request to crate::mock::RcServer::handle_abb under that StreamId, propagating EP0/lifecycle/register-map gating and EndpointTable-routed device-endpoint dispatch (including Err(EpNotFound) for an unregistered device endpoint) unchanged from RcServer's own contract",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-UDP-009",
+      "title": "UdpRcServer answers discovery reads in any lifecycle state, addressed under the server's own identity",
+      "text": "UdpRcServer::serve_one recognizes a discovery::is_discovery_request-shaped request, whether addressed under discovery::DISCOVERY_BROADCAST_STREAM_ID or a real client StreamId, and answers it via discovery::build_discovery_response in every RcServerState, with the response NTSCF frame always addressed under UdpRcServer::local_stream rather than the requester's StreamId",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-UDP-010",
+      "title": "UdpRcServer grants/refreshes and rejects discovery-stream configure attempts per discovery.rs's own claim rules",
+      "text": "UdpRcServer::serve_one recognizes a discovery::is_discovery_configure_request-shaped request, gates it via discovery::check_discovery_access(..., DiscoveryAccessKind::Configure, ...), and on success grants or refreshes the internally-held claim via discovery::try_claim_discovery_stream, storing the result; a configure attempt from a StreamId other than the current live claimant is rejected with Err(RcpError::UnauthorizedAccess) and the existing claim is left unaffected",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-UDP-011",
+      "title": "UdpRcServer rejects a non-discovery request arriving under the broadcast sentinel StreamId",
+      "text": "UdpRcServer::serve_one returns Err(RcpError::InvalidParameter), without ever reaching RcServer::handle_abb, when a decoded request's NTSCF-header StreamId equals discovery::DISCOVERY_BROADCAST_STREAM_ID and the request is neither a discovery::is_discovery_request nor a discovery::is_discovery_configure_request shape",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-DISC-021",
+      "title": "is_discovery_configure_request recognizes the write-direction discovery shape",
+      "text": "is_discovery_configure_request returns true iff msg is a write-direction (op true) ACF_ABB addressed to EP0_BYTE_BUS_ID whose payload's leading DISCOVERY_REGISTER_ADDRESS_LEN bytes decode to DISCOVERY_REGISTER_ADDRESS, is mutually exclusive with is_discovery_request for the same message (differing only in op), ignores trailing payload bytes beyond the register-address prefix, and never panics for any input",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",

@@ -18,6 +18,7 @@
 // fusa:req REQ-DISC-018
 // fusa:req REQ-DISC-019
 // fusa:req REQ-DISC-020
+// fusa:req REQ-DISC-021
 
 //! Discovery request/response, discovery-stream claiming, multi-client
 //! coexistence, and the client-side discovery cache — TC18 register-map
@@ -51,6 +52,19 @@
 //!   how [`build_discovery_response`] takes `state`/`general` as
 //!   caller-supplied values rather than owning them) — nothing here spawns a
 //!   timer thread, holds a lock, or reads the real clock itself.
+//!
+//!   `ROADMAP.md` Milestone 9's `udp` REPLACE row (its still-open "deeper
+//!   rebuild": register-map-driven dispatch, discovery integration) is the
+//!   first item to actually wire this module into a live path:
+//!   [`crate::udp::UdpRcServer`] composes [`is_discovery_request`]/
+//!   [`build_discovery_response`]/[`check_discovery_access`]/
+//!   [`try_claim_discovery_stream`] (and the new
+//!   [`is_discovery_configure_request`] below, added by that same item) into
+//!   its own inbound-datagram dispatch. This module's own functions are
+//!   otherwise unchanged by that wiring — see [`crate::udp`]'s module doc
+//!   comment for the wire-level "configure" encoding [`crate::udp`] had to
+//!   choose, and this function's own doc comment for why it lives here
+//!   rather than in `udp.rs` itself.
 //!
 //! This module composes with, rather than duplicates, three already-landed
 //! Milestone 1/2 pieces:
@@ -278,6 +292,17 @@
 //!   about who currently holds the discovery-stream claim. A caller that
 //!   wants the two coupled composes them explicitly rather than this module
 //!   assuming that coupling on the caller's behalf.
+//! - **Wire encoding for a "configure" attempt.** Added by the `udp`
+//!   REPLACE item that first wires this module into a dispatch loop (see the
+//!   out-of-scope list above): [`is_discovery_configure_request`] reuses
+//!   [`is_discovery_request`]'s exact addressing/register shape, flipping
+//!   only the read/write direction bit — this crate's own chosen encoding,
+//!   not a confirmed spec field, since neither the roadmap nor this crate's
+//!   Milestone 1 framing names one. An alternative this module rejected: a
+//!   dedicated non-zero register address for "configure," which would have
+//!   split discovery's on-wire footprint across two register addresses for
+//!   no roadmap-stated reason, where the read/write bit `ByteMessageInfo`
+//!   already carries needs none.
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -380,6 +405,45 @@ pub fn build_discovery_request(transaction_num: u8) -> AcfAbbMessage {
 pub fn is_discovery_request(msg: &AcfAbbMessage) -> bool {
     route_byte_bus_id(msg.info.byte_bus_id) == RequestRoute::Ep0
         && access_kind(&msg.info) == Ep0AccessKind::Read
+        && decode_register_address(&msg.payload) == Some(DISCOVERY_REGISTER_ADDRESS)
+}
+
+/// Is `msg` this module's chosen wire encoding for a "configure the
+/// discovery stream" access attempt: a write-direction `ACF_ABB` addressed
+/// to [`EP0_BYTE_BUS_ID`], whose payload's leading
+/// [`DISCOVERY_REGISTER_ADDRESS_LEN`] bytes decode to
+/// [`DISCOVERY_REGISTER_ADDRESS`] — the same shape [`is_discovery_request`]
+/// recognizes, but write- rather than read-direction.
+///
+/// Added by `ROADMAP.md` Milestone 9's `udp` REPLACE item (the "deeper
+/// rebuild" the roadmap's own Progress note names: register-map-driven
+/// dispatch, discovery integration) — the first item to wire this module
+/// into an actual decoder/dispatch loop, per this module's own out-of-scope
+/// list above. Per Guiding Principle 5, this is flagged as a working
+/// interpretation, not a transcription of confirmed spec behavior: neither
+/// `ROADMAP.md`'s checklist wording nor this crate's Milestone 1 framing
+/// names a distinct field, register, or opcode for "configuring the
+/// discovery stream" (see [`DiscoveryAccessKind`]'s own doc comment, which
+/// already flagged deferring this exact choice). Reusing
+/// [`is_discovery_request`]'s own read/write-direction symmetry —
+/// [`crate::ep0::Ep0AccessKind`]'s existing convention for every other EP0
+/// register — needs no new wire field and keeps the discovery request/
+/// response/configure trio addressed at the one register
+/// ([`DISCOVERY_REGISTER_ADDRESS`]) the roadmap already names, rather than
+/// inventing a second one. Lives here, next to [`is_discovery_request`],
+/// rather than in `crate::udp` (its only caller today): recognizing this
+/// wire shape is a discovery-module-level concept — should some other
+/// transport ever also need to recognize it, duplicating this function
+/// there would violate the same "reuse, don't duplicate" discipline this
+/// module's own doc comment already applies to [`crate::acf`]/[`crate::ep0`]
+/// composition.
+///
+/// Trailing payload bytes beyond the register-address prefix, if any, are
+/// ignored, mirroring [`is_discovery_request`]. Never panics for any input.
+// fusa:req REQ-DISC-021
+pub fn is_discovery_configure_request(msg: &AcfAbbMessage) -> bool {
+    route_byte_bus_id(msg.info.byte_bus_id) == RequestRoute::Ep0
+        && access_kind(&msg.info) == Ep0AccessKind::Write
         && decode_register_address(&msg.payload) == Some(DISCOVERY_REGISTER_ADDRESS)
 }
 
@@ -912,6 +976,64 @@ mod tests {
         let mut request = build_discovery_request(0);
         request.payload.extend_from_slice(&[0xAA, 0xBB, 0xCC]);
         assert!(is_discovery_request(&request));
+    }
+
+    // ── is_discovery_configure_request ──────────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-DISC-021
+    fn is_discovery_configure_request_recognizes_the_write_direction_shape() {
+        let mut request = build_discovery_request(0);
+        request.info.op = true;
+        assert!(is_discovery_configure_request(&request));
+        // The read-direction shape it was built from is not itself a
+        // configure attempt.
+        assert!(!is_discovery_configure_request(&build_discovery_request(0)));
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-021
+    fn is_discovery_configure_request_and_is_discovery_request_are_mutually_exclusive() {
+        for op in [false, true] {
+            let mut request = build_discovery_request(0);
+            request.info.op = op;
+            assert_ne!(
+                is_discovery_request(&request),
+                is_discovery_configure_request(&request)
+            );
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-021
+    fn is_discovery_configure_request_rejects_non_matching_shapes() {
+        let mut request = build_discovery_request(0);
+        request.info.op = true;
+
+        // Wrong byte_bus_id.
+        let mut wrong_bus = request.clone();
+        wrong_bus.info.byte_bus_id = 1;
+        assert!(!is_discovery_configure_request(&wrong_bus));
+
+        // Wrong register address.
+        let mut wrong_addr = request.clone();
+        wrong_addr.payload = 7u16.to_be_bytes().to_vec();
+        assert!(!is_discovery_configure_request(&wrong_addr));
+
+        // Short payload.
+        request.payload = vec![0x00];
+        assert!(!is_discovery_configure_request(&request));
+        request.payload = vec![];
+        assert!(!is_discovery_configure_request(&request));
+    }
+
+    #[test]
+    // fusa:test REQ-DISC-021
+    fn is_discovery_configure_request_ignores_trailing_payload_bytes() {
+        let mut request = build_discovery_request(0);
+        request.info.op = true;
+        request.payload.extend_from_slice(&[0xAA, 0xBB, 0xCC]);
+        assert!(is_discovery_configure_request(&request));
     }
 
     // ── Discovery response: answerable in any lifecycle state ─────────────

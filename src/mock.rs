@@ -1031,9 +1031,16 @@ use crate::regmap::{EndpointType, GeneralRegisters};
 /// completed without wiring `crate::can` onto this trait either, for the
 /// same reason — that rebuild's scope was the legacy `CanBridge`/
 /// `CanSocket` cutover itself, not new dispatch plumbing; `linbr`'s own
-/// REPLACE rebuild has since completed the same way, leaving `udp`'s own
-/// still-open deeper rebuild as the most likely next caller, per
-/// `ROADMAP.md`'s own Progress note for this bullet. [`MockEndpoint`] is
+/// REPLACE rebuild has since completed the same way. `udp`'s own
+/// still-open deeper rebuild, anticipated here as "the most likely next
+/// caller," has *also* since completed: [`crate::udp::UdpRcServer`] composes
+/// [`RcServer`] directly (see that type's own doc comment for the
+/// "test double called from non-test code" judgment call this crate made
+/// rather than duplicating `handle_abb`'s dispatch logic) — but it still
+/// dispatches through this same [`Endpoint`] trait rather than wiring any
+/// concrete endpoint type onto it, so the gap this paragraph describes
+/// remains open for whichever later item first needs one.
+/// [`MockEndpoint`] is
 /// this item's only implementation, standing
 /// in for a concrete endpoint the same way [`crate::addressing::EndpointId`]
 /// itself stands in for one.
