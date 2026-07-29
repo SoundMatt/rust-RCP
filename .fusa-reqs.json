@@ -5796,6 +5796,96 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ISELED-001",
+      "title": "The NIBBLE_TO_5B 4b/5b data code-group table has 16 distinct, 5-bit-wide entries",
+      "text": "iseled::NIBBLE_TO_5B contains 16 entries, one per 4-bit nibble value, each fitting in 5 bits with no duplicate code group across the table",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ISELED-002",
+      "title": "encode_4b5b/decode_4b5b round-trip any byte sequence, decode_4b5b rejects odd-length or invalid-code-group input, and never panics",
+      "text": "iseled::encode_4b5b/iseled::decode_4b5b round-trip any byte slice including empty input through NIBBLE_TO_5B's data code groups; decode_4b5b returns Err(RcpError::ShortFrame) for odd-length input, Err(RcpError::InvalidParameter) for any byte not among NIBBLE_TO_5B's 16 valid code groups, and never panics for any input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ISELED-003",
+      "title": "IseledFrame's chain_address/command/data fields round-trip through encode with no length ceiling on data",
+      "text": "IseledFrame::encode serializes chain_address, command, and data unmodified in that order, and IseledFrame accepts data of any length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ISELED-004",
+      "title": "IseledFrame::decode round-trips encode's output, rejects input shorter than 2 bytes, and never panics",
+      "text": "IseledFrame::decode(IseledFrame::encode(frame)) reproduces the original frame for any chain_address/command/data combination; IseledFrame::decode returns Err(RcpError::ShortFrame) for input shorter than 2 bytes and never panics for any input length",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ISELED-005",
+      "title": "IseledFrame::encode_line/decode_line compose IseledFrame::encode/decode with encode_4b5b/decode_4b5b and propagate the latter's errors",
+      "text": "IseledFrame::decode_line(frame.encode_line()) reproduces the original frame, and IseledFrame::decode_line propagates Err(RcpError::ShortFrame)/Err(RcpError::InvalidParameter) from decode_4b5b unchanged for malformed line-coded input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ISELED-006",
+      "title": "iseled_frame_crc8 is a deterministic function of an IseledFrame's own bytes, computed independently of crate::e2e::crc32_tc18",
+      "text": "iseled_frame_crc8 returns the same IseledFrameCrc value for the same IseledFrame content and a different value when frame content differs, and this crate's native ISELED CRC computation shares no code path with crate::e2e::crc32_tc18's own RCP-level safe-point CRC-32",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ISELED-007",
+      "title": "IseledDeviceResponse carries one daisy-chain device's chain_address and its own response data bytes",
+      "text": "IseledDeviceResponse's chain_address and data fields are preserved unmodified when constructed and compared",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ISELED-008",
+      "title": "iseled_collect_resp preserves caller-supplied per-device structure and order, yields an empty result for empty input, and never panics",
+      "text": "iseled_collect_resp(per_device) produces an IseledCollectedResponse whose contents equal per_device in the same order, with no reordering, deduplication, or flattening of distinct devices' responses; an empty per_device slice yields an empty IseledCollectedResponse, and the function never panics for any input, mirroring crate::can::CanXlCombinedPayload::assemble's own caller-supplied-ordering discipline",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ISELED-009",
+      "title": "IseledFunctionalConfig's native_crc_enabled field models the native ISELED CRC's optional, additive-only presence",
+      "text": "IseledFunctionalConfig::native_crc_enabled defaults to false and can be independently set to true without altering whether crate::e2e::crc32_tc18's RCP-level safe-point CRC applies",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-ISELED-010",
+      "title": "IseledFunctionalConfig's layer tag matches crate::regmap's EndpointType::Iseled cross-layer rule",
+      "text": "IseledFunctionalConfig::layer_tag produces a crate::regmap::PerEpTypeFunctionalConfig tagged EndpointType::Iseled that satisfies crate::regmap::check_functional_config_matches_ep_type against a generic PerEpConfigBlock of the same ep_type, and is rejected by functional_config_matches_ep_type against a mismatched ep_type",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

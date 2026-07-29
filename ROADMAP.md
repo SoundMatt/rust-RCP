@@ -1900,10 +1900,42 @@ types deferred out of Milestone 4.
       remains Milestone 9's job. New `REQ-CAN-001`..`REQ-CAN-011` added to
       `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair in
       `src/can.rs`.
-- [ ] **ISELED** (`ep_type 0x0C`): native 4b/5b-encoded daisy-chain framing;
+- [x] **ISELED** (`ep_type 0x0C`): native 4b/5b-encoded daisy-chain framing;
       optional native ISELED CRC, distinct from and additional to the
       RCP-level CRC32; multi-device response aggregation
-      (`iseled_collect_resp`)
+      (`iseled_collect_resp`). Done (v0.10.0-dev): new `src/iseled.rs` —
+      this milestone's third entry, and additive standalone plumbing only,
+      matching `src/lin.rs`/`src/can.rs`'s own discipline. Unlike LIN and
+      CAN, ISELED has no old-protocol satellite bridge module in this crate
+      (no `iseledbr.rs`) to validate against or migrate away from, so every
+      piece here is new modeling rather than a read-and-reject exercise.
+      Adds [`encode_4b5b`]/[`decode_4b5b`], using the public FDDI/TP-PMD and
+      100BASE-TX 4b/5b data code-group table (unrelated to and predating any
+      OPEN Alliance TC18 or ISELED-specific content) at a flagged
+      symbol-per-byte granularity, since this crate has no bit-serial
+      transmission path and no stated software-layer representation to
+      match; [`IseledFrame`], carrying a client-supplied `chain_address`,
+      `command`, and unbounded `data` — this crate's own flagged working
+      interpretation of an unstated frame layout, mirroring
+      `lin::LinFrameTransfer`'s own precedent — plus `encode_line`/
+      `decode_line` composing that frame shape with the 4b/5b codec for the
+      native line-coded form; `iseled_frame_crc8`/`IseledFrameCrc`, a
+      flagged CRC-8/AUTOSAR placeholder kept fully independent of
+      `e2e::crc32_tc18` (different width, different input, no shared code
+      path) pending recovery of ISELED's own confirmed CRC parameters; and
+      `iseled_collect_resp`/`IseledDeviceResponse`/`IseledCollectedResponse`
+      — named to match this checklist bullet's own identifier — which
+      aggregates each daisy-chain device's own response from a
+      caller-supplied, already chain-ordered slice, mirroring
+      `can::CanXlCombinedPayload::assemble`'s ordering discipline while
+      preserving each device's own identity rather than flattening every
+      device's bytes together. `IseledFunctionalConfig` carries one
+      `native_crc_enabled` field (the "optional" part of this bullet) and
+      composes against `regmap::check_functional_config_matches_ep_type`
+      via `layer_tag`, exactly as every prior entry's own config type
+      already does, tagged the already-reserved `EndpointType::Iseled`.
+      New `REQ-ISELED-001`..`REQ-ISELED-010` added to `.fusa-reqs.json`,
+      each with a `// fusa:req`/`// fusa:test` pair in `src/iseled.rs`.
 - [ ] **MDIO** (`ep_type 0x0D`): Clause-22/45 addressing modes
       (`mdio_mode` 2-bit selector); minimal functional config (no
       clock-divider or mode-select fields beyond the universal common
