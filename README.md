@@ -55,7 +55,6 @@ assert_eq!(resp.zone, Zone::FRONT_LEFT);
 | `mock` | In-process mock controller and registry for testing |
 | `wire` | Binary wire-frame encoder/decoder (RELAY spec §10) |
 | `e2e` | End-to-end protection: OPEN Alliance TC18 safe-point CRC-32 |
-| `prioqueue` | Priority-queue controller (Critical > High > Normal) |
 | `ratelimit` | Token-bucket rate limiter (`RateLimitEndpoint`, over `mock::Endpoint`) |
 | `sim` | Deterministic simulation endpoint (`SimEndpoint`) |
 | `watchdog` | Periodic WATCHDOG command dispatcher |
@@ -63,13 +62,10 @@ assert_eq!(resp.zone, Zone::FRONT_LEFT);
 | `powerstate` | SLEEP/WAKE power state machine |
 | `faultinject` | Deterministic fault injection for testing (`FaultInjectEndpoint`) |
 | `loan` | Zero-copy payload pool (`LoanPoolEndpoint`) |
-| `zonegroup` | Broadcast commands to multiple zones in parallel |
 | `proxy` | Hot-swappable proxy endpoint (`ProxyEndpoint`) |
 | `redundancy` | 1-of-2 hot-standby failover endpoint (`RedundancyEndpoint`) |
 | `observe` | Latency histogram and event hooks (`ObserveEndpoint`) |
-| `tsn` | IEEE 802.1Qav traffic-class tagging |
 | `authz` | (endpoint-type, request-type) ACL policy enforcement (`AuthzEndpoint`) |
-| `firmware` | Chunked firmware update sequencer |
 | `record` | Read/write call audit logger (`RecordEndpoint`) |
 | `federation` | Multi-vehicle routing over each peer's own `DiscoveryCache` |
 | `dyndata` | Runtime key/value parameter store |
@@ -79,17 +75,10 @@ assert_eq!(resp.zone, Zone::FRONT_LEFT);
 | `certgap` | Certification gap analysis |
 | `formal` | Runtime-checkable formal invariants |
 | `admin` | Discovered-peer health/staleness reporting and graceful shutdown (`AdminServer`, over `discovery::DiscoveryCache`) |
-| `someip` | SOME/IP bridge |
-| `mqttbr` | MQTT bridge |
-| `ddsbr` | DDS / AUTOSAR Adaptive bridge |
 | `udp` | UDP unicast transport (`UdpTransport`, client) + RC-Server-endpoint dispatch with discovery integration (`UdpRcServer`, server) |
 | `shmem` | Shared-memory IPC bridge, `StreamId`-addressed (`ShmBridge`) |
 | `mdns` | mDNS/DNS-SD pre-discovery rendezvous helper |
 | `tlstransport` | TLS 1.2+ secured transport |
-| `grpcbridge` | gRPC stub bridge |
-| `restbridge` | REST/HTTP bridge |
-| `udsbr` | UDS (ISO 14229) bridge |
-| `doipbr` | DoIP (ISO 13400-2) bridge |
 | `capi` | C FFI types and error codes |
 | `adapt` | External message format adapter over `mock::Endpoint` (`AdaptEndpoint`), and the still-`Controller`-bound RELAY `Adapt()`/`to_message()`/`from_message()` entry point (§10.3, §15.7.5), pending its own Milestone 10 endpoint-addressed rebuild |
 | `relay` | Vendored RELAY protocol types — `Message`, `Node`, `Caller`, error sentinels (§18.3) |

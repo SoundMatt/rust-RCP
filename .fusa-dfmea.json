@@ -45,10 +45,11 @@
       "failure_mode": "CRITICAL command starved behind NORMAL backlog",
       "effect": "Safety-critical command delayed in emergency scenario",
       "severity": "S3",
-      "cause": "Priority inversion in queue implementation",
-      "detection": "PrioController dispatches Critical queue first (REQ-PQ-004)",
-      "mitigation": "Separate CRITICAL/HIGH/NORMAL queues with CRITICAL-first dispatch",
-      "residual_risk": "low"
+      "cause": "Priority inversion in request scheduling",
+      "detection": "None currently live; execution_priority_tier/select_next_pending_request (REQ-PRIO-004) exist as caller-invocable, standalone plumbing but are not called from any decoder or dispatch loop",
+      "mitigation": "REQ-PRIO-004 execution-priority-tier ordering (cancellation > triggered > timed > compound > compound-wait > chained > standard), once wired into a live request path",
+      "residual_risk": "medium",
+      "note": "Milestone 9's DEPRECATE-disposition removal (ROADMAP.md Satellite Package Disposition) deleted prioqueue::PrioController outright, the separate CRITICAL/HIGH/NORMAL queue this failure mode originally described; request::execution_priority_tier/select_next_pending_request (REQ-PRIO-004, built ahead of schedule in Milestone 5) is the closest surviving analog, but is not yet wired into any dispatch loop, so residual_risk is raised from its prior 'low' rating to reflect that honestly, mirroring FM-003's own treatment of the e2e REPLACE cutover"
     },
     {
       "id": "FM-005",
@@ -101,9 +102,10 @@
       "effect": "Member controllers reject command with ZoneMismatch",
       "severity": "S2",
       "cause": "cmd.zone not rewritten to member zone before dispatch",
-      "detection": "ZoneGroup::send() rewrites cmd.zone = m.zone() per member",
-      "mitigation": "REQ-ZG-003 per-member zone rewrite before dispatch",
-      "residual_risk": "low"
+      "detection": "None — the function no longer exists",
+      "mitigation": "None — no analog exists in the endpoint-addressed model",
+      "residual_risk": "not applicable",
+      "note": "Milestone 9's DEPRECATE-disposition removal (ROADMAP.md Satellite Package Disposition) deleted zonegroup::ZoneGroup outright, per the disposition table's own reason: multi-endpoint fan-out has no direct equivalent once Zone disappears, and is not modeled anywhere in the new endpoint-addressed core. This failure mode cannot presently occur, since no group-broadcast capability exists for cmd.zone to be mis-rewritten within; retained here for audit-trail continuity rather than deleted outright, per this crate's 'never renumber or reuse' FM-ID discipline"
     },
     {
       "id": "FM-010",

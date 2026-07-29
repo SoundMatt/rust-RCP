@@ -34,7 +34,7 @@ Key security controls:
 | Endpoint ACL ((ep_type, request-type) allowlist) | `authz` | REQ-AUTHZ-005 |
 | Rate limiting | `ratelimit` | REQ-RL-006 |
 | Payload size cap (65491 B) | `wire` | REQ-WIRE-007 |
-| Priority preemption (`prioqueue` only — `ratelimit` no longer exempts Critical priority, see `.fusa-iec62443.json` T-004) | `prioqueue` | REQ-PQ-004 |
+| Execution-priority ordering (not yet dispatch-wired; `prioqueue` removed by Milestone 9's DEPRECATE disposition — `ratelimit` no longer exempts Critical priority either, see `.fusa-iec62443.json` T-004) | `request` | REQ-PRIO-004 |
 
 ## Memory Safety
 

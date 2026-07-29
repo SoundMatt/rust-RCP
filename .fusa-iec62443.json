@@ -29,8 +29,8 @@
       "id": "T-004",
       "category": "denial-of-service",
       "description": "Attacker floods RCP with low-priority commands to delay critical ones",
-      "countermeasures": ["REQ-RL-006", "REQ-PQ-004"],
-      "residual_risk": "medium — ratelimit::RateLimitEndpoint's own token bucket (REQ-RL-006) now applies uniformly to every read/write call with no Critical-priority exemption (Milestone 9's ADAPT retarget retired the old REQ-RL-007 carve-out, since Endpoint requests carry no Priority field at all); DoS-vs-critical-priority mitigation now depends entirely on prioqueue::PrioController's dispatch ordering (REQ-PQ-004), a DEPRECATE-disposition package itself slated for removal by this same milestone's next checklist bullet, with no priority-aware replacement decided yet"
+      "countermeasures": ["REQ-RL-006", "REQ-PRIO-004"],
+      "residual_risk": "high — ratelimit::RateLimitEndpoint's own token bucket (REQ-RL-006) applies uniformly to every read/write call with no Critical-priority exemption (Milestone 9's ADAPT retarget retired the old REQ-RL-007 carve-out, since Endpoint requests carry no Priority field at all); prioqueue::PrioController (REQ-PQ-004) was deleted outright by Milestone 9's DEPRECATE-disposition removal (ROADMAP.md Satellite Package Disposition), so DoS-vs-critical-priority mitigation no longer has a live decorator to depend on at all. request::execution_priority_tier/select_next_pending_request (REQ-PRIO-004) is the closest surviving analog — built ahead of schedule in Milestone 5 — but, like REQ-CAN-005 in T-005 below, it remains additive standalone plumbing not wired into any decoder or dispatch loop, so no priority-aware DoS mitigation is presently enforced end-to-end"
     },
     {
       "id": "T-005",
@@ -53,7 +53,7 @@
     { "id": "SC-003", "name": "Monotonic sequence check (not yet dispatch-wired)", "requirement": "REQ-SEQENF-003", "sl_provided": "SL-1" },
     { "id": "SC-004", "name": "Command ACL", "requirement": "REQ-AUTHZ-005", "sl_provided": "SL-2" },
     { "id": "SC-005", "name": "Rate limiting", "requirement": "REQ-RL-006", "sl_provided": "SL-1" },
-    { "id": "SC-006", "name": "Priority preemption", "requirement": "REQ-PQ-004", "sl_provided": "SL-1" },
+    { "id": "SC-006", "name": "Execution-priority ordering (not yet dispatch-wired; prioqueue removed by Milestone 9's DEPRECATE disposition)", "requirement": "REQ-PRIO-004", "sl_provided": "SL-1" },
     { "id": "SC-007", "name": "Payload size cap", "requirement": "REQ-WIRE-007", "sl_provided": "SL-2" }
   ]
 }
