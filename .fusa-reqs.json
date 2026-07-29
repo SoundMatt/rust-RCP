@@ -5265,6 +5265,60 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RLC-001",
+      "title": "RequestLifecycleState and is_request_lifecycle_transition_defined model the four-state pending/started/under-execution/finalized lifecycle and its three linear forward hops only",
+      "text": "RequestLifecycleState has exactly four variants (Pending, Started, UnderExecution, Finalized) in that order, carrying no numeric encoding; is_request_lifecycle_transition_defined(from, to) is true only for (Pending, Started), (Started, UnderExecution), and (UnderExecution, Finalized), and false for every other (from, to) pair among the four states, including identity, backward, and skip transitions; never panics for any input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RLC-002",
+      "title": "RequestLifecycleState::try_transition rejects every undefined transition shape before consulting any type-specific guard",
+      "text": "RequestLifecycleState::try_transition(self, target, input) returns Err(RcpError::RequestRejected) for any (self, target) pair is_request_lifecycle_transition_defined does not name, regardless of input; for a defined pair it delegates to the type-specific guard and returns Ok(target) on success or that guard's own Err otherwise; self-consuming (takes self by value, does not mutate anything in place); never panics for any sampled state pair or RequestLifecycleGuardInput value",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RLC-003",
+      "title": "The Pending -> Started hop composes check_compound_gate for Compound/CompoundWait and is_timed_request_ready for Timed, and passes unconditionally for every other RequestKind",
+      "text": "RequestLifecycleState::Pending.try_transition(RequestLifecycleState::Started, input) composes check_compound_gate for RequestLifecycleGuardInput::Compound/CompoundWait (propagating Err(RcpError::SequencerNotKnown) for an out-of-bounds sequencer or Err(RcpError::RequestRejected) for a known-but-unsatisfied gate), composes is_timed_request_ready for RequestLifecycleGuardInput::Timed (Err(RcpError::RequestRejected) when not yet ready, Ok(Started) once ready), and returns Ok(Started) unconditionally for Standard/Chained/ClearAll/ClearNonSafestate/ClearSingle/Triggered inputs; never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RLC-004",
+      "title": "The Started -> UnderExecution hop composes check_chain_continuation for Chained and the trigger repeat-exhaustion check for Triggered, and passes unconditionally for every other RequestKind",
+      "text": "RequestLifecycleState::Started.try_transition(RequestLifecycleState::UnderExecution, input) composes check_chain_continuation for RequestLifecycleGuardInput::Chained (propagating Err(RcpError::ChainAborted) when cs is set and the predecessor errored, Ok(UnderExecution) otherwise), composes should_count_trigger_occurrence together with is_trigger_repeat_exhausted for RequestLifecycleGuardInput::Triggered (Err(RcpError::RequestRejected) once the configured repeat count is exhausted, Ok(UnderExecution) otherwise, and never exhausting for TriggerRepeatCount::Infinite), and returns Ok(UnderExecution) unconditionally for Standard/ClearAll/ClearNonSafestate/ClearSingle/Timed/Compound/CompoundWait inputs; never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RLC-005",
+      "title": "The UnderExecution -> Finalized hop is unconditional for every RequestKind",
+      "text": "RequestLifecycleState::UnderExecution.try_transition(RequestLifecycleState::Finalized, input) returns Ok(RequestLifecycleState::Finalized) for every RequestLifecycleGuardInput variant sampled across all nine RequestKind values, since no checklist-named rule gates completion separately from the eligibility/continuation gates already applied at the two earlier hops; never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RLC-006",
+      "title": "try_force_cancel_all/try_force_cancel_non_safestate/try_force_cancel_single force a target request straight to Finalized per the cancellation trio's own check_clear_*_cancellation rule, idempotently",
+      "text": "try_force_cancel_all(current) always sets *current to RequestLifecycleState::Finalized and returns Err(RcpError::RequestCanceled) unless *current is already Finalized, in which case it is left unchanged and Ok(()) is returned; try_force_cancel_non_safestate(current, is_safestate_related) and try_force_cancel_single(current, candidate_transaction_num, target) apply the same Finalized-forcing/idempotent shape, delegating to check_clear_non_safestate_cancellation and check_clear_single_cancellation respectively to decide whether *current is force-canceled; never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

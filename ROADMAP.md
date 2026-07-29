@@ -1414,9 +1414,55 @@ per-endpoint scheduler, since the spec defines that ordering natively.
       bullet, still not built). New `REQ-PRIO-001`..`REQ-PRIO-004` (in
       `src/request.rs`) added to `.fusa-reqs.json`, each with a
       `// fusa:req`/`// fusa:test` pair.
-- [ ] Request lifecycle state machine: pending → started → under-execution
+- [x] Request lifecycle state machine: pending → started → under-execution
       → finalized, with the type-specific sub-behavior at each transition
-      (§3.14)
+      (§3.14). Done (v0.8.0-dev): `src/request.rs` gains
+      `RequestLifecycleState` (`Pending`/`Started`/`UnderExecution`/
+      `Finalized`, in that order, carrying no numeric encoding — see
+      "Provenance note: `RequestLifecycleState` carries no numeric
+      encoding") and `is_request_lifecycle_transition_defined`, the
+      coarse state-shape check admitting only the three linear forward
+      hops (no skip/backward/identity transition), mirroring
+      `crate::lifecycle::is_transition_defined`'s own discipline;
+      `RequestLifecycleState::try_transition`, a self-consuming,
+      never-panicking `Result<RequestLifecycleState, RcpError>` method
+      mirroring `crate::lifecycle::RcServerState::try_transition`'s own
+      coarse-check-then-guard shape; and `RequestLifecycleGuardInput`, one
+      variant per `RequestKind`, giving `try_transition` the "type-specific
+      sub-behavior at each transition" this checklist bullet names by
+      dispatching each kind onto the already-built per-kind check that hop
+      composes: `check_compound_gate` for Compound/CompoundWait and
+      `is_timed_request_ready` for Timed gate `Pending` → `Started`;
+      `check_chain_continuation` for Chained and
+      `should_count_trigger_occurrence`/`is_trigger_repeat_exhausted` for
+      Triggered gate `Started` → `UnderExecution`; `UnderExecution` →
+      `Finalized` is unconditional for every kind. The cancellation trio's
+      own type-specific behavior is separate:
+      `try_force_cancel_all`/`try_force_cancel_non_safestate`/
+      `try_force_cancel_single`, each composing the matching
+      `check_clear_*_cancellation` function to force a *target* request
+      straight to `Finalized` (idempotently, once already `Finalized`)
+      rather than gating that target's own linear progression — the
+      "short-circuit straight to a rejected/aborted outcome" the
+      cancellation trio's own role as *acting on another pending request*
+      implies, distinct from every other `RequestKind`'s role of gating
+      its own progression. Per Guiding Principle 5, two points are flagged
+      in `src/request.rs`'s own "Provenance note: which existing check
+      applies at which lifecycle hop": (1) since §3.14 is cited by section
+      number only, exactly which per-kind rule gates which of the three
+      hops is this item's own working interpretation, not a transcription
+      of confirmed spec structure; (2) `UnderExecution` → `Finalized`
+      being unconditional for every kind is likewise this item's own
+      reading — no checklist wording anywhere in this crate's roadmap text
+      names a rule for whether an already-executing request is allowed to
+      *finish*, distinct from whether it was allowed to *start*. Same
+      "additive standalone plumbing only" discipline as every prior
+      Milestone 1-5 entry: not wired into any decoder, dispatch loop, or
+      `select_next_pending_request` (picking *which* pending request goes
+      next and advancing *that* request's own lifecycle state stay two
+      separate, uncomposed pieces for now). New `REQ-RLC-001`..`REQ-RLC-006`
+      (in `src/request.rs`) added to `.fusa-reqs.json`, each with a
+      `// fusa:req`/`// fusa:test` pair.
 - [ ] Feature-bundle gating: claiming "compound request support" requires
       shipping compound-wait, ≥4 sequencers, *and* clear-non-safestate
       together — not compound message parsing alone
