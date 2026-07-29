@@ -82,7 +82,7 @@ assert_eq!(resp.zone, Zone::FRONT_LEFT);
 | `someip` | SOME/IP bridge |
 | `mqttbr` | MQTT bridge |
 | `ddsbr` | DDS / AUTOSAR Adaptive bridge |
-| `udp` | UDP unicast transport |
+| `udp` | UDP unicast transport (`UdpTransport`, client) + RC-Server-endpoint dispatch with discovery integration (`UdpRcServer`, server) |
 | `shmem` | Shared-memory IPC bridge |
 | `mdns` | mDNS/DNS-SD service discovery |
 | `tlstransport` | TLS 1.2+ secured transport |

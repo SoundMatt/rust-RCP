@@ -2169,8 +2169,8 @@ Execute the REPLACE / ADAPT / DEPRECATE / KEEP-AS-IS dispositions from the
 package-by-package audit below, now that the core protocol (Milestones 1–8)
 exists to migrate them onto.
 
-- [ ] All **REPLACE**-disposition packages rebuilt against the new core
-      Progress (v0.12.0-dev): 9 of 10 done. `watchdog`/`powerstate` were
+- [x] All **REPLACE**-disposition packages rebuilt against the new core
+      Done (v0.12.0-dev): 10 of 10 done — this bullet is now closed. `watchdog`/`powerstate` were
       already REPLACEd ahead of schedule inside Milestones 6/7 (see their
       own "Done" notes above); `wire` and `e2e` are done too. `src/
       wire.rs` — the legacy 16-byte private frame — is deleted outright,
@@ -2472,7 +2472,64 @@ exists to migrate them onto.
       module index drops its now-inaccurate `linbr` row outright, the same
       way `canbr`'s row was dropped.
 
-      Remaining REPLACE packages: `udp`'s own deeper rebuild.
+      `udp`'s own row is now done too, closing this bullet out entirely (10
+      of 10). Its remaining scope, per this row's own text above and
+      `src/udp.rs`'s own pre-existing doc comment, was "a real
+      RC-Server-endpoint-level rebuild: register-map-driven dispatch,
+      discovery integration" — the framing-only cutover (`UdpTransport`)
+      had already landed as part of the `wire` REPLACE item earlier in this
+      milestone. New `src/udp.rs` type [`UdpRcServer`] is `UdpTransport`'s
+      server-side counterpart: it drives an actual `mock::RcServer`
+      register-map/lifecycle-gated dispatch engine
+      (`RcServer::handle_abb`) from real inbound UDP datagrams
+      (`UdpSocket::recv_from`), decoding each as an NTSCF/ACF_ABB request and
+      dispatching under the *requesting client's* `StreamId` — recovered
+      from the decoded NTSCF header itself, not a caller-supplied value, the
+      way `mock::RcServer::handle_ntscf_frame`'s own test-double simplicity
+      allows — while every response frame is addressed under the server's
+      own `StreamId`, never the requester's. Composing `mock::RcServer`
+      directly, rather than lifting/duplicating its dispatch logic into a
+      new home, is a flagged judgment call (Guiding Principle 5): `mock.rs`
+      is nominally "test doubles," but its own doc comment had already
+      anticipated `udp` as "the most likely next caller," `RcServer` is a
+      plain `pub` item with no `#[cfg(test)]` gate, and duplicating its
+      EP0/`EndpointTable`/echo-back dispatch would fork one rule into two
+      independently-maintained copies — see `UdpRcServer`'s own doc comment
+      for the full reasoning, including the still-open naming/relocation
+      question this item deliberately does not resolve.
+
+      `crate::discovery` is wired into a live path for the first time by
+      this item too, closing the "discovery integration" half: `UdpRcServer`
+      recognizes a broadcast-or-direct `discovery::is_discovery_request` and
+      answers it via `discovery::build_discovery_response` in any lifecycle
+      state, with the response frame's `StreamId` always the server's own —
+      how a client is meant to learn a server's real identity from a
+      broadcast exchange, to key its own `discovery::DiscoveryCache` by
+      afterward. New `discovery::is_discovery_configure_request` (added by
+      this item, alongside new `REQ-DISC-021`) recognizes this crate's own
+      chosen wire encoding for "configuring the discovery stream" —
+      `is_discovery_request`'s exact addressing/register shape with the
+      read/write direction bit flipped — since neither this roadmap nor any
+      Milestone 1-3 item ever named one, and `discovery.rs`'s own doc
+      comment had already flagged deferring that exact choice to whichever
+      item first wired it into a dispatch loop; `UdpRcServer` gates a
+      recognized configure attempt via `discovery::check_discovery_access`
+      and grants/refreshes the resulting claim via
+      `discovery::try_claim_discovery_stream`, rejecting a different live
+      claimant's attempt with `Err(UnauthorizedAccess)` and leaving the
+      existing claim unaffected. A request arriving under
+      `discovery::DISCOVERY_BROADCAST_STREAM_ID` that is neither shape is
+      rejected outright (`Err(InvalidParameter)`) rather than dispatched as
+      if the sentinel named a real client. `resolve_endpoint` and
+      `UdpTransport` are unchanged by this item.
+
+      `.fusa-reqs.json` gains `REQ-UDP-008`..`011` (`UdpRcServer`'s
+      register-map dispatch, discovery-read answering, discovery-configure
+      claim handling, and broadcast-sentinel misuse rejection) and
+      `REQ-DISC-021` (`is_discovery_configure_request`), each with a
+      `// fusa:req`/`// fusa:test` pair, following the same "retarget in
+      place, or add new — never renumber or reuse" discipline every prior
+      Milestone 9 REPLACE cutover in this bullet established.
 - [ ] All **ADAPT**-disposition packages retargeted to whatever new
       endpoint/RC-Server trait surface replaces `Controller`/`Registry`
 - [ ] All **DEPRECATE**-disposition packages removed, with a migration note
