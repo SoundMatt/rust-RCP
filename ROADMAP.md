@@ -2659,9 +2659,72 @@ exists to migrate them onto.
       clean; `bash scripts/fusa-gap-check.sh` reports 678/678 (100%)
       requirements traced; `bash scripts/cyber-gap-check.sh` reports 6/6
       threats with tested countermeasures.
-- [ ] All **DEPRECATE**-disposition packages removed, with a migration note
+- [x] All **DEPRECATE**-disposition packages removed, with a migration note
       in the changelog explaining the replacement path (generally: use
       RELAY's `crossbar` router instead of an in-crate protocol bridge)
+      Done (v0.12.0-dev): 11 of 11 done. `src/prioqueue.rs`, `src/
+      zonegroup.rs`, `src/tsn.rs`, `src/firmware.rs`, `src/someip.rs`,
+      `src/mqttbr.rs`, `src/ddsbr.rs`, `src/grpcbridge.rs`, `src/
+      restbridge.rs`, `src/udsbr.rs`, and `src/doipbr.rs` are deleted
+      outright, with their `pub mod` declarations removed from `src/
+      lib.rs` — none had a cross-module caller anywhere in `src/` or in
+      `src/bin/rcp.rs` (confirmed by inspection before removal), the same
+      "self-contained cutover" precedent the REPLACE items (`canbr`,
+      `linbr`, `capi`, `config`) established earlier in this milestone.
+      `README.md`'s module index drops all 11 now-inaccurate rows outright,
+      the same treatment `canbr`/`linbr` already established.
+
+      A new top-level `CHANGELOG.md` (this repo had none before this item)
+      carries the migration note this bullet's own text requires: the six
+      protocol-bridge packages (`someip`, `mqttbr`, `ddsbr`, `grpcbridge`,
+      `restbridge`, `udsbr`, `doipbr`) point integrators at RELAY's
+      `crossbar` router (RELAY `v1.8`, RELAY PR #45) instead of an in-crate
+      bridge — the same `crossbar`-router precedent go-DDS set removing its
+      own MQTT/domain bridges in `v0.52.0` — while `prioqueue`, `zonegroup`,
+      `tsn`, and `firmware` each get their own no-direct-replacement note,
+      per the disposition table's own stated reasons.
+
+      `.fusa-reqs.json`'s `REQ-PQ-001`..`008`, `REQ-ZG-001`..`007`,
+      `REQ-TSN-001`..`005`, `REQ-FW-001`..`006`, `REQ-SOMEIP-001`..`005`,
+      `REQ-MQTT-001`..`005`, `REQ-DDS-001`..`004`, `REQ-GRPC-001`..`004`,
+      `REQ-REST-001`..`004`, `REQ-UDS-001`..`005`, and `REQ-DOIP-001`..`004`
+      (57 requirements total) are retired (removed) rather than retargeted,
+      per this milestone's own "retarget in place, or explicitly retire if
+      no equivalent behavior exists" discipline: ten of the eleven deleted
+      packages' tested behavior has no surviving in-crate analog at all.
+      `prioqueue`'s `REQ-PQ-004` ("Critical dispatched before High/Normal")
+      is the one exception with a real analog — `request::
+      execution_priority_tier`/`select_next_pending_request` (`REQ-PRIO-
+      001`..`004`), built ahead of schedule in Milestone 5 — but that
+      analog is already fully covered by its own pre-existing requirement
+      IDs, so `REQ-PQ-*` is retired rather than force-duplicated onto them,
+      the same way `REQ-CANBR-001`'s covered-elsewhere fact was retired
+      rather than kept in `canbr`'s own REPLACE cutover earlier in this
+      milestone.
+
+      Three FuSa/cybersecurity artifacts had already anticipated this item
+      as "next" from `prioqueue`'s own ADAPT-bullet residual-risk notes and
+      needed their now-dangling cross-references retargeted from the
+      no-longer-slated-for-removal-but-actually-gone `REQ-PQ-004` onto
+      `REQ-PRIO-004`, with residual risk raised honestly (mirroring the
+      `wire`/`e2e` REPLACE cutovers' own treatment of `ReplayGuard`'s
+      removal) since `REQ-PRIO-004` itself remains additive standalone
+      plumbing, not yet wired into any dispatch loop: `.fusa-iec62443.json`
+      (`T-004`'s countermeasures/residual_risk, `SC-006`), `tara.json`
+      (`A-005`, `T-RCP-04`, `CSG-RCP-03`), `SECURITY.md`'s security-controls
+      table, and `HARA.md`'s `SG-009` row. `.fusa-dfmea.json`'s `FM-004`
+      ("Priority queue dispatch") gets the same treatment, retargeted onto
+      `REQ-PRIO-004` with residual risk raised from `low` to `medium`; its
+      `FM-009` ("Zone group broadcast") describes a `zonegroup`-only
+      function with no analog at all, so it is retargeted to `residual_risk:
+      "not applicable"` and kept (not deleted) for audit-trail continuity,
+      mirroring this crate's own "never renumber or reuse" ID discipline.
+      `cargo build`/`cargo clippy -- -D warnings`/`cargo test --all-targets`
+      (including `--release`)/`cargo fmt --check` are clean;
+      `bash scripts/fusa-gap-check.sh` reports 621/621 (100%) requirements
+      traced; `bash scripts/cyber-gap-check.sh` reports 6/6 threats with
+      tested countermeasures; `rsfusa check`/`qualify`/`release` all pass
+      locally with zero ERROR findings; `relay conform --strict` passes.
 - [ ] All **KEEP-AS-IS** packages given a regression pass to confirm they
       are genuinely unaffected
 

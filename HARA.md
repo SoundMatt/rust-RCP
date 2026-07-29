@@ -31,5 +31,5 @@ Full machine-readable HARA is in `.fusa-hara.json`.
 | SG-006 | Auth enforcement | ASIL-B | 0 | `REQ-AUTHZ-*`, `AuthzEndpoint` |
 | SG-007 | Atomic power transitions | ASIL-A | 500 | `REQ-PWR-*`/`REQ-PWRSTART-*`/`REQ-WAKE-*`, `try_enter_power_mode`/`try_cold_start`/`try_hot_start` gated by `PowerModeGateInput`, driven at the Wakeup endpoint by `wakeup::request_sleep_via_sleep_cmd`/`wakeup::wake_source_signals_trigger_handshake` |
 | SG-008 | Payload size validation | ASIL-B | 0 | `REQ-WIRE-007`, MAX_PAYLOAD check |
-| SG-009 | Critical preemption | ASIL-B | 100 | `REQ-PQ-004`, `PrioController` |
+| SG-009 | Critical preemption | ASIL-B | 100 | `REQ-PRIO-004`, `execution_priority_tier`/`select_next_pending_request` (not yet wired into a live dispatch loop — `prioqueue`/`PrioController` removed by Milestone 9's DEPRECATE disposition, see `tara.json` T-RCP-04) |
 | SG-010 | Defined close behaviour | ASIL-A | 200 | `REQ-ERR-007`, `Closed` sentinel |

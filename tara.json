@@ -31,8 +31,8 @@
     },
     {
       "id": "A-005",
-      "name": "Rate-limiter and priority-queue availability",
-      "description": "ratelimit::RateLimitEndpoint remains responsive under sustained load (uniform per-call token-bucket admission, with no Critical-priority exemption since Milestone 9's ADAPT retarget — see T-RCP-04) and prioqueue::PrioController remains responsive to Critical-priority commands under load from lower-priority traffic",
+      "name": "Rate-limiter and execution-priority availability",
+      "description": "ratelimit::RateLimitEndpoint remains responsive under sustained load (uniform per-call token-bucket admission, with no Critical-priority exemption since Milestone 9's ADAPT retarget — see T-RCP-04). Note: prioqueue::PrioController was deleted outright by Milestone 9's DEPRECATE-disposition removal (ROADMAP.md Satellite Package Disposition); request::execution_priority_tier/select_next_pending_request (REQ-PRIO-004) is the closest surviving analog but is not yet wired into any dispatch loop, so this asset no longer includes a live guarantee of Critical-priority responsiveness under load",
       "cybersecurityProperty": "Availability"
     },
     {
@@ -153,8 +153,8 @@
       "feasibilityRating": "High",
       "cal": "CAL-3",
       "cybersecurityGoal": "CSG-RCP-03",
-      "mitigations": ["REQ-RL-006", "REQ-PQ-004"],
-      "residualRisk": "Medium — ratelimit::RateLimitEndpoint's own token bucket (REQ-RL-006) now applies uniformly with no Critical-priority exemption of its own (Milestone 9's ADAPT retarget retired the old REQ-RL-007 carve-out, since Endpoint requests carry no Priority field at all); mitigation against a flood starving genuinely critical requests depends entirely on prioqueue::PrioController's dispatch ordering (REQ-PQ-004) being composed — itself a DEPRECATE-disposition package slated for removal by this same milestone's next checklist bullet, with no priority-aware replacement decided yet. A deployment that composes only ratelimit today has no protection against this scenario"
+      "mitigations": ["REQ-RL-006", "REQ-PRIO-004"],
+      "residualRisk": "High — ratelimit::RateLimitEndpoint's own token bucket (REQ-RL-006) applies uniformly with no Critical-priority exemption of its own (Milestone 9's ADAPT retarget retired the old REQ-RL-007 carve-out, since Endpoint requests carry no Priority field at all); prioqueue::PrioController (REQ-PQ-004) was deleted outright by Milestone 9's DEPRECATE-disposition removal (ROADMAP.md Satellite Package Disposition), so mitigation against a flood starving genuinely critical requests no longer has any live dispatch-ordering mechanism to depend on. request::execution_priority_tier/select_next_pending_request (REQ-PRIO-004) is the closest surviving analog but remains additive standalone plumbing, not wired into any dispatch loop. A deployment that composes only ratelimit today has no protection against this scenario, and no deployment currently has a live priority-aware one either"
     },
     {
       "id": "T-RCP-05",
@@ -287,10 +287,10 @@
     },
     {
       "id": "CSG-RCP-03",
-      "description": "rust-RCP shall resist priority-inversion denial-of-service by always dispatching Critical-priority commands ahead of lower-priority traffic when prioqueue is composed, and by admitting no unbounded request flood through ratelimit's own token bucket. Milestone 9's ADAPT retarget of ratelimit dropped its own Critical-priority exemption (Endpoint requests carry no Priority field), so this goal is presently satisfied only when prioqueue is composed — itself a DEPRECATE-disposition package slated for removal, with no priority-aware replacement decided yet; flagged as an open gap for whichever later item defines one.",
+      "description": "rust-RCP shall resist priority-inversion denial-of-service by always dispatching Critical-priority commands ahead of lower-priority traffic, and by admitting no unbounded request flood through ratelimit's own token bucket. Milestone 9's ADAPT retarget of ratelimit dropped its own Critical-priority exemption (Endpoint requests carry no Priority field), and its later DEPRECATE-disposition removal (ROADMAP.md Satellite Package Disposition) deleted prioqueue::PrioController outright. request::execution_priority_tier/select_next_pending_request (REQ-PRIO-004) is the closest surviving analog — built ahead of schedule in Milestone 5 — but remains additive standalone plumbing not wired into any dispatch loop, so this goal is not presently satisfied by any live mechanism; flagged as an open gap for whichever later item wires REQ-PRIO-004 into live dispatch.",
       "cal": "CAL-3",
       "threats": ["T-RCP-04"],
-      "requirements": ["REQ-RL-006", "REQ-PQ-004"]
+      "requirements": ["REQ-RL-006", "REQ-PRIO-004"]
     },
     {
       "id": "CSG-RCP-04",
