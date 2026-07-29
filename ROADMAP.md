@@ -2170,7 +2170,7 @@ package-by-package audit below, now that the core protocol (Milestones 1–8)
 exists to migrate them onto.
 
 - [ ] All **REPLACE**-disposition packages rebuilt against the new core
-      Progress (v0.12.0-dev): 6 of 10 done. `watchdog`/`powerstate` were
+      Progress (v0.12.0-dev): 7 of 10 done. `watchdog`/`powerstate` were
       already REPLACEd ahead of schedule inside Milestones 6/7 (see their
       own "Done" notes above); `wire` and `e2e` are done too. `src/
       wire.rs` — the legacy 16-byte private frame — is deleted outright,
@@ -2334,8 +2334,43 @@ exists to migrate them onto.
       `RcpConfig`-category reachability) that have no counterpart among the
       retargeted three.
 
-      Remaining REPLACE packages: `capi`, `canbr`, `linbr`, and `udp`'s own
-      deeper rebuild.
+      `capi`'s row is now done too. Its old `CCommand`/`CResponse`/`CError`
+      trio — 1:1 tied to the legacy `Command`/`Zone` shapes, per this row's
+      own disposition-table reason — is deleted outright and replaced with
+      `CStreamId` (mirroring `avtp::StreamId`), `CByteMessageInfo`
+      (mirroring every `acf::ByteMessageInfo` field, flattening `Evt` and
+      `ReadSizeOrSegmentNum` since neither is itself `#[repr(C)]`), and
+      `CAbbRequest`/`CAbbResponse` (each pairing a `CStreamId` with a
+      `CByteMessageInfo`) — kept as two distinct Rust types despite an
+      identical field layout, since a real request and its response are
+      actually the same `acf::AcfAbbMessage` Rust type today, unlike the
+      old `CCommand`/`CResponse`, which really were two different shapes.
+      Neither new header type carries the ACF_ABB message's variable-length
+      `payload: Vec<u8>`, the same scope limit the old `CCommand`/`Command`
+      conversion had (it always discarded `Command::payload`, reconstructing
+      `payload: None`) — a `Vec<u8>` has no fixed-size `#[repr(C)]` shape,
+      and carrying it across a real C boundary is a raw-pointer-plus-length
+      concern for whichever `extern "C"` cdylib target eventually wraps this
+      module, which this crate does not build today. `CError` is rebuilt
+      against every current `RcpError` variant instead of the old
+      `Closed`/`NotFound`/`ZoneMismatch`/etc. set: all eleven TC18 spec
+      error codes (`RcpError::is_tc18_error_code`'s own members), the RELAY
+      mandatory sentinels, `ShortFrame`, the chained-request codes, and
+      `CrcError` each get their own `CError` variant, while the legacy
+      `NotFound`/`AlreadyExists`/`Busy`/`ZoneMismatch` Zone/Controller/
+      Registry sentinels (no TC18 analog) and `RcpError::Other(String)`
+      collapse to `CError::Other`. Like `wire`/`e2e`/`config` before it,
+      `capi::` had zero callers anywhere else in `src/` before this item
+      (confirmed by inspection — neither `src/bin/rcp.rs` nor any other
+      module constructed `CCommand`/`CResponse`) and still has none after
+      it, so this is a self-contained cutover with no other file's callers
+      to fix. `.fusa-reqs.json`'s `REQ-CAPI-001`..`004` are retargeted in
+      place (same IDs) to describe the new types/conversions/error mapping
+      — unlike `config`'s `REQ-CFG-002`..`004`, every one of the four has a
+      direct working analog in the new types, so nothing is retired.
+
+      Remaining REPLACE packages: `canbr`, `linbr`, and `udp`'s own deeper
+      rebuild.
 - [ ] All **ADAPT**-disposition packages retargeted to whatever new
       endpoint/RC-Server trait surface replaces `Controller`/`Registry`
 - [ ] All **DEPRECATE**-disposition packages removed, with a migration note
