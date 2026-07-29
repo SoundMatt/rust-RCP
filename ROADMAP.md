@@ -2928,9 +2928,81 @@ Ship a stable, TC18-conformant rust-RCP.
       scripts/fusa-gap-check.sh` reports 622/622 (100%) requirements traced;
       `bash scripts/cyber-gap-check.sh` reports 6/6 threats with tested
       countermeasures.
-- [ ] CLI (`rust-rcp`) command surface updated: discovery, register
+- [x] CLI (`rust-rcp`) command surface updated: discovery, register
       read/write, per-endpoint drive commands, replacing the old
       `send`/`zones`/`status --zone` shape
+
+      Done (v0.13.0-dev): `src/bin/rcp.rs`'s command surface is rebuilt
+      against `mock::RcServer`'s `(avtp::StreamId, byte_bus_id)`-addressed
+      model, the same backing type `src/adapt.rs`'s own Milestone 10
+      rebuild targets. `zones`/`send`/`status --zone` and every
+      `Zone`/`Command`/`Controller`/`Registry`/`rcp::mock::MockRegistry`
+      reference are gone from the file; `version`/`capabilities`/`status`/
+      `convert` are unchanged in shape (none of them ever referenced
+      `Zone` — `convert`'s own `"zone"`/`"seq"`/`"healthy"` JSON shape is a
+      self-contained RELAY-spec wire transform, not a use of the `Zone`
+      Rust type), with `capabilities`'s `commands`/`interfaces` JSON
+      fields updated to `["version","capabilities","status","convert",
+      "discover","register","endpoint"]` /
+      `["RcServer","Endpoint"]`.
+
+      Three new subcommands replace the retired trio:
+
+      - `discover [--transaction <n>] [--format json]` builds a discovery
+        request (`discovery::build_discovery_request`) and answers it via
+        `discovery::build_discovery_response`, decoding/printing the
+        resulting `GeneralRegisters` snapshot.
+      - `register read [--stream <hex>] [--format json]` /
+        `register write --payload <hex> [--stream <hex>] [--root]`
+        dispatch an EP0-addressed (`ep0::EP0_BYTE_BUS_ID`) read/write
+        `AcfAbbMessage` through `RcServer::handle_abb`. `--root` first
+        designates `--stream` the server's root client via
+        `RcServer::set_root_client`. A write is reported exactly as
+        `RcServer::handle_abb` answers it, including
+        `RcpError::LockedMemAccess` for the root client itself — see that
+        function's own doc comment for why a `General`-category write is
+        currently never actually accepted by this in-process server; the
+        CLI does not paper over that.
+      - `endpoint read --bus-id <n> [--stream <hex>] [--ep-type <n>]
+        [--initial <hex>] [--read-size <n>] [--format json]` /
+        `endpoint write --bus-id <n> --payload <hex> [--stream <hex>]
+        [--ep-type <n>] [--initial <hex>]` register a fresh
+        `mock::MockEndpoint` of `--ep-type` (default
+        `regmap::EndpointType::Gpio`) holding `--initial` under
+        `(--stream, --bus-id)` via `RcServer::register_endpoint`, then
+        dispatch a read/write `AcfAbbMessage` through `RcServer::handle_abb`'s
+        `DeviceEndpoint` route.
+
+      One design choice flagged per Guiding Principle 5, documented in the
+      file's own doc comment: this crate has no concrete `udp::UdpSocket`
+      implementation over a real OS socket, so `discover`/`register`/
+      `endpoint` each construct and address a fresh in-process `RcServer`
+      for the lifetime of one invocation — the same ephemeral-server
+      discipline the retired `send`/`status --zone` already used against a
+      fresh `mock::MockRegistry` each invocation, not a regression this
+      item introduces. `--stream` is parsed/rendered as bare lowercase hex
+      (no `0x` prefix), matching `adapt::format_endpoint_id`'s own
+      `StreamId` rendering, per this item's naming-consistency instruction
+      (issue #35 settled module naming only; no CLI-specific addressing
+      convention existed yet for this item to reconcile against, so it
+      follows `adapt.rs`'s existing one).
+
+      `.fusa-reqs.json` `REQ-CLI-001`/`002`/`004`/`005` text is retargeted
+      to describe `discover`/the shared `register`+`endpoint` flag set/
+      `endpoint`/the shared `register`+`endpoint` dispatch-through-
+      `RcServer::handle_abb` behavior, in place of the retired `send`/
+      `zones`/`status --zone` wording; `REQ-CLI-008`'s text drops its
+      stale `"(no --zone)"` parenthetical. No new requirement IDs were
+      needed. `src/bin/rcp.rs`'s own tests are rewritten against
+      `mock::RcServer`/`mock::MockEndpoint` in place of `MockController`/
+      `MockRegistry`/`Zone`/`Command` (27 tests, up from 19).
+
+      `cargo build --all-targets`, `cargo clippy --all-targets --all-features
+      -- -D warnings`, `cargo test --all-targets` (1062 lib tests, 27 in
+      `src/bin/rcp.rs`, up from 19), and `cargo fmt --all -- --check` are
+      clean; `bash scripts/fusa-gap-check.sh` reports 622/622 (100%)
+      requirements traced; `bash scripts/cyber-gap-check.sh` reports 6/6
+      threats with tested countermeasures.
 - [ ] Conformance test vectors / interop verification against at least one
       sibling x-RCP implementation once it has also uplifted, or
       self-referential wire-format golden vectors if none is ready yet

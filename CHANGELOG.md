@@ -110,6 +110,63 @@ traced; `bash scripts/cyber-gap-check.sh` reports 6/6 threats with tested
 countermeasures; `relay conform --strict` against the release binary passes
 all three RELAY §12 checks.
 
+### Changed — CLI command surface
+
+`src/bin/rcp.rs`'s command surface is rebuilt against `mock::RcServer`'s
+`(avtp::StreamId, byte_bus_id)`-addressed model, the same backing type
+`src/adapt.rs`'s own Milestone 10 rebuild targets. `zones`/`send`/
+`status --zone` and every `Zone`/`Command`/`Controller`/`Registry`/
+`mock::MockRegistry` reference are gone from the file.
+`version`/`capabilities`/`status`/`convert` are unchanged in shape (none of
+them ever referenced `Zone`), with `capabilities`'s `commands`/`interfaces`
+JSON fields updated to
+`["version","capabilities","status","convert","discover","register","endpoint"]`
+/ `["RcServer","Endpoint"]`.
+
+Three new subcommands replace the retired trio:
+
+- `discover [--transaction <n>] [--format json]` builds a discovery
+  request (`discovery::build_discovery_request`) and answers it via
+  `discovery::build_discovery_response`, printing the decoded
+  `GeneralRegisters` snapshot.
+- `register read [--stream <hex>] [--format json]` / `register write
+  --payload <hex> [--stream <hex>] [--root]` dispatch an EP0-addressed
+  read/write `AcfAbbMessage` through `RcServer::handle_abb`. `--root`
+  first designates `--stream` the server's root client. A write is
+  reported exactly as `RcServer::handle_abb` answers it, including
+  `RcpError::LockedMemAccess` for the root client itself — see that
+  function's own doc comment for why a `General`-category write is never
+  currently accepted by this in-process server.
+- `endpoint read --bus-id <n> [...]` / `endpoint write --bus-id <n>
+  --payload <hex> [...]` register a fresh `mock::MockEndpoint` of
+  `--ep-type` (default `regmap::EndpointType::Gpio`) holding `--initial`
+  under `(--stream, --bus-id)`, then dispatch a read/write `AcfAbbMessage`
+  through `RcServer::handle_abb`'s `DeviceEndpoint` route.
+
+One flagged design choice (Guiding Principle 5): this crate has no
+concrete `udp::UdpSocket` implementation over a real OS socket, so
+`discover`/`register`/`endpoint` each construct and address a fresh
+in-process `RcServer` for the lifetime of one invocation — the same
+ephemeral-server discipline the retired `send`/`status --zone` already
+used against a fresh `mock::MockRegistry` each invocation. `--stream` is
+parsed/rendered as bare lowercase hex (no `0x` prefix), matching
+`adapt::format_endpoint_id`'s own `StreamId` rendering.
+
+`.fusa-reqs.json` `REQ-CLI-001`/`002`/`004`/`005` text is retargeted to
+describe the new `discover`/shared flag/`endpoint`/shared dispatch
+behavior in place of the retired `send`/`zones`/`status --zone` wording;
+`REQ-CLI-008`'s text drops its stale `"(no --zone)"` parenthetical. No new
+requirement IDs were needed. `src/bin/rcp.rs`'s own tests are rewritten
+against `mock::RcServer`/`mock::MockEndpoint` in place of
+`MockController`/`MockRegistry`/`Zone`/`Command` (27 tests, up from 19).
+
+`cargo build --all-targets`, `cargo clippy --all-targets --all-features --
+-D warnings`, `cargo test --all-targets` (1062 lib tests + 27 `src/bin/
+rcp.rs` tests, up from 19), and `cargo fmt --all -- --check` are clean;
+`bash scripts/fusa-gap-check.sh` reports 622/622 (100%) requirements
+traced; `bash scripts/cyber-gap-check.sh` reports 6/6 threats with tested
+countermeasures.
+
 ## v0.12.0-dev (Milestone 9) — closed
 
 ### Removed
