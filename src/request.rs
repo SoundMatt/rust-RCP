@@ -28,6 +28,12 @@
 // fusa:req REQ-PRIO-002
 // fusa:req REQ-PRIO-003
 // fusa:req REQ-PRIO-004
+// fusa:req REQ-RLC-001
+// fusa:req REQ-RLC-002
+// fusa:req REQ-RLC-003
+// fusa:req REQ-RLC-004
+// fusa:req REQ-RLC-005
+// fusa:req REQ-RLC-006
 
 //! Conditional-request taxonomy: compound / compound-wait (`0x0F`/`0x0B`),
 //! triggered (`0x0E`), chained (`0x01`), timed (`0x0A`), the
@@ -35,7 +41,7 @@
 //! (`0x05`/`0x06`/`0x07`), the persistent sequencer-state register bank, and
 //! the execution priority ordering that selects which pending request runs
 //! next — `ROADMAP.md` Milestone 5 ("Conditional Requests & Sequencers"),
-//! first through seventh checklist bullets. The first bullet
+//! first through eighth checklist bullets. The first bullet
 //! covers sequencer-gated
 //! execution and wait, with `cmp_exec_delay`/`cmpw_exec_delay` timers and
 //! the "advance sequencer only if still in start state" rule. The second
@@ -74,6 +80,27 @@
 //! [`select_next_pending_request`], a pure selection function choosing
 //! which of a caller-supplied set of pending requests should run next —
 //! highest tier first, FIFO (earliest arrival) among same-tier entries.
+//! The eighth covers the request lifecycle state machine itself:
+//! [`RequestLifecycleState`], the four linear states this checklist
+//! bullet's own wording names (pending -> started -> under-execution ->
+//! finalized), [`is_request_lifecycle_transition_defined`] and
+//! [`RequestLifecycleState::try_transition`] (mirroring
+//! [`crate::lifecycle::RcServerState`]'s own coarse-shape-check-then-guard
+//! shape), and the "type-specific sub-behavior at each transition" this
+//! checklist bullet names: [`RequestLifecycleGuardInput`] dispatches each
+//! of [`RequestKind`]'s nine values onto the already-built per-kind check
+//! that hop composes ([`check_compound_gate`] for Compound/CompoundWait,
+//! [`is_timed_request_ready`] for Timed, [`check_chain_continuation`] for
+//! Chained, [`should_count_trigger_occurrence`]/
+//! [`is_trigger_repeat_exhausted`] for Triggered), plus
+//! [`try_force_cancel_all`]/[`try_force_cancel_non_safestate`]/
+//! [`try_force_cancel_single`], the cancellation trio's own type-specific
+//! behavior: forcing a *target* request straight to
+//! [`RequestLifecycleState::Finalized`] rather than progressing it through
+//! the normal linear hops. See "Provenance note: which existing check
+//! applies at which lifecycle hop" below for this item's own working
+//! mapping from checklist wording to source, since §3.14 is cited by
+//! section number only per this crate's spec-citation policy.
 //!
 //! Compound/compound-wait was the opening item of Milestone 5, and the
 //! first thing to land in `src/request.rs` — the module name the
@@ -84,13 +111,19 @@
 //! Chained is the third, added there. Timed is the fourth, added there.
 //! Cancellation is the fifth, added there. [`SequencerBank`] is the sixth,
 //! added in the prior entry this one extends. Execution priority ordering
-//! is the seventh, added here. Same "additive standalone
-//! plumbing only" discipline as every prior Milestone 1-5 entry, and as the
-//! compound/compound-wait, triggered, chained, timed, cancellation, and
-//! sequencer-bank work above: [`select_next_pending_request`] is a pure
+//! is the seventh, added in the prior entry this one extends. The request
+//! lifecycle state machine is the eighth, added here. Same "additive
+//! standalone plumbing only" discipline as every prior Milestone 1-5 entry,
+//! and as the compound/compound-wait, triggered, chained, timed,
+//! cancellation, sequencer-bank, and execution-priority work above:
+//! [`RequestLifecycleState::try_transition`] is a pure, self-consuming
 //! function over caller-supplied inputs — nothing here is wired into a
-//! decoder, dispatch loop, or the request-lifecycle state machine (the next
-//! checklist bullet in this milestone, still not built). The old
+//! decoder or dispatch loop, and [`select_next_pending_request`] is still
+//! not called from anywhere in this crate, including from this item's own
+//! [`RequestLifecycleState::try_transition`] (see this module's doc
+//! comment "Deliberately out of scope" section below for why picking
+//! *which* pending request goes next and advancing *that* request's own
+//! lifecycle state stay two separate, uncomposed pieces for now). The old
 //! `src/prioqueue.rs` `Zone`/`Command`/`Controller`/`Priority` decorator
 //! this milestone's own Goal text names as the eventual absorption target
 //! for "picking which pending request runs next" is read only as
@@ -233,6 +266,36 @@
 //!   what execution priority ordering does not decide" below for the two
 //!   points this checklist bullet leaves unstated that this item does not
 //!   silently resolve.
+//! - [`RequestLifecycleState`] / [`is_request_lifecycle_transition_defined`]
+//!   — the four-state lifecycle this checklist bullet names (pending ->
+//!   started -> under-execution -> finalized) and the coarse, state-shape
+//!   check for which of the twelve possible `(from, to)` pairs among those
+//!   four states are actually defined: the three linear forward hops, and
+//!   no others — no skip, backward, or identity transition, mirroring
+//!   [`crate::lifecycle::is_transition_defined`]'s own discipline.
+//! - [`RequestLifecycleGuardInput`] / [`RequestLifecycleState::try_transition`]
+//!   — the "type-specific sub-behavior at each transition" this checklist
+//!   bullet names: one [`RequestLifecycleGuardInput`] variant per
+//!   [`RequestKind`], each carrying exactly the fields the already-built
+//!   per-kind check that hop composes needs, and
+//!   [`RequestLifecycleState::try_transition`], the self-consuming,
+//!   never-panicking `Result`-returning method that rejects any
+//!   `(self, target)` pair [`is_request_lifecycle_transition_defined`]
+//!   does not name, and otherwise applies that hop's composed guard. See
+//!   "Provenance note: which existing check applies at which lifecycle
+//!   hop" below for this item's own working mapping.
+//! - [`try_force_cancel_all`] / [`try_force_cancel_non_safestate`] /
+//!   [`try_force_cancel_single`] — the cancellation trio's own
+//!   type-specific lifecycle behavior: each composes the matching
+//!   `check_clear_*_cancellation` function against a *target* request's
+//!   current [`RequestLifecycleState`], forcing it straight to
+//!   [`RequestLifecycleState::Finalized`] when that check selects it for
+//!   cancellation rather than progressing it through the normal linear
+//!   hops — the "short-circuit" behavior distinguishing the cancellation
+//!   trio's own lifecycle role (acting on another pending request) from
+//!   every other [`RequestKind`]'s role (gating its own progression). All
+//!   three are idempotent against an already-[`RequestLifecycleState::Finalized`]
+//!   target.
 //!
 //! Deliberately out of scope:
 //!
@@ -251,14 +314,25 @@
 //!   alternative that composes the free functions instead of replacing
 //!   them. Triggered execution's own busy/idle independence needs no such
 //!   state at all; see [`should_count_trigger_occurrence`] above.
-//! - Wiring [`SequencerBank`], [`select_next_pending_request`], or any of
-//!   the below into an actual decoder, dispatch loop, or the
-//!   request-lifecycle state machine (`ROADMAP.md`'s own "Request lifecycle
-//!   state machine" checklist bullet, the next one in this milestone, still
-//!   not built). [`select_next_pending_request`] decides *which* pending
-//!   request goes next given a caller-supplied set; nothing here owns a
-//!   real pending-request set, tracks lifecycle transitions, or calls this
-//!   function from anywhere.
+//! - Wiring [`SequencerBank`], [`select_next_pending_request`],
+//!   [`RequestLifecycleState::try_transition`], or any of the below into an
+//!   actual decoder or dispatch loop. [`select_next_pending_request`]
+//!   decides *which* pending request goes next given a caller-supplied
+//!   set; [`RequestLifecycleState::try_transition`] advances *one already
+//!   identified* request's own lifecycle state; nothing here owns a real
+//!   pending-request store, calls [`select_next_pending_request`] and then
+//!   feeds its result into [`RequestLifecycleState::try_transition`], or
+//!   calls either from anywhere else in this crate.
+//! - A unified pending-request record type that owns both a
+//!   [`RequestKind`] and a live [`RequestLifecycleState`] together (so that,
+//!   for instance, [`select_next_pending_request`] could filter to only
+//!   `Pending`-state entries before choosing among them). Each of this
+//!   item's functions takes its [`RequestLifecycleState`] and
+//!   [`RequestLifecycleGuardInput`]/kind arguments as separate
+//!   caller-supplied values instead, mirroring every prior entry's
+//!   "caller-supplied state, no owned store" precedent
+//!   ([`SequencerBank`] being the one deliberate exception, and even it
+//!   stores only [`SequencerState`], not a full pending-request record).
 //! - The old `src/prioqueue.rs` `Zone`/`Command`/`Controller`/`Priority`
 //!   model this milestone's own Goal text names as the eventual absorption
 //!   target for "picking which pending request runs next". This item is
@@ -275,6 +349,60 @@
 //!   execution priority is evaluated across (per-endpoint, per-stream, or
 //!   server-wide). See "Provenance note: what execution priority ordering
 //!   does not decide" below.
+//!
+//! ## Provenance note: `RequestLifecycleState` carries no numeric encoding
+//!
+//! Unlike [`crate::lifecycle::RcServerState`] (`0x00`/`0x55`/`0xAA`) or
+//! [`RequestKind`] (`0x00`..=`0x0F`), `ROADMAP.md`'s checklist bullet names
+//! no wire byte, register value, or other numeric encoding for any of the
+//! four [`RequestLifecycleState`] values — "pending", "started",
+//! "under-execution", and "finalized" read as this crate's own internal
+//! bookkeeping states for a request already admitted to this RC Server,
+//! not as a value transmitted on the wire or exposed through a register
+//! this crate has modeled so far. Per Guiding Principle 5, rather than
+//! mint an unconfirmed placeholder discriminant the way
+//! [`RequestKind::Standard`]'s own `0x00` was minted (see "Provenance
+//! note: `RequestKind::Standard`'s discriminant" below), this item leaves
+//! [`RequestLifecycleState`] as a plain enum with no `#[repr(u8)]` and no
+//! `to_u8`/`from_u8` pair at all, flagging the absence rather than
+//! guessing at a number nothing in this crate's roadmap text supports.
+//!
+//! ## Provenance note: which existing check applies at which lifecycle hop
+//!
+//! §3.14 is cited by section number only, per this crate's policy of never
+//! transcribing the confidential OPEN Alliance TC18 specification's own
+//! text (see `ROADMAP.md`'s Guiding Principle 4) — so exactly which
+//! per-kind rule gates which of the three linear hops
+//! ([`RequestLifecycleState::Pending`] -> `Started`, `Started` ->
+//! `UnderExecution`, `UnderExecution` -> `Finalized`) is this item's own
+//! working interpretation, not a transcription of confirmed spec
+//! structure, and is flagged here per Guiding Principle 5 rather than
+//! silently asserted as spec fact:
+//!
+//! - `Pending` -> `Started` (this item reads as: "is this request now
+//!   eligible to be the one that runs") is where [`check_compound_gate`]
+//!   (Compound/CompoundWait) and [`is_timed_request_ready`] (Timed) are
+//!   composed — both are pre-execution eligibility gates in their own
+//!   existing doc comments, which is why this item places them at the
+//!   *first* hop rather than the second.
+//! - `Started` -> `UnderExecution` (read as: "does this request's own
+//!   execution actually proceed now that it has been selected") is where
+//!   [`check_chain_continuation`] (Chained — whether *this* link runs,
+//!   given the preceding link's own outcome) and
+//!   [`should_count_trigger_occurrence`]/[`is_trigger_repeat_exhausted`]
+//!   (Triggered — whether this occurrence still counts toward a
+//!   not-yet-exhausted repeat budget) are composed.
+//! - `UnderExecution` -> `Finalized` is unconditional for every
+//!   [`RequestKind`] — no checklist wording anywhere in this crate's
+//!   roadmap text names a rule for whether a request that has already
+//!   begun executing is allowed to *finish*, distinct from whether it was
+//!   allowed to *start*. [`RequestKind::Standard`] and the cancellation
+//!   trio ([`RequestKind::ClearAll`]/[`RequestKind::ClearNonSafestate`]/
+//!   [`RequestKind::ClearSingle`]) are unconditional at every hop — the
+//!   cancellation trio's actual type-specific lifecycle behavior is
+//!   [`try_force_cancel_all`]/[`try_force_cancel_non_safestate`]/
+//!   [`try_force_cancel_single`] instead (see this module's doc comment's
+//!   "in scope" list above), not a gate on their own linear progression.
 //!
 //! ## Provenance note: `RequestKind`'s wire placement
 //!
@@ -1399,6 +1527,336 @@ pub fn select_next_pending_request(pending: &[PendingRequestKey]) -> Option<usiz
         .map(|(index, _)| index)
 }
 
+// ── Request lifecycle state machine (§3.14) ──────────────────────────────────
+
+/// The four-state request lifecycle `ROADMAP.md`'s "Request lifecycle state
+/// machine" checklist bullet names: pending -> started -> under-execution
+/// -> finalized.
+///
+/// Mirrors [`crate::lifecycle::RcServerState`]'s own linear-transition
+/// shape, but see this module's doc comment "Provenance note:
+/// `RequestLifecycleState` carries no numeric encoding" for why this type,
+/// unlike [`crate::lifecycle::RcServerState`], has no `#[repr(u8)]` and no
+/// `to_u8`/`from_u8` pair.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// fusa:req REQ-RLC-001
+pub enum RequestLifecycleState {
+    /// A request has been decoded and admitted to this RC Server's pending
+    /// set, but has not yet been evaluated for execution eligibility.
+    Pending,
+    /// A request has passed its kind-specific eligibility gate (if any —
+    /// see [`RequestLifecycleGuardInput`]) but has not yet begun actively
+    /// driving its target endpoint.
+    Started,
+    /// A request is actively driving its target endpoint.
+    UnderExecution,
+    /// A request has completed — either by finishing normal execution or
+    /// by being force-canceled (see [`try_force_cancel_all`],
+    /// [`try_force_cancel_non_safestate`], [`try_force_cancel_single`]).
+    /// Terminal: no transition out of this state is defined.
+    Finalized,
+}
+
+/// Whether `(from, to)` is one of the three linear forward hops this
+/// checklist bullet names.
+///
+/// Mirrors [`crate::lifecycle::is_transition_defined`]'s own role as the
+/// coarse, state-shape check performed before any type-specific guard:
+/// every pair other than the three named here is `false`, including
+/// staying in the same state, any backward move, and skipping a state on
+/// the way up (e.g. `Pending` straight to `UnderExecution`). Never panics
+/// for any input.
+// fusa:req REQ-RLC-001
+pub fn is_request_lifecycle_transition_defined(
+    from: RequestLifecycleState,
+    to: RequestLifecycleState,
+) -> bool {
+    matches!(
+        (from, to),
+        (
+            RequestLifecycleState::Pending,
+            RequestLifecycleState::Started
+        ) | (
+            RequestLifecycleState::Started,
+            RequestLifecycleState::UnderExecution
+        ) | (
+            RequestLifecycleState::UnderExecution,
+            RequestLifecycleState::Finalized
+        )
+    )
+}
+
+/// The type-specific inputs [`RequestLifecycleState::try_transition`]
+/// consults when advancing a request along the linear pending -> started
+/// -> under-execution -> finalized path — the "type-specific sub-behavior
+/// at each transition" this checklist bullet names.
+///
+/// One variant per [`RequestKind`], each carrying exactly the fields the
+/// already-built per-kind check that variant composes needs. See this
+/// module's doc comment "Provenance note: which existing check applies at
+/// which lifecycle hop" for this item's own working mapping from checklist
+/// wording to the two guarded hops below, and for why the third hop
+/// (`UnderExecution` -> `Finalized`) is unconditional for every kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// fusa:req REQ-RLC-003
+// fusa:req REQ-RLC-004
+pub enum RequestLifecycleGuardInput {
+    /// [`RequestKind::Standard`]: no gate at either hop.
+    Standard,
+    /// [`RequestKind::Chained`]: [`check_chain_continuation`] gates the
+    /// `Started` -> `UnderExecution` hop.
+    Chained {
+        /// This link's own decoded `cs` bit.
+        cs: bool,
+        /// Whether the chain's preceding link errored.
+        predecessor_errored: bool,
+    },
+    /// [`RequestKind::ClearAll`]: no gate at either hop — see
+    /// [`try_force_cancel_all`] for this kind's actual type-specific
+    /// behavior, which applies to a *target* request rather than to a
+    /// clear-all request's own linear progression.
+    ClearAll,
+    /// [`RequestKind::ClearNonSafestate`]: no gate at either hop — see
+    /// [`try_force_cancel_non_safestate`].
+    ClearNonSafestate,
+    /// [`RequestKind::ClearSingle`]: no gate at either hop — see
+    /// [`try_force_cancel_single`].
+    ClearSingle,
+    /// [`RequestKind::Timed`]: [`is_timed_request_ready`] gates the
+    /// `Pending` -> `Started` hop.
+    Timed {
+        /// The current presentation time.
+        current: AvtpTimestamp,
+        /// This request's own carried execution-time gate.
+        exec_time: TimedExecutionTime,
+    },
+    /// [`RequestKind::CompoundWait`]: [`check_compound_gate`] gates the
+    /// `Pending` -> `Started` hop.
+    CompoundWait {
+        /// The gated sequencer's current persistent state.
+        current_sequencer_state: SequencerState,
+        /// This request's own sequencer gate configuration.
+        gate: CompoundGateConfig,
+        /// The live sequencer-count bound `gate.sequencer_num` is checked
+        /// against.
+        svr_sequencers_max: u8,
+    },
+    /// [`RequestKind::Triggered`]: [`should_count_trigger_occurrence`] and
+    /// [`is_trigger_repeat_exhausted`] together gate the `Started` ->
+    /// `UnderExecution` hop.
+    Triggered {
+        /// The target endpoint's busy/idle state — deliberately
+        /// non-gating (see [`should_count_trigger_occurrence`]), carried
+        /// here only so this hop composes that function rather than
+        /// bypassing it.
+        endpoint_busy: bool,
+        /// This request's own configured repeat count.
+        repeat: TriggerRepeatCount,
+        /// Trigger occurrences already counted for this request.
+        occurrences_so_far: u16,
+    },
+    /// [`RequestKind::Compound`]: [`check_compound_gate`] gates the
+    /// `Pending` -> `Started` hop.
+    Compound {
+        /// The gated sequencer's current persistent state.
+        current_sequencer_state: SequencerState,
+        /// This request's own sequencer gate configuration.
+        gate: CompoundGateConfig,
+        /// The live sequencer-count bound `gate.sequencer_num` is checked
+        /// against.
+        svr_sequencers_max: u8,
+    },
+}
+
+/// Evaluate the type-specific guard for advancing into `to`, given `input`.
+///
+/// Returns `Ok(())` when the hop's kind-specific gate (if any) is
+/// satisfied, and the same `Err` the composed existing check itself
+/// constructs otherwise — [`RcpError::SequencerNotKnown`] or
+/// [`RcpError::RequestRejected`] from [`check_compound_gate`], or
+/// [`RcpError::ChainAborted`] from [`check_chain_continuation`] — or a
+/// fresh [`RcpError::RequestRejected`] for the two hop guards this item
+/// composes from a plain `bool`-returning check ([`is_timed_request_ready`],
+/// the Triggered repeat-exhaustion check) rather than one that already
+/// constructs its own [`RcpError`]. Every `(to, input)` pair not named
+/// below — including `to == `[`RequestLifecycleState::Finalized`] and
+/// every [`RequestLifecycleGuardInput::Standard`]/`ClearAll`/
+/// `ClearNonSafestate`/`ClearSingle` input at either guarded hop — is an
+/// unconditional pass. Never panics for any input.
+// fusa:req REQ-RLC-003
+// fusa:req REQ-RLC-004
+// fusa:req REQ-RLC-005
+fn request_lifecycle_transition_guard(
+    to: RequestLifecycleState,
+    input: &RequestLifecycleGuardInput,
+) -> Result<(), RcpError> {
+    match (to, input) {
+        (
+            RequestLifecycleState::Started,
+            RequestLifecycleGuardInput::Compound {
+                current_sequencer_state,
+                gate,
+                svr_sequencers_max,
+            },
+        )
+        | (
+            RequestLifecycleState::Started,
+            RequestLifecycleGuardInput::CompoundWait {
+                current_sequencer_state,
+                gate,
+                svr_sequencers_max,
+            },
+        ) => check_compound_gate(*current_sequencer_state, gate, *svr_sequencers_max),
+        (
+            RequestLifecycleState::Started,
+            RequestLifecycleGuardInput::Timed { current, exec_time },
+        ) => {
+            if is_timed_request_ready(*current, *exec_time) {
+                Ok(())
+            } else {
+                Err(RcpError::RequestRejected)
+            }
+        }
+        (
+            RequestLifecycleState::UnderExecution,
+            RequestLifecycleGuardInput::Chained {
+                cs,
+                predecessor_errored,
+            },
+        ) => check_chain_continuation(*cs, *predecessor_errored),
+        (
+            RequestLifecycleState::UnderExecution,
+            RequestLifecycleGuardInput::Triggered {
+                endpoint_busy,
+                repeat,
+                occurrences_so_far,
+            },
+        ) => {
+            if should_count_trigger_occurrence(*endpoint_busy)
+                && is_trigger_repeat_exhausted(*occurrences_so_far, *repeat)
+            {
+                Err(RcpError::RequestRejected)
+            } else {
+                Ok(())
+            }
+        }
+        _ => Ok(()),
+    }
+}
+
+impl RequestLifecycleState {
+    /// Attempt to move a request from its current lifecycle state (`self`)
+    /// to `target`, applying `input`'s type-specific guard for hops that
+    /// have one.
+    ///
+    /// Returns `Err(RcpError::RequestRejected)` immediately for any
+    /// `(self, target)` pair [`is_request_lifecycle_transition_defined`]
+    /// does not name — mirroring
+    /// [`crate::lifecycle::RcServerState::try_transition`]'s own coarse
+    /// shape check ahead of any guard. For a defined hop, delegates to
+    /// [`request_lifecycle_transition_guard`]; on success returns
+    /// `Ok(target)`, on failure returns whatever `Err` that guard
+    /// constructed. This method takes `self` by value and returns the
+    /// *new* state on success — it does not mutate anything in place,
+    /// matching `RcServerState::try_transition`'s own non-mutating
+    /// convention. Never panics for any input.
+    ///
+    /// This diverges from `RcServerState::try_transition`'s plain
+    /// `impl FnOnce() -> bool` guard closure: this checklist bullet's own
+    /// "type-specific sub-behavior at each transition" wording means a
+    /// request's guard is type-specific, so `input` carries kind-aware
+    /// data rather than a single opaque predicate — see
+    /// [`RequestLifecycleGuardInput`].
+    // fusa:req REQ-RLC-002
+    pub fn try_transition(
+        self,
+        target: Self,
+        input: &RequestLifecycleGuardInput,
+    ) -> Result<Self, RcpError> {
+        if !is_request_lifecycle_transition_defined(self, target) {
+            return Err(RcpError::RequestRejected);
+        }
+        request_lifecycle_transition_guard(target, input)?;
+        Ok(target)
+    }
+}
+
+// ── Cancellation trio: force-canceling a target request out of its normal
+//    linear progression ───────────────────────────────────────────────────
+
+/// Force a target request out of its normal linear lifecycle progression
+/// and straight to [`RequestLifecycleState::Finalized`], per a clear-all
+/// (`0x05`, mandatory) cancellation — the cancellation trio's own
+/// type-specific lifecycle behavior, applied to a request other than
+/// itself (see this module's doc comment "in scope" list).
+///
+/// A `current` already at [`RequestLifecycleState::Finalized`] is left
+/// unchanged and this returns `Ok(())` — finalized is terminal, and a
+/// second cancellation of an already-finished request has nothing left to
+/// cancel. Otherwise, delegates to [`check_clear_all_cancellation`]: since
+/// that check is mandatory and unconditional, `*current` always becomes
+/// `Finalized` and `Err(RcpError::RequestCanceled)` is always returned.
+/// Never panics for any input.
+// fusa:req REQ-RLC-006
+pub fn try_force_cancel_all(current: &mut RequestLifecycleState) -> Result<(), RcpError> {
+    if *current == RequestLifecycleState::Finalized {
+        return Ok(());
+    }
+    match check_clear_all_cancellation() {
+        Ok(()) => Ok(()),
+        Err(err) => {
+            *current = RequestLifecycleState::Finalized;
+            Err(err)
+        }
+    }
+}
+
+/// The clear-non-safestate (`0x06`, optional) analog of
+/// [`try_force_cancel_all`]: force-cancels `current` unless
+/// `is_safestate_related` is `true`, delegating to
+/// [`check_clear_non_safestate_cancellation`]. A `current` already at
+/// [`RequestLifecycleState::Finalized`] is left unchanged. Never panics
+/// for any input.
+// fusa:req REQ-RLC-006
+pub fn try_force_cancel_non_safestate(
+    current: &mut RequestLifecycleState,
+    is_safestate_related: bool,
+) -> Result<(), RcpError> {
+    if *current == RequestLifecycleState::Finalized {
+        return Ok(());
+    }
+    match check_clear_non_safestate_cancellation(is_safestate_related) {
+        Ok(()) => Ok(()),
+        Err(err) => {
+            *current = RequestLifecycleState::Finalized;
+            Err(err)
+        }
+    }
+}
+
+/// The clear-single (`0x07`, optional) analog of [`try_force_cancel_all`]:
+/// force-cancels `current` only if `candidate_transaction_num` matches
+/// `target`, delegating to [`check_clear_single_cancellation`]. A
+/// `current` already at [`RequestLifecycleState::Finalized`] is left
+/// unchanged. Never panics for any input.
+// fusa:req REQ-RLC-006
+pub fn try_force_cancel_single(
+    current: &mut RequestLifecycleState,
+    candidate_transaction_num: u8,
+    target: ClearTransactionNum,
+) -> Result<(), RcpError> {
+    if *current == RequestLifecycleState::Finalized {
+        return Ok(());
+    }
+    match check_clear_single_cancellation(candidate_transaction_num, target) {
+        Ok(()) => Ok(()),
+        Err(err) => {
+            *current = RequestLifecycleState::Finalized;
+            Err(err)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2520,6 +2978,482 @@ mod tests {
                 let pending = [PendingRequestKey { kind, arrival_seq }];
                 let _ = select_next_pending_request(&pending);
             }
+        }
+    }
+
+    // ── RequestLifecycleState: transition-shape definition ──────────────────
+
+    const ALL_LIFECYCLE_STATES: [RequestLifecycleState; 4] = [
+        RequestLifecycleState::Pending,
+        RequestLifecycleState::Started,
+        RequestLifecycleState::UnderExecution,
+        RequestLifecycleState::Finalized,
+    ];
+
+    #[test]
+    // fusa:test REQ-RLC-001
+    fn is_request_lifecycle_transition_defined_allows_only_the_three_linear_forward_hops() {
+        let defined_pairs = [
+            (
+                RequestLifecycleState::Pending,
+                RequestLifecycleState::Started,
+            ),
+            (
+                RequestLifecycleState::Started,
+                RequestLifecycleState::UnderExecution,
+            ),
+            (
+                RequestLifecycleState::UnderExecution,
+                RequestLifecycleState::Finalized,
+            ),
+        ];
+        for from in ALL_LIFECYCLE_STATES {
+            for to in ALL_LIFECYCLE_STATES {
+                let expected = defined_pairs.contains(&(from, to));
+                assert_eq!(
+                    is_request_lifecycle_transition_defined(from, to),
+                    expected,
+                    "from={from:?} to={to:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-RLC-001
+    fn is_request_lifecycle_transition_defined_rejects_every_backward_or_identity_pair() {
+        for state in ALL_LIFECYCLE_STATES {
+            // Identity: staying put is never a defined transition.
+            assert!(!is_request_lifecycle_transition_defined(state, state));
+        }
+        // Backward moves, sampled explicitly.
+        assert!(!is_request_lifecycle_transition_defined(
+            RequestLifecycleState::Started,
+            RequestLifecycleState::Pending
+        ));
+        assert!(!is_request_lifecycle_transition_defined(
+            RequestLifecycleState::Finalized,
+            RequestLifecycleState::UnderExecution
+        ));
+        // Skip: Pending straight to UnderExecution or Finalized.
+        assert!(!is_request_lifecycle_transition_defined(
+            RequestLifecycleState::Pending,
+            RequestLifecycleState::UnderExecution
+        ));
+        assert!(!is_request_lifecycle_transition_defined(
+            RequestLifecycleState::Pending,
+            RequestLifecycleState::Finalized
+        ));
+        assert!(!is_request_lifecycle_transition_defined(
+            RequestLifecycleState::Started,
+            RequestLifecycleState::Finalized
+        ));
+    }
+
+    // ── RequestLifecycleState::try_transition: undefined-shape rejection ────
+
+    #[test]
+    // fusa:test REQ-RLC-002
+    fn try_transition_rejects_every_undefined_shape_regardless_of_input() {
+        for from in ALL_LIFECYCLE_STATES {
+            for to in ALL_LIFECYCLE_STATES {
+                if is_request_lifecycle_transition_defined(from, to) {
+                    continue;
+                }
+                assert_eq!(
+                    from.try_transition(to, &RequestLifecycleGuardInput::Standard),
+                    Err(RcpError::RequestRejected),
+                    "from={from:?} to={to:?}"
+                );
+            }
+        }
+    }
+
+    // ── RequestLifecycleState::try_transition: Pending -> Started guards ────
+
+    #[test]
+    // fusa:test REQ-RLC-002
+    // fusa:test REQ-RLC-003
+    fn try_transition_pending_to_started_passes_unconditionally_for_ungated_kinds() {
+        for input in [
+            RequestLifecycleGuardInput::Standard,
+            RequestLifecycleGuardInput::Chained {
+                cs: true,
+                predecessor_errored: true,
+            },
+            RequestLifecycleGuardInput::ClearAll,
+            RequestLifecycleGuardInput::ClearNonSafestate,
+            RequestLifecycleGuardInput::ClearSingle,
+            RequestLifecycleGuardInput::Triggered {
+                endpoint_busy: true,
+                repeat: TriggerRepeatCount::Finite(0),
+                occurrences_so_far: 0,
+            },
+        ] {
+            assert_eq!(
+                RequestLifecycleState::Pending
+                    .try_transition(RequestLifecycleState::Started, &input),
+                Ok(RequestLifecycleState::Started)
+            );
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-RLC-002
+    // fusa:test REQ-RLC-003
+    fn try_transition_pending_to_started_gates_timed_on_is_timed_request_ready() {
+        let exec_time = TimedExecutionTime(AvtpTimestamp::new(1_000));
+
+        let not_ready = RequestLifecycleGuardInput::Timed {
+            current: AvtpTimestamp::new(500),
+            exec_time,
+        };
+        assert_eq!(
+            RequestLifecycleState::Pending
+                .try_transition(RequestLifecycleState::Started, &not_ready),
+            Err(RcpError::RequestRejected)
+        );
+
+        let ready = RequestLifecycleGuardInput::Timed {
+            current: AvtpTimestamp::new(1_000),
+            exec_time,
+        };
+        assert_eq!(
+            RequestLifecycleState::Pending.try_transition(RequestLifecycleState::Started, &ready),
+            Ok(RequestLifecycleState::Started)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-RLC-002
+    // fusa:test REQ-RLC-003
+    fn try_transition_pending_to_started_gates_compound_and_compound_wait_on_check_compound_gate() {
+        let gate = CompoundGateConfig {
+            sequencer_num: 0,
+            start_state: SequencerState(1),
+        };
+
+        for make_input in [
+            (|current_sequencer_state, gate, svr_sequencers_max| {
+                RequestLifecycleGuardInput::Compound {
+                    current_sequencer_state,
+                    gate,
+                    svr_sequencers_max,
+                }
+            })
+                as fn(SequencerState, CompoundGateConfig, u8) -> RequestLifecycleGuardInput,
+            (|current_sequencer_state, gate, svr_sequencers_max| {
+                RequestLifecycleGuardInput::CompoundWait {
+                    current_sequencer_state,
+                    gate,
+                    svr_sequencers_max,
+                }
+            })
+                as fn(SequencerState, CompoundGateConfig, u8) -> RequestLifecycleGuardInput,
+        ] {
+            // Gate satisfied.
+            let satisfied = make_input(SequencerState(1), gate, 4);
+            assert_eq!(
+                RequestLifecycleState::Pending
+                    .try_transition(RequestLifecycleState::Started, &satisfied),
+                Ok(RequestLifecycleState::Started)
+            );
+
+            // Sequencer known, but not in start state.
+            let not_satisfied = make_input(SequencerState(2), gate, 4);
+            assert_eq!(
+                RequestLifecycleState::Pending
+                    .try_transition(RequestLifecycleState::Started, &not_satisfied),
+                Err(RcpError::RequestRejected)
+            );
+
+            // Sequencer out of bounds.
+            let unknown_sequencer = make_input(SequencerState(1), gate, 0);
+            assert_eq!(
+                RequestLifecycleState::Pending
+                    .try_transition(RequestLifecycleState::Started, &unknown_sequencer),
+                Err(RcpError::SequencerNotKnown)
+            );
+        }
+    }
+
+    // ── RequestLifecycleState::try_transition: Started -> UnderExecution
+    //    guards ──────────────────────────────────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-RLC-002
+    // fusa:test REQ-RLC-004
+    fn try_transition_started_to_under_execution_passes_unconditionally_for_ungated_kinds() {
+        let gate = CompoundGateConfig {
+            sequencer_num: 0,
+            start_state: SequencerState(1),
+        };
+        for input in [
+            RequestLifecycleGuardInput::Standard,
+            RequestLifecycleGuardInput::ClearAll,
+            RequestLifecycleGuardInput::ClearNonSafestate,
+            RequestLifecycleGuardInput::ClearSingle,
+            RequestLifecycleGuardInput::Timed {
+                current: AvtpTimestamp::new(0),
+                exec_time: TimedExecutionTime(AvtpTimestamp::new(0)),
+            },
+            RequestLifecycleGuardInput::Compound {
+                current_sequencer_state: SequencerState(9),
+                gate,
+                svr_sequencers_max: 0,
+            },
+            RequestLifecycleGuardInput::CompoundWait {
+                current_sequencer_state: SequencerState(9),
+                gate,
+                svr_sequencers_max: 0,
+            },
+        ] {
+            assert_eq!(
+                RequestLifecycleState::Started
+                    .try_transition(RequestLifecycleState::UnderExecution, &input),
+                Ok(RequestLifecycleState::UnderExecution)
+            );
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-RLC-002
+    // fusa:test REQ-RLC-004
+    fn try_transition_started_to_under_execution_gates_chained_on_check_chain_continuation() {
+        let continues = RequestLifecycleGuardInput::Chained {
+            cs: true,
+            predecessor_errored: false,
+        };
+        assert_eq!(
+            RequestLifecycleState::Started
+                .try_transition(RequestLifecycleState::UnderExecution, &continues),
+            Ok(RequestLifecycleState::UnderExecution)
+        );
+
+        let aborts = RequestLifecycleGuardInput::Chained {
+            cs: true,
+            predecessor_errored: true,
+        };
+        assert_eq!(
+            RequestLifecycleState::Started
+                .try_transition(RequestLifecycleState::UnderExecution, &aborts),
+            Err(RcpError::ChainAborted)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-RLC-002
+    // fusa:test REQ-RLC-004
+    fn try_transition_started_to_under_execution_gates_triggered_on_repeat_exhaustion() {
+        let not_exhausted = RequestLifecycleGuardInput::Triggered {
+            endpoint_busy: true,
+            repeat: TriggerRepeatCount::Finite(3),
+            occurrences_so_far: 2,
+        };
+        assert_eq!(
+            RequestLifecycleState::Started
+                .try_transition(RequestLifecycleState::UnderExecution, &not_exhausted),
+            Ok(RequestLifecycleState::UnderExecution)
+        );
+
+        let exhausted = RequestLifecycleGuardInput::Triggered {
+            endpoint_busy: true,
+            repeat: TriggerRepeatCount::Finite(3),
+            occurrences_so_far: 3,
+        };
+        assert_eq!(
+            RequestLifecycleState::Started
+                .try_transition(RequestLifecycleState::UnderExecution, &exhausted),
+            Err(RcpError::RequestRejected)
+        );
+
+        let infinite_never_exhausts = RequestLifecycleGuardInput::Triggered {
+            endpoint_busy: false,
+            repeat: TriggerRepeatCount::Infinite,
+            occurrences_so_far: u16::MAX,
+        };
+        assert_eq!(
+            RequestLifecycleState::Started.try_transition(
+                RequestLifecycleState::UnderExecution,
+                &infinite_never_exhausts
+            ),
+            Ok(RequestLifecycleState::UnderExecution)
+        );
+    }
+
+    // ── RequestLifecycleState::try_transition: UnderExecution -> Finalized
+    //    is unconditional ───────────────────────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-RLC-002
+    // fusa:test REQ-RLC-005
+    fn try_transition_under_execution_to_finalized_is_unconditional_for_every_kind() {
+        let gate = CompoundGateConfig {
+            sequencer_num: 0,
+            start_state: SequencerState(1),
+        };
+        let inputs = [
+            RequestLifecycleGuardInput::Standard,
+            RequestLifecycleGuardInput::Chained {
+                cs: true,
+                predecessor_errored: true,
+            },
+            RequestLifecycleGuardInput::ClearAll,
+            RequestLifecycleGuardInput::ClearNonSafestate,
+            RequestLifecycleGuardInput::ClearSingle,
+            RequestLifecycleGuardInput::Timed {
+                current: AvtpTimestamp::new(0),
+                exec_time: TimedExecutionTime(AvtpTimestamp::new(u32::MAX)),
+            },
+            RequestLifecycleGuardInput::CompoundWait {
+                current_sequencer_state: SequencerState(9),
+                gate,
+                svr_sequencers_max: 0,
+            },
+            RequestLifecycleGuardInput::Triggered {
+                endpoint_busy: true,
+                repeat: TriggerRepeatCount::Finite(0),
+                occurrences_so_far: 0,
+            },
+            RequestLifecycleGuardInput::Compound {
+                current_sequencer_state: SequencerState(9),
+                gate,
+                svr_sequencers_max: 0,
+            },
+        ];
+        for input in inputs {
+            assert_eq!(
+                RequestLifecycleState::UnderExecution
+                    .try_transition(RequestLifecycleState::Finalized, &input),
+                Ok(RequestLifecycleState::Finalized)
+            );
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-RLC-002
+    fn try_transition_never_panics_for_any_sampled_state_pair_or_input() {
+        let gate = CompoundGateConfig {
+            sequencer_num: 0,
+            start_state: SequencerState(1),
+        };
+        let inputs = [
+            RequestLifecycleGuardInput::Standard,
+            RequestLifecycleGuardInput::Chained {
+                cs: false,
+                predecessor_errored: false,
+            },
+            RequestLifecycleGuardInput::ClearAll,
+            RequestLifecycleGuardInput::ClearNonSafestate,
+            RequestLifecycleGuardInput::ClearSingle,
+            RequestLifecycleGuardInput::Timed {
+                current: AvtpTimestamp::new(0),
+                exec_time: TimedExecutionTime(AvtpTimestamp::new(0)),
+            },
+            RequestLifecycleGuardInput::CompoundWait {
+                current_sequencer_state: SequencerState(0),
+                gate,
+                svr_sequencers_max: 1,
+            },
+            RequestLifecycleGuardInput::Triggered {
+                endpoint_busy: false,
+                repeat: TriggerRepeatCount::Infinite,
+                occurrences_so_far: 0,
+            },
+            RequestLifecycleGuardInput::Compound {
+                current_sequencer_state: SequencerState(0),
+                gate,
+                svr_sequencers_max: 1,
+            },
+        ];
+        for from in ALL_LIFECYCLE_STATES {
+            for to in ALL_LIFECYCLE_STATES {
+                for input in &inputs {
+                    let _ = from.try_transition(to, input);
+                }
+            }
+        }
+    }
+
+    // ── Cancellation trio: force-canceling a target request ─────────────────
+
+    #[test]
+    // fusa:test REQ-RLC-006
+    fn try_force_cancel_all_always_finalizes_and_returns_request_canceled() {
+        for mut state in [
+            RequestLifecycleState::Pending,
+            RequestLifecycleState::Started,
+            RequestLifecycleState::UnderExecution,
+        ] {
+            let result = try_force_cancel_all(&mut state);
+            assert_eq!(result, Err(RcpError::RequestCanceled));
+            assert_eq!(state, RequestLifecycleState::Finalized);
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-RLC-006
+    fn try_force_cancel_all_is_idempotent_once_already_finalized() {
+        let mut state = RequestLifecycleState::Finalized;
+        assert_eq!(try_force_cancel_all(&mut state), Ok(()));
+        assert_eq!(state, RequestLifecycleState::Finalized);
+    }
+
+    #[test]
+    // fusa:test REQ-RLC-006
+    fn try_force_cancel_non_safestate_leaves_safestate_related_requests_untouched() {
+        let mut state = RequestLifecycleState::UnderExecution;
+        assert_eq!(try_force_cancel_non_safestate(&mut state, true), Ok(()));
+        assert_eq!(state, RequestLifecycleState::UnderExecution);
+    }
+
+    #[test]
+    // fusa:test REQ-RLC-006
+    fn try_force_cancel_non_safestate_finalizes_non_safestate_related_requests() {
+        let mut state = RequestLifecycleState::UnderExecution;
+        assert_eq!(
+            try_force_cancel_non_safestate(&mut state, false),
+            Err(RcpError::RequestCanceled)
+        );
+        assert_eq!(state, RequestLifecycleState::Finalized);
+    }
+
+    #[test]
+    // fusa:test REQ-RLC-006
+    fn try_force_cancel_single_finalizes_only_the_matching_transaction() {
+        let target = ClearTransactionNum(7);
+
+        let mut matching = RequestLifecycleState::Started;
+        assert_eq!(
+            try_force_cancel_single(&mut matching, 7, target),
+            Err(RcpError::RequestCanceled)
+        );
+        assert_eq!(matching, RequestLifecycleState::Finalized);
+
+        let mut non_matching = RequestLifecycleState::Started;
+        assert_eq!(
+            try_force_cancel_single(&mut non_matching, 8, target),
+            Ok(())
+        );
+        assert_eq!(non_matching, RequestLifecycleState::Started);
+    }
+
+    #[test]
+    // fusa:test REQ-RLC-006
+    fn force_cancel_functions_never_panic_for_any_sampled_input() {
+        for state in ALL_LIFECYCLE_STATES {
+            let mut s = state;
+            let _ = try_force_cancel_all(&mut s);
+
+            let mut s = state;
+            let _ = try_force_cancel_non_safestate(&mut s, true);
+            let mut s = state;
+            let _ = try_force_cancel_non_safestate(&mut s, false);
+
+            let mut s = state;
+            let _ = try_force_cancel_single(&mut s, 0, ClearTransactionNum(0));
+            let mut s = state;
+            let _ = try_force_cancel_single(&mut s, 1, ClearTransactionNum(0));
         }
     }
 }
