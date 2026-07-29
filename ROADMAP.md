@@ -1862,12 +1862,44 @@ types deferred out of Milestone 4.
       its REPLACE-disposition cutover remains Milestone 9's job. New
       `REQ-LIN-001`..`REQ-LIN-006` added to `.fusa-reqs.json`, each with a
       `// fusa:req`/`// fusa:test` pair in `src/lin.rs`.
-- [ ] **CAN controller** (`ep_type 0x0B`): Classical/FD/XL `FrameFormat`
+- [x] **CAN controller** (`ep_type 0x0B`): Classical/FD/XL `FrameFormat`
       selection (CBFF/CEFF/FBFF/FEFF/XL-classical/XL-new); CAN XL's 6-byte
       sub-header plus up to 2048-byte payload (needs fragmentation — see
       Milestone 8); data frames only, no remote-frame support; note the
       spec's own CAN trigger-signal table is unpopulated in this revision —
-      that's a spec gap to track, not an implementation omission
+      that's a spec gap to track, not an implementation omission. Done
+      (v0.10.0-dev): new `src/can.rs` — this milestone's second entry, and
+      additive standalone plumbing only, matching `src/lin.rs`'s own
+      discipline — adds [`FrameFormat`], the six named CBFF/CEFF/FBFF/FEFF/
+      XL-classical/XL-new variants with sequential, own-interpretation byte
+      values (flagged, since `ROADMAP.md` names no wire encoding for them);
+      [`CanDataFrame`] for the four non-XL formats, enforcing each format's
+      real classical (8-byte) or FD (64-byte, reused from
+      `canbr::CAN_FD_MAX_PAYLOAD` as a physical fact) data ceiling and real
+      11-bit/29-bit base-vs-extended arbitration-ID width; and
+      [`CanXlSubHeader`]/[`CanXlFrame`] for CAN XL's 6-byte sub-header
+      (carried opaque — its internal field layout is unstated) plus payload
+      capped at 2048 bytes, with [`CanXlCombinedPayload::assemble`] modeling
+      fragment-train reassembly from a caller-supplied `&[&[u8]]`, mirroring
+      `e2e::CombinedFragmentPayload`'s own precedent for the same Milestone 8
+      forward dependency — this crate builds no live multi-AVTPDU reassembly
+      buffer here, that remains Milestone 8's job. `CanFunctionalConfig`
+      carries the selected `FrameFormat` as this endpoint type's
+      functional-config content, composing against
+      `regmap::check_functional_config_matches_ep_type` via `layer_tag`
+      exactly as every prior entry's own config type already does. Neither
+      `CanDataFrame` nor `CanXlFrame` has any RTR field or remote-frame
+      variant, per this bullet's data-frame-only scope. The unpopulated CAN
+      trigger-signal table is recorded as a flagged spec gap in `can.rs`'s
+      own provenance note (no `CanTriggerSignal` type is built) rather than
+      guessed at. `canbr.rs`'s existing `can_id = zone_id << 8 | cmd_type`
+      framing and its `CanSocket` abstraction were read and explicitly not
+      reused — both tie frame identity to the old `Zone`/`Command` model;
+      only its `CAN_FD_MAX_PAYLOAD` physical-fact constant carried over.
+      `canbr.rs` itself is untouched — its REPLACE-disposition cutover
+      remains Milestone 9's job. New `REQ-CAN-001`..`REQ-CAN-011` added to
+      `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair in
+      `src/can.rs`.
 - [ ] **ISELED** (`ep_type 0x0C`): native 4b/5b-encoded daisy-chain framing;
       optional native ISELED CRC, distinct from and additional to the
       RCP-level CRC32; multi-device response aggregation

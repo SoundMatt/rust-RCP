@@ -87,6 +87,7 @@ pub mod admin;
 pub mod authz;
 pub mod avtp;
 pub(crate) mod base64_serde;
+pub mod can;
 pub mod canbr;
 pub mod capi;
 pub mod certgap;
