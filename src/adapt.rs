@@ -8,58 +8,93 @@
 // fusa:req REQ-ADAPT-008
 // fusa:req REQ-ADAPT-009
 // fusa:req REQ-ADAPT-010
+// fusa:req REQ-ADAPT-011
 
 //! Adapter layer — converts between RCP and external protocol representations.
 //!
 //! Provides bi-directional mapping between endpoint payload bytes and
 //! arbitrary external message formats via the [`Adapter`] trait, and the
-//! RELAY-spec `Adapt()` entry point (§10.3) that wraps a [`Controller`] as a
+//! RELAY-spec `Adapt()` entry point (§10.3) that wraps an [`RcServer`] as a
 //! [`crate::relay::Caller`] using `to_message()`/`from_message()` (§15.7.5).
 //!
 //! `ROADMAP.md` Milestone 9 ("All ADAPT-disposition packages retargeted...")
-//! cutover: per this module's own ADAPT disposition ("the RELAY
-//! `Adapt()`/`to_message()`/`from_message()` pattern itself persists; the
-//! mapping needs to be rebuilt against the new endpoint-addressed `Message`
-//! shape (Milestone 10)"), this item's scope is deliberately split in two,
-//! flagged here per Guiding Principle 5 rather than silently picked:
+//! split this module's own cutover in two, per its own ADAPT disposition
+//! ("the RELAY `Adapt()`/`to_message()`/`from_message()` pattern itself
+//! persists; the mapping needs to be rebuilt against the new
+//! endpoint-addressed `Message` shape (Milestone 10)"):
 //!
 //! - [`Adapter`]/[`AdaptEndpoint`] — the generic "convert an external
 //!   message format to/from RCP" decorator layer, structurally the same
-//!   kind of wrapper `ratelimit`/`proxy`/etc. are — is retargeted now, onto
-//!   [`crate::mock::Endpoint`] in place of `Controller`. Since `Endpoint`
-//!   has no single `send`-shaped call (only distinct `read`/`write`
-//!   verbs), [`AdaptEndpoint::send_msg`] models one external "call" as a
-//!   write-then-read round trip, converting `M` to write-payload bytes and
-//!   converting the subsequent read's bytes back to `M` — this crate's own
-//!   simplification, not a transcription of any real external protocol's
-//!   actual semantics, which the deeper Milestone 10 rebuild below is
-//!   still responsible for defining honestly.
+//!   kind of wrapper `ratelimit`/`proxy`/etc. are — was retargeted in
+//!   Milestone 9 onto [`crate::mock::Endpoint`] in place of `Controller`.
+//!   Since `Endpoint` has no single `send`-shaped call (only distinct
+//!   `read`/`write` verbs), [`AdaptEndpoint::send_msg`] models one external
+//!   "call" as a write-then-read round trip, converting `M` to
+//!   write-payload bytes and converting the subsequent read's bytes back
+//!   to `M` — this crate's own simplification, not a transcription of any
+//!   real external protocol's actual semantics.
 //! - [`adapt()`]/`RcpAdapter`/[`to_message`]/[`from_message`]/
-//!   [`response_to_message`] — the RELAY §10.3/§15.7.5 binding itself,
-//!   which maps a zone *name* to/from `relay::Message.id` and forwards
-//!   `Status`-keyed `Priority`/`CommandType` metadata neither of which
-//!   `Endpoint` has an analog for — stay bound to the legacy `Controller`/
-//!   `Zone`/`Command`/`Response`/`Status` surface unchanged. Retargeting
-//!   this half honestly requires the endpoint-addressed `Message` shape
-//!   this row's own disposition-table text reserves for Milestone 10 (a
-//!   `StreamId`+`byte_bus_id` addressing scheme in place of a zone name,
-//!   and a resolution for `crate::mock::RcServer`'s still-open "no live
-//!   notification mechanism" gap before `Status`-style `subscribe`
-//!   forwarding has anything real to forward) — inventing one here would
-//!   guess at behavior this crate has not decided, rather than retarget
-//!   existing behavior.
+//!   [`response_to_message`] — the RELAY §10.3/§15.7.5 binding itself — is
+//!   rebuilt here (Milestone 10) against [`crate::mock::RcServer`]'s
+//!   `(StreamId, byte_bus_id)` addressing in place of the retired
+//!   zone-name-as-`id` convention. See "Provenance note" below for the
+//!   design choices this rebuild had to make that neither the RELAY spec
+//!   nor `ROADMAP.md` pin down, per Guiding Principle 5.
+//!
+//! ## Provenance note
+//!
+//! - **`Message.id` encoding.** The RELAY spec says `id` names a message's
+//!   addressed target; it does not prescribe a string shape. This binding
+//!   encodes `(stream_id, byte_bus_id)` as
+//!   `"<16 lowercase hex digits><'.'><decimal byte_bus_id>"` — see
+//!   [`format_endpoint_id`]/[`parse_endpoint_id`] for the exact grammar.
+//!   This crate's own choice, not a spec requirement.
+//! - **Read vs. write.** Unlike the retired `Command`/`CommandType` model,
+//!   `RcServer::handle_abb` dispatches purely on a boolean `op` (write) /
+//!   not-`op` (read) flag, with no third "no-op" case. `from_message`
+//!   reads an optional `"rcp.op"` meta key (`"read"`/`"write"`) and, absent
+//!   one, infers `op` from whether `msg.payload` is empty — a stand-in
+//!   signal this binding chose since `relay::Message` has no field that
+//!   states read/write intent directly.
+//! - **Read size.** A read additionally needs a requested byte count that
+//!   `Command` never carried. `from_message` reads an optional
+//!   `"rcp.read_size"` meta key (decimal `u8`), defaulting to `u8::MAX` —
+//!   "return everything held" — matching [`crate::mock::MockEndpoint::read`]'s
+//!   own already-established "cap to whatever is actually held" behavior.
+//! - **Subscribe.** [`crate::mock::RcServer`]'s own doc comment states it
+//!   deliberately does not model live asynchronous notification — no TC18
+//!   analog has been identified for one in this crate to date — so unlike
+//!   the retired `Controller::subscribe`/`Status` forwarding this replaced,
+//!   there is nothing today for a subscription to forward. Rather than
+//!   invent a notification source or overload one of the four RELAY error
+//!   sentinels to mean "unsupported," [`RcpAdapter`]'s `subscribe`
+//!   (`crate::relay::Node::subscribe`) returns a channel that is
+//!   immediately, legitimately closed — an honest "no events, currently"
+//!   answer within `Node::subscribe`'s existing typed contract, not a
+//!   silently-invented notification stream. Building a real one is left to
+//!   whichever later milestone gives `RcServer` a live-notification
+//!   mechanism to forward, same as `crate::mock::RcServer`'s own doc
+//!   comment already defers it.
+//! - **Close.** `RcServer` tracks an [`crate::lifecycle::RcServerState`]
+//!   lifecycle position, not an open/closed connection boolean, so there is
+//!   nothing on `RcServer` itself for `Node::close` to delegate to —
+//!   mirroring [`crate::udp::UdpTransport::close`]'s own precedent of a
+//!   locally-tracked close in this same endpoint-addressed model.
+//!   [`RcpAdapter`] keeps its own `closed` flag so `close`'s "further calls
+//!   fail" contract stays meaningful rather than becoming a pure no-op.
 
-use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use tokio::sync::{mpsc, Notify};
+use tokio::sync::mpsc;
 
-use crate::mock::Endpoint;
-use crate::relay::{BackPressurePolicy, Context, Message, Protocol, SubscriberOptions, Version};
-use crate::{zone_from_str, Command, CommandType, Controller, Priority, RcpError, Response};
+use crate::acf::{AcfAbbMessage, ByteMessageInfo, ReadSizeOrSegmentNum};
+use crate::avtp::StreamId;
+use crate::mock::{Endpoint, RcServer};
+use crate::relay::{Context, Message, Protocol, SubscriberOptions, Version};
+use crate::RcpError;
 
 // ── Adapter trait ─────────────────────────────────────────────────────────────
 
@@ -117,209 +152,185 @@ impl Adapter<Vec<u8>> for PassthroughAdapter {
 }
 
 // ---------------------------------------------------------------------------
-// to_message / from_message — RELAY spec §15.7.5
+// Endpoint-address encoding — this binding's own `Message.id` mapping
+// (ROADMAP.md Milestone 10), replacing the retired zone-name-as-`id`
+// convention. See this module's provenance note for why this shape.
 // ---------------------------------------------------------------------------
 
-/// Convert a [`Status`](crate::Status) to a `relay::Message` (Subscribe
-/// direction) per RELAY spec §15.7.5.
-// fusa:req REQ-ADAPT-006
-pub fn to_message(status: &crate::Status) -> Message {
-    let mut meta = std::collections::BTreeMap::new();
-    meta.insert("rcp.healthy".to_string(), status.healthy.to_string());
-    Message {
-        protocol: Protocol::Rcp,
-        version: Version::default(),
-        id: status.zone.as_str().to_string(),
-        payload: status.payload.clone().unwrap_or_default(),
-        timestamp: Utc::now(),
-        seq: status.seq as u64,
-        meta,
-    }
-}
+/// Separator between the hex `stream_id` half and the decimal `byte_bus_id`
+/// half of an encoded [`Message::id`].
+const ENDPOINT_ID_SEP: char = '.';
 
-/// Convert a `relay::Message` to a [`Command`] (Caller.Call direction,
-/// request half) per RELAY spec §15.7.5.
+/// Encode a `(stream_id, byte_bus_id)` pair as a `relay::Message.id` string.
 ///
-/// Returns `Err(RcpError::NotFound)` if `msg.id` is not a known zone name.
-// fusa:req REQ-ADAPT-007
-pub fn from_message(msg: &Message) -> Result<Command, RcpError> {
-    let zone = zone_from_str(&msg.id)?;
-    let priority = msg
-        .meta
-        .get("rcp.priority")
-        .map(|v| parse_priority(v))
-        .unwrap_or(Priority::NORMAL);
-    let cmd_type = msg
-        .meta
-        .get("rcp.cmd_type")
-        .map(|v| parse_cmd_type(v))
-        .unwrap_or(CommandType::NOOP);
-    let payload = if msg.payload.is_empty() {
-        None
-    } else {
-        Some(msg.payload.clone())
-    };
-    Ok(Command {
-        id: 0,
-        zone,
-        cmd_type,
-        priority,
-        payload,
-    })
+/// `stream_id` is rendered as [`StreamId::to_u64`]'s full 64-bit value in
+/// 16 lowercase hex digits, zero-padded so [`parse_endpoint_id`] never has
+/// to guess where it ends; `byte_bus_id` follows in plain decimal, needing
+/// no padding since [`ENDPOINT_ID_SEP`] already marks where it starts.
+// fusa:req REQ-ADAPT-011
+pub fn format_endpoint_id(stream_id: StreamId, byte_bus_id: u16) -> String {
+    format!(
+        "{:016x}{}{}",
+        stream_id.to_u64(),
+        ENDPOINT_ID_SEP,
+        byte_bus_id
+    )
 }
 
-/// Convert a [`Response`] to a `relay::Message` (Caller.Call direction,
-/// reply half) per RELAY spec §15.7.5.
-// fusa:req REQ-ADAPT-008
-pub fn response_to_message(resp: &Response) -> Message {
+/// Decode a `relay::Message.id` string built by [`format_endpoint_id`] back
+/// into its `(stream_id, byte_bus_id)` pair.
+///
+/// Returns `Err(RcpError::InvalidParameter)` if `id` is not exactly one
+/// [`ENDPOINT_ID_SEP`]-separated pair of a 16-hex-digit `stream_id` and a
+/// decimal `byte_bus_id` in `0..=u16::MAX`. Never panics on malformed
+/// input.
+// fusa:req REQ-ADAPT-011
+pub fn parse_endpoint_id(id: &str) -> Result<(StreamId, u16), RcpError> {
+    let (sid_hex, bus_dec) = id
+        .split_once(ENDPOINT_ID_SEP)
+        .ok_or(RcpError::InvalidParameter)?;
+    let raw = u64::from_str_radix(sid_hex, 16).map_err(|_| RcpError::InvalidParameter)?;
+    let byte_bus_id = bus_dec
+        .parse::<u16>()
+        .map_err(|_| RcpError::InvalidParameter)?;
+    Ok((StreamId::from_u64(raw), byte_bus_id))
+}
+
+// ---------------------------------------------------------------------------
+// to_message / from_message / response_to_message — RELAY spec §15.7.5,
+// rebuilt against RcServer's (StreamId, byte_bus_id)-addressed ACF_ABB
+// request/response shape.
+// ---------------------------------------------------------------------------
+
+/// Convert a `relay::Message` to an addressed ACF_ABB request per RELAY
+/// spec §15.7.5 (Caller.Call direction, request half), ready to hand to
+/// [`crate::mock::RcServer::handle_abb`].
+///
+/// `msg.id` is decoded via [`parse_endpoint_id`]. `msg.meta` supplies two
+/// optional, this-binding-defined keys — see this module's provenance
+/// note for why each defaults the way it does:
+///
+/// - `"rcp.op"` (`"read"` or `"write"`; any other value is
+///   `Err(RcpError::InvalidParameter)`) — defaults to `"write"` if
+///   `msg.payload` is non-empty, `"read"` otherwise.
+/// - `"rcp.read_size"` (a decimal `u8`; malformed is
+///   `Err(RcpError::InvalidParameter)`) — defaults to `u8::MAX`, meaningful
+///   only for a read.
+///
+/// Every other `ByteMessageInfo` field this binding has no `Message`-level
+/// analog for (`evt`, `hs`, `cs`, `transaction_num`, `ms`, `pad`, `mtv`) is
+/// left at its zero default; [`crate::mock::RcServer::handle_abb`]'s
+/// dispatch logic does not consult any of them.
+// fusa:req REQ-ADAPT-007
+pub fn from_message(msg: &Message) -> Result<(StreamId, AcfAbbMessage), RcpError> {
+    let (stream_id, byte_bus_id) = parse_endpoint_id(&msg.id)?;
+    let op = match msg.meta.get("rcp.op").map(String::as_str) {
+        Some("write") => true,
+        Some("read") => false,
+        Some(_) => return Err(RcpError::InvalidParameter),
+        None => !msg.payload.is_empty(),
+    };
+    let read_size = msg
+        .meta
+        .get("rcp.read_size")
+        .map(|v| v.parse::<u8>().map_err(|_| RcpError::InvalidParameter))
+        .transpose()?
+        .unwrap_or(u8::MAX);
+    Ok((
+        stream_id,
+        AcfAbbMessage {
+            info: ByteMessageInfo {
+                byte_bus_id,
+                op,
+                read_size_segment_num: ReadSizeOrSegmentNum(read_size),
+                ..Default::default()
+            },
+            payload: msg.payload.clone(),
+        },
+    ))
+}
+
+/// Convert an addressed ACF_ABB response to a `relay::Message` per RELAY
+/// spec §15.7.5. Shared by both directions this module's provenance note
+/// describes: the Caller.Call reply half (used by [`response_to_message`]
+/// below) and, per that note, the same shape a future subscribe-forwarding
+/// path would reuse once [`crate::mock::RcServer`] gains a live-notification
+/// mechanism.
+///
+/// `resp.info.op` is surfaced back as the `"rcp.op"` meta key
+/// (`"write"`/`"read"`), mirroring [`from_message`]'s own request-side key,
+/// so a caller can confirm which operation the RC Server actually
+/// performed.
+// fusa:req REQ-ADAPT-006
+pub fn to_message(stream_id: StreamId, resp: &AcfAbbMessage) -> Message {
     let mut meta = std::collections::BTreeMap::new();
-    meta.insert("rcp.status".to_string(), resp.status.0.to_string());
+    meta.insert(
+        "rcp.op".to_string(),
+        if resp.info.op { "write" } else { "read" }.to_string(),
+    );
     Message {
         protocol: Protocol::Rcp,
         version: Version::default(),
-        id: resp.zone.as_str().to_string(),
-        payload: resp.payload.clone().unwrap_or_default(),
+        id: format_endpoint_id(stream_id, resp.info.byte_bus_id),
+        payload: resp.payload.clone(),
         timestamp: Utc::now(),
         seq: 0,
         meta,
     }
 }
 
-fn parse_priority(s: &str) -> Priority {
-    match s {
-        "high" => Priority::HIGH,
-        "critical" => Priority::CRITICAL,
-        _ => Priority::NORMAL,
-    }
-}
-
-fn parse_cmd_type(s: &str) -> CommandType {
-    match s {
-        "set" => CommandType::SET,
-        "get" => CommandType::GET,
-        "reset" => CommandType::RESET,
-        "watchdog" => CommandType::WATCHDOG,
-        "sleep" => CommandType::SLEEP,
-        "wake" => CommandType::WAKE,
-        _ => CommandType::NOOP,
-    }
-}
-
-// ---------------------------------------------------------------------------
-// AdaptQueue — policy-aware buffer for the Adapt()-level relay.Message
-// channel, per RELAY spec §10.5 rule 3.
-// ---------------------------------------------------------------------------
-
-/// A bounded `Message` queue implementing `DropNewest`/`DropOldest`/`Block`
-/// back-pressure, sitting between the blocking [`Controller::subscribe`]
-/// forwarding task and the async `relay::Node::subscribe` channel returned
-/// to the caller.
-struct AdaptQueue {
-    queue: Mutex<VecDeque<Message>>,
-    capacity: usize,
-    policy: BackPressurePolicy,
-    notify_push: Notify,
-    notify_pop: Notify,
-    closed: std::sync::atomic::AtomicBool,
-}
-
-impl AdaptQueue {
-    fn new(capacity: usize, policy: BackPressurePolicy) -> Self {
-        Self {
-            queue: Mutex::new(VecDeque::with_capacity(capacity.min(256))),
-            capacity: capacity.max(1),
-            policy,
-            notify_push: Notify::new(),
-            notify_pop: Notify::new(),
-            closed: std::sync::atomic::AtomicBool::new(false),
-        }
-    }
-
-    async fn push(&self, msg: Message) {
-        match self.policy {
-            BackPressurePolicy::DropNewest => {
-                let mut q = self.queue.lock().unwrap();
-                if q.len() < self.capacity {
-                    q.push_back(msg);
-                    drop(q);
-                    self.notify_push.notify_one();
-                }
-            }
-            BackPressurePolicy::DropOldest => {
-                let mut q = self.queue.lock().unwrap();
-                if q.len() >= self.capacity {
-                    q.pop_front();
-                }
-                q.push_back(msg);
-                drop(q);
-                self.notify_push.notify_one();
-            }
-            BackPressurePolicy::Block => loop {
-                {
-                    let mut q = self.queue.lock().unwrap();
-                    if q.len() < self.capacity {
-                        q.push_back(msg);
-                        drop(q);
-                        self.notify_push.notify_one();
-                        return;
-                    }
-                }
-                self.notify_pop.notified().await;
-            },
-        }
-    }
-
-    async fn pop(&self) -> Option<Message> {
-        loop {
-            {
-                let mut q = self.queue.lock().unwrap();
-                if let Some(m) = q.pop_front() {
-                    drop(q);
-                    self.notify_pop.notify_one();
-                    return Some(m);
-                }
-            }
-            if self.closed.load(std::sync::atomic::Ordering::SeqCst) {
-                return self.queue.lock().unwrap().pop_front();
-            }
-            self.notify_push.notified().await;
-        }
-    }
-
-    fn close(&self) {
-        self.closed.store(true, std::sync::atomic::Ordering::SeqCst);
-        self.notify_push.notify_waiters();
-    }
-}
-
-// ---------------------------------------------------------------------------
-// adapt() — RELAY spec §10.3: RCP `Adapt(c Controller) relay.Caller`
-// ---------------------------------------------------------------------------
-
-/// Wrap a [`Controller`] as a `relay::Caller` (which also satisfies
-/// `relay::Node`) per RELAY spec §10.3.
+/// Convert an addressed ACF_ABB response to a `relay::Message` (Caller.Call
+/// direction, reply half) per RELAY spec §15.7.5.
 ///
-/// `Controller`'s methods are blocking; each call here dispatches through
-/// [`tokio::task::spawn_blocking`] so the async boundary required by §18.3
-/// is genuine rather than a facade over a blocking call on the calling task.
-// fusa:req REQ-ADAPT-009
-pub fn adapt(ctrl: Arc<dyn Controller>) -> Box<dyn crate::relay::Caller> {
-    Box::new(RcpAdapter { ctrl })
+/// A thin, separately-named entry point over [`to_message`] — kept for
+/// symmetry with [`from_message`]'s request half, since both directions now
+/// share one addressed-response conversion (see this module's provenance
+/// note on why the retired `Status`/`Response` split collapsed to one
+/// shape).
+// fusa:req REQ-ADAPT-008
+pub fn response_to_message(stream_id: StreamId, resp: &AcfAbbMessage) -> Message {
+    to_message(stream_id, resp)
+}
+
+// ---------------------------------------------------------------------------
+// adapt() — RELAY spec §10.3: RCP `Adapt(...) relay.Caller`, rebuilt against
+// crate::mock::RcServer per ROADMAP.md Milestone 10.
+//
+// Note: the retired `Controller`-based binding kept its own `AdaptQueue` —
+// a `BackPressurePolicy`-aware buffer per RELAY spec §10.5 rule 3 — sitting
+// between a blocking notification-producer task and the async
+// `relay::Node::subscribe` channel. Since `subscribe` below has no producer
+// to buffer for (see this module's provenance note), that queue has no
+// caller left and is removed rather than kept as unused scaffolding;
+// whichever later milestone gives `RcServer` a live-notification mechanism
+// can reintroduce the same `crate::relay::BackPressurePolicy`-driven shape
+// once it has something real to buffer.
+// ---------------------------------------------------------------------------
+
+/// Wrap an [`RcServer`] as a `relay::Caller` (which also satisfies
+/// `relay::Node`) per RELAY spec §10.3, addressed by
+/// `(StreamId, byte_bus_id)` rather than by the retired `Zone` model.
+///
+/// `RcServer`'s dispatch methods are synchronous; each call here still
+/// dispatches through [`tokio::task::spawn_blocking`], preserving this
+/// binding's existing §18.3 discipline (a genuine async boundary, not a
+/// facade over a blocking call on the calling task) — a real `Endpoint`
+/// behind an `RcServer` may perform real, blocking device I/O even though
+/// [`crate::mock::MockEndpoint`] does not.
+pub fn adapt(server: Arc<RcServer>) -> Box<dyn crate::relay::Caller> {
+    Box::new(RcpAdapter {
+        server,
+        closed: AtomicBool::new(false),
+    })
 }
 
 struct RcpAdapter {
-    ctrl: Arc<dyn Controller>,
-}
-
-fn ctx_timeout(ctx: &Context) -> Option<Duration> {
-    ctx.deadline.map(|d| {
-        let now = std::time::Instant::now();
-        if d > now {
-            d - now
-        } else {
-            Duration::ZERO
-        }
-    })
+    server: Arc<RcServer>,
+    /// This binding's own open/closed flag — see this module's provenance
+    /// note on why `RcServer` itself has nothing for `Node::close` to
+    /// delegate to, and why this flag is actually consulted by
+    /// `send`/`call` below rather than being a pure no-op.
+    closed: AtomicBool,
 }
 
 fn map_err(e: RcpError) -> crate::relay::Error {
@@ -330,8 +341,9 @@ fn map_err(e: RcpError) -> crate::relay::Error {
     } else if e.is_relay_payload_too_large() {
         crate::relay::Error::PayloadTooLarge
     } else {
-        // NotConnected / NotFound / ZoneMismatch / wire / e2e / other — closest
-        // available sentinel is NotConnected (§5.3: "no usable route" family).
+        // InvalidParameter / EpNotFound / EpError / UnauthorizedAccess /
+        // LockedMemAccess / wire / other — closest available sentinel is
+        // NotConnected (§5.3: "no usable route" family).
         crate::relay::Error::NotConnected
     }
 }
@@ -342,96 +354,69 @@ impl crate::relay::Node for RcpAdapter {
         Protocol::Rcp
     }
 
-    /// Send a `relay::Message` by converting it to a [`Command`] and
-    /// dispatching it; the [`Response`] is awaited (so delivery can be
-    /// confirmed) but discarded, matching `Node::send`'s fire-and-forget
-    /// contract (§10.1) — use [`crate::relay::Caller::call`] for the reply.
+    /// Send a `relay::Message` by converting it to an addressed ACF_ABB
+    /// request and dispatching it; the response is awaited (so delivery
+    /// can be confirmed) but discarded, matching `Node::send`'s
+    /// fire-and-forget contract (§10.1) — use
+    /// [`crate::relay::Caller::call`] for the reply.
     async fn send(&self, ctx: Context, msg: Message) -> Result<(), crate::relay::Error> {
-        let cmd = from_message(&msg).map_err(map_err)?;
-        let ctrl = Arc::clone(&self.ctrl);
-        let timeout = ctx_timeout(&ctx);
-        tokio::task::spawn_blocking(move || ctrl.send(&cmd, timeout))
+        if self.closed.load(Ordering::SeqCst) {
+            return Err(crate::relay::Error::Closed);
+        }
+        if ctx.done() {
+            return Err(crate::relay::Error::Timeout);
+        }
+        let (stream_id, request) = from_message(&msg).map_err(map_err)?;
+        let server = Arc::clone(&self.server);
+        tokio::task::spawn_blocking(move || server.handle_abb(stream_id, &request))
             .await
             .map_err(|_| crate::relay::Error::Closed)?
             .map_err(map_err)?;
         Ok(())
     }
 
-    /// Subscribe to [`Status`](crate::Status) updates and forward them as
-    /// `relay::Message`s, following the goroutine/task model of §10.5: one
-    /// task per subscription, its own `Seq` counter starting at 0, and the
-    /// caller-supplied `BackPressurePolicy` applied at the `relay.Message`
-    /// layer via [`AdaptQueue`].
+    /// See this module's provenance note on `subscribe`: `RcServer` has no
+    /// live-notification mechanism to forward yet, so this returns a
+    /// channel that is immediately, legitimately closed (no sender is ever
+    /// held past this call) rather than inventing one.
     async fn subscribe(
         &self,
-        opts: SubscriberOptions,
+        _opts: SubscriberOptions,
     ) -> Result<mpsc::Receiver<Message>, crate::relay::Error> {
-        let depth = opts.chan_depth(64);
-        let policy = opts.back_pressure;
-        let ctrl = Arc::clone(&self.ctrl);
-
-        let sub = tokio::task::spawn_blocking(move || ctrl.subscribe())
-            .await
-            .map_err(|_| crate::relay::Error::Closed)?
-            .map_err(map_err)?;
-
-        let (tx, rx) = mpsc::channel::<Message>(1);
-        let queue = Arc::new(AdaptQueue::new(depth, policy));
-
-        // Producer: blocking thread draining the sync Subscription, applying
-        // the back-pressure policy against `queue` (§10.5 rule 3). The
-        // runtime `Handle` is captured here (on the async task, inside the
-        // runtime) since `Handle::current()` panics if called from a plain
-        // `std::thread::spawn` thread with no ambient runtime context.
-        let producer_queue = Arc::clone(&queue);
-        let rt = tokio::runtime::Handle::current();
-        std::thread::spawn(move || {
-            let mut seq: u64 = 0;
-            while let Some(status) = sub.recv() {
-                let mut m = to_message(&status);
-                m.seq = seq;
-                seq += 1;
-                rt.block_on(producer_queue.push(m));
-            }
-            producer_queue.close();
-        });
-
-        // Forwarder: drains `queue` into the external channel one message at
-        // a time. §10.5 rule 2: the channel closes when this task exits.
-        tokio::spawn(async move {
-            while let Some(msg) = queue.pop().await {
-                if tx.send(msg).await.is_err() {
-                    break; // receiver dropped
-                }
-            }
-        });
-
+        if self.closed.load(Ordering::SeqCst) {
+            return Err(crate::relay::Error::Closed);
+        }
+        let (_tx, rx) = mpsc::channel::<Message>(1);
+        // `_tx` is dropped here, closing `rx` immediately — see this
+        // module's provenance note on `subscribe`.
         Ok(rx)
     }
 
     async fn close(&self) -> Result<(), crate::relay::Error> {
-        let ctrl = Arc::clone(&self.ctrl);
-        tokio::task::spawn_blocking(move || ctrl.close())
-            .await
-            .map_err(|_| crate::relay::Error::Closed)?
-            .map_err(map_err)
+        self.closed.store(true, Ordering::SeqCst);
+        Ok(())
     }
 }
 
 #[async_trait]
 impl crate::relay::Caller for RcpAdapter {
-    /// Dispatch `req` and return the zone controller's reply as a
-    /// `relay::Message`, per RELAY spec §10.2/§15.7.5.
+    /// Dispatch `req` against the wrapped [`RcServer`] and return its reply
+    /// as a `relay::Message`, per RELAY spec §10.2/§15.7.5.
     // fusa:req REQ-ADAPT-010
     async fn call(&self, ctx: Context, req: Message) -> Result<Message, crate::relay::Error> {
-        let cmd = from_message(&req).map_err(map_err)?;
-        let ctrl = Arc::clone(&self.ctrl);
-        let timeout = ctx_timeout(&ctx);
-        let resp = tokio::task::spawn_blocking(move || ctrl.send(&cmd, timeout))
+        if self.closed.load(Ordering::SeqCst) {
+            return Err(crate::relay::Error::Closed);
+        }
+        if ctx.done() {
+            return Err(crate::relay::Error::Timeout);
+        }
+        let (stream_id, request) = from_message(&req).map_err(map_err)?;
+        let server = Arc::clone(&self.server);
+        let response = tokio::task::spawn_blocking(move || server.handle_abb(stream_id, &request))
             .await
             .map_err(|_| crate::relay::Error::Closed)?
             .map_err(map_err)?;
-        Ok(response_to_message(&resp))
+        Ok(response_to_message(stream_id, &response))
     }
 }
 
@@ -441,22 +426,33 @@ impl crate::relay::Caller for RcpAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mock::{MockController, MockEndpoint};
-    use crate::regmap::EndpointType;
-    use crate::{Response, ResponseStatus, Zone};
-
-    fn ok_ctrl() -> Arc<dyn Controller> {
-        let h: crate::mock::Handler = Box::new(|cmd| Response {
-            command_id: cmd.id,
-            zone: cmd.zone,
-            status: ResponseStatus::OK,
-            payload: cmd.payload.clone(),
-        });
-        MockController::new(Zone::FRONT_LEFT, Some(h)) as Arc<dyn Controller>
-    }
+    use crate::mock::MockEndpoint;
+    use crate::regmap::{EndpointType, GeneralRegisters};
+    use std::time::Duration;
 
     fn ok_endpoint() -> Arc<dyn Endpoint> {
         MockEndpoint::new(EndpointType::Gpio, vec![0u8; 8]) as Arc<dyn Endpoint>
+    }
+
+    fn stream(unique_id: u16) -> StreamId {
+        StreamId::new([0x02, 0x11, 0x22, 0x33, 0x44, 0x55], unique_id)
+    }
+
+    /// A fresh `RcServer` with one `MockEndpoint` (initially holding
+    /// `initial`) registered under `(stream, byte_bus_id)`.
+    fn server_with_endpoint(
+        stream_id: StreamId,
+        byte_bus_id: u16,
+        initial: Vec<u8>,
+    ) -> Arc<RcServer> {
+        let srv = RcServer::new(GeneralRegisters::default());
+        srv.register_endpoint(
+            stream_id,
+            byte_bus_id,
+            MockEndpoint::new(EndpointType::Gpio, initial),
+        )
+        .unwrap();
+        srv
     }
 
     #[test]
@@ -501,68 +497,115 @@ mod tests {
         assert!(out.starts_with(b"data"));
     }
 
+    // ── endpoint-id encoding ───────────────────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-ADAPT-011
+    fn endpoint_id_roundtrips() {
+        let sid = stream(0x1234);
+        let encoded = format_endpoint_id(sid, 0x07FF);
+        let (decoded_sid, decoded_bus) = parse_endpoint_id(&encoded).unwrap();
+        assert_eq!(decoded_sid, sid);
+        assert_eq!(decoded_bus, 0x07FF);
+    }
+
+    #[test]
+    // fusa:test REQ-ADAPT-011
+    fn parse_endpoint_id_rejects_malformed_input() {
+        assert_eq!(
+            parse_endpoint_id("not-an-address").unwrap_err(),
+            RcpError::InvalidParameter
+        );
+        assert_eq!(
+            parse_endpoint_id("zzzz.3").unwrap_err(),
+            RcpError::InvalidParameter
+        );
+        assert_eq!(
+            parse_endpoint_id("00000000000001ff.notanumber").unwrap_err(),
+            RcpError::InvalidParameter
+        );
+    }
+
     // ── to_message / from_message / response_to_message (§15.7.5) ────────────
 
     #[test]
     // fusa:test REQ-ADAPT-006
-    fn status_to_message_maps_zone_seq_healthy_payload() {
-        let status = crate::Status {
-            zone: Zone::FRONT_LEFT,
-            seq: 3,
-            healthy: true,
-            payload: Some(vec![0x01]),
-        };
-        let msg = to_message(&status);
-        assert_eq!(msg.protocol, Protocol::Rcp);
-        assert_eq!(msg.id, "FrontLeft");
-        assert_eq!(msg.seq, 3);
-        assert_eq!(msg.payload, vec![0x01]);
-        assert_eq!(msg.meta.get("rcp.healthy"), Some(&"true".to_string()));
-    }
-
-    #[test]
-    // fusa:test REQ-ADAPT-007
-    fn message_from_message_maps_zone_priority_cmd_type() {
-        let mut meta = std::collections::BTreeMap::new();
-        meta.insert("rcp.priority".to_string(), "critical".to_string());
-        meta.insert("rcp.cmd_type".to_string(), "reset".to_string());
-        let msg = Message {
-            protocol: Protocol::Rcp,
-            version: Version::default(),
-            id: "RearRight".to_string(),
+    fn to_message_maps_address_op_and_payload() {
+        let sid = stream(7);
+        let resp = AcfAbbMessage {
+            info: ByteMessageInfo {
+                byte_bus_id: 9,
+                op: true,
+                ..Default::default()
+            },
             payload: vec![0xAA],
-            timestamp: Utc::now(),
-            seq: 0,
-            meta,
         };
-        let cmd = from_message(&msg).unwrap();
-        assert_eq!(cmd.zone, Zone::REAR_RIGHT);
-        assert_eq!(cmd.priority, Priority::CRITICAL);
-        assert_eq!(cmd.cmd_type, CommandType::RESET);
-        assert_eq!(cmd.payload, Some(vec![0xAA]));
+        let msg = to_message(sid, &resp);
+        assert_eq!(msg.protocol, Protocol::Rcp);
+        assert_eq!(msg.id, format_endpoint_id(sid, 9));
+        assert_eq!(msg.payload, vec![0xAA]);
+        assert_eq!(msg.meta.get("rcp.op"), Some(&"write".to_string()));
     }
 
     #[test]
     // fusa:test REQ-ADAPT-007
-    fn message_from_message_unknown_zone_is_not_found() {
-        let msg = Message::new(Protocol::Rcp, "NotAZone", vec![]);
-        let err = from_message(&msg).unwrap_err();
-        assert_eq!(err, RcpError::NotFound);
+    fn from_message_defaults_op_from_payload_emptiness() {
+        let write_msg = Message::new(Protocol::Rcp, format_endpoint_id(stream(1), 3), vec![0xAA]);
+        let (_, write_req) = from_message(&write_msg).unwrap();
+        assert!(write_req.info.op);
+
+        let read_msg = Message::new(Protocol::Rcp, format_endpoint_id(stream(1), 3), vec![]);
+        let (_, read_req) = from_message(&read_msg).unwrap();
+        assert!(!read_req.info.op);
+    }
+
+    #[test]
+    // fusa:test REQ-ADAPT-007
+    fn from_message_honors_explicit_op_and_read_size_meta() {
+        let mut msg = Message::new(Protocol::Rcp, format_endpoint_id(stream(1), 3), vec![]);
+        msg.meta.insert("rcp.op".to_string(), "read".to_string());
+        msg.meta
+            .insert("rcp.read_size".to_string(), "16".to_string());
+        let (sid, req) = from_message(&msg).unwrap();
+        assert_eq!(sid, stream(1));
+        assert_eq!(req.info.byte_bus_id, 3);
+        assert!(!req.info.op);
+        assert_eq!(req.info.read_size_segment_num.as_read_size(), 16);
+    }
+
+    #[test]
+    // fusa:test REQ-ADAPT-007
+    fn from_message_rejects_unknown_op_value() {
+        let mut msg = Message::new(Protocol::Rcp, format_endpoint_id(stream(1), 3), vec![]);
+        msg.meta
+            .insert("rcp.op".to_string(), "sideways".to_string());
+        assert_eq!(from_message(&msg).unwrap_err(), RcpError::InvalidParameter);
+    }
+
+    #[test]
+    // fusa:test REQ-ADAPT-007
+    fn from_message_rejects_malformed_id() {
+        let msg = Message::new(Protocol::Rcp, "not-an-address", vec![]);
+        assert_eq!(from_message(&msg).unwrap_err(), RcpError::InvalidParameter);
     }
 
     #[test]
     // fusa:test REQ-ADAPT-008
-    fn response_to_message_maps_zone_status_payload() {
-        let resp = Response {
-            command_id: 9,
-            zone: Zone::CENTRAL,
-            status: ResponseStatus::ERROR,
-            payload: Some(vec![0xFF]),
+    fn response_to_message_matches_to_message() {
+        let sid = stream(2);
+        let resp = AcfAbbMessage {
+            info: ByteMessageInfo {
+                byte_bus_id: 5,
+                op: false,
+                ..Default::default()
+            },
+            payload: vec![0x01, 0x02],
         };
-        let msg = response_to_message(&resp);
-        assert_eq!(msg.id, "Central");
-        assert_eq!(msg.payload, vec![0xFF]);
-        assert_eq!(msg.meta.get("rcp.status"), Some(&"1".to_string()));
+        let via_response = response_to_message(sid, &resp);
+        let via_to_message = to_message(sid, &resp);
+        assert_eq!(via_response.id, via_to_message.id);
+        assert_eq!(via_response.payload, via_to_message.payload);
+        assert_eq!(via_response.meta, via_to_message.meta);
     }
 
     // ── adapt() (§10.3) ────────────────────────────────────────────────────
@@ -571,20 +614,33 @@ mod tests {
     // fusa:test REQ-ADAPT-009
     // fusa:test REQ-ADAPT-010
     // fusa:test REQ-RELAY-008
-    async fn adapt_call_dispatches_and_returns_message() {
-        let node = adapt(ok_ctrl());
-        let req = Message::new(Protocol::Rcp, "FrontLeft", vec![1, 2]);
-        let reply = node.call(Context::background(), req).await.unwrap();
-        assert_eq!(reply.id, "FrontLeft");
-        assert_eq!(reply.payload, vec![1, 2]);
-        assert_eq!(reply.meta.get("rcp.status"), Some(&"0".to_string()));
+    async fn adapt_call_write_then_read_round_trips_payload() {
+        let sid = stream(11);
+        let server = server_with_endpoint(sid, 4, vec![0u8; 8]);
+        let node = adapt(server);
+
+        let write_req = Message::new(Protocol::Rcp, format_endpoint_id(sid, 4), vec![1, 2, 3]);
+        let write_reply = node.call(Context::background(), write_req).await.unwrap();
+        assert_eq!(write_reply.id, format_endpoint_id(sid, 4));
+        assert!(write_reply.payload.is_empty());
+        assert_eq!(write_reply.meta.get("rcp.op"), Some(&"write".to_string()));
+
+        let mut read_req = Message::new(Protocol::Rcp, format_endpoint_id(sid, 4), vec![]);
+        read_req
+            .meta
+            .insert("rcp.read_size".to_string(), "3".to_string());
+        let read_reply = node.call(Context::background(), read_req).await.unwrap();
+        assert_eq!(read_reply.payload, vec![1, 2, 3]);
+        assert_eq!(read_reply.meta.get("rcp.op"), Some(&"read".to_string()));
     }
 
     #[tokio::test]
     // fusa:test REQ-ADAPT-009
     async fn adapt_send_discards_response() {
-        let node = adapt(ok_ctrl());
-        let msg = Message::new(Protocol::Rcp, "FrontLeft", vec![]);
+        let sid = stream(12);
+        let server = server_with_endpoint(sid, 4, vec![0u8; 8]);
+        let node = adapt(server);
+        let msg = Message::new(Protocol::Rcp, format_endpoint_id(sid, 4), vec![9]);
         crate::relay::Node::send(&*node, Context::background(), msg)
             .await
             .unwrap();
@@ -592,9 +648,11 @@ mod tests {
 
     #[tokio::test]
     // fusa:test REQ-ADAPT-009
-    async fn adapt_send_invalid_zone_is_not_connected() {
-        let node = adapt(ok_ctrl());
-        let msg = Message::new(Protocol::Rcp, "NoSuchZone", vec![]);
+    async fn adapt_send_invalid_address_is_not_connected() {
+        let sid = stream(13);
+        let server = server_with_endpoint(sid, 4, vec![0u8; 8]);
+        let node = adapt(server);
+        let msg = Message::new(Protocol::Rcp, "not-an-address", vec![]);
         let err = crate::relay::Node::send(&*node, Context::background(), msg)
             .await
             .unwrap_err();
@@ -603,43 +661,61 @@ mod tests {
 
     #[tokio::test]
     // fusa:test REQ-ADAPT-009
-    async fn adapt_subscribe_delivers_published_status() {
-        let ctrl = MockController::new(Zone::FRONT_LEFT, None);
-        let publishable = Arc::clone(&ctrl);
-        let node = adapt(ctrl as Arc<dyn Controller>);
-
-        let mut rx = crate::relay::Node::subscribe(&*node, SubscriberOptions::default())
-            .await
-            .unwrap();
-
-        publishable.publish(Some(vec![0xAB]));
-        let msg = tokio::time::timeout(Duration::from_secs(1), rx.recv())
-            .await
-            .expect("no message received in time")
-            .expect("channel closed");
-        assert_eq!(msg.id, "FrontLeft");
-        assert_eq!(msg.payload, vec![0xAB]);
+    async fn adapt_call_unknown_endpoint_is_not_connected() {
+        let sid = stream(14);
+        let server = server_with_endpoint(sid, 4, vec![0u8; 8]);
+        let node = adapt(server);
+        // byte_bus_id 5 was never registered.
+        let msg = Message::new(Protocol::Rcp, format_endpoint_id(sid, 5), vec![]);
+        let err = node.call(Context::background(), msg).await.unwrap_err();
+        assert_eq!(err, crate::relay::Error::NotConnected);
     }
 
     #[tokio::test]
     // fusa:test REQ-ADAPT-009
-    async fn adapt_close_closes_inner_controller() {
-        let ctrl = MockController::new(Zone::FRONT_LEFT, None);
-        let inner = Arc::clone(&ctrl);
-        let node = adapt(ctrl as Arc<dyn Controller>);
+    async fn adapt_call_already_expired_context_is_timeout() {
+        let sid = stream(15);
+        let server = server_with_endpoint(sid, 4, vec![0u8; 8]);
+        let node = adapt(server);
+        let msg = Message::new(Protocol::Rcp, format_endpoint_id(sid, 4), vec![]);
+        let ctx = Context::with_timeout(Duration::ZERO);
+        std::thread::sleep(Duration::from_millis(1));
+        let err = node.call(ctx, msg).await.unwrap_err();
+        assert_eq!(err, crate::relay::Error::Timeout);
+    }
+
+    #[tokio::test]
+    // fusa:test REQ-ADAPT-009
+    async fn adapt_subscribe_returns_immediately_closed_channel() {
+        let sid = stream(16);
+        let server = server_with_endpoint(sid, 4, vec![0u8; 8]);
+        let node = adapt(server);
+        let mut rx = crate::relay::Node::subscribe(&*node, SubscriberOptions::default())
+            .await
+            .unwrap();
+        assert!(rx.recv().await.is_none());
+    }
+
+    #[tokio::test]
+    // fusa:test REQ-ADAPT-009
+    async fn adapt_close_then_call_is_closed() {
+        let sid = stream(17);
+        let server = server_with_endpoint(sid, 4, vec![0u8; 8]);
+        let node = adapt(server);
         crate::relay::Node::close(&*node).await.unwrap();
-        let cmd = Command {
-            zone: Zone::FRONT_LEFT,
-            ..Default::default()
-        };
-        assert_eq!(inner.send(&cmd, None).unwrap_err(), RcpError::Closed);
+
+        let msg = Message::new(Protocol::Rcp, format_endpoint_id(sid, 4), vec![]);
+        let err = node.call(Context::background(), msg).await.unwrap_err();
+        assert_eq!(err, crate::relay::Error::Closed);
     }
 
     #[test]
     // fusa:test REQ-ADAPT-009
     // fusa:test REQ-RELAY-007
     fn adapt_protocol_is_rcp() {
-        let node = adapt(ok_ctrl());
+        let sid = stream(18);
+        let server = server_with_endpoint(sid, 4, vec![0u8; 8]);
+        let node = adapt(server);
         assert_eq!(crate::relay::Node::protocol(&*node), Protocol::Rcp);
     }
 }
