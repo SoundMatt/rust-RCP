@@ -519,6 +519,28 @@ pub struct Status {
 /// "Error Model" item's own eleven named codes, and is left unchanged by
 /// this addition rather than silently widened to a twelve-or-more-member
 /// group the checklist text for that item never named.
+///
+/// ## `CRC_ERROR` error code (`ROADMAP.md` Milestone 6, "`CRC_ERROR` error
+/// path")
+///
+/// [`CrcError`](Self::CrcError) is the second of the "timing- and
+/// CRC-specific codes wired in by later milestones" the "TC18 spec error
+/// codes" section above defers, and the first CRC-specific one of the two
+/// to actually land ([`ChainAborted`](Self::ChainAborted)/
+/// [`ChainError`](Self::ChainError) above are both chain/timing-specific,
+/// not CRC-specific). [`crate::request::check_rx_enforce_e2e`] constructs
+/// it on a TC18 safe-point CRC-32 mismatch, replacing that function's
+/// earlier, explicitly-provisional reuse of
+/// [`CrcMismatch`](Self::CrcMismatch) — the unrelated, still-live legacy
+/// CRC-16 sentinel [`crate::e2e`]'s `wrap`/`unwrap` path continues to
+/// return unchanged. See [`crate::request`]'s own doc comment "Provenance
+/// note: `CrcError` as a new variant, distinct from the legacy
+/// `CrcMismatch` sentinel" for the full reasoning behind adding a new
+/// variant here rather than collapsing onto `CrcMismatch` or any of the
+/// eleven TC18 codes above. Per the same pattern as
+/// [`ChainAborted`](Self::ChainAborted)/[`ChainError`](Self::ChainError),
+/// [`CrcError`](Self::CrcError) is kept out of the eleven-member
+/// [`is_tc18_error_code`](Self::is_tc18_error_code) group.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum RcpError {
     // ── Mandatory RELAY sentinels ─────────────────────────────────────────
@@ -637,6 +659,19 @@ pub enum RcpError {
 
     #[error("rcp/error: CHAIN_ERROR — chained request link's own execution failed")]
     ChainError,
+
+    // ── CRC_ERROR error code (ROADMAP.md Milestone 6, "CRC_ERROR error
+    //    path") ─────────────────────────────────────────────────────────
+    // See this enum's own doc comment "CRC_ERROR error code" section and
+    // crate::request's "Provenance note: CrcError as a new variant,
+    // distinct from the legacy CrcMismatch sentinel" for the full
+    // provenance note behind adding this as a new variant rather than
+    // continuing check_rx_enforce_e2e's earlier reuse of CrcMismatch, and
+    // for why this stays separate from the eleven-member "TC18 RCP spec
+    // error codes" group.
+    // fusa:req REQ-CRC-011
+    #[error("rcp/error: CRC_ERROR — end-to-end CRC-32 safe-point verification failed")]
+    CrcError,
 
     // ── General errors ───────────────────────────────────────────────────
     #[error("rcp: invalid size")]

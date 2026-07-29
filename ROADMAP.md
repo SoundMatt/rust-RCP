@@ -1732,7 +1732,31 @@ concepts into it rather than treating them as unrelated decorators.
       `StreamWatchdogOutcome`/`OverflowOutcome`/`SequenceEnforcementOutcome`/
       `E2eFailureScope` still has to be composed into
       `resolve_safe_state_action` by a future caller, not by this item.
-- [ ] `CRC_ERROR` error path
+- [x] `CRC_ERROR` error path. Done (v0.9.0-dev): `src/lib.rs` gains
+      `RcpError::CrcError`, a new variant in its own doc-commented section
+      analogous to the `ChainAborted`/`ChainError` "Chained-request error
+      codes" group above it — kept out of the eleven-member
+      `is_tc18_error_code()` predicate, same as that pair.
+      `src/request.rs::check_rx_enforce_e2e` (the `rx_enforce_e2e` CRC32
+      safe-point mismatch rule from the "Per-stream safety config" entry
+      above) now constructs `RcpError::CrcError` in place of its earlier,
+      explicitly-provisional reuse of the legacy CRC-16-era
+      `RcpError::CrcMismatch` sentinel; `crate::e2e`'s own `wrap`/`unwrap`
+      CRC-16 path keeps returning `RcpError::CrcMismatch` unchanged, since
+      that mechanism stays REPLACE-scheduled for later milestones and this
+      item does not touch it. New `REQ-CRC-011` added to `.fusa-reqs.json`
+      (this module's existing `REQ-CRC-*` prefix, continuing its numbering)
+      with a `// fusa:req`/`// fusa:test` pair; `REQ-E2EENF-002`'s text is
+      updated in place to name `RcpError::CrcError` rather than the retired
+      reuse. Per Guiding Principle 5, this entry leaves
+      `crate::e2e::check_fragment_crc_placement`'s own unrelated
+      `InvalidParameter` return untouched and open rather than folding it
+      into `CRC_ERROR` as well — that function's own doc comment already
+      scoped itself as a separate, non-`CRC_ERROR` placement rule ahead of
+      this item landing. Same "additive standalone plumbing only"
+      discipline as every prior milestone entry: `check_rx_enforce_e2e`
+      remains standalone, non-decoder-wired plumbing; only the sentinel it
+      returns changed.
 - [ ] Real power-mode model backing the safe-state work: Normal / StandBy /
       Sleep / Unpowered, cold-start vs. hot-start, and the
       hot-start-from-Sleep WakeUp-message handshake (replacing the ad-hoc

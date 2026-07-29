@@ -5494,7 +5494,16 @@
     {
       "id": "REQ-E2EENF-002",
       "title": "check_rx_enforce_e2e compares crc32_tc18(coverage_buffer) against expected_crc and reports scope on mismatch",
-      "text": "check_rx_enforce_e2e(coverage_buffer, expected_crc, rx_enforce_e2e) returns Ok(()) when crc32_tc18(coverage_buffer) equals expected_crc for any rx_enforce_e2e value, and Err((RcpError::CrcMismatch, e2e_failure_scope(rx_enforce_e2e))) when it does not; never panics for any sampled input",
+      "text": "check_rx_enforce_e2e(coverage_buffer, expected_crc, rx_enforce_e2e) returns Ok(()) when crc32_tc18(coverage_buffer) equals expected_crc for any rx_enforce_e2e value, and Err((RcpError::CrcError, e2e_failure_scope(rx_enforce_e2e))) when it does not; never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CRC-011",
+      "title": "RcpError gains CrcError as a new variant for the CRC_ERROR error path, distinct from the legacy CrcMismatch sentinel",
+      "text": "RcpError::CrcError is added as a new variant (not collapsed onto RcpError::CrcMismatch or any of the eleven Milestone 2 TC18 error codes), is distinct from RcpError::CrcMismatch under equality, its Display text embeds the roadmap-named CRC_ERROR code following the enum's established \"rcp/error: <CODE> - ...\" message convention, and check_rx_enforce_e2e constructs it (in place of RcpError::CrcMismatch) on a TC18 safe-point CRC-32 mismatch",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
