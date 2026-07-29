@@ -91,7 +91,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: install cargo-fuzz
         run: cargo install cargo-fuzz --locked
-      - name: fuzz wire decoder (30s)
+      - name: fuzz NTSCF frame decoder (30s)
         run: |
           if [ -d fuzz ]; then
             cargo +nightly fuzz run fuzz_wire_decode -- -max_total_time=30

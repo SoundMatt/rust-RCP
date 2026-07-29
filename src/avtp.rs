@@ -23,9 +23,11 @@
 
 //! IEEE 1722 AVTPDU framing — TC18 wire format core (`ROADMAP.md` Milestone 1).
 //!
-//! This module begins the replacement of the legacy 16-byte frame in
-//! [`crate::wire`] with the real OPEN Alliance TC18 Remote Control Protocol
-//! wire format. It models the two AVTPDU header variants named on the
+//! This module begins the replacement of the legacy 16-byte frame that used
+//! to live in `crate::wire` (deleted by `ROADMAP.md` Milestone 9's `wire`
+//! REPLACE cutover — see this module's "Frame composition" section below)
+//! with the real OPEN Alliance TC18 Remote Control Protocol wire format. It
+//! models the two AVTPDU header variants named on the
 //! Milestone 1 checklist:
 //!
 //! - **NTSCF** — per this crate's own spec-extraction notes, the only header
@@ -71,9 +73,24 @@
 //! stream-relative, not global, uniqueness) and the echo-back rule for
 //! responses/acks — are still separate, later work.
 //!
-//! Nothing else in the crate depends on this module yet: it coexists with
-//! [`crate::wire`] rather than replacing it, so existing callers of the
-//! legacy frame are unaffected until a later milestone cuts them over.
+//! ## Frame composition (`ROADMAP.md` Milestone 9)
+//!
+//! Every item above stops at a decoded/encoded *header* — assembling a
+//! whole on-wire AVTPDU (an NTSCF header followed by its ACF payload) was
+//! explicitly left for "whichever later milestone actually builds that
+//! request/response lifecycle." [`encode_ntscf_frame`]/
+//! [`decode_ntscf_frame`] are that composition step, added as part of
+//! Milestone 9's `wire` REPLACE-disposition cutover: they combine an
+//! [`NtscfHeader`] with an already-encoded [`crate::acf::AcfAbbMessage`]/
+//! [`crate::acf::AcfGbbMessage`] payload (or any other bytes a caller
+//! supplies) into one transportable frame, and split one back apart. This
+//! is the piece that lets a transport (`crate::udp`, `crate::tlstransport`)
+//! stop calling the legacy `crate::wire` frame encoder/decoder — deleted by
+//! this same milestone item, since nothing else in the crate constructed
+//! its 16-byte frame — in favor of the real TC18 wire format built here and
+//! in `crate::acf`. Per this module's own discipline, neither function
+//! parses or interprets the ACF payload itself; that remains `crate::acf`'s
+//! job.
 //!
 //! ## Provenance note
 //!
@@ -491,6 +508,59 @@ pub fn parse_stream_id(raw: u64) -> ([u8; 6], u16) {
     ];
     let unique_id = raw as u16;
     (sender_mac, unique_id)
+}
+
+// ── Frame composition (ROADMAP.md Milestone 9, `wire` REPLACE cutover) ───────
+
+/// Combine an [`NtscfHeader`] (built from `stream_id`/`sequence_num`) with
+/// an already-encoded ACF payload into one on-wire AVTPDU frame, ready to
+/// hand to a transport.
+///
+/// `acf_payload` is opaque to this function — it is typically the output of
+/// [`crate::acf::encode_acf_abb`] or [`crate::acf::encode_acf_gbb`], but
+/// this function does not require that; it only measures the payload's
+/// length to populate `ntscf_data_length`. Returns
+/// `Err(RcpError::InvalidSize)` if that length exceeds
+/// [`NTSCF_DATA_LENGTH_MAX`] (the same 11-bit field width
+/// [`encode_ntscf_header`] itself enforces).
+// fusa:req REQ-WIRE-001
+// fusa:req REQ-WIRE-002
+// fusa:req REQ-WIRE-004
+// fusa:req REQ-WIRE-007
+pub fn encode_ntscf_frame(
+    stream_id: StreamId,
+    sequence_num: u8,
+    acf_payload: &[u8],
+) -> Result<Vec<u8>, RcpError> {
+    let ntscf_data_length = u16::try_from(acf_payload.len()).map_err(|_| RcpError::InvalidSize)?;
+    let hdr = NtscfHeader {
+        sequence_num,
+        ntscf_data_length,
+        stream_id: stream_id.to_u64(),
+    };
+    let hdr_bytes = encode_ntscf_header(&hdr)?;
+    let mut buf = Vec::with_capacity(hdr_bytes.len() + acf_payload.len());
+    buf.extend_from_slice(&hdr_bytes);
+    buf.extend_from_slice(acf_payload);
+    Ok(buf)
+}
+
+/// Split a decoded [`NtscfHeader`] from its trailing ACF payload bytes.
+///
+/// The returned payload slice is handed unparsed to whichever ACF decoder
+/// the caller expects ([`crate::acf::decode_acf_abb`]/
+/// [`crate::acf::decode_acf_gbb`]) — this function does not attempt to
+/// distinguish between them. Never panics on short, truncated, or arbitrary
+/// input: delegates directly to [`decode_ntscf_header`] for that case, then
+/// returns whatever trailing bytes remain (including zero of them)
+/// verbatim.
+// fusa:req REQ-WIRE-003
+// fusa:req REQ-WIRE-005
+// fusa:req REQ-WIRE-008
+// fusa:req REQ-WIRE-009
+pub fn decode_ntscf_frame(b: &[u8]) -> Result<(NtscfHeader, &[u8]), RcpError> {
+    let hdr = decode_ntscf_header(b)?;
+    Ok((hdr, &b[NTSCF_HEADER_LEN..]))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1093,5 +1163,85 @@ mod tests {
         let frame = encode_tscf_header(&hdr).unwrap();
         let decoded = decode_tscf_header(&frame).unwrap();
         assert_eq!(StreamId::from_u64(decoded.stream_id), id);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Frame composition (encode_ntscf_frame / decode_ntscf_frame)
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    // fusa:test REQ-WIRE-001
+    // fusa:test REQ-WIRE-002
+    // fusa:test REQ-WIRE-003
+    // fusa:test REQ-WIRE-004
+    // fusa:test REQ-WIRE-005
+    fn ntscf_frame_round_trips_arbitrary_payload() {
+        let sid = StreamId::new([0x02, 0x11, 0x22, 0x33, 0x44, 0x55], 0x0042);
+        let payload = vec![0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03];
+        let frame = encode_ntscf_frame(sid, 7, &payload).unwrap();
+        assert_eq!(frame.len(), NTSCF_HEADER_LEN + payload.len());
+        let (hdr, decoded_payload) = decode_ntscf_frame(&frame).unwrap();
+        assert_eq!(hdr.sequence_num, 7);
+        assert_eq!(hdr.ntscf_data_length, payload.len() as u16);
+        assert_eq!(StreamId::from_u64(hdr.stream_id), sid);
+        assert_eq!(decoded_payload, payload.as_slice());
+    }
+
+    #[test]
+    // fusa:test REQ-WIRE-005
+    fn ntscf_frame_round_trips_empty_payload() {
+        let sid = StreamId::default();
+        let frame = encode_ntscf_frame(sid, 0, &[]).unwrap();
+        assert_eq!(frame.len(), NTSCF_HEADER_LEN);
+        let (hdr, decoded_payload) = decode_ntscf_frame(&frame).unwrap();
+        assert_eq!(hdr.ntscf_data_length, 0);
+        assert!(decoded_payload.is_empty());
+    }
+
+    #[test]
+    // fusa:test REQ-WIRE-001
+    // fusa:test REQ-WIRE-007
+    fn ntscf_frame_rejects_oversized_payload() {
+        let oversized = vec![0u8; NTSCF_DATA_LENGTH_MAX as usize + 1];
+        assert_eq!(
+            encode_ntscf_frame(StreamId::default(), 0, &oversized),
+            Err(RcpError::InvalidSize)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-WIRE-008
+    fn decode_ntscf_frame_propagates_wrong_subtype() {
+        let mut frame = encode_ntscf_frame(StreamId::default(), 0, &[1, 2, 3]).unwrap();
+        frame[0] = TSCF_SUBTYPE;
+        assert!(matches!(
+            decode_ntscf_frame(&frame),
+            Err(RcpError::Other(_))
+        ));
+    }
+
+    #[test]
+    // fusa:test REQ-WIRE-009
+    fn decode_ntscf_frame_rejects_short_input() {
+        for len in 0..NTSCF_HEADER_LEN {
+            let buf = vec![0u8; len];
+            assert_eq!(decode_ntscf_frame(&buf), Err(RcpError::ShortFrame));
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-WIRE-009
+    fn ntscf_frame_functions_never_panic_on_arbitrary_input() {
+        let mut state: u32 = 0x1357_9BDF;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            state
+        };
+        for len in 0..NTSCF_HEADER_LEN + 20 {
+            let buf: Vec<u8> = (0..len).map(|_| (next() & 0xFF) as u8).collect();
+            let _ = decode_ntscf_frame(&buf);
+        }
     }
 }

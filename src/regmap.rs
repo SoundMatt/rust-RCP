@@ -237,8 +237,10 @@
 //! recurring two-field shape its own reusable type rather than repeating it
 //! nine times. [`GeneralRegisters::encode`]/[`GeneralRegisters::decode`]
 //! give the whole block a never-panicking, fixed-length, big-endian wire
-//! form, matching [`crate::wire`]'s own big-endian convention for every
-//! other multi-byte field this crate already encodes.
+//! form, matching the same big-endian convention this crate uses for every
+//! other multi-byte field it encodes (including `crate::avtp`'s NTSCF/TSCF
+//! headers, which absorbed the role `crate::wire` — deleted by `ROADMAP.md`
+//! Milestone 9's `wire` REPLACE cutover — used to serve).
 //!
 //! Like every prior Milestone 1/2 entry, [`GeneralRegisters`] is purely
 //! additive: it performs no register I/O against a real RC Server, and is
