@@ -5373,6 +5373,42 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CRC-004",
+      "title": "CRC-32 coverage buffer assembly order",
+      "text": "build_crc32_coverage_buffer assembles the byte sequence crc32_tc18 is computed over in order: the 8-byte stream_id, the 4-byte avtp_timestamp position, the full ACF header, and the payload, and the resulting buffer's CRC is sensitive to changes anywhere in that sequence",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CRC-005",
+      "title": "avtp_timestamp zeroed under NTSCF, real value under TSCF",
+      "text": "build_crc32_coverage_buffer substitutes four zero bytes for the avtp_timestamp position when the AVTPDU header variant is NTSCF (which carries no avtp_timestamp field), and uses the header's real 4-byte avtp_timestamp value when the variant is TSCF",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CRC-006",
+      "title": "ACF header length-field pre-adjustment before CRC coverage",
+      "text": "build_crc32_coverage_buffer encodes the covered ACF header's byte_message_info.acf_msg_length as the caller-supplied value plus one quadlet (4 octets), per this crate's working interpretation of the coverage rule's length-field pre-adjustment, and rejects a pre-adjusted value that overflows the 11-bit field width the same way encode_byte_message_info itself would",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CRC-007",
+      "title": "Coverage buffer covers the correct ACF_ABB vs ACF_GBB header shape",
+      "text": "build_crc32_coverage_buffer's ACF header region is exactly ACF_ABB_HEADER_LEN bytes (discriminant + byte_message_info, no message_timestamp) for AcfCoverageMessage::Abb, and exactly ACF_GBB_HEADER_LEN bytes (discriminant + byte_message_info + the 8-byte message_timestamp) for AcfCoverageMessage::Gbb, immediately followed by the payload in both cases",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

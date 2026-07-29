@@ -9,6 +9,10 @@
 // fusa:req REQ-CRC-001
 // fusa:req REQ-CRC-002
 // fusa:req REQ-CRC-003
+// fusa:req REQ-CRC-004
+// fusa:req REQ-CRC-005
+// fusa:req REQ-CRC-006
+// fusa:req REQ-CRC-007
 
 //! End-to-end protection: CRC-16/CCITT-FALSE header + replay guard, plus
 //! (as of `ROADMAP.md` Milestone 6) the standalone OPEN Alliance TC18
@@ -22,12 +26,39 @@
 //! ```
 //!
 //! [`crc32_tc18`] is added additively alongside the above: it is not yet
-//! called from `wrap`/`unwrap` or from [`E2eController`]. Deciding exactly
-//! which bytes of a real safe-point frame the CRC-32 covers (`stream_id`,
-//! `avtp_timestamp`, the ACF header, and payload, per `ROADMAP.md`
-//! Milestone 6's "Coverage rule" bullet) requires the AVTPDU/ACF framing
-//! types from [`crate::avtp`]/[`crate::acf`], and is deliberately deferred
-//! to that bullet rather than guessed at here.
+//! called from `wrap`/`unwrap` or from [`E2eController`].
+//!
+//! ## Coverage rule (`ROADMAP.md` Milestone 6, "Coverage rule" bullet)
+//!
+//! [`build_crc32_coverage_buffer`] assembles the exact byte sequence
+//! [`crc32_tc18`] is meant to run over for a real safe-point AVTPDU/ACF
+//! frame: `stream_id`, then `avtp_timestamp` (or, for an NTSCF-headed
+//! frame — which carries no `avtp_timestamp` field at all — four zero
+//! bytes in its place), then the full ACF header (the `acf_msg_type`
+//! discriminant, `byte_message_info`, and — for ACF_GBB only —
+//! `message_timestamp`), then the payload. It reuses
+//! [`crate::avtp::HeaderVariant`] to decide which of `stream_id`/
+//! `avtp_timestamp` apply, and [`AcfCoverageMessage`] to decide which ACF
+//! header shape applies, rather than re-deriving either decision.
+//!
+//! ### Working interpretation: which length field gets the `+4` octet
+//! pre-adjustment (Guiding Principle 5)
+//!
+//! The Milestone 6 checklist states a length field is pre-adjusted by one
+//! quadlet (4 octets) before the CRC is computed over it, but does not say
+//! which length field. Of this crate's currently-decoded length fields,
+//! `byte_message_info`'s `acf_msg_length` is the only one that lives inside
+//! the region this coverage rule actually covers (`stream_id`/
+//! `avtp_timestamp`/ACF-header/payload) — the AVTP-level
+//! `ntscf_data_length`/`stream_data_length` fields sit entirely outside
+//! that region, in [`crate::avtp`]'s NTSCF/TSCF header, which this
+//! function does not re-encode. [`build_crc32_coverage_buffer`] therefore
+//! treats `acf_msg_length` as the field being pre-adjusted: the value it
+//! encodes into the coverage buffer's ACF header is the caller-supplied
+//! `ByteMessageInfo::acf_msg_length` plus 4, not the raw as-decoded value.
+//! This is this crate's own working interpretation, not a spec-confirmed
+//! fact, and is flagged here for reconciliation against real TC18 behavior
+//! (never against spec prose) before being relied on for interop.
 //!
 //! ## Provenance note: `crc32_tc18` verified by cross-implementation, not
 //! by a published check value
@@ -59,6 +90,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use crate::acf::{self, AcfAbbMessage, AcfGbbMessage};
+use crate::avtp::HeaderVariant;
 use crate::{Command, Controller, RcpError, Response, Subscription, Zone};
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -129,6 +162,102 @@ pub fn crc32_tc18(data: &[u8]) -> u32 {
         }
     }
     crc ^ CRC32_TC18_INIT_XOROUT
+}
+
+// ── CRC-32 coverage rule ─────────────────────────────────────────────────────
+
+/// Number of octets the "length-field pre-adjustment" in `ROADMAP.md`
+/// Milestone 6's "Coverage rule" bullet adds to a length field before the
+/// CRC is computed: one quadlet (4 octets). See this module's doc comment
+/// for which length field [`build_crc32_coverage_buffer`] applies this to,
+/// and why — this crate's own working interpretation, flagged per Guiding
+/// Principle 5.
+const CRC32_COVERAGE_LENGTH_PREADJUST_OCTETS: u16 = 4;
+
+/// Which of the two Milestone 1 ACF message shapes a
+/// [`build_crc32_coverage_buffer`] call's "full ACF header" is drawn from.
+///
+/// Mirrors [`AcfAbbMessage`]/[`AcfGbbMessage`] rather than adding a new
+/// decoded representation of either: this type only selects which one
+/// applies, it does not reinterpret either message's fields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AcfCoverageMessage<'a> {
+    /// An ACF_ABB message (no `message_timestamp`; `ACF_ABB_HEADER_LEN` ==
+    /// 9-byte header before payload).
+    Abb(&'a AcfAbbMessage),
+    /// An ACF_GBB message (carries `message_timestamp`;
+    /// `ACF_GBB_HEADER_LEN` == 17-byte header before payload).
+    Gbb(&'a AcfGbbMessage),
+}
+
+/// Assembles the exact byte sequence [`crc32_tc18`] is meant to run over
+/// for a real safe-point AVTPDU/ACF frame, per `ROADMAP.md` Milestone 6's
+/// "Coverage rule" bullet: `stream_id`, then `avtp_timestamp` (zeroed under
+/// NTSCF), then the full ACF header, then the payload.
+///
+/// - `stream_id` comes from whichever of [`HeaderVariant::Ntscf`]/
+///   [`HeaderVariant::Tscf`] `header` is, encoded big-endian as 8 bytes.
+/// - `avtp_timestamp` is the real 4-byte big-endian value from
+///   [`HeaderVariant::Tscf`], or, for [`HeaderVariant::Ntscf`] (which has no
+///   `avtp_timestamp` field to carry), four zero bytes occupying the same
+///   position in the buffer rather than being omitted.
+/// - The full ACF header is `acf`'s discriminant byte, `byte_message_info`,
+///   and (for [`AcfCoverageMessage::Gbb`] only) the 8-byte
+///   `message_timestamp` — reusing [`acf::encode_acf_abb`]/
+///   [`acf::encode_acf_gbb`] (which also appends the payload, completing
+///   the buffer in the same call) rather than re-deriving either message's
+///   wire layout here. Before encoding, `acf`'s `byte_message_info.
+///   acf_msg_length` is increased by [`CRC32_COVERAGE_LENGTH_PREADJUST_OCTETS`]
+///   — see this module's doc comment for why that field specifically.
+///
+/// Returns `Err(RcpError::InvalidSize)` if the pre-adjusted `acf_msg_length`
+/// (or any other `ByteMessageInfo` field) fails
+/// [`acf::encode_byte_message_info`]'s field-width validation — the same
+/// error [`acf::encode_acf_abb`]/[`acf::encode_acf_gbb`] would themselves
+/// return for an out-of-range header.
+///
+/// Additive standalone plumbing, matching every prior Milestone 1-6 entry's
+/// discipline: not called from [`crc32_tc18`], `wrap`/`unwrap`, or
+/// [`E2eController`] — this function only assembles the buffer a caller
+/// would pass to `crc32_tc18` and a later milestone's dispatch/CRC-error
+/// path.
+// fusa:req REQ-CRC-004
+// fusa:req REQ-CRC-005
+// fusa:req REQ-CRC-006
+// fusa:req REQ-CRC-007
+pub fn build_crc32_coverage_buffer(
+    header: &HeaderVariant,
+    acf: &AcfCoverageMessage,
+) -> Result<Vec<u8>, RcpError> {
+    let (stream_id, avtp_timestamp_bytes) = match header {
+        HeaderVariant::Ntscf(h) => (h.stream_id, [0u8; 4]),
+        HeaderVariant::Tscf(h) => (h.stream_id, h.avtp_timestamp.to_be_bytes()),
+    };
+
+    let mut buf = Vec::new();
+    buf.extend_from_slice(&stream_id.to_be_bytes());
+    buf.extend_from_slice(&avtp_timestamp_bytes);
+
+    match acf {
+        AcfCoverageMessage::Abb(msg) => {
+            let mut adjusted = (*msg).clone();
+            adjusted.info.acf_msg_length = adjusted
+                .info
+                .acf_msg_length
+                .saturating_add(CRC32_COVERAGE_LENGTH_PREADJUST_OCTETS);
+            buf.extend_from_slice(&acf::encode_acf_abb(&adjusted)?);
+        }
+        AcfCoverageMessage::Gbb(msg) => {
+            let mut adjusted = (*msg).clone();
+            adjusted.info.acf_msg_length = adjusted
+                .info
+                .acf_msg_length
+                .saturating_add(CRC32_COVERAGE_LENGTH_PREADJUST_OCTETS);
+            buf.extend_from_slice(&acf::encode_acf_gbb(&adjusted)?);
+        }
+    }
+
+    Ok(buf)
 }
 
 // ── Wrap / Unwrap ─────────────────────────────────────────────────────────────
@@ -259,6 +388,7 @@ impl Controller for E2eController {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::avtp;
     use crate::mock::MockController;
     use crate::Zone;
 
@@ -368,6 +498,178 @@ mod tests {
         let baseline = crc32_tc18(&data);
         data[0] ^= 0x01;
         assert_ne!(crc32_tc18(&data), baseline);
+    }
+
+    // ── CRC-32 coverage rule ────────────────────────────────────────────────
+
+    fn sample_abb_message(acf_msg_length: u16, payload: &[u8]) -> AcfAbbMessage {
+        AcfAbbMessage {
+            info: acf::ByteMessageInfo {
+                acf_msg_length,
+                ..Default::default()
+            },
+            payload: payload.to_vec(),
+        }
+    }
+
+    fn sample_gbb_message(
+        acf_msg_length: u16,
+        message_timestamp: u64,
+        payload: &[u8],
+    ) -> AcfGbbMessage {
+        AcfGbbMessage {
+            info: acf::ByteMessageInfo {
+                acf_msg_length,
+                ..Default::default()
+            },
+            message_timestamp,
+            payload: payload.to_vec(),
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-004
+    fn coverage_buffer_leads_with_stream_id_bytes() {
+        let header = HeaderVariant::Ntscf(avtp::NtscfHeader {
+            stream_id: 0x0102_0304_0506_0708,
+            ..Default::default()
+        });
+        let acf = AcfCoverageMessage::Abb(&sample_abb_message(0, b"pl"));
+        let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
+        assert_eq!(&buf[0..8], &0x0102_0304_0506_0708u64.to_be_bytes());
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-005
+    fn coverage_buffer_zeroes_avtp_timestamp_under_ntscf() {
+        let header = HeaderVariant::Ntscf(avtp::NtscfHeader {
+            stream_id: 0xAABB_CCDD_EEFF_0011,
+            ..Default::default()
+        });
+        let acf = AcfCoverageMessage::Abb(&sample_abb_message(0, b"pl"));
+        let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
+        // Bytes [8..12] are the avtp_timestamp position, immediately after
+        // the 8-byte stream_id — must be all-zero, not omitted, per the
+        // "zeroed under NTSCF" rule.
+        assert_eq!(&buf[8..12], &[0, 0, 0, 0]);
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-005
+    fn coverage_buffer_uses_real_avtp_timestamp_under_tscf() {
+        let header = HeaderVariant::Tscf(avtp::TscfHeader {
+            stream_id: 0x1,
+            avtp_timestamp: 0xDEAD_BEEF,
+            ..Default::default()
+        });
+        let acf = AcfCoverageMessage::Abb(&sample_abb_message(0, b"pl"));
+        let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
+        assert_eq!(&buf[8..12], &0xDEAD_BEEFu32.to_be_bytes());
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-007
+    fn coverage_buffer_abb_header_has_no_message_timestamp_region() {
+        let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
+        let payload = b"abb-payload";
+        let acf = AcfCoverageMessage::Abb(&sample_abb_message(0, payload));
+        let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
+        // 8 (stream_id) + 4 (avtp_timestamp) + ACF_ABB_HEADER_LEN + payload.
+        assert_eq!(buf.len(), 12 + acf::ACF_ABB_HEADER_LEN + payload.len());
+        // The ACF discriminant byte sits right after the 12-byte prefix.
+        assert_eq!(buf[12], acf::ACF_ABB_MSG_TYPE);
+        assert_eq!(&buf[buf.len() - payload.len()..], payload);
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-007
+    fn coverage_buffer_gbb_header_carries_message_timestamp() {
+        let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
+        let payload = b"gbb-payload";
+        let msg = sample_gbb_message(0, 0x0011_2233_4455_6677, payload);
+        let acf = AcfCoverageMessage::Gbb(&msg);
+        let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
+        // 8 (stream_id) + 4 (avtp_timestamp) + ACF_GBB_HEADER_LEN + payload.
+        assert_eq!(buf.len(), 12 + acf::ACF_GBB_HEADER_LEN + payload.len());
+        assert_eq!(buf[12], acf::ACF_GBB_MSG_TYPE);
+        // message_timestamp occupies the 8 bytes just before the payload
+        // (ACF_GBB_HEADER_LEN already accounts for byte_message_info's
+        // width, so it starts right after that).
+        let ts_start = 12 + 1 + acf::BYTE_MESSAGE_INFO_LEN;
+        let ts_end = ts_start + 8;
+        assert_eq!(
+            &buf[ts_start..ts_end],
+            &0x0011_2233_4455_6677u64.to_be_bytes()
+        );
+        assert_eq!(&buf[buf.len() - payload.len()..], payload);
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-006
+    fn coverage_buffer_preadjusts_acf_msg_length_by_one_quadlet() {
+        let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
+        let acf_msg_length = 0x0100u16;
+        let acf = AcfCoverageMessage::Abb(&sample_abb_message(acf_msg_length, b"x"));
+        let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
+        // The ACF header region starts at byte 12 (after stream_id +
+        // avtp_timestamp); byte_message_info follows the 1-byte
+        // discriminant.
+        let info_start = 12 + 1;
+        let decoded = acf::decode_byte_message_info(
+            &buf[info_start..info_start + acf::BYTE_MESSAGE_INFO_LEN],
+        )
+        .unwrap();
+        assert_eq!(
+            decoded.acf_msg_length,
+            acf_msg_length + CRC32_COVERAGE_LENGTH_PREADJUST_OCTETS
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-006
+    fn coverage_buffer_rejects_length_that_overflows_11_bits_after_preadjustment() {
+        let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
+        // Max legal 11-bit acf_msg_length; +4 pushes it past the field
+        // width, so encoding must fail the same way
+        // `acf::encode_byte_message_info` itself would.
+        let acf =
+            AcfCoverageMessage::Abb(&sample_abb_message(acf::BYTE_MESSAGE_INFO_11BIT_MAX, b"x"));
+        assert_eq!(
+            build_crc32_coverage_buffer(&header, &acf),
+            Err(RcpError::InvalidSize)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-004
+    fn coverage_buffer_feeds_crc32_tc18_without_panicking() {
+        let header = HeaderVariant::Tscf(avtp::TscfHeader {
+            stream_id: 0x0203_0405_0607_0809,
+            avtp_timestamp: 0x1234_5678,
+            ..Default::default()
+        });
+        let msg = sample_gbb_message(0x0010, 0x99, b"safe-point payload");
+        let acf = AcfCoverageMessage::Gbb(&msg);
+        let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
+        let _ = crc32_tc18(&buf);
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-004
+    fn coverage_buffer_changes_when_stream_id_differs() {
+        let payload = b"same-payload";
+        let acf = AcfCoverageMessage::Abb(&sample_abb_message(0, payload));
+        let h1 = HeaderVariant::Ntscf(avtp::NtscfHeader {
+            stream_id: 1,
+            ..Default::default()
+        });
+        let h2 = HeaderVariant::Ntscf(avtp::NtscfHeader {
+            stream_id: 2,
+            ..Default::default()
+        });
+        let b1 = build_crc32_coverage_buffer(&h1, &acf).unwrap();
+        let b2 = build_crc32_coverage_buffer(&h2, &acf).unwrap();
+        assert_ne!(crc32_tc18(&b1), crc32_tc18(&b2));
     }
 
     // ── Header length ─────────────────────────────────────────────────────────
