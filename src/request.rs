@@ -24,13 +24,18 @@
 // fusa:req REQ-SEQ-002
 // fusa:req REQ-SEQ-003
 // fusa:req REQ-SEQ-004
+// fusa:req REQ-PRIO-001
+// fusa:req REQ-PRIO-002
+// fusa:req REQ-PRIO-003
+// fusa:req REQ-PRIO-004
 
 //! Conditional-request taxonomy: compound / compound-wait (`0x0F`/`0x0B`),
 //! triggered (`0x0E`), chained (`0x01`), timed (`0x0A`), the
 //! cancellation trio clear-all / clear-non-safestate / clear-single
-//! (`0x05`/`0x06`/`0x07`), and the persistent sequencer-state register bank
-//! — `ROADMAP.md` Milestone 5 ("Conditional Requests & Sequencers"), first
-//! through sixth checklist bullets. The first bullet
+//! (`0x05`/`0x06`/`0x07`), the persistent sequencer-state register bank, and
+//! the execution priority ordering that selects which pending request runs
+//! next — `ROADMAP.md` Milestone 5 ("Conditional Requests & Sequencers"),
+//! first through seventh checklist bullets. The first bullet
 //! covers sequencer-gated
 //! execution and wait, with `cmp_exec_delay`/`cmpw_exec_delay` timers and
 //! the "advance sequencer only if still in start state" rule. The second
@@ -59,7 +64,16 @@
 //! finally giving [`check_compound_gate`] and
 //! [`advance_sequencer_if_still_in_start_state`] a genuine backing store to
 //! compose against instead of requiring every caller to supply a
-//! [`SequencerState`] by hand.
+//! [`SequencerState`] by hand. The seventh covers execution priority
+//! ordering: [`RequestKind::Standard`], the eighth and final variant this
+//! item adds so the checklist's own priority list ("cancellation >
+//! triggered > timed > compound > compound-wait > chained > standard") has
+//! a [`RequestKind`] for every tier it names; [`ExecutionPriorityTier`] and
+//! [`execution_priority_tier`], collapsing all eight [`RequestKind`] values
+//! down to that same seven-tier ordering; and [`PendingRequestKey`] /
+//! [`select_next_pending_request`], a pure selection function choosing
+//! which of a caller-supplied set of pending requests should run next —
+//! highest tier first, FIFO (earliest arrival) among same-tier entries.
 //!
 //! Compound/compound-wait was the opening item of Milestone 5, and the
 //! first thing to land in `src/request.rs` — the module name the
@@ -69,32 +83,37 @@
 //! reservation for Milestone 8. Triggered is the second, added there.
 //! Chained is the third, added there. Timed is the fourth, added there.
 //! Cancellation is the fifth, added there. [`SequencerBank`] is the sixth,
-//! added here. The "Standard"/unconditional kind implied by the spec's own
-//! execution-priority ordering is still expected to extend [`RequestKind`];
-//! none of that is attempted here — see this module's own doc comment
-//! "Deliberately out of scope" section below. Same "additive standalone
+//! added in the prior entry this one extends. Execution priority ordering
+//! is the seventh, added here. Same "additive standalone
 //! plumbing only" discipline as every prior Milestone 1-5 entry, and as the
-//! compound/compound-wait, triggered, chained, timed, and cancellation work
-//! above: [`SequencerBank`] is constructed and read/advanced only by
-//! whatever later item chooses to hold one — nothing here is wired into a
-//! decoder, dispatch loop, or request-lifecycle state machine. The old
+//! compound/compound-wait, triggered, chained, timed, cancellation, and
+//! sequencer-bank work above: [`select_next_pending_request`] is a pure
+//! function over caller-supplied inputs — nothing here is wired into a
+//! decoder, dispatch loop, or the request-lifecycle state machine (the next
+//! checklist bullet in this milestone, still not built). The old
 //! `src/prioqueue.rs` `Zone`/`Command`/`Controller`/`Priority` decorator
 //! this milestone's own Goal text names as the eventual absorption target
 //! for "picking which pending request runs next" is read only as
-//! background for this change, not extended or touched.
+//! background for this change — see this module's doc comment
+//! "Deliberately out of scope" section below for why `prioqueue.rs` itself
+//! is still not touched.
 //!
-//! Twenty named pieces are in scope, all implemented here or in the five
+//! Twenty-four named pieces are in scope, all implemented here or in the six
 //! prior entries this one extends:
 //!
-//! - [`RequestKind`] — the request-type discriminant, now covering eight
+//! - [`RequestKind`] — the request-type discriminant, now covering nine
 //!   values ([`RequestKind::ClearAll`] = `0x05`,
 //!   [`RequestKind::ClearNonSafestate`] = `0x06`,
 //!   [`RequestKind::ClearSingle`] = `0x07`, [`RequestKind::Chained`] =
 //!   `0x01`, [`RequestKind::Timed`] = `0x0A`, [`RequestKind::CompoundWait`]
 //!   = `0x0B`, [`RequestKind::Triggered`] = `0x0E`,
-//!   [`RequestKind::Compound`] = `0x0F`). See "Provenance note:
+//!   [`RequestKind::Compound`] = `0x0F`, and — new in this item —
+//!   [`RequestKind::Standard`]). See "Provenance note:
 //!   `RequestKind`'s wire placement" below for why this is modeled as a
-//!   standalone value type, not yet tied to a decoded byte offset.
+//!   standalone value type, not yet tied to a decoded byte offset, and
+//!   "Provenance note: `RequestKind::Standard`'s discriminant" below for why
+//!   its own numeric value carries even less confidence than the other
+//!   eight.
 //! - [`CompoundGateConfig`] / [`SequencerState`] /
 //!   [`check_sequencer_num_in_bounds`] / [`is_gate_satisfied`] /
 //!   [`check_compound_gate`] — the sequencer-gating rule: a compound(-wait)
@@ -195,12 +214,28 @@
 //!   select for cancellation; the first construction site for this
 //!   Milestone-2-reserved sentinel (see "Provenance note:
 //!   `RequestCanceled` as this item's outcome signal" below).
+//! - [`ExecutionPriorityTier`] / [`execution_priority_tier`] — the seven
+//!   named execution-priority tiers this checklist bullet's own ordering
+//!   names ("cancellation > triggered > timed > compound > compound-wait >
+//!   chained > standard"), and the mapping from each of [`RequestKind`]'s
+//!   nine values down to one of them, with the three cancellation variants
+//!   collapsing onto a single [`ExecutionPriorityTier::Cancellation`] tier.
+//!   See "Provenance note: `RequestKind::Standard`'s discriminant" below for
+//!   [`RequestKind::Standard`] itself, which this tier mapping is the first
+//!   thing to actually use.
+//! - [`PendingRequestKey`] / [`select_next_pending_request`] — the pure
+//!   selection function this checklist bullet's "FIFO within a tier" rule
+//!   implies: given a caller-supplied set of pending requests, each tagged
+//!   with a [`RequestKind`] and a monotonic arrival marker, which one
+//!   should run next. See "Provenance note: arrival order as a
+//!   caller-supplied sequence number" below for why arrival order is
+//!   modeled this way rather than as an owned queue, and "Provenance note:
+//!   what execution priority ordering does not decide" below for the two
+//!   points this checklist bullet leaves unstated that this item does not
+//!   silently resolve.
 //!
 //! Deliberately out of scope:
 //!
-//! - The "Standard" (unconditional) request kind implicit in the spec's own
-//!   priority ordering. [`RequestKind`] intentionally leaves room for it
-//!   but does not add it.
 //! - The persistent 8-bit sequencer-state register machine itself
 //!   (`ROADMAP.md` Milestone 5's own "Sequencers" checklist bullet) is now
 //!   built as [`SequencerBank`] — but every free function that needs a
@@ -216,14 +251,30 @@
 //!   alternative that composes the free functions instead of replacing
 //!   them. Triggered execution's own busy/idle independence needs no such
 //!   state at all; see [`should_count_trigger_occurrence`] above.
-//! - Wiring [`SequencerBank`] or any of the below into an actual decoder,
-//!   dispatch loop, or request-lifecycle state machine (`ROADMAP.md`'s own
-//!   "Request lifecycle state machine" checklist bullet, later in this
-//!   milestone).
-//! - The old `src/prioqueue.rs` model this milestone's Goal text names as
-//!   the eventual absorption target for "picking which pending request
-//!   runs next" — that absorption is the separate "Execution priority
-//!   ordering" checklist bullet, not this one.
+//! - Wiring [`SequencerBank`], [`select_next_pending_request`], or any of
+//!   the below into an actual decoder, dispatch loop, or the
+//!   request-lifecycle state machine (`ROADMAP.md`'s own "Request lifecycle
+//!   state machine" checklist bullet, the next one in this milestone, still
+//!   not built). [`select_next_pending_request`] decides *which* pending
+//!   request goes next given a caller-supplied set; nothing here owns a
+//!   real pending-request set, tracks lifecycle transitions, or calls this
+//!   function from anywhere.
+//! - The old `src/prioqueue.rs` `Zone`/`Command`/`Controller`/`Priority`
+//!   model this milestone's own Goal text names as the eventual absorption
+//!   target for "picking which pending request runs next". This item is
+//!   the "Execution priority ordering" checklist bullet the Goal text
+//!   points at, and [`select_next_pending_request`] is its own
+//!   from-scratch, spec-native implementation of that job — but
+//!   `src/prioqueue.rs` itself is still read only as background, not
+//!   extended, modified, or migrated onto [`select_next_pending_request`];
+//!   that KEEP/DEPRECATE-style migration is `ROADMAP.md`'s own Milestone 9
+//!   satellite-package-migration job (`prioqueue` is DEPRECATE-dispositioned
+//!   in that milestone's satellite table), not this item's.
+//! - Any error/rejection behavior for a pending request that never gets a
+//!   turn (queue overflow, starvation) and any statement of what scope
+//!   execution priority is evaluated across (per-endpoint, per-stream, or
+//!   server-wide). See "Provenance note: what execution priority ordering
+//!   does not decide" below.
 //!
 //! ## Provenance note: `RequestKind`'s wire placement
 //!
@@ -244,7 +295,34 @@
 //! adding [`RequestKind::Triggered`], [`RequestKind::Chained`],
 //! [`RequestKind::Timed`], or the [`RequestKind::ClearAll`]/
 //! [`RequestKind::ClearNonSafestate`]/[`RequestKind::ClearSingle`] trio;
-//! each is simply one more value under the same still-open question.
+//! each is simply one more value under the same still-open question. See
+//! "Provenance note: `RequestKind::Standard`'s discriminant" below for why
+//! [`RequestKind::Standard`] — added by this item — is a step further out
+//! on that same open question, not just one more instance of it.
+//!
+//! ## Provenance note: `RequestKind::Standard`'s discriminant
+//!
+//! `ROADMAP.md`'s "Execution priority ordering" checklist bullet names
+//! "standard" as the lowest-priority tier in its ordering, alongside the
+//! other six tiers this module already models — but, unlike every other
+//! [`RequestKind`] variant, no `ROADMAP.md` checklist text anywhere in this
+//! crate's roadmap gives "standard" a numeric discriminant byte at all. The
+//! other eight variants at least inherit a roadmap-named hex value each
+//! (`0x01`/`0x05`/`0x06`/`0x07`/`0x0A`/`0x0B`/`0x0E`/`0x0F`) even though
+//! their byte *offset* is unconfirmed (see the provenance note above);
+//! [`RequestKind::Standard`] has neither. Per Guiding Principle 5, this
+//! crate does not invent a plausible-looking spec value for it. The
+//! discriminant assigned here, `0x00`, is a crate-local placeholder chosen
+//! only for two structural reasons — it is the one byte value none of the
+//! other eight named discriminants occupies, and `#[repr(u8)]` requires
+//! every variant to have some concrete value for [`RequestKind::to_u8`]'s
+//! `self as u8` cast to compile — not a transcription of, or a guess at,
+//! any confirmed TC18 wire encoding. Should a future item learn the real
+//! "standard" discriminant (or learn that "standard"/unconditional requests
+//! carry no discriminant byte at all, being whatever a request is when none
+//! of the other eight kinds' bytes match), this placeholder value is
+//! expected to change; nothing in this crate depends on `0x00` specifically
+//! beyond this enum's own internal round-trip.
 //!
 //! ## Provenance note: `start_state` and the sequencer-state machine
 //!
@@ -523,6 +601,59 @@
 //! [`check_clear_single_cancellation`] all construct
 //! [`crate::RcpError::RequestCanceled`] for a request they select for
 //! cancellation, retiring it as a reserved-but-unconstructed placeholder.
+//!
+//! ## Provenance note: arrival order as a caller-supplied sequence number
+//!
+//! `ROADMAP.md`'s checklist bullet's own tie-break rule, "FIFO within a
+//! tier", requires comparing when two same-tier pending requests each
+//! arrived — but this crate has no unified pending-request queue type yet
+//! (`ROADMAP.md`'s own "Request lifecycle state machine" checklist bullet,
+//! the next item in this milestone, is what would introduce one; see this
+//! module's doc comment "Deliberately out of scope" section). Per this
+//! milestone's own established discipline — [`SequencerState`] being taken
+//! as caller-supplied ahead of [`SequencerBank`] existing,
+//! `endpoint_busy` being taken as caller-supplied ahead of any unified
+//! endpoint-state type existing — [`PendingRequestKey::arrival_seq`] is a
+//! plain caller-supplied `u64`, presumed monotonically increasing in
+//! arrival order (e.g. a per-server request counter or an arrival
+//! timestamp), rather than this module inventing an owned queue/list data
+//! structure of its own to track arrival order internally.
+//! [`select_next_pending_request`] does not validate monotonicity — a
+//! caller that supplies non-monotonic `arrival_seq` values gets
+//! whatever FIFO ordering those values imply, silently, the same way a
+//! caller that supplies an already-stale [`SequencerState`] to
+//! [`check_compound_gate`] gets whatever gating outcome that stale value
+//! implies.
+//!
+//! ## Provenance note: what execution priority ordering does not decide
+//!
+//! Per Guiding Principle 5, two points `ROADMAP.md`'s checklist bullet does
+//! not state are flagged here rather than silently resolved one way or the
+//! other:
+//!
+//! 1. **Scope.** The checklist bullet does not say whether execution
+//!    priority is evaluated per-endpoint, per-stream, or server-wide across
+//!    every pending request this RC Server holds regardless of which
+//!    endpoint or stream it targets — mirroring the exact same
+//!    unresolved-scope question this module's own "cancellation scope and
+//!    the addressed-endpoint/stream ambiguity" provenance note already
+//!    flags for clear-all. [`select_next_pending_request`] sidesteps the
+//!    question rather than guessing at it: it operates purely over whatever
+//!    slice of [`PendingRequestKey`] values a caller passes in, and it is
+//!    the caller's own responsibility to have already narrowed that slice
+//!    to whatever scope (one endpoint's pending requests, one stream's, or
+//!    the whole server's) applies.
+//! 2. **Starvation/overflow.** The checklist bullet names no
+//!    error/rejection behavior for a pending request that never gets a
+//!    turn because higher-tier requests keep arriving — nor for a pending
+//!    set that grows without bound. [`select_next_pending_request`] takes
+//!    no position on either: it always returns the single
+//!    highest-priority, earliest-arrived entry in whatever non-empty slice
+//!    it is given (or `None` for an empty slice), and has no notion of "too
+//!    long waiting" or "too many pending" to reject on. Any such policy —
+//!    were `ROADMAP.md` ever to name one — belongs to whatever later item
+//!    owns the actual pending-request store this function's caller would
+//!    draw its slice from, not to this pure selection rule.
 
 use crate::regmap::SequencerStateEntry;
 use crate::timestamp::AvtpTimestamp;
@@ -532,11 +663,13 @@ use crate::RcpError;
 
 /// The request-type discriminant naming a conditional request's kind.
 ///
-/// Only the eight values the checklist bullets built so far name are
-/// modeled; see this module's doc comment "Deliberately out of scope"
-/// section for why the remaining "Standard" conditional-request kind
-/// `ROADMAP.md` names elsewhere in this milestone is not yet added as a
-/// variant.
+/// Nine values are modeled: the eight prior checklist bullets' own named
+/// discriminants, plus [`RequestKind::Standard`] — the unconditional kind
+/// this milestone's "Execution priority ordering" checklist bullet implies
+/// by naming it as the lowest tier in its own ordering. See this module's
+/// doc comment "Provenance note: `RequestKind::Standard`'s discriminant"
+/// for why [`RequestKind::Standard`]'s numeric value carries materially
+/// less confidence than the other eight.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 // fusa:req REQ-CMP-001
@@ -544,7 +677,18 @@ use crate::RcpError;
 // fusa:req REQ-CHAIN-001
 // fusa:req REQ-TIME-001
 // fusa:req REQ-CANCEL-001
+// fusa:req REQ-PRIO-001
 pub enum RequestKind {
+    /// The crate-local placeholder discriminant byte assigned to
+    /// [`RequestKind::Standard`] — see this module's doc comment
+    /// "Provenance note: `RequestKind::Standard`'s discriminant" for why
+    /// `0x00`, unlike every other variant's discriminant below, is not a
+    /// transcription of any roadmap-named wire value.
+    ///
+    /// Standard: the unconditional request kind implied by this milestone's
+    /// own execution-priority ordering as its lowest-priority tier — see
+    /// [`ExecutionPriorityTier::Standard`].
+    Standard = 0x00,
     /// Chained (`0x01`): a sequence of requests whose remaining links are
     /// gated on the `cs`-bit abort-on-predecessor-error rule — see
     /// [`check_chain_continuation`].
@@ -582,6 +726,7 @@ impl RequestKind {
     // fusa:req REQ-CHAIN-001
     // fusa:req REQ-TIME-001
     // fusa:req REQ-CANCEL-001
+    // fusa:req REQ-PRIO-001
     pub fn to_u8(self) -> u8 {
         self as u8
     }
@@ -589,16 +734,16 @@ impl RequestKind {
     /// Decode a discriminant byte into a [`RequestKind`].
     ///
     /// Returns `Err(RcpError::InvalidParameter)` for any value other than
-    /// the named discriminants — including the "Standard" kind `ROADMAP.md`
-    /// names elsewhere in this milestone, which this module does not yet
-    /// model. Never panics for any input.
+    /// the named discriminants. Never panics for any input.
     // fusa:req REQ-CMP-002
     // fusa:req REQ-TRIG-001
     // fusa:req REQ-CHAIN-001
     // fusa:req REQ-TIME-001
     // fusa:req REQ-CANCEL-001
+    // fusa:req REQ-PRIO-001
     pub fn from_u8(raw: u8) -> Result<Self, RcpError> {
         match raw {
+            0x00 => Ok(Self::Standard),
             0x01 => Ok(Self::Chained),
             0x05 => Ok(Self::ClearAll),
             0x06 => Ok(Self::ClearNonSafestate),
@@ -730,11 +875,15 @@ pub struct CompoundExecDelays {
 /// [`RequestKind::ClearSingle`], added alongside
 /// [`check_clear_all_cancellation`]) are likewise `None` here —
 /// `ROADMAP.md`'s Cancellation checklist bullet names no `*_exec_delay`
-/// timer for any of the three. Not yet called from anywhere in this crate
+/// timer for any of the three, and so is [`RequestKind::Standard`] (a
+/// ninth and final variant, added alongside [`ExecutionPriorityTier`]) —
+/// the unconditional kind names no execution-delay timer of its own
+/// either. Not yet called from anywhere in this crate
 /// (see this module's doc comment for why), so this is a safe
 /// additive-plumbing-stage widening, not a breaking change to any
 /// consumer.
 // fusa:req REQ-CMP-006
+// fusa:req REQ-PRIO-002
 pub fn resolve_compound_exec_delay(kind: RequestKind, delays: &CompoundExecDelays) -> Option<u32> {
     match kind {
         RequestKind::Compound => Some(delays.cmp_exec_delay),
@@ -744,7 +893,8 @@ pub fn resolve_compound_exec_delay(kind: RequestKind, delays: &CompoundExecDelay
         | RequestKind::Timed
         | RequestKind::ClearAll
         | RequestKind::ClearNonSafestate
-        | RequestKind::ClearSingle => None,
+        | RequestKind::ClearSingle
+        | RequestKind::Standard => None,
     }
 }
 
@@ -901,8 +1051,11 @@ pub struct TriggerExecDelay(pub u32);
 /// Returns `Some(delay.0)` when `kind` is [`RequestKind::Triggered`] —
 /// the only kind [`TriggerExecDelay`] applies to — and `None` for every
 /// other [`RequestKind`], mirroring [`resolve_compound_exec_delay`]'s own
-/// per-kind-timer-selection shape. Never panics for any input.
+/// per-kind-timer-selection shape, including [`RequestKind::Standard`] (a
+/// ninth and final variant, added alongside [`ExecutionPriorityTier`]).
+/// Never panics for any input.
 // fusa:req REQ-TRIG-002
+// fusa:req REQ-PRIO-002
 pub fn resolve_trigger_exec_delay(kind: RequestKind, delay: TriggerExecDelay) -> Option<u32> {
     match kind {
         RequestKind::Triggered => Some(delay.0),
@@ -912,7 +1065,8 @@ pub fn resolve_trigger_exec_delay(kind: RequestKind, delay: TriggerExecDelay) ->
         | RequestKind::Timed
         | RequestKind::ClearAll
         | RequestKind::ClearNonSafestate
-        | RequestKind::ClearSingle => None,
+        | RequestKind::ClearSingle
+        | RequestKind::Standard => None,
     }
 }
 
@@ -1148,13 +1302,111 @@ pub fn check_clear_single_cancellation(
     }
 }
 
+// ── Execution priority ordering ──────────────────────────────────────────────
+
+/// The seven execution-priority tiers `ROADMAP.md`'s "Execution priority
+/// ordering" checklist bullet names, in the exact order it states them —
+/// cancellation first (highest priority), standard last (lowest):
+/// "cancellation > triggered > timed > compound > compound-wait > chained >
+/// standard".
+///
+/// [`RequestKind`]'s three cancellation variants ([`RequestKind::ClearAll`],
+/// [`RequestKind::ClearNonSafestate`], [`RequestKind::ClearSingle`]) all
+/// collapse onto the single [`Self::Cancellation`] tier here — the
+/// checklist names one "cancellation" priority tier, not three, even though
+/// three distinct [`RequestKind`] discriminants carry it.
+///
+/// `derive(PartialOrd, Ord)` orders variants by declaration position, so
+/// [`Self::Cancellation`] (declared first) compares as "less than" every
+/// later-declared, lower-priority tier; [`select_next_pending_request`]
+/// relies on that ordering directly rather than re-deriving a rank number.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+// fusa:req REQ-PRIO-003
+pub enum ExecutionPriorityTier {
+    /// Highest priority: the cancellation trio (clear-all,
+    /// clear-non-safestate, clear-single).
+    Cancellation,
+    /// [`RequestKind::Triggered`]'s own tier.
+    Triggered,
+    /// [`RequestKind::Timed`]'s own tier.
+    Timed,
+    /// [`RequestKind::Compound`]'s own tier.
+    Compound,
+    /// [`RequestKind::CompoundWait`]'s own tier.
+    CompoundWait,
+    /// [`RequestKind::Chained`]'s own tier.
+    Chained,
+    /// Lowest priority: [`RequestKind::Standard`]'s own tier.
+    Standard,
+}
+
+/// Map a [`RequestKind`] to the [`ExecutionPriorityTier`] it executes
+/// under, collapsing [`RequestKind`]'s nine values down to the checklist's
+/// seven named tiers. Never panics for any input.
+// fusa:req REQ-PRIO-003
+pub fn execution_priority_tier(kind: RequestKind) -> ExecutionPriorityTier {
+    match kind {
+        RequestKind::ClearAll | RequestKind::ClearNonSafestate | RequestKind::ClearSingle => {
+            ExecutionPriorityTier::Cancellation
+        }
+        RequestKind::Triggered => ExecutionPriorityTier::Triggered,
+        RequestKind::Timed => ExecutionPriorityTier::Timed,
+        RequestKind::Compound => ExecutionPriorityTier::Compound,
+        RequestKind::CompoundWait => ExecutionPriorityTier::CompoundWait,
+        RequestKind::Chained => ExecutionPriorityTier::Chained,
+        RequestKind::Standard => ExecutionPriorityTier::Standard,
+    }
+}
+
+/// One pending request's priority-ordering inputs, as
+/// [`select_next_pending_request`] consumes them: its [`RequestKind`] and a
+/// caller-supplied, presumed-monotonically-increasing arrival marker.
+///
+/// See this module's doc comment "Provenance note: arrival order as a
+/// caller-supplied sequence number" for why `arrival_seq` is a plain `u64`
+/// rather than this module owning a queue data structure of its own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// fusa:req REQ-PRIO-004
+pub struct PendingRequestKey {
+    /// This pending request's kind, which [`execution_priority_tier`] maps
+    /// to the tier it competes within.
+    pub kind: RequestKind,
+    /// This pending request's arrival marker: presumed to increase
+    /// monotonically in true arrival order across the caller-supplied set
+    /// [`select_next_pending_request`] is evaluated over. Not validated for
+    /// monotonicity — see this module's doc comment "Provenance note:
+    /// arrival order as a caller-supplied sequence number".
+    pub arrival_seq: u64,
+}
+
+/// Select which of `pending`'s entries should execute next: the entry
+/// whose [`execution_priority_tier`] is highest priority (lowest
+/// [`ExecutionPriorityTier`] ordinal), breaking ties between same-tier
+/// entries by earliest `arrival_seq` — the checklist's own "FIFO within a
+/// tier" rule.
+///
+/// Returns the index into `pending` of the selected entry, or `None` if
+/// `pending` is empty. Never panics for any input. See this module's doc
+/// comment "Provenance note: what execution priority ordering does not
+/// decide" for the scope and starvation/overflow questions this function
+/// deliberately does not answer.
+// fusa:req REQ-PRIO-004
+pub fn select_next_pending_request(pending: &[PendingRequestKey]) -> Option<usize> {
+    pending
+        .iter()
+        .enumerate()
+        .min_by_key(|(_, key)| (execution_priority_tier(key.kind), key.arrival_seq))
+        .map(|(index, _)| index)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     // ── RequestKind: discriminant round-trip / rejection ────────────────────
 
-    const ALL_REQUEST_KINDS: [RequestKind; 8] = [
+    const ALL_REQUEST_KINDS: [RequestKind; 9] = [
+        RequestKind::Standard,
         RequestKind::Chained,
         RequestKind::ClearAll,
         RequestKind::ClearNonSafestate,
@@ -1171,6 +1423,7 @@ mod tests {
     // fusa:test REQ-CHAIN-001
     // fusa:test REQ-TIME-001
     // fusa:test REQ-CANCEL-001
+    // fusa:test REQ-PRIO-001
     fn request_kind_round_trips_through_to_u8_from_u8() {
         for kind in ALL_REQUEST_KINDS {
             assert_eq!(RequestKind::from_u8(kind.to_u8()), Ok(kind));
@@ -1183,6 +1436,7 @@ mod tests {
     // fusa:test REQ-CHAIN-001
     // fusa:test REQ-TIME-001
     // fusa:test REQ-CANCEL-001
+    // fusa:test REQ-PRIO-001
     fn request_kind_discriminants_match_roadmap_named_values() {
         assert_eq!(RequestKind::Compound.to_u8(), 0x0F);
         assert_eq!(RequestKind::CompoundWait.to_u8(), 0x0B);
@@ -1192,12 +1446,18 @@ mod tests {
         assert_eq!(RequestKind::ClearAll.to_u8(), 0x05);
         assert_eq!(RequestKind::ClearNonSafestate.to_u8(), 0x06);
         assert_eq!(RequestKind::ClearSingle.to_u8(), 0x07);
+        // Standard's 0x00 is this crate's own crate-local placeholder, not a
+        // roadmap-named value — see this module's doc comment "Provenance
+        // note: `RequestKind::Standard`'s discriminant". Asserted here
+        // anyway so an accidental future renumbering is caught by this
+        // test suite.
+        assert_eq!(RequestKind::Standard.to_u8(), 0x00);
     }
 
     #[test]
     // fusa:test REQ-CMP-002
     fn request_kind_from_u8_rejects_every_other_value() {
-        for raw in [0x00u8, 0x02, 0x0C, 0x10, 0x7F, 0xFF] {
+        for raw in [0x02u8, 0x03, 0x04, 0x08, 0x0C, 0x10, 0x7F, 0xFF] {
             assert_eq!(RequestKind::from_u8(raw), Err(RcpError::InvalidParameter));
         }
     }
@@ -1206,6 +1466,12 @@ mod tests {
     // fusa:test REQ-TRIG-001
     fn request_kind_from_u8_accepts_triggered_discriminant() {
         assert_eq!(RequestKind::from_u8(0x0E), Ok(RequestKind::Triggered));
+    }
+
+    #[test]
+    // fusa:test REQ-PRIO-001
+    fn request_kind_from_u8_accepts_standard_discriminant() {
+        assert_eq!(RequestKind::from_u8(0x00), Ok(RequestKind::Standard));
     }
 
     #[test]
@@ -1429,6 +1695,20 @@ mod tests {
         ] {
             assert_eq!(resolve_compound_exec_delay(kind, &delays), None);
         }
+    }
+
+    #[test]
+    // fusa:test REQ-CMP-006
+    // fusa:test REQ-PRIO-002
+    fn resolve_compound_exec_delay_is_none_for_standard() {
+        let delays = CompoundExecDelays {
+            cmp_exec_delay: 100,
+            cmpw_exec_delay: 200,
+        };
+        assert_eq!(
+            resolve_compound_exec_delay(RequestKind::Standard, &delays),
+            None
+        );
     }
 
     // ── advance_sequencer_if_still_in_start_state ────────────────────────────
@@ -1728,6 +2008,17 @@ mod tests {
         }
     }
 
+    #[test]
+    // fusa:test REQ-TRIG-002
+    // fusa:test REQ-PRIO-002
+    fn resolve_trigger_exec_delay_is_none_for_standard() {
+        let delay = TriggerExecDelay(42);
+        assert_eq!(
+            resolve_trigger_exec_delay(RequestKind::Standard, delay),
+            None
+        );
+    }
+
     // ── TriggerRepeatCount ────────────────────────────────────────────────────
 
     #[test]
@@ -2022,6 +2313,212 @@ mod tests {
         for candidate in [0x00u8, 0x42, 0xFF] {
             for target in [0x00u8, 0x42, 0xFF] {
                 let _ = check_clear_single_cancellation(candidate, ClearTransactionNum(target));
+            }
+        }
+    }
+
+    // ── ExecutionPriorityTier / execution_priority_tier ──────────────────────
+
+    #[test]
+    // fusa:test REQ-PRIO-003
+    fn execution_priority_tier_orders_tiers_cancellation_highest_standard_lowest() {
+        // `ROADMAP.md`'s own stated order: cancellation > triggered > timed >
+        // compound > compound-wait > chained > standard. Ord's derive makes
+        // the earlier-declared variant compare as "less than" — i.e. this
+        // module's convention is: lower ordinal == higher priority.
+        assert!(ExecutionPriorityTier::Cancellation < ExecutionPriorityTier::Triggered);
+        assert!(ExecutionPriorityTier::Triggered < ExecutionPriorityTier::Timed);
+        assert!(ExecutionPriorityTier::Timed < ExecutionPriorityTier::Compound);
+        assert!(ExecutionPriorityTier::Compound < ExecutionPriorityTier::CompoundWait);
+        assert!(ExecutionPriorityTier::CompoundWait < ExecutionPriorityTier::Chained);
+        assert!(ExecutionPriorityTier::Chained < ExecutionPriorityTier::Standard);
+    }
+
+    #[test]
+    // fusa:test REQ-PRIO-003
+    fn execution_priority_tier_collapses_all_three_cancellation_kinds_onto_one_tier() {
+        for kind in [
+            RequestKind::ClearAll,
+            RequestKind::ClearNonSafestate,
+            RequestKind::ClearSingle,
+        ] {
+            assert_eq!(
+                execution_priority_tier(kind),
+                ExecutionPriorityTier::Cancellation
+            );
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-PRIO-003
+    fn execution_priority_tier_maps_every_remaining_kind_to_its_own_named_tier() {
+        assert_eq!(
+            execution_priority_tier(RequestKind::Triggered),
+            ExecutionPriorityTier::Triggered
+        );
+        assert_eq!(
+            execution_priority_tier(RequestKind::Timed),
+            ExecutionPriorityTier::Timed
+        );
+        assert_eq!(
+            execution_priority_tier(RequestKind::Compound),
+            ExecutionPriorityTier::Compound
+        );
+        assert_eq!(
+            execution_priority_tier(RequestKind::CompoundWait),
+            ExecutionPriorityTier::CompoundWait
+        );
+        assert_eq!(
+            execution_priority_tier(RequestKind::Chained),
+            ExecutionPriorityTier::Chained
+        );
+        assert_eq!(
+            execution_priority_tier(RequestKind::Standard),
+            ExecutionPriorityTier::Standard
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-PRIO-003
+    fn execution_priority_tier_never_panics_for_any_request_kind() {
+        for kind in ALL_REQUEST_KINDS {
+            let _ = execution_priority_tier(kind);
+        }
+    }
+
+    // ── PendingRequestKey / select_next_pending_request ──────────────────────
+
+    #[test]
+    // fusa:test REQ-PRIO-004
+    fn select_next_pending_request_is_none_for_an_empty_slice() {
+        assert_eq!(select_next_pending_request(&[]), None);
+    }
+
+    #[test]
+    // fusa:test REQ-PRIO-004
+    fn select_next_pending_request_picks_the_single_entry() {
+        let pending = [PendingRequestKey {
+            kind: RequestKind::Standard,
+            arrival_seq: 0,
+        }];
+        assert_eq!(select_next_pending_request(&pending), Some(0));
+    }
+
+    #[test]
+    // fusa:test REQ-PRIO-004
+    fn select_next_pending_request_picks_the_highest_priority_tier_regardless_of_arrival_order() {
+        // A later-arriving cancellation request must still win over an
+        // earlier-arriving standard request — priority tier dominates FIFO,
+        // not the other way around.
+        let pending = [
+            PendingRequestKey {
+                kind: RequestKind::Standard,
+                arrival_seq: 0,
+            },
+            PendingRequestKey {
+                kind: RequestKind::Chained,
+                arrival_seq: 1,
+            },
+            PendingRequestKey {
+                kind: RequestKind::ClearSingle,
+                arrival_seq: 2,
+            },
+        ];
+        assert_eq!(select_next_pending_request(&pending), Some(2));
+    }
+
+    #[test]
+    // fusa:test REQ-PRIO-004
+    fn select_next_pending_request_respects_the_full_roadmap_tier_order() {
+        // One entry per tier, deliberately listed out of priority order and
+        // out of arrival order, so this test cannot pass by accident of
+        // slice order alone.
+        let pending = [
+            PendingRequestKey {
+                kind: RequestKind::Chained,
+                arrival_seq: 5,
+            },
+            PendingRequestKey {
+                kind: RequestKind::Standard,
+                arrival_seq: 0,
+            },
+            PendingRequestKey {
+                kind: RequestKind::CompoundWait,
+                arrival_seq: 4,
+            },
+            PendingRequestKey {
+                kind: RequestKind::Compound,
+                arrival_seq: 3,
+            },
+            PendingRequestKey {
+                kind: RequestKind::Timed,
+                arrival_seq: 2,
+            },
+            PendingRequestKey {
+                kind: RequestKind::Triggered,
+                arrival_seq: 1,
+            },
+            PendingRequestKey {
+                kind: RequestKind::ClearAll,
+                arrival_seq: 6,
+            },
+        ];
+        // Index 6 is RequestKind::ClearAll — the cancellation tier, which
+        // outranks every other tier present regardless of its arrival_seq.
+        assert_eq!(select_next_pending_request(&pending), Some(6));
+    }
+
+    #[test]
+    // fusa:test REQ-PRIO-004
+    fn select_next_pending_request_breaks_same_tier_ties_fifo_by_earliest_arrival() {
+        let pending = [
+            PendingRequestKey {
+                kind: RequestKind::Triggered,
+                arrival_seq: 10,
+            },
+            PendingRequestKey {
+                kind: RequestKind::Triggered,
+                arrival_seq: 3,
+            },
+            PendingRequestKey {
+                kind: RequestKind::Triggered,
+                arrival_seq: 7,
+            },
+        ];
+        // Index 1 carries the earliest arrival_seq (3) among the three
+        // same-tier Triggered entries.
+        assert_eq!(select_next_pending_request(&pending), Some(1));
+    }
+
+    #[test]
+    // fusa:test REQ-PRIO-004
+    fn select_next_pending_request_prefers_cancellation_regardless_of_which_of_the_three_kinds() {
+        for cancellation_kind in [
+            RequestKind::ClearAll,
+            RequestKind::ClearNonSafestate,
+            RequestKind::ClearSingle,
+        ] {
+            let pending = [
+                PendingRequestKey {
+                    kind: RequestKind::Triggered,
+                    arrival_seq: 0,
+                },
+                PendingRequestKey {
+                    kind: cancellation_kind,
+                    arrival_seq: 1,
+                },
+            ];
+            assert_eq!(select_next_pending_request(&pending), Some(1));
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-PRIO-004
+    fn select_next_pending_request_never_panics_for_any_sampled_input() {
+        for kind in ALL_REQUEST_KINDS {
+            for arrival_seq in [0u64, 1, u64::MAX] {
+                let pending = [PendingRequestKey { kind, arrival_seq }];
+                let _ = select_next_pending_request(&pending);
             }
         }
     }
