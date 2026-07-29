@@ -5,7 +5,7 @@ the roadmap milestone that produced them (see `ROADMAP.md`), since this
 crate's `Cargo.toml` version does not move until the OPEN Alliance TC18
 core replacement reaches `v1.0.0`.
 
-## Unreleased — v0.13.0-dev (Milestone 10)
+## v1.0.0 (Milestone 10) — closed
 
 ### Changed
 
@@ -260,10 +260,22 @@ scripts/fusa-gap-check.sh` reports 551/551 (100%) requirements traced;
 countermeasures.
 
 This was Milestone 10's last unchecked checklist item. `ROADMAP.md`
-Milestone 10 is now complete; the actual `Cargo.toml` version bump, tag,
-and `crates.io` publish to `v1.0.0` are a deliberately separate release
-step (`Cargo.toml` still reads `0.3.0` as of this entry), not folded into
-this change.
+Milestone 10 is now complete.
+
+### Released — v1.0.0
+
+`Cargo.toml`'s `version` moves from `0.3.0` to `1.0.0` in this
+follow-up commit, per the version-freeze policy stated above and in
+`docs/SEMVER.md`: this is the first version number assigned after the
+OPEN Alliance TC18 core replacement (`ROADMAP.md` Milestones 1-10)
+reaches a coherent, checked-out point. This is a deliberately separate
+commit from the conformance-test-vectors item itself (kept out of PR
+#85), tagged as `v1.0.0` immediately after. `crates.io` publication via
+the tag-triggered `Release` workflow remains blocked on the still-open
+`CARGO_REGISTRY_TOKEN` secret gap tracked by issue #12 — the GitHub
+Release and tag are real; the `cargo publish` step is expected to fail
+until a maintainer provisions that secret, same as it did on the prior
+`v0.2.0`/`v0.3.0` tags.
 
 ## v0.12.0-dev (Milestone 9) — closed
 
