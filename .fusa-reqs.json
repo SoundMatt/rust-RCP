@@ -2388,8 +2388,8 @@
     },
     {
       "id": "REQ-CLI-001",
-      "title": "send command",
-      "text": "rcp send dispatches a command to a zone controller",
+      "title": "discover command",
+      "text": "rust-rcp discover builds a discovery request via discovery::build_discovery_request and prints the GeneralRegisters snapshot decoded from discovery::build_discovery_response",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "QM",
@@ -2397,8 +2397,8 @@
     },
     {
       "id": "REQ-CLI-002",
-      "title": "send options",
-      "text": "rcp send accepts --zone, --type, --priority, --payload flags",
+      "title": "register/endpoint options",
+      "text": "rust-rcp register and rust-rcp endpoint accept --stream, --bus-id, --ep-type, --initial, --read-size, --payload, and --root flags",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "QM",
@@ -2415,8 +2415,8 @@
     },
     {
       "id": "REQ-CLI-004",
-      "title": "zones command",
-      "text": "rcp zones lists all standard zone IDs and names",
+      "title": "endpoint command",
+      "text": "rust-rcp endpoint read/write registers a MockEndpoint under (--stream, --bus-id) and dispatches a read or write request against it",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "QM",
@@ -2424,8 +2424,8 @@
     },
     {
       "id": "REQ-CLI-005",
-      "title": "status command",
-      "text": "rcp status subscribes to a zone and prints the first Status",
+      "title": "register/endpoint dispatch",
+      "text": "rust-rcp register read/write and rust-rcp endpoint read/write dispatch their requests through mock::RcServer::handle_abb, honoring EP0 root-client/lock gating for register and per-endpoint DeviceEndpoint routing for endpoint",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "QM",
@@ -2452,7 +2452,7 @@
     {
       "id": "REQ-CLI-008",
       "title": "status --format json",
-      "text": "The CLI must emit a valid \u00a712.3 status JSON document when invoked with status --format json (no --zone) containing protocol, tool, version, healthy, connected, endpoint, details fields",
+      "text": "The CLI must emit a valid \u00a712.3 status JSON document when invoked with status --format json containing protocol, tool, version, healthy, connected, endpoint, details fields",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
