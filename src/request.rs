@@ -16,11 +16,17 @@
 // fusa:req REQ-TIME-001
 // fusa:req REQ-TIME-002
 // fusa:req REQ-TIME-003
+// fusa:req REQ-CANCEL-001
+// fusa:req REQ-CANCEL-002
+// fusa:req REQ-CANCEL-003
+// fusa:req REQ-CANCEL-004
 
 //! Conditional-request taxonomy: compound / compound-wait (`0x0F`/`0x0B`),
-//! triggered (`0x0E`), chained (`0x01`), and timed (`0x0A`) — `ROADMAP.md`
-//! Milestone 5 ("Conditional Requests & Sequencers"), first, second, third,
-//! and fourth checklist bullets. The first bullet covers sequencer-gated
+//! triggered (`0x0E`), chained (`0x01`), timed (`0x0A`), and the
+//! cancellation trio clear-all / clear-non-safestate / clear-single
+//! (`0x05`/`0x06`/`0x07`) — `ROADMAP.md` Milestone 5 ("Conditional Requests
+//! & Sequencers"), first through fifth checklist bullets. The first bullet
+//! covers sequencer-gated
 //! execution and wait, with `cmp_exec_delay`/`cmpw_exec_delay` timers and
 //! the "advance sequencer only if still in start state" rule. The second
 //! covers trigger-occurrence counting that runs independent of the target
@@ -34,7 +40,13 @@
 //! that did not arrive framed with [`crate::avtp::TscfHeader::
 //! avtp_timestamp`] (e.g. one carried by NTSCF/ACF_ABB instead, which
 //! Milestone 1 modeled as having no timestamp field at all) can still
-//! carry its own presentation-time execution gate.
+//! carry its own presentation-time execution gate. The fifth covers the
+//! cancellation trio: clear-all (mandatory, cancels every pending/
+//! in-flight request), clear-non-safestate (optional, cancels every such
+//! request except one actively driving an endpoint toward its configured
+//! safe state), and clear-single (optional, cancels exactly one pending
+//! request identified by a `clear_transaction_num` matched against the
+//! already-decoded [`crate::acf::ByteMessageInfo::transaction_num`]).
 //!
 //! Compound/compound-wait was the opening item of Milestone 5, and the
 //! first thing to land in `src/request.rs` — the module name the
@@ -42,31 +54,32 @@
 //! module naming with RELAY spec v1.14 §13.7.2") reserved for this
 //! milestone's request-kind/taxonomy work, mirroring `fragment.rs`'s own
 //! reservation for Milestone 8. Triggered is the second, added there.
-//! Chained is the third, added there. Timed is the fourth, added here.
-//! This milestone's one remaining conditional-request checklist item (the
-//! cancellation trio), plus the "Standard"/unconditional kind implied by
-//! the spec's own execution-priority ordering, are still expected to
-//! extend [`RequestKind`] and add sibling sections to this module; none of
-//! that is attempted here. Same "additive standalone plumbing only"
-//! discipline as every prior Milestone 1-4 entry, and as the
-//! compound/compound-wait, triggered, and chained work above: nothing here
-//! is wired into a decoder, dispatch loop, or request-lifecycle state
-//! machine. The old `src/prioqueue.rs` `Zone`/`Command`/`Controller`/
-//! `Priority` decorator this milestone's own Goal text names as the
-//! eventual absorption target for "picking which pending request runs
-//! next" is read only as background for this change, not extended or
-//! touched.
+//! Chained is the third, added there. Timed is the fourth, added there.
+//! Cancellation is the fifth, added here. The "Standard"/unconditional
+//! kind implied by the spec's own execution-priority ordering is still
+//! expected to extend [`RequestKind`]; none of that is attempted here —
+//! see this module's own doc comment "Deliberately out of scope" section
+//! below. Same "additive standalone plumbing only" discipline as every
+//! prior Milestone 1-4 entry, and as the compound/compound-wait,
+//! triggered, chained, and timed work above: nothing here is wired into a
+//! decoder, dispatch loop, or request-lifecycle state machine. The old
+//! `src/prioqueue.rs` `Zone`/`Command`/`Controller`/`Priority` decorator
+//! this milestone's own Goal text names as the eventual absorption target
+//! for "picking which pending request runs next" is read only as
+//! background for this change, not extended or touched.
 //!
-//! Twelve named pieces are in scope, all implemented here or in the three
+//! Sixteen named pieces are in scope, all implemented here or in the four
 //! prior entries this one extends:
 //!
-//! - [`RequestKind`] — the request-type discriminant, now covering five
-//!   values ([`RequestKind::Chained`] = `0x01`, [`RequestKind::Timed`] =
-//!   `0x0A`, [`RequestKind::CompoundWait`] = `0x0B`,
-//!   [`RequestKind::Triggered`] = `0x0E`, [`RequestKind::Compound`] =
-//!   `0x0F`). See "Provenance note: `RequestKind`'s wire placement" below
-//!   for why this is modeled as a standalone value type, not yet tied to a
-//!   decoded byte offset.
+//! - [`RequestKind`] — the request-type discriminant, now covering eight
+//!   values ([`RequestKind::ClearAll`] = `0x05`,
+//!   [`RequestKind::ClearNonSafestate`] = `0x06`,
+//!   [`RequestKind::ClearSingle`] = `0x07`, [`RequestKind::Chained`] =
+//!   `0x01`, [`RequestKind::Timed`] = `0x0A`, [`RequestKind::CompoundWait`]
+//!   = `0x0B`, [`RequestKind::Triggered`] = `0x0E`,
+//!   [`RequestKind::Compound`] = `0x0F`). See "Provenance note:
+//!   `RequestKind`'s wire placement" below for why this is modeled as a
+//!   standalone value type, not yet tied to a decoded byte offset.
 //! - [`CompoundGateConfig`] / [`SequencerState`] /
 //!   [`check_sequencer_num_in_bounds`] / [`is_gate_satisfied`] /
 //!   [`check_compound_gate`] — the sequencer-gating rule: a compound(-wait)
@@ -129,14 +142,36 @@
 //!   [`crate::timestamp::AvtpTimestamp::is_untimed`]'s existing
 //!   all-zero-means-untimed fallback rather than inventing new ordering or
 //!   fallback logic of its own.
+//! - [`check_clear_all_cancellation`] — the clear-all (`0x05`, mandatory)
+//!   cancellation rule: every pending/in-flight request is canceled,
+//!   unconditionally. See "Provenance note: cancellation scope and the
+//!   addressed-endpoint/stream ambiguity" below for what "every" is scoped
+//!   to.
+//! - [`check_clear_non_safestate_cancellation`] — the clear-non-safestate
+//!   (`0x06`, optional) cancellation rule: a request is canceled unless it
+//!   is actively driving an endpoint toward its configured safe state. See
+//!   "Provenance note: the safe-state-driving predicate as a
+//!   caller-supplied parameter" below for why that determination is a
+//!   caller-supplied `bool` rather than something this module computes
+//!   itself.
+//! - [`ClearTransactionNum`] / [`check_clear_single_cancellation`] — the
+//!   clear-single (`0x07`, optional) cancellation rule: exactly one pending
+//!   request, identified by a `clear_transaction_num` matched against a
+//!   caller-supplied candidate transaction number, is canceled. See
+//!   "Provenance note: `clear_transaction_num`'s width and matching field"
+//!   below for why this matches against
+//!   [`crate::acf::ByteMessageInfo::transaction_num`].
+//! - [`crate::RcpError::RequestCanceled`] — the outcome signal all three
+//!   `check_clear_*_cancellation` functions construct for a request they
+//!   select for cancellation; the first construction site for this
+//!   Milestone-2-reserved sentinel (see "Provenance note:
+//!   `RequestCanceled` as this item's outcome signal" below).
 //!
 //! Deliberately out of scope:
 //!
-//! - The one remaining conditional-request kind this milestone's checklist
-//!   still names (the cancellation trio), and the "Standard"
-//!   (unconditional) kind implicit in the spec's own priority ordering.
-//!   [`RequestKind`] intentionally leaves room for them but does not add
-//!   them.
+//! - The "Standard" (unconditional) request kind implicit in the spec's own
+//!   priority ordering. [`RequestKind`] intentionally leaves room for it
+//!   but does not add it.
 //! - The persistent 8-bit sequencer-state register machine itself
 //!   (`ROADMAP.md` Milestone 5's own "Sequencers" checklist bullet, not yet
 //!   built). Every function here that needs a sequencer's current state
@@ -158,8 +193,9 @@
 //! ## Provenance note: `RequestKind`'s wire placement
 //!
 //! `ROADMAP.md`'s checklist bullets name `0x0F`/`0x0B`/`0x0E`/`0x01`/`0x0A`
-//! as the compound, compound-wait, triggered, chained, and timed
-//! discriminant values, but — unlike `acf_msg_type`
+//! and, for this item, `0x05`/`0x06`/`0x07` as the compound, compound-wait,
+//! triggered, chained, timed, clear-all, clear-non-safestate, and
+//! clear-single discriminant values, but — unlike `acf_msg_type`
 //! ([`crate::acf::ACF_ABB_MSG_TYPE`]/[`crate::acf::ACF_GBB_MSG_TYPE`]),
 //! whose byte offset within an ACF message header this crate already
 //! pinned down in Milestone 1 — no checklist text anywhere in this crate's
@@ -170,9 +206,10 @@
 //! text is, and no more: it is not attached to any offset within
 //! [`crate::acf::ByteMessageInfo`] or any other already-built wire shape,
 //! and no such offset is guessed here. This reasoning is unchanged by
-//! adding [`RequestKind::Triggered`], [`RequestKind::Chained`], or
-//! [`RequestKind::Timed`]; each is simply one more value under the same
-//! still-open question.
+//! adding [`RequestKind::Triggered`], [`RequestKind::Chained`],
+//! [`RequestKind::Timed`], or the [`RequestKind::ClearAll`]/
+//! [`RequestKind::ClearNonSafestate`]/[`RequestKind::ClearSingle`] trio;
+//! each is simply one more value under the same still-open question.
 //!
 //! ## Provenance note: `start_state` and the not-yet-built sequencer-state
 //! machine
@@ -357,6 +394,75 @@
 //! is, like [`RequestKind`] itself, a standalone value type not yet tied to
 //! any offset within [`crate::acf::ByteMessageInfo`] or any other decoded
 //! wire shape.
+//!
+//! ## Provenance note: cancellation scope and the addressed-endpoint/stream
+//! ambiguity
+//!
+//! `ROADMAP.md`'s checklist bullet names clear-all as canceling "every
+//! pending/in-flight request" but does not state what that "every" is
+//! scoped to — the single addressed endpoint the clear-all request itself
+//! targets, every endpoint on the addressed stream, or every request known
+//! to this RC Server regardless of stream. This crate has no unified
+//! "which requests are currently pending, across which scope" registry yet
+//! (that is `ROADMAP.md`'s own not-yet-built "Request lifecycle state
+//! machine" checklist bullet, later in this milestone), so
+//! [`check_clear_all_cancellation`] does not attempt to enumerate or scope
+//! anything itself: it is the uniform per-request outcome rule — a request
+//! considered for clear-all is always canceled — leaving *which* requests
+//! get considered, and under what scope, to whatever later item builds the
+//! request registry this rule would be applied across.
+//!
+//! ## Provenance note: the safe-state-driving predicate as a
+//! caller-supplied parameter
+//!
+//! `ROADMAP.md`'s checklist bullet states that clear-non-safestate must not
+//! cancel requests that are part of a safe-state-driving sequence, but this
+//! crate has no `rx_safety_measure`/safe-state machinery yet — that is
+//! `ROADMAP.md` Milestone 6's own "Per-stream safety config" checklist
+//! bullet, not yet built. [`check_clear_non_safestate_cancellation`]
+//! therefore takes "is this request safe-state-related" as a plain
+//! caller-supplied `bool` parameter, mirroring [`SequencerState`]'s own
+//! caller-supplied-rather-than-read precedent above and
+//! [`should_count_trigger_occurrence`]'s own caller-supplied-`bool`
+//! precedent, rather than this module reading or inventing the not-yet-built
+//! safe-state machinery's own state.
+//!
+//! ## Provenance note: `clear_transaction_num`'s width and matching field
+//!
+//! `ROADMAP.md`'s checklist bullet names `clear_transaction_num` as
+//! clear-single's target-selection field but states neither its wire width
+//! nor which already-decoded field it is matched against. Per Guiding
+//! Principle 5, this crate reads "clear ... a single [request], identified
+//! by a transaction number" as referring to the same per-transaction
+//! correlation id Milestone 1 already decoded as
+//! [`crate::acf::ByteMessageInfo::transaction_num`] (a plain `u8`), rather
+//! than inventing a second, differently-shaped transaction-id concept.
+//! [`ClearTransactionNum`] therefore wraps a `u8` to match
+//! `transaction_num`'s own width, and [`check_clear_single_cancellation`]
+//! takes its candidate transaction number as a plain `u8` — presumed to be
+//! a request's own already-decoded `transaction_num` — rather than
+//! accepting a [`crate::acf::ByteMessageInfo`] value directly, since this
+//! module does not otherwise depend on `crate::acf` types.
+//!
+//! ## Provenance note: `RequestCanceled` as this item's outcome signal
+//!
+//! [`crate::RcpError::RequestCanceled`] was added in Milestone 2's own
+//! "Error Model" item and reserved, unconstructed, ever since — see that
+//! enum's own doc comment listing it among five codes "not yet constructed
+//! anywhere in this crate" pending the later milestone that introduces a
+//! cancelable-request concept. This item is that later milestone: per
+//! Guiding Principle 5, this crate checked whether
+//! [`crate::RcpError::RequestRejected`] (the collapse candidate every prior
+//! Milestone 5 entry has checked and, so far, rejected for its own new
+//! codes) plausibly covers a canceled request instead, and rejected it for
+//! the same reason those prior entries did — `RequestRejected` names a
+//! request that never executes at all, which does not capture a request
+//! that *was* pending/in-flight and was deliberately stopped by another
+//! request's own cancellation action. [`check_clear_all_cancellation`],
+//! [`check_clear_non_safestate_cancellation`], and
+//! [`check_clear_single_cancellation`] all construct
+//! [`crate::RcpError::RequestCanceled`] for a request they select for
+//! cancellation, retiring it as a reserved-but-unconstructed placeholder.
 
 use crate::timestamp::AvtpTimestamp;
 use crate::RcpError;
@@ -365,21 +471,35 @@ use crate::RcpError;
 
 /// The request-type discriminant naming a conditional request's kind.
 ///
-/// Only the five values the checklist bullets built so far name are
+/// Only the eight values the checklist bullets built so far name are
 /// modeled; see this module's doc comment "Deliberately out of scope"
-/// section for why the remaining conditional-request kinds `ROADMAP.md`
-/// names elsewhere in this milestone are not yet added as variants.
+/// section for why the remaining "Standard" conditional-request kind
+/// `ROADMAP.md` names elsewhere in this milestone is not yet added as a
+/// variant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 // fusa:req REQ-CMP-001
 // fusa:req REQ-TRIG-001
 // fusa:req REQ-CHAIN-001
 // fusa:req REQ-TIME-001
+// fusa:req REQ-CANCEL-001
 pub enum RequestKind {
     /// Chained (`0x01`): a sequence of requests whose remaining links are
     /// gated on the `cs`-bit abort-on-predecessor-error rule — see
     /// [`check_chain_continuation`].
     Chained = 0x01,
+    /// Clear-all (`0x05`, mandatory): cancels every pending/in-flight
+    /// request — see [`check_clear_all_cancellation`].
+    ClearAll = 0x05,
+    /// Clear-non-safestate (`0x06`, optional): cancels every
+    /// pending/in-flight request except one actively driving an endpoint
+    /// toward its configured safe state — see
+    /// [`check_clear_non_safestate_cancellation`].
+    ClearNonSafestate = 0x06,
+    /// Clear-single (`0x07`, optional): cancels exactly one pending request
+    /// identified by a `clear_transaction_num` — see [`ClearTransactionNum`]
+    /// and [`check_clear_single_cancellation`].
+    ClearSingle = 0x07,
     /// Timed (`0x0A`): presentation-time execution as this checklist
     /// bullet's own named alternative to a TSCF header — see
     /// [`TimedExecutionTime`] and [`is_timed_request_ready`].
@@ -400,6 +520,7 @@ impl RequestKind {
     // fusa:req REQ-TRIG-001
     // fusa:req REQ-CHAIN-001
     // fusa:req REQ-TIME-001
+    // fusa:req REQ-CANCEL-001
     pub fn to_u8(self) -> u8 {
         self as u8
     }
@@ -407,16 +528,20 @@ impl RequestKind {
     /// Decode a discriminant byte into a [`RequestKind`].
     ///
     /// Returns `Err(RcpError::InvalidParameter)` for any value other than
-    /// the named discriminants — including the other conditional-request
-    /// kinds `ROADMAP.md` names elsewhere in this milestone, which this
-    /// module does not yet model. Never panics for any input.
+    /// the named discriminants — including the "Standard" kind `ROADMAP.md`
+    /// names elsewhere in this milestone, which this module does not yet
+    /// model. Never panics for any input.
     // fusa:req REQ-CMP-002
     // fusa:req REQ-TRIG-001
     // fusa:req REQ-CHAIN-001
     // fusa:req REQ-TIME-001
+    // fusa:req REQ-CANCEL-001
     pub fn from_u8(raw: u8) -> Result<Self, RcpError> {
         match raw {
             0x01 => Ok(Self::Chained),
+            0x05 => Ok(Self::ClearAll),
+            0x06 => Ok(Self::ClearNonSafestate),
+            0x07 => Ok(Self::ClearSingle),
             0x0A => Ok(Self::Timed),
             0x0B => Ok(Self::CompoundWait),
             0x0E => Ok(Self::Triggered),
@@ -539,16 +664,26 @@ pub struct CompoundExecDelays {
 /// and so is `RequestKind::Timed` (a fifth variant, added alongside
 /// [`TimedExecutionTime`]): Timed's own gate is
 /// [`is_timed_request_ready`], not an elapsed-tick delay timer like
-/// [`CompoundExecDelays`]/[`TriggerExecDelay`]. Not yet called from
-/// anywhere in this crate (see this module's doc comment for why), so this
-/// is a safe additive-plumbing-stage widening, not a breaking change to
-/// any consumer.
+/// [`CompoundExecDelays`]/[`TriggerExecDelay`]. The three cancellation
+/// variants ([`RequestKind::ClearAll`]/[`RequestKind::ClearNonSafestate`]/
+/// [`RequestKind::ClearSingle`], added alongside
+/// [`check_clear_all_cancellation`]) are likewise `None` here —
+/// `ROADMAP.md`'s Cancellation checklist bullet names no `*_exec_delay`
+/// timer for any of the three. Not yet called from anywhere in this crate
+/// (see this module's doc comment for why), so this is a safe
+/// additive-plumbing-stage widening, not a breaking change to any
+/// consumer.
 // fusa:req REQ-CMP-006
 pub fn resolve_compound_exec_delay(kind: RequestKind, delays: &CompoundExecDelays) -> Option<u32> {
     match kind {
         RequestKind::Compound => Some(delays.cmp_exec_delay),
         RequestKind::CompoundWait => Some(delays.cmpw_exec_delay),
-        RequestKind::Triggered | RequestKind::Chained | RequestKind::Timed => None,
+        RequestKind::Triggered
+        | RequestKind::Chained
+        | RequestKind::Timed
+        | RequestKind::ClearAll
+        | RequestKind::ClearNonSafestate
+        | RequestKind::ClearSingle => None,
     }
 }
 
@@ -606,7 +741,10 @@ pub fn resolve_trigger_exec_delay(kind: RequestKind, delay: TriggerExecDelay) ->
         RequestKind::Compound
         | RequestKind::CompoundWait
         | RequestKind::Chained
-        | RequestKind::Timed => None,
+        | RequestKind::Timed
+        | RequestKind::ClearAll
+        | RequestKind::ClearNonSafestate
+        | RequestKind::ClearSingle => None,
     }
 }
 
@@ -768,14 +906,91 @@ pub fn is_timed_request_ready(current: AvtpTimestamp, exec_time: TimedExecutionT
     current == exec_time.0 || current.is_after(exec_time.0)
 }
 
+// ── Cancellation (0x05/0x06/0x07): clear-all / clear-non-safestate /
+//    clear-single ──────────────────────────────────────────────────────────
+
+/// The clear-all (`0x05`, mandatory) cancellation rule this checklist
+/// bullet names: every pending/in-flight request considered under a
+/// clear-all is canceled, unconditionally.
+///
+/// Always returns `Err(RcpError::RequestCanceled)`. Never panics — this
+/// function takes no input to panic on. See this module's doc comment
+/// "Provenance note: cancellation scope and the addressed-endpoint/stream
+/// ambiguity" for what "every" is scoped to, and "Provenance note:
+/// `RequestCanceled` as this item's outcome signal" for why this
+/// constructs [`RcpError::RequestCanceled`] rather than
+/// [`RcpError::RequestRejected`] or a new variant of its own.
+// fusa:req REQ-CANCEL-002
+pub fn check_clear_all_cancellation() -> Result<(), RcpError> {
+    Err(RcpError::RequestCanceled)
+}
+
+/// The clear-non-safestate (`0x06`, optional) cancellation rule this
+/// checklist bullet names: every pending/in-flight request is canceled
+/// *except* one that is actively driving an endpoint toward its configured
+/// safe state.
+///
+/// Returns `Ok(())` (do not cancel) when `is_safestate_related` is `true`,
+/// and `Err(RcpError::RequestCanceled)` otherwise. Never panics for any
+/// input.
+///
+/// See this module's doc comment "Provenance note: the safe-state-driving
+/// predicate as a caller-supplied parameter" for why `is_safestate_related`
+/// is taken as a plain caller-supplied `bool` rather than read from this
+/// crate's not-yet-built `rx_safety_measure`/safe-state machinery.
+// fusa:req REQ-CANCEL-003
+pub fn check_clear_non_safestate_cancellation(is_safestate_related: bool) -> Result<(), RcpError> {
+    if is_safestate_related {
+        Ok(())
+    } else {
+        Err(RcpError::RequestCanceled)
+    }
+}
+
+/// A clear-single (`0x07`) cancellation's `clear_transaction_num` target: the
+/// single pending request's transaction number to cancel.
+///
+/// See this module's doc comment "Provenance note:
+/// `clear_transaction_num`'s width and matching field" for why this wraps a
+/// `u8` matching [`crate::acf::ByteMessageInfo::transaction_num`]'s own
+/// width.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+// fusa:req REQ-CANCEL-004
+pub struct ClearTransactionNum(pub u8);
+
+/// The clear-single (`0x07`, optional) cancellation rule this checklist
+/// bullet names: exactly one pending request — the one whose own
+/// transaction number matches `target` — is canceled.
+///
+/// `candidate_transaction_num` is the transaction number of the request
+/// under consideration, presumed to be a request's own already-decoded
+/// [`crate::acf::ByteMessageInfo::transaction_num`]. Returns
+/// `Err(RcpError::RequestCanceled)` when `candidate_transaction_num` equals
+/// `target.0`, and `Ok(())` (do not cancel) otherwise. Never panics for any
+/// input.
+// fusa:req REQ-CANCEL-004
+pub fn check_clear_single_cancellation(
+    candidate_transaction_num: u8,
+    target: ClearTransactionNum,
+) -> Result<(), RcpError> {
+    if candidate_transaction_num == target.0 {
+        Err(RcpError::RequestCanceled)
+    } else {
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     // ── RequestKind: discriminant round-trip / rejection ────────────────────
 
-    const ALL_REQUEST_KINDS: [RequestKind; 5] = [
+    const ALL_REQUEST_KINDS: [RequestKind; 8] = [
         RequestKind::Chained,
+        RequestKind::ClearAll,
+        RequestKind::ClearNonSafestate,
+        RequestKind::ClearSingle,
         RequestKind::Timed,
         RequestKind::CompoundWait,
         RequestKind::Triggered,
@@ -787,6 +1002,7 @@ mod tests {
     // fusa:test REQ-TRIG-001
     // fusa:test REQ-CHAIN-001
     // fusa:test REQ-TIME-001
+    // fusa:test REQ-CANCEL-001
     fn request_kind_round_trips_through_to_u8_from_u8() {
         for kind in ALL_REQUEST_KINDS {
             assert_eq!(RequestKind::from_u8(kind.to_u8()), Ok(kind));
@@ -798,12 +1014,16 @@ mod tests {
     // fusa:test REQ-TRIG-001
     // fusa:test REQ-CHAIN-001
     // fusa:test REQ-TIME-001
+    // fusa:test REQ-CANCEL-001
     fn request_kind_discriminants_match_roadmap_named_values() {
         assert_eq!(RequestKind::Compound.to_u8(), 0x0F);
         assert_eq!(RequestKind::CompoundWait.to_u8(), 0x0B);
         assert_eq!(RequestKind::Triggered.to_u8(), 0x0E);
         assert_eq!(RequestKind::Chained.to_u8(), 0x01);
         assert_eq!(RequestKind::Timed.to_u8(), 0x0A);
+        assert_eq!(RequestKind::ClearAll.to_u8(), 0x05);
+        assert_eq!(RequestKind::ClearNonSafestate.to_u8(), 0x06);
+        assert_eq!(RequestKind::ClearSingle.to_u8(), 0x07);
     }
 
     #[test]
@@ -830,6 +1050,17 @@ mod tests {
     // fusa:test REQ-TIME-001
     fn request_kind_from_u8_accepts_timed_discriminant() {
         assert_eq!(RequestKind::from_u8(0x0A), Ok(RequestKind::Timed));
+    }
+
+    #[test]
+    // fusa:test REQ-CANCEL-001
+    fn request_kind_from_u8_accepts_all_three_cancellation_discriminants() {
+        assert_eq!(RequestKind::from_u8(0x05), Ok(RequestKind::ClearAll));
+        assert_eq!(
+            RequestKind::from_u8(0x06),
+            Ok(RequestKind::ClearNonSafestate)
+        );
+        assert_eq!(RequestKind::from_u8(0x07), Ok(RequestKind::ClearSingle));
     }
 
     #[test]
@@ -1015,6 +1246,23 @@ mod tests {
         );
     }
 
+    #[test]
+    // fusa:test REQ-CMP-006
+    // fusa:test REQ-CANCEL-001
+    fn resolve_compound_exec_delay_is_none_for_all_three_cancellation_kinds() {
+        let delays = CompoundExecDelays {
+            cmp_exec_delay: 100,
+            cmpw_exec_delay: 200,
+        };
+        for kind in [
+            RequestKind::ClearAll,
+            RequestKind::ClearNonSafestate,
+            RequestKind::ClearSingle,
+        ] {
+            assert_eq!(resolve_compound_exec_delay(kind, &delays), None);
+        }
+    }
+
     // ── advance_sequencer_if_still_in_start_state ────────────────────────────
 
     #[test]
@@ -1087,6 +1335,20 @@ mod tests {
             None
         );
         assert_eq!(resolve_trigger_exec_delay(RequestKind::Timed, delay), None);
+    }
+
+    #[test]
+    // fusa:test REQ-TRIG-002
+    // fusa:test REQ-CANCEL-001
+    fn resolve_trigger_exec_delay_is_none_for_all_three_cancellation_kinds() {
+        let delay = TriggerExecDelay(42);
+        for kind in [
+            RequestKind::ClearAll,
+            RequestKind::ClearNonSafestate,
+            RequestKind::ClearSingle,
+        ] {
+            assert_eq!(resolve_trigger_exec_delay(kind, delay), None);
+        }
     }
 
     // ── TriggerRepeatCount ────────────────────────────────────────────────────
@@ -1310,6 +1572,79 @@ mod tests {
                     AvtpTimestamp::new(current),
                     TimedExecutionTime(AvtpTimestamp::new(target)),
                 );
+            }
+        }
+    }
+
+    // ── check_clear_all_cancellation ──────────────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-CANCEL-002
+    fn check_clear_all_cancellation_always_cancels() {
+        assert_eq!(
+            check_clear_all_cancellation(),
+            Err(RcpError::RequestCanceled)
+        );
+    }
+
+    // ── check_clear_non_safestate_cancellation ────────────────────────────────
+
+    #[test]
+    // fusa:test REQ-CANCEL-003
+    fn check_clear_non_safestate_cancellation_spares_safestate_related_requests() {
+        assert_eq!(check_clear_non_safestate_cancellation(true), Ok(()));
+    }
+
+    #[test]
+    // fusa:test REQ-CANCEL-003
+    fn check_clear_non_safestate_cancellation_cancels_non_safestate_related_requests() {
+        assert_eq!(
+            check_clear_non_safestate_cancellation(false),
+            Err(RcpError::RequestCanceled)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-CANCEL-003
+    fn check_clear_non_safestate_cancellation_never_panics_for_any_input() {
+        for is_safestate_related in [true, false] {
+            let _ = check_clear_non_safestate_cancellation(is_safestate_related);
+        }
+    }
+
+    // ── ClearTransactionNum / check_clear_single_cancellation ────────────────
+
+    #[test]
+    // fusa:test REQ-CANCEL-004
+    fn clear_transaction_num_default_is_zero() {
+        assert_eq!(ClearTransactionNum::default(), ClearTransactionNum(0));
+    }
+
+    #[test]
+    // fusa:test REQ-CANCEL-004
+    fn check_clear_single_cancellation_cancels_only_the_matching_transaction_num() {
+        let target = ClearTransactionNum(0x42);
+        assert_eq!(
+            check_clear_single_cancellation(0x42, target),
+            Err(RcpError::RequestCanceled)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-CANCEL-004
+    fn check_clear_single_cancellation_spares_every_non_matching_transaction_num() {
+        let target = ClearTransactionNum(0x42);
+        for candidate in [0x00u8, 0x01, 0x41, 0x43, 0xFF] {
+            assert_eq!(check_clear_single_cancellation(candidate, target), Ok(()));
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-CANCEL-004
+    fn check_clear_single_cancellation_never_panics_for_any_sampled_input() {
+        for candidate in [0x00u8, 0x42, 0xFF] {
+            for target in [0x00u8, 0x42, 0xFF] {
+                let _ = check_clear_single_cancellation(candidate, ClearTransactionNum(target));
             }
         }
     }

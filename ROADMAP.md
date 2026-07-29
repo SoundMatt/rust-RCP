@@ -1288,9 +1288,50 @@ per-endpoint scheduler, since the spec defines that ordering natively.
       the request-lifecycle state machine. New `REQ-TIME-001`..
       `REQ-TIME-003` (in `src/request.rs`) added to `.fusa-reqs.json`,
       each with a `// fusa:req`/`// fusa:test` pair.
-- [ ] Cancellation: clear-all (`0x05`, mandatory), clear-non-safestate
+- [x] Cancellation: clear-all (`0x05`, mandatory), clear-non-safestate
       (`0x06`, optional), clear-single (`0x07` + `clear_transaction_num`,
-      optional)
+      optional). Done (v0.8.0-dev): `src/request.rs` gains
+      `RequestKind::ClearAll = 0x05`, `RequestKind::ClearNonSafestate = 0x06`,
+      and `RequestKind::ClearSingle = 0x07` alongside the existing
+      `Chained`/`Timed`/`CompoundWait`/`Triggered`/`Compound` variants, with
+      `to_u8`/`from_u8` extended to match; `check_clear_all_cancellation`, a
+      pure function implementing the mandatory clear-all rule (always
+      cancels); `check_clear_non_safestate_cancellation`, a pure function
+      taking a caller-supplied `is_safestate_related` flag and canceling
+      unless it is set; and `ClearTransactionNum` (a `u8` newtype matching
+      `acf::ByteMessageInfo::transaction_num`'s own width) with
+      `check_clear_single_cancellation`, a pure function canceling only when
+      a caller-supplied candidate transaction number matches the configured
+      target. All three functions construct `RcpError::RequestCanceled` for
+      a request they select for cancellation — the first construction site
+      for that Milestone-2-reserved sentinel, retiring it as a placeholder.
+      `resolve_compound_exec_delay`/`resolve_trigger_exec_delay` both widen
+      to return `None` for all three cancellation variants to stay
+      exhaustive over the now eight-variant `RequestKind` (not yet called
+      from anywhere in this crate, so this is a safe additive-stage
+      widening). Three points flagged per Guiding Principle 5: (1) same as
+      every prior conditional-request kind in this module, no checklist
+      text states which byte/field of a request carries the
+      `0x05`/`0x06`/`0x07` discriminant or `clear_transaction_num`'s wire
+      offset, nor what scope ("every pending/in-flight request") is bounded
+      by for clear-all — the addressed endpoint, the addressed stream, or
+      this whole RC Server — so `check_clear_all_cancellation` is the
+      uniform per-request outcome rule only, not a scope-enumeration
+      function; (2) clear-non-safestate's safe-state-driving determination
+      is taken as a caller-supplied `bool` rather than read from this
+      crate's not-yet-built `rx_safety_measure`/safe-state machinery
+      (`ROADMAP.md` Milestone 6), mirroring `SequencerState`'s and
+      `should_count_trigger_occurrence`'s own caller-supplied-state
+      precedent; (3) `clear_transaction_num` is read as matching against
+      the already-decoded `acf::ByteMessageInfo::transaction_num` (a plain
+      `u8`) rather than a new field, since the checklist text gives no
+      field name or width of its own and this is the closest existing
+      per-transaction correlation id this crate has decoded. Same
+      "additive standalone plumbing only" discipline as every prior
+      Milestone 1-5 entry — not wired into any decoder, dispatch loop, or
+      the request-lifecycle state machine. New `REQ-CANCEL-001`..
+      `REQ-CANCEL-004` (in `src/request.rs`) added to `.fusa-reqs.json`,
+      each with a `// fusa:req`/`// fusa:test` pair.
 - [ ] Sequencers: persistent 8-bit state registers, power-on default state
       `1`, bounded by `svr_sequencers_max`
 - [ ] Execution priority ordering: cancellation > triggered > timed >

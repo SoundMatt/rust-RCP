@@ -5157,6 +5157,42 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CANCEL-001",
+      "title": "RequestKind gains ClearAll = 0x05, ClearNonSafestate = 0x06, and ClearSingle = 0x07 variants that round-trip through to_u8/from_u8",
+      "text": "RequestKind::ClearAll/ClearNonSafestate/ClearSingle encode to discriminant bytes 0x05/0x06/0x07 respectively via to_u8, RequestKind::from_u8 decodes each byte back to the matching variant, and every RequestKind variant (Chained, ClearAll, ClearNonSafestate, ClearSingle, Timed, CompoundWait, Triggered, Compound) round-trips through to_u8/from_u8; resolve_compound_exec_delay and resolve_trigger_exec_delay both return None for all three cancellation variants to stay exhaustive over the now eight-variant RequestKind; from_u8 continues to reject every other byte value and never panics across the full 0..=255 range",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CANCEL-002",
+      "title": "check_clear_all_cancellation implements the clear-all (0x05, mandatory) cancellation rule",
+      "text": "check_clear_all_cancellation always returns Err(RcpError::RequestCanceled), the uniform per-request outcome for a mandatory clear-all cancellation that cancels every pending/in-flight request it is applied to; never panics",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CANCEL-003",
+      "title": "check_clear_non_safestate_cancellation implements the clear-non-safestate (0x06, optional) cancellation rule",
+      "text": "check_clear_non_safestate_cancellation(is_safestate_related) returns Ok(()) (do not cancel) when is_safestate_related is true, and Err(RcpError::RequestCanceled) when is_safestate_related is false, capturing the rule that clear-non-safestate cancels every pending/in-flight request except one actively driving an endpoint toward its configured safe state; never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CANCEL-004",
+      "title": "ClearTransactionNum and check_clear_single_cancellation implement the clear-single (0x07, optional) cancellation rule",
+      "text": "ClearTransactionNum wraps a u8 matching acf::ByteMessageInfo::transaction_num's own width, defaulting to zero; check_clear_single_cancellation(candidate_transaction_num, target) returns Err(RcpError::RequestCanceled) when candidate_transaction_num equals target.0, and Ok(()) (do not cancel) for every other candidate value, capturing the rule that clear-single cancels exactly one pending request identified by clear_transaction_num; never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
