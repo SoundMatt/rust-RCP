@@ -24,7 +24,7 @@ This safety plan covers the **rust-RCP** crate — a Rust implementation of the 
 
 ### 4.1 Hazard Analysis and Risk Assessment (HARA)
 
-See `HARA.md` and `.fusa-hara.json` for the full HARA. Ten hazards (H-001 to H-010) and ten safety goals (SG-001 to SG-010) are identified.
+See `HARA.md` and `.fusa-hara.json` for the full HARA. Ten hazards (H-001 to H-010) and ten safety goals (SG-001 to SG-010) are identified, rebased against the OPEN Alliance TC18 Remote Control Protocol core (AVTPDU/ACF wire framing, RC Server lifecycle/register-map, EP0, discovery, endpoint types, conditional-request/sequencer model, E2E CRC-32 safe point) that Milestones 1-9 of `ROADMAP.md` built.
 
 ### 4.2 Requirements Tracing
 
@@ -35,7 +35,7 @@ All safety requirements are annotated with `// fusa:req REQ-XXX` in source files
 | Method | Coverage Target | Tool |
 |---|---|---|
 | Unit tests | ≥ 90% line coverage | `cargo test` + `cargo llvm-cov` |
-| Integration tests | All controller trait methods | `cargo test` |
+| Integration tests | Full decode -> route -> dispatch -> encode path (`mock::RcServer::handle_ntscf_frame`) across all endpoint types | `cargo test` |
 | Fuzz testing | Wire decoder, E2E unwrap | `cargo fuzz` |
 | Static analysis | All warnings as errors | `cargo clippy -- -D warnings` |
 | Formal model | State invariants | `formal.rs` runtime checks |
