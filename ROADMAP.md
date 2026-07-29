@@ -1557,9 +1557,36 @@ concepts into it rather than treating them as unrelated decorators.
       This entry also does not address which requests/streams get
       CRC-protected in the first place (the later "Per-stream safety
       config" bullet's job).
-- [ ] Coverage rule: CRC spans `stream_id` + `avtp_timestamp` (zeroed under
+- [x] Coverage rule: CRC spans `stream_id` + `avtp_timestamp` (zeroed under
       NTSCF) + the full ACF header + payload; length-field pre-adjustment
-      (+1 quadlet / +4 octets) before computing it
+      (+1 quadlet / +4 octets) before computing it. Done (v0.9.0-dev):
+      `src/e2e.rs` gains `build_crc32_coverage_buffer`, assembling the
+      exact byte sequence `crc32_tc18` is meant to run over — the 8-byte
+      `stream_id`, then a 4-byte `avtp_timestamp` position (the real value
+      for `avtp::HeaderVariant::Tscf`, four zero bytes in that same
+      position for `avtp::HeaderVariant::Ntscf`, never omitted), then the
+      full ACF header (the `acf_msg_type` discriminant, `byte_message_info`,
+      and — for ACF_GBB only — `message_timestamp`), then the payload — via
+      a new `AcfCoverageMessage` enum selecting between `acf::AcfAbbMessage`
+      and `acf::AcfGbbMessage` and reusing `acf::encode_acf_abb`/
+      `acf::encode_acf_gbb` rather than re-deriving either message's wire
+      layout. Per Guiding Principle 5, this entry flags rather than
+      silently resolves which length field the checklist's "+1 quadlet /
+      +4 octets" pre-adjustment applies to: `ROADMAP.md` does not say, and
+      of this crate's currently-decoded length fields, `byte_message_info`'s
+      `acf_msg_length` is the only one living inside the covered region
+      (the AVTP-level `ntscf_data_length`/`stream_data_length` fields sit
+      entirely outside it) — so `build_crc32_coverage_buffer` treats
+      `acf_msg_length` as the field being pre-adjusted, as its own working
+      interpretation pending reconciliation against real TC18 behavior,
+      never against spec prose. New `REQ-CRC-004`..`REQ-CRC-007` added to
+      `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair.
+      Same "additive standalone plumbing only" discipline as every prior
+      milestone entry: `build_crc32_coverage_buffer` is not wired into
+      `crc32_tc18`, `wrap`/`unwrap`, or `E2eController` — it only assembles
+      the buffer a caller would pass to `crc32_tc18`, leaving the
+      Fragmentation-interaction, Safety-request MSB-tagging, and
+      CRC_ERROR-path bullets below to actually invoke it.
 - [ ] Fragmentation interaction: only the *last* fragment of a multi-segment
       message carries the CRC, computed across the combined payload
 - [ ] Safety-request MSB-tagging: `0x8F`/`0x8B`/`0x8E` variants; on watchdog
