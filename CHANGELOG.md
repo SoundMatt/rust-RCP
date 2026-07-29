@@ -223,6 +223,48 @@ requirements traced; `bash scripts/cyber-gap-check.sh` reports 6/6 threats
 with tested countermeasures; `bash scripts/api-snapshot-check.sh` reports
 the public API surface matches `docs/PUBLIC_API.txt`.
 
+### Added — conformance test vectors (Milestone 10 closed)
+
+`src/conformance.rs` (`ROADMAP.md` Milestone 10's last checklist item,
+"Conformance test vectors / interop verification") is test-only
+(`#[cfg(test)] mod conformance;` in `lib.rs`, not `pub` like every other
+module here) and pins five self-referential wire-format golden vectors —
+frozen literal byte arrays, not recomputed from the encoder under test — for
+an NTSCF header, a TSCF header with a non-degenerate `avtp_timestamp`, an
+ACF_ABB message, an ACF_GBB message with a non-zero `message_timestamp`,
+and a composed NTSCF+ACF_ABB frame.
+
+`go-RCP`, the one sibling x-RCP implementation that has also uplifted to a
+real TC18 core and shipped `v1.0.0`, was cross-checked directly: a
+standalone Go program (not committed here) called go-RCP's own
+`avtp.EncodeHeader`/`acf.EncodeMessage` (commit
+`bdc760fb057f067cfb68199b6c3d0edab9e0c671`) for field values logically
+analogous to each golden vector. The two implementations' wire bytes are
+**not byte-identical** at any of the four vector types — divergent header/
+message lengths, `data_length` field packing, a go-RCP timestamp-status
+marker this crate's `TscfHeader` has no equivalent for, differing
+message-kind discriminants, and differing `byte_bus_id` width — recorded in
+`conformance.rs`'s module doc comment and pinned by a dedicated test rather
+than silently resolved, per Guiding Principle 5; reconciling either
+implementation's byte-level choices against the other, or against the OPEN
+Alliance TC18 spec's own behavior directly, is left for a follow-up. Both
+implementations' `stream_id` sender-MAC/suffix split agrees byte-for-byte,
+which is also recorded.
+
+`.fusa-reqs.json` gains `REQ-CONF-001..006`. `cargo build --all-targets`,
+`cargo clippy --all-targets --all-features -- -D warnings`, `cargo test
+--all-targets` (986 lib tests, up from 978; 27 unchanged
+`src/bin/rcp.rs` tests), and `cargo fmt --all -- --check` are clean; `bash
+scripts/fusa-gap-check.sh` reports 551/551 (100%) requirements traced;
+`bash scripts/cyber-gap-check.sh` reports 6/6 threats with tested
+countermeasures.
+
+This was Milestone 10's last unchecked checklist item. `ROADMAP.md`
+Milestone 10 is now complete; the actual `Cargo.toml` version bump, tag,
+and `crates.io` publish to `v1.0.0` are a deliberately separate release
+step (`Cargo.toml` still reads `0.3.0` as of this entry), not folded into
+this change.
+
 ## v0.12.0-dev (Milestone 9) — closed
 
 ### Removed
