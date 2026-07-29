@@ -2789,9 +2789,78 @@ Goal:
 Ship a stable, TC18-conformant rust-RCP.
 
 - [ ] Public API stability guarantees (semver) for the new core
-- [ ] Full FuSa artifact re-basing: HARA, SAFETY_PLAN.md, and tara.json
+- [x] Full FuSa artifact re-basing: HARA, SAFETY_PLAN.md, and tara.json
       rewritten against the new architecture (the old versions describe
       hazards and threats specific to the replaced protocol)
+      Done (v0.13.0-dev): `HARA.md`/`.fusa-hara.json`'s hazard and safety-goal
+      tables are rebased against the TC18 core Milestones 1-9 built.
+      H-001/H-005 (endpoint misaddressing, per-stream watchdog lockup) and
+      H-002 (safety-tagged request loss) are retargeted onto their nearest
+      TC18 mechanisms (`addressing::EndpointTable`,
+      `watchdog::StreamWatchdogState`, `request::check_watchdog_overflow_purge`)
+      rather than dropped, since the underlying safety concern persists
+      under a different mechanism; H-010 ("Registry close race", which has
+      no TC18 equivalent — the new `RcServerState` lifecycle has no "close"
+      state) is replaced outright with a hazard the new register-map/EP0
+      model actually introduces: a write bypassing lifecycle-state or
+      root-client gating (`ep0::check_ep0_access_for_stream`/
+      `is_root_client` composed with `lifecycle::is_register_reachable`/
+      `is_register_writable`). H-003/H-004/H-006/H-007/H-008/H-009 already
+      described TC18-native mechanisms (CRC-32 safe point, `AuthzEndpoint`,
+      power-mode gating, NTSCF length validation, execution-priority
+      tiering) from their prior Milestone 9 amendments and needed only
+      terminology harmonization.
+
+      `SAFETY_PLAN.md` §4.1 now cites the TC18 core by name; §4.3's
+      integration-test coverage target no longer says "All controller trait
+      methods" (the retired `Controller` trait) and instead names the live
+      `mock::RcServer::handle_ntscf_frame` decode -> route -> dispatch ->
+      encode path.
+
+      `tara.json`'s scope is rewritten around the TC18 core surface, with
+      an explicit note that the legacy `Zone`/`Command`/`Controller`/
+      `Registry` API (retained pending Milestone 10's CLI cutover) is out
+      of scope and receives no fresh threat modeling since it has no
+      compatibility shim and will be deleted outright. Asset A-001 ("Wire
+      frame structural integrity", `wire::validate_header()`, deleted
+      outright by Milestone 9's `wire` REPLACE cutover) is retargeted onto
+      `avtp::decode_ntscf_frame`/`acf::decode_acf_abb`; A-003 ("Zone
+      controller command-execution availability") is retargeted onto
+      `mock::RcServer`'s endpoint-addressed dispatch path. Two new assets
+      (A-007 EP0 register-map access-control integrity, A-008
+      discovery-stream claim integrity) and their threat scenarios
+      (T-RCP-09, T-RCP-10) and cybersecurity goals (CSG-RCP-06, CSG-RCP-07)
+      cover TC18-native attack surface — EP0 root-client/lifecycle-gate
+      bypass and discovery-stream claim hijack — that the replaced protocol
+      never had. T-RCP-01 is retargeted onto AVTPDU/ACF frame injection;
+      T-RCP-05 drops its now-moot "no in-crate mitigation until Milestone
+      10 replaces Controller/Command" framing (that removal is not a
+      Milestone 10 checklist item; the legacy surface is simply out of this
+      TARA's scope per the rewritten scope note) and is retargeted fully
+      onto `authz::AuthzEndpoint`. T-RCP-02/04 have minor terminology
+      updates ("write request"/"RC Server"/"addressed endpoint" in place of
+      "Set command"/"zone controller"). T-RCP-03/06/07/08 already described
+      TC18-native mechanisms and needed no content change.
+
+      `.fusa-reqs.json` needed no changes: every `REQ-*` group the rebased
+      HARA/TARA cite (`REQ-EPLK-*`, `REQ-SAFETY-*`, `REQ-EP0-*`,
+      `REQ-LIFE-*`, `REQ-DISC-*`, `REQ-WIRE-*`, etc.) was already retargeted
+      onto TC18 behavior by its own satellite package's Milestone 1-9 item;
+      only `REQ-ZONE-*`/`REQ-CTRL-*`/`REQ-REG-*`/`REQ-RESP-*`/`REQ-STAT-*`
+      still describe the legacy API, and nothing in the rebased HARA/TARA
+      cites them, consistent with those types' removal being out of this
+      item's scope. `.fusa-dfmea.json`/`.fusa-iec62443.json`/
+      `.fusa-problems.json` already carried their own Milestone 9
+      surgical-amendment notes and needed no further change for this item.
+
+      `cargo build --all-targets`, `cargo clippy --all-targets
+      --all-features -- -D warnings`, `cargo test --all-targets` (1062 lib
+      tests + 19 `src/bin/rcp.rs` tests, unchanged — this item touched no
+      source), and `cargo fmt --all -- --check` are clean; `bash
+      scripts/fusa-gap-check.sh` reports 622/622 (100%) requirements
+      traced; `bash scripts/cyber-gap-check.sh` reports 6/6 threats with
+      tested countermeasures; `relay conform --strict` against the release
+      binary passes all three RELAY §12 checks.
 - [x] RELAY spec `Adapt()`/`to_message()`/`from_message()` rebuilt against
       the new endpoint-addressed `Message` shape (no more zone-name-as-`id`
       mapping)

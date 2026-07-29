@@ -2,7 +2,7 @@
   "hazards": [
     {
       "id": "H-001",
-      "description": "Incorrect zone routing — command dispatched to wrong vehicle zone",
+      "description": "Endpoint misaddressing — a request resolves to the wrong (stream_id, byte_bus_id)-addressed endpoint",
       "severity": "S2",
       "exposure": "E4",
       "controllability": "C2",
@@ -11,7 +11,7 @@
     },
     {
       "id": "H-002",
-      "description": "Lost command — zone controller does not receive a critical command",
+      "description": "Safety-tagged request lost — a Critical-priority/safety-tagged request is silently dropped instead of executed or explicitly failed",
       "severity": "S2",
       "exposure": "E4",
       "controllability": "C2",
@@ -20,7 +20,7 @@
     },
     {
       "id": "H-003",
-      "description": "Replayed command — stale command executed out of sequence",
+      "description": "Replayed request — a previously valid request is re-injected and executed out of its intended context",
       "severity": "S2",
       "exposure": "E3",
       "controllability": "C2",
@@ -29,7 +29,7 @@
     },
     {
       "id": "H-004",
-      "description": "Payload corruption — bitflip in command payload causes erroneous actuation",
+      "description": "Payload corruption — a bitflip in a safe-point request/response payload causes erroneous actuation",
       "severity": "S3",
       "exposure": "E4",
       "controllability": "C1",
@@ -38,7 +38,7 @@
     },
     {
       "id": "H-005",
-      "description": "Zone controller lockup — watchdog not triggered, controller unresponsive",
+      "description": "Endpoint/stream lockup undetected — the per-stream watchdog fails to flag an unresponsive endpoint",
       "severity": "S2",
       "exposure": "E4",
       "controllability": "C2",
@@ -47,7 +47,7 @@
     },
     {
       "id": "H-006",
-      "description": "Unauthorised command — unauthenticated source sends actuation commands",
+      "description": "Unauthorized request execution — a caller dispatches an (endpoint-type, request-type) pair outside its granted allowlist",
       "severity": "S2",
       "exposure": "E3",
       "controllability": "C2",
@@ -56,7 +56,7 @@
     },
     {
       "id": "H-007",
-      "description": "Power state race — commands sent during SLEEP transition cause undefined behaviour",
+      "description": "Power-state transition race — requests processed during a Normal/StandBy/Sleep/Unpowered transition or cold/hot start handshake cause undefined behaviour",
       "severity": "S1",
       "exposure": "E3",
       "controllability": "C3",
@@ -65,7 +65,7 @@
     },
     {
       "id": "H-008",
-      "description": "Overflow in payload length field enables remote code execution",
+      "description": "Frame/payload length overflow — a malformed NTSCF/ACF length field enables an oversized allocation or malformed decode",
       "severity": "S3",
       "exposure": "E4",
       "controllability": "C0",
@@ -74,7 +74,7 @@
     },
     {
       "id": "H-009",
-      "description": "Denial of service via command flooding — critical commands delayed",
+      "description": "Request flooding denial of service — a flood of Standard-priority requests starves Critical-priority/safety-tagged request dispatch",
       "severity": "S2",
       "exposure": "E4",
       "controllability": "C2",
@@ -83,7 +83,7 @@
     },
     {
       "id": "H-010",
-      "description": "Registry closed while commands in flight — undefined response to caller",
+      "description": "Register-map integrity bypass — a write reaches a register the RC Server's lifecycle state or root-client policy should have blocked",
       "severity": "S1",
       "exposure": "E4",
       "controllability": "C3",
@@ -100,15 +100,15 @@
     { "id": "OS-006", "description": "Emergency stop / rapid deceleration" }
   ],
   "safety_goals": [
-    { "id": "SG-001", "description": "Commands shall only be delivered to the correct target zone", "asil": "ASIL-B", "ftti_ms": 200 },
-    { "id": "SG-002", "description": "Critical commands shall not be silently dropped", "asil": "ASIL-B", "ftti_ms": 100 },
+    { "id": "SG-001", "description": "Requests shall only be delivered to the correct addressed endpoint", "asil": "ASIL-B", "ftti_ms": 200 },
+    { "id": "SG-002", "description": "Safety-tagged requests shall not be silently dropped", "asil": "ASIL-B", "ftti_ms": 100 },
     { "id": "SG-003", "description": "Replayed frames shall be detected and rejected", "asil": "ASIL-B", "ftti_ms": 500 },
     { "id": "SG-004", "description": "Payload integrity shall be verified before execution", "asil": "ASIL-B", "ftti_ms": 200 },
-    { "id": "SG-005", "description": "Unresponsive controllers shall be detected within the watchdog window", "asil": "ASIL-B", "ftti_ms": 3000 },
-    { "id": "SG-006", "description": "Only authorised senders may issue actuation commands", "asil": "ASIL-B", "ftti_ms": 0 },
-    { "id": "SG-007", "description": "Power state transitions shall be atomic with respect to concurrent commands", "asil": "ASIL-A", "ftti_ms": 500 },
-    { "id": "SG-008", "description": "Payload length fields shall be validated before memory allocation", "asil": "ASIL-B", "ftti_ms": 0 },
-    { "id": "SG-009", "description": "Critical-priority commands shall not be delayed by lower-priority flooding", "asil": "ASIL-B", "ftti_ms": 100 },
-    { "id": "SG-010", "description": "Registry close shall signal all in-flight callers with a defined error", "asil": "ASIL-A", "ftti_ms": 200 }
+    { "id": "SG-005", "description": "Unresponsive endpoints shall be detected within the watchdog window", "asil": "ASIL-B", "ftti_ms": 3000 },
+    { "id": "SG-006", "description": "Only authorized callers may dispatch a given (endpoint-type, request-type) pair", "asil": "ASIL-B", "ftti_ms": 0 },
+    { "id": "SG-007", "description": "Power state transitions shall be atomic with respect to concurrent requests", "asil": "ASIL-A", "ftti_ms": 500 },
+    { "id": "SG-008", "description": "Frame/payload length fields shall be validated before memory allocation", "asil": "ASIL-B", "ftti_ms": 0 },
+    { "id": "SG-009", "description": "Critical-priority/safety-tagged requests shall not be delayed by lower-priority flooding", "asil": "ASIL-B", "ftti_ms": 100 },
+    { "id": "SG-010", "description": "Register writes shall be rejected unless permitted by both the current lifecycle state and root-client policy", "asil": "ASIL-A", "ftti_ms": 200 }
   ]
 }

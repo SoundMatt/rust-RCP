@@ -1,14 +1,14 @@
 {
   "project": "rust-RCP",
   "standard": "ISO/SAE 21434:2021",
-  "createdAt": "2026-07-27T00:00:00Z",
-  "scope": "rust-RCP is a software library component used in road-vehicle zonal-architecture ECUs. This TARA covers cybersecurity threats arising from rust-RCP's Command/Response/Status control-plane surface (wire framing, E2E safe-point CRC-32 integrity, authorization policy, rate limiting, priority scheduling, and the UDP/TLS transport bridges) when integrated into a central HPC or zone controller that exchanges RCP frames over an in-vehicle network. System-level CAL may differ after architectural decomposition per ISO/SAE 21434 clause 15.",
+  "createdAt": "2026-07-29T00:00:00Z",
+  "scope": "rust-RCP is a software library component used in road-vehicle zonal-architecture ECUs. This TARA covers cybersecurity threats arising from rust-RCP's OPEN Alliance TC18 Remote Control Protocol core surface — AVTPDU/ACF wire framing, (stream_id, byte_bus_id) endpoint addressing, the RC Server lifecycle/register-map model and EP0 root-client access control, discovery-stream claiming, E2E safe-point CRC-32 integrity, authorization policy, rate limiting, execution-priority scheduling, and the UDP/TLS transport bridges — when integrated into a central HPC or zone controller that exchanges RCP frames over an in-vehicle network. System-level CAL may differ after architectural decomposition per ISO/SAE 21434 clause 15. This TARA is rebased against the TC18 core Milestones 1-9 of `ROADMAP.md` built; it supersedes the previous TARA, which analyzed the now-replaced private `Zone`/`Command`/`Controller`/`Registry` protocol. That legacy surface is retained in-tree pending Milestone 10's CLI cutover (`ROADMAP.md`) but is out of scope here — per `ROADMAP.md`'s breaking-change notice it has no compatibility shim and will be deleted outright rather than carried forward, so it receives no fresh threat modeling of its own.",
 
   "assets": [
     {
       "id": "A-001",
-      "name": "Wire frame structural integrity",
-      "description": "Correctness of the 16-byte wire header (magic, protocol version, message type, zone, ID/seq, payload length) as decoded by wire::validate_header() and the UDP/TLS bridges",
+      "name": "AVTPDU/ACF frame structural integrity",
+      "description": "Correctness of the IEEE 1722 NTSCF AVTPDU header (subtype, sv bit, ntscf_data_length) as decoded by avtp::decode_ntscf_frame, and of the ACF ABB message shape (byte_bus_id, opcode/sub_opcode, address, length) as decoded by acf::decode_acf_abb, ahead of the UDP/TLS bridges",
       "cybersecurityProperty": "Integrity"
     },
     {
@@ -19,8 +19,8 @@
     },
     {
       "id": "A-003",
-      "name": "Zone controller command-execution availability",
-      "description": "Timely dispatch of Watchdog/Reset/Sleep/Wake commands to the correct zone controller; a delayed or suppressed safety-relevant command can mask a real failure condition",
+      "name": "Endpoint request-execution availability",
+      "description": "Timely dispatch of Watchdog/Reset/Sleep/Wake and other safety-tagged requests to the correct (stream_id, byte_bus_id)-addressed endpoint via mock::RcServer's handle_ntscf_frame/handle_abb decode-route-dispatch-encode path; a delayed or suppressed safety-relevant request can mask a real failure condition",
       "cybersecurityProperty": "Availability"
     },
     {
@@ -40,18 +40,30 @@
       "name": "Transport confidentiality/authenticity (TLS bridge)",
       "description": "tlstransport::TlsBridge enforces TLS 1.2+ and mutual authentication so that wire frames are not exposed to, or accepted from, an unauthenticated peer",
       "cybersecurityProperty": "Confidentiality"
+    },
+    {
+      "id": "A-007",
+      "name": "EP0 register-map access-control integrity",
+      "description": "Correctness of the composed EP0 gate that determines whether a write to the RC Server's own whole register map (byte_bus_id 0) is permitted: lifecycle-state reachability/writability (lifecycle::is_register_reachable/is_register_writable) composed with the root-client identity check (ep0::is_root_client/check_ep0_access_for_stream)",
+      "cybersecurityProperty": "Integrity"
+    },
+    {
+      "id": "A-008",
+      "name": "Discovery-stream claim integrity",
+      "description": "Correctness of the discovery-stream first-claimant rule and Discovery_TimeOut lapse-and-reopen behavior (discovery::try_claim_discovery_stream/check_discovery_access), which determines which client may configure a discovered stream while all clients retain read access",
+      "cybersecurityProperty": "Integrity"
     }
   ],
 
   "threatScenarios": [
     {
       "id": "T-RCP-01",
-      "title": "Frame injection — bad magic, version, or truncated header",
+      "title": "Frame injection — bad subtype, oversized length field, or truncated header",
       "asset": "A-001",
       "property": "Integrity",
       "stride": "Tampering",
-      "description": "An attacker on the RCP transport (UDP or an unauthenticated TLS peer) sends malformed wire frames — truncated below the 16-byte header, wrong magic bytes, or an unsupported protocol version — attempting to desynchronize the receiver or trigger undefined decode behaviour.",
-      "attackPath": "Attacker gains network access to the UDP/TLS transport; crafts a raw byte sequence shorter than HEADER_LEN, or with magic bytes other than 'RC', or ProtoVer != 0x01; sends it before any application-level filtering.",
+      "description": "An attacker on the RCP transport (UDP or an unauthenticated TLS peer) sends malformed AVTPDU/ACF frames — truncated below the NTSCF header width, a subtype byte other than NTSCF_SUBTYPE, or an ntscf_data_length field wider than the encoded ACF payload — attempting to desynchronize the receiver or trigger undefined decode behaviour.",
+      "attackPath": "Attacker gains network access to the UDP/TLS transport; crafts a raw byte sequence shorter than the NTSCF header, or with a subtype byte other than avtp::NTSCF_SUBTYPE (0x82), or an ntscf_data_length/ACF byte_bus_id-opcode shape decode_acf_abb does not recognize; sends it before any application-level filtering.",
       "impact": {
         "safety": "Moderate",
         "financial": "Negligible",
@@ -69,8 +81,8 @@
       "feasibilityRating": "High",
       "cal": "CAL-2",
       "cybersecurityGoal": "CSG-RCP-01",
-      "mitigations": ["REQ-WIRE-001", "REQ-WIRE-002", "REQ-WIRE-008", "REQ-WIRE-009"],
-      "residualRisk": "Low — validate_header() is the mandatory gate before any frame is decoded; ShortFrame/BadMagic/BadVersion are returned instead of panicking"
+      "mitigations": ["REQ-WIRE-001", "REQ-WIRE-002", "REQ-WIRE-008", "REQ-WIRE-009", "REQ-EPLK-004"],
+      "residualRisk": "Low — decode_ntscf_frame/decode_acf_abb are the mandatory gates before any frame is interpreted; ShortFrame/InvalidSize are returned instead of panicking, and EndpointTable::lookup never panics on an unresolved (stream_id, byte_bus_id) pair"
     },
     {
       "id": "T-RCP-02",
@@ -78,7 +90,7 @@
       "asset": "A-002",
       "property": "Integrity",
       "stride": "Tampering",
-      "description": "UDP provides no authentication or encryption. An attacker on the same network segment intercepts a wire frame in transit and modifies the payload bytes (e.g. a Set command's actuation value) before it reaches the zone controller.",
+      "description": "UDP provides no authentication or encryption. An attacker on the same network segment intercepts a wire frame in transit and modifies the payload bytes (e.g. a write request's actuation value) before it reaches the addressed endpoint.",
       "attackPath": "Attacker performs ARP spoofing or otherwise gains a man-in-the-middle position on the CAN-to-Ethernet gateway segment carrying RCP-over-UDP; captures a frame; edits payload bytes; re-computes/forges the E2E CRC (see T-RCP-07); re-injects.",
       "impact": {
         "safety": "Severe",
@@ -134,8 +146,8 @@
       "asset": "A-005",
       "property": "Availability",
       "stride": "Denial of Service",
-      "description": "An attacker (or a malfunctioning peer) floods a zone controller with a high volume of Normal/High-priority commands, attempting to starve or delay Critical-priority commands such as Watchdog or Reset.",
-      "attackPath": "Attacker gains send access to a zone controller's transport; issues Set/Get commands as fast as the transport allows, with no rate limiting in front of the controller.",
+      "description": "An attacker (or a malfunctioning peer) floods an RC Server with a high volume of Standard-priority requests, attempting to starve or delay Critical-priority/safety-tagged requests such as Watchdog or Reset.",
+      "attackPath": "Attacker gains send access to an RC Server's transport; issues read/write requests as fast as the transport allows, with no rate limiting in front of the endpoint dispatch path.",
       "impact": {
         "safety": "Severe",
         "financial": "Negligible",
@@ -158,12 +170,12 @@
     },
     {
       "id": "T-RCP-05",
-      "title": "Unauthorized safety-relevant command execution",
+      "title": "Unauthorized safety-relevant request execution",
       "asset": "A-004",
       "property": "Integrity",
       "stride": "Elevation of Privilege",
-      "description": "A caller without the intended authority sends a Reset, Sleep, or Wake command to a zone controller that should only accept Get/Set from that caller, attempting to force an unintended power-state transition.",
-      "attackPath": "Attacker (or a compromised, lower-trust peer) obtains network access to a zone controller that is composed without an ACL wrapper, or whose Policy allowlist was misconfigured to allow_all(); sends a Reset/Sleep/Wake Command directly. Milestone 9's ADAPT retarget replaced authz::AuthzController (a Controller-wrapping ACL) with authz::AuthzEndpoint (an Endpoint-wrapping ACL keyed on (ep_type, is_write) instead of CommandType) — see that module's own doc comment — so this exact Command-shaped attack against a legacy Controller now has no in-crate ACL wrapper available to compose against it at all, until Milestone 10's core-surface cutover replaces Controller/Command with the endpoint-addressed model authz::AuthzEndpoint already protects.",
+      "description": "A caller without the intended authority sends a Reset, Sleep, or Wake write request to an endpoint that should only accept a narrower (ep_type, is_write) pair from that caller, attempting to force an unintended power-state transition.",
+      "attackPath": "Attacker (or a compromised, lower-trust peer) obtains network access to an endpoint that is composed without an AuthzEndpoint wrapper, or whose Policy allowlist was misconfigured to allow_all(); sends the write request directly.",
       "impact": {
         "safety": "Severe",
         "financial": "Moderate",
@@ -182,7 +194,7 @@
       "cal": "CAL-3",
       "cybersecurityGoal": "CSG-RCP-04",
       "mitigations": ["REQ-AUTHZ-001", "REQ-AUTHZ-005", "REQ-AUTHZ-006"],
-      "residualRisk": "High for a deployment still composing a legacy Controller-based zone controller: authz no longer offers a Controller-wrapping ACL at all (that capability was retargeted to authz::AuthzEndpoint, an Endpoint-space ACL, by Milestone 9's ADAPT retarget), so this exact Command-shaped attack has no in-crate mitigation until Milestone 10 replaces the Controller/Command surface itself. For the new Endpoint-space surface, residual risk remains deployment-dependent as before: the ACL is enforced only when the integrator wraps every externally reachable Endpoint in an AuthzEndpoint with a least-privilege Policy; rust-RCP cannot force composition at the library level"
+      "residualRisk": "Medium — authz::AuthzEndpoint's (ep_type, is_write)-keyed Policy allowlist (Milestone 9's ADAPT retarget from the retired Controller-wrapping, CommandType-keyed ACL) is enforced only when the integrator wraps every externally reachable Endpoint in an AuthzEndpoint with a least-privilege Policy; rust-RCP cannot force that composition at the library level"
     },
     {
       "id": "T-RCP-06",
@@ -267,6 +279,62 @@
       "cybersecurityGoal": "CSG-RCP-04",
       "mitigations": ["REQ-WDG-002", "REQ-WDG-005", "REQ-TLS-001", "REQ-TLS-002"],
       "residualRisk": "Medium — forging traffic that resets a stream's liveness timer is a transport-layer attack outside rust-RCP's own visibility; running the watchdog path over an authenticated, integrity-protected transport (TLS bridge, mutual auth) is the primary mitigation, since the library cannot itself distinguish a genuine request from a forged one without it"
+    },
+    {
+      "id": "T-RCP-09",
+      "title": "EP0 register-map write bypassing lifecycle or root-client gating",
+      "asset": "A-007",
+      "property": "Integrity",
+      "stride": "Elevation of Privilege",
+      "description": "A non-root-client caller (or a caller acting before the RC Server has reached the lifecycle state a given register category requires) writes to the RC Server's own whole register map via EP0 (byte_bus_id 0), attempting to reconfigure hardware/RCP-level settings underlying every other endpoint without the intended authority or sequencing.",
+      "attackPath": "Attacker (or a compromised, lower-trust peer) obtains network access to an RC Server whose EP0-addressed requests reach ep0::check_ep0_access_for_stream without the caller's stream_id ever being registered as svr_root_client_index, or targets a register category before lifecycle::RcServerState has advanced to the state that category requires; if the composed check is bypassed or misconfigured, the write proceeds.",
+      "impact": {
+        "safety": "Severe",
+        "financial": "Moderate",
+        "operational": "Major",
+        "privacy": "Negligible"
+      },
+      "impactRating": 3,
+      "attackFeasibility": {
+        "elapsedTime": "< 1 week",
+        "expertise": "Proficient",
+        "knowledgeOfItem": "Restricted",
+        "windowOfOpportunity": "Moderate",
+        "equipment": "Standard"
+      },
+      "feasibilityRating": "Medium",
+      "cal": "CAL-3",
+      "cybersecurityGoal": "CSG-RCP-06",
+      "mitigations": ["REQ-EP0-007", "REQ-EP0-009", "REQ-EP0-010", "REQ-LIFE-009", "REQ-LIFE-010"],
+      "residualRisk": "Low in-library — check_ep0_access_for_stream composes root-client identity with lifecycle-gated reachability/writability and rejects a non-root write with RcpError::UnauthorizedAccess before any register mutation; residual risk is deployment-dependent on the integrator correctly registering the intended root client's stream_id and not exposing EP0 write access over an unauthenticated transport"
+    },
+    {
+      "id": "T-RCP-10",
+      "title": "Discovery-stream claim hijack",
+      "asset": "A-008",
+      "property": "Integrity",
+      "stride": "Spoofing",
+      "description": "An attacker races a legitimate configuring client to claim a newly discovered stream first, or waits for a legitimate claimant's Discovery_TimeOut to lapse and re-claims the stream before the legitimate client renews it, gaining exclusive configure access to a stream it does not legitimately own.",
+      "attackPath": "Attacker observes discovery broadcast traffic (read access is unauthenticated by design — any client may read); sends a configure-shaped discovery request before the legitimate client does, or immediately after the legitimate claimant's claim lapses per Discovery_TimeOut, so try_claim_discovery_stream/check_discovery_access grants it configure access instead.",
+      "impact": {
+        "safety": "Moderate",
+        "financial": "Low",
+        "operational": "Major",
+        "privacy": "Negligible"
+      },
+      "impactRating": 2,
+      "attackFeasibility": {
+        "elapsedTime": "< 1 day",
+        "expertise": "Proficient",
+        "knowledgeOfItem": "Public",
+        "windowOfOpportunity": "Easy",
+        "equipment": "Standard"
+      },
+      "feasibilityRating": "High",
+      "cal": "CAL-2",
+      "cybersecurityGoal": "CSG-RCP-07",
+      "mitigations": ["REQ-DISC-007", "REQ-DISC-008", "REQ-DISC-009", "REQ-DISC-013", "REQ-DISC-014", "REQ-TLS-001", "REQ-TLS-002"],
+      "residualRisk": "Medium — the first-claimant rule and Discovery_TimeOut lapse-and-reopen behavior are a coordination mechanism for cooperating clients, not an authentication mechanism; the spec's discovery model has no notion of claimant identity beyond stream possession, so an attacker with plain network access can always attempt to win the race or the lapse-reclaim window. Running discovery configuration over the mutually authenticated TLS bridge restricts this to already-trusted peers, at which point the residual concern becomes a benign multi-client coexistence race rather than a security boundary"
     }
   ],
 
@@ -294,7 +362,7 @@
     },
     {
       "id": "CSG-RCP-04",
-      "description": "rust-RCP shall provide an authorization allowlist that integrators can compose in front of any Endpoint to restrict which (endpoint-type, request-type) pairs a caller may dispatch, and a per-stream watchdog mechanism whose liveness-reset and safe-state-on-expiry behavior is independently verifiable. Milestone 9's ADAPT retarget moved this allowlist from wrapping Controller (keyed on CommandType) to wrapping Endpoint (keyed on (ep_type, is_write)) — see T-RCP-05's own residualRisk for the resulting Controller-space coverage gap.",
+      "description": "rust-RCP shall provide an authorization allowlist that integrators can compose in front of any Endpoint to restrict which (endpoint-type, request-type) pairs a caller may dispatch, and a per-stream watchdog mechanism whose liveness-reset and safe-state-on-expiry behavior is independently verifiable.",
       "cal": "CAL-3",
       "threats": ["T-RCP-05", "T-RCP-08"],
       "requirements": ["REQ-AUTHZ-001", "REQ-AUTHZ-005", "REQ-AUTHZ-006", "REQ-WDG-002", "REQ-WDG-005"]
@@ -305,6 +373,20 @@
       "cal": "CAL-2",
       "threats": ["T-RCP-06"],
       "requirements": ["REQ-TLS-001", "REQ-TLS-002"]
+    },
+    {
+      "id": "CSG-RCP-06",
+      "description": "rust-RCP shall reject an EP0-addressed register write unless the requesting stream is the registered root client and the target register category is reachable and writable under the RC Server's current lifecycle state.",
+      "cal": "CAL-3",
+      "threats": ["T-RCP-09"],
+      "requirements": ["REQ-EP0-007", "REQ-EP0-009", "REQ-EP0-010", "REQ-LIFE-009", "REQ-LIFE-010"]
+    },
+    {
+      "id": "CSG-RCP-07",
+      "description": "rust-RCP shall enforce the discovery-stream first-claimant rule so that only the current claimant (or any claimant after a genuine Discovery_TimeOut lapse) is granted configure access to a discovered stream, while read access remains available to all clients.",
+      "cal": "CAL-2",
+      "threats": ["T-RCP-10"],
+      "requirements": ["REQ-DISC-007", "REQ-DISC-008", "REQ-DISC-009", "REQ-DISC-013", "REQ-DISC-014"]
     }
   ]
 }

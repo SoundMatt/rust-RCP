@@ -60,6 +60,56 @@ clean; `bash scripts/fusa-gap-check.sh` reports 622/622 (100%) requirements
 traced; `bash scripts/cyber-gap-check.sh` reports 6/6 threats with tested
 countermeasures.
 
+### Changed — FuSa artifact re-basing
+
+`HARA.md`/`.fusa-hara.json`, `SAFETY_PLAN.md`, and `tara.json` are rewritten
+against the TC18 core Milestones 1-9 built, superseding the versions that
+described the replaced private `Zone`/`Command`/`Controller`/`Registry`
+protocol.
+
+`HARA.md`/`.fusa-hara.json`: H-001/H-005 (endpoint misaddressing, per-stream
+watchdog lockup) and H-002 (safety-tagged request loss) are retargeted onto
+`addressing::EndpointTable`, `watchdog::StreamWatchdogState`, and
+`request::check_watchdog_overflow_purge`. H-010 ("Registry close race" — no
+equivalent in the new three-state `RcServerState` lifecycle, which has no
+"close" state) is replaced outright with a register-map write bypassing
+lifecycle-state or root-client gating (`ep0::check_ep0_access_for_stream`/
+`is_root_client` composed with `lifecycle::is_register_reachable`/
+`is_register_writable`).
+
+`SAFETY_PLAN.md` §4.3's integration-test coverage target no longer names
+the retired `Controller` trait; it now names the live
+`mock::RcServer::handle_ntscf_frame` decode -> route -> dispatch -> encode
+path.
+
+`tara.json`'s scope explicitly excludes the legacy `Zone`/`Command`/
+`Controller`/`Registry` API (retained pending Milestone 10's CLI cutover)
+from fresh threat modeling, since it has no compatibility shim and will be
+deleted outright. Asset A-001 is retargeted from `wire::validate_header()`
+(deleted by Milestone 9's `wire` REPLACE cutover) onto
+`avtp::decode_ntscf_frame`/`acf::decode_acf_abb`; A-003 is retargeted onto
+`mock::RcServer`'s endpoint-addressed dispatch path. Two new assets (A-007
+EP0 register-map access-control integrity, A-008 discovery-stream claim
+integrity) with new threat scenarios T-RCP-09/T-RCP-10 and cybersecurity
+goals CSG-RCP-06/CSG-RCP-07 cover TC18-native attack surface the replaced
+protocol never had. T-RCP-01 is retargeted onto AVTPDU/ACF frame injection;
+T-RCP-05 is retargeted fully onto `authz::AuthzEndpoint`, dropping its
+now-out-of-scope framing around the still-present legacy `Controller`
+surface.
+
+`.fusa-reqs.json`/`.fusa-dfmea.json`/`.fusa-iec62443.json`/
+`.fusa-problems.json` needed no changes: every `REQ-*` group the rebased
+HARA/TARA cite was already retargeted onto TC18 behavior by its own
+satellite package's Milestone 1-9 item.
+
+`cargo build --all-targets`, `cargo clippy --all-targets --all-features --
+-D warnings`, `cargo test --all-targets` (1062 lib tests + 19 `src/bin/
+rcp.rs` tests, unchanged), and `cargo fmt --all -- --check` are clean;
+`bash scripts/fusa-gap-check.sh` reports 622/622 (100%) requirements
+traced; `bash scripts/cyber-gap-check.sh` reports 6/6 threats with tested
+countermeasures; `relay conform --strict` against the release binary passes
+all three RELAY §12 checks.
+
 ## v0.12.0-dev (Milestone 9) — closed
 
 ### Removed
