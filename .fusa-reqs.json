@@ -2369,42 +2369,6 @@
       "verificationMethod": "test"
     },
     {
-      "id": "REQ-LINBR-001",
-      "title": "LIN max data",
-      "text": "LIN_MAX_DATA == 8 bytes",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-LINBR-002",
-      "title": "LinMaster trait",
-      "text": "LinMaster defines send_frame and recv_frame",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-LINBR-003",
-      "title": "LinBridge wraps master",
-      "text": "LinBridge delegates to a LinMaster",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-LINBR-004",
-      "title": "Payload, zone, and timeout checks",
-      "text": "LinBridge rejects oversized payload, wrong zone, zero timeout",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
       "id": "REQ-SOMEIP-001",
       "title": "SOME/IP header length",
       "text": "SOMEIP_HEADER_LEN == 16 bytes",
@@ -5547,8 +5511,8 @@
     },
     {
       "id": "REQ-LIN-001",
-      "title": "LIN_MAX_DATA matches the real LIN 2.x per-frame data ceiling reused from linbr",
-      "text": "lin::LIN_MAX_DATA == 8 and is defined as crate::linbr::LIN_MAX_DATA, reusing that value as a physical fact about the bus rather than duplicating a second literal or reusing any of linbr::LinBridge::send's surrounding PID-derivation logic",
+      "title": "LIN_MAX_DATA matches the real LIN 2.x per-frame data ceiling",
+      "text": "lin::LIN_MAX_DATA == 8, LIN 2.x's own physical ceiling stated directly as this module's own constant (originally reused as crate::linbr::LIN_MAX_DATA, the value's original home before the linbr REPLACE cutover deleted that legacy Zone/Command-coupled module in Milestone 9, no longer exists to import from), without reusing any of the legacy linbr::LinBridge::send's surrounding PID-derivation logic",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -5575,7 +5539,7 @@
     {
       "id": "REQ-LIN-004",
       "title": "LinFrameTransfer::decode rejects data bytes exceeding LIN_MAX_DATA and accepts exactly LIN_MAX_DATA",
-      "text": "LinFrameTransfer::decode returns Err(RcpError::PayloadTooLarge) when the bytes following the PID byte exceed LIN_MAX_DATA in length, and succeeds when they equal LIN_MAX_DATA exactly, matching the real LIN 2.x per-frame data ceiling linbr::LinBridge::send already enforced",
+      "text": "LinFrameTransfer::decode returns Err(RcpError::PayloadTooLarge) when the bytes following the PID byte exceed LIN_MAX_DATA in length, and succeeds when they equal LIN_MAX_DATA exactly, matching the real LIN 2.x per-frame data ceiling the legacy linbr::LinBridge::send already enforced",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",

@@ -112,7 +112,6 @@ pub mod iseled;
 pub mod iso21434;
 pub mod lifecycle;
 pub mod lin;
-pub mod linbr;
 pub mod loan;
 pub mod mdio;
 pub mod mdns;
@@ -568,7 +567,7 @@ pub enum RcpError {
     // `Registry` surface (`ROADMAP.md` Milestone 9's satellite-package
     // migration and Milestone 10's core-surface cutover) — kept unchanged
     // by this item since dozens of still-live satellite packages (`mock`,
-    // `capi`, `linbr`, and others) construct and match on them
+    // `capi`, and others) construct and match on them
     // today. `udp`'s own `wire` REPLACE cutover (Milestone 9) already
     // dropped its use of `ZoneMismatch` — see `src/udp.rs` — but the
     // variant itself stays for the packages that still construct it. Out

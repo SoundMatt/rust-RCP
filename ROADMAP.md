@@ -2170,7 +2170,7 @@ package-by-package audit below, now that the core protocol (Milestones 1–8)
 exists to migrate them onto.
 
 - [ ] All **REPLACE**-disposition packages rebuilt against the new core
-      Progress (v0.12.0-dev): 8 of 10 done. `watchdog`/`powerstate` were
+      Progress (v0.12.0-dev): 9 of 10 done. `watchdog`/`powerstate` were
       already REPLACEd ahead of schedule inside Milestones 6/7 (see their
       own "Done" notes above); `wire` and `e2e` are done too. `src/
       wire.rs` — the legacy 16-byte private frame — is deleted outright,
@@ -2426,7 +2426,53 @@ exists to migrate them onto.
       in place when its own REPLACE cutover landed, rather than left
       stale).
 
-      Remaining REPLACE packages: `linbr` and `udp`'s own deeper rebuild.
+      `linbr`'s row is now done too, following the `canbr` cutover
+      immediately before it as precedent — the most structurally similar of
+      the REPLACE items so far, a bridge module with exactly one physical-
+      fact constant reused by its Milestone-7-built replacement and no other
+      in-crate caller. `src/linbr.rs`'s legacy `Controller`-trait
+      `LinBridge`, its `LinMaster` transport abstraction, its
+      `Zone`/`Command`-keyed `pid = (zone.0 << 2) | (cmd_type.0 & 0x03)` PID
+      scheme, and their test module are deleted outright — no external
+      caller depended on any of them outside `src/linbr.rs` itself
+      (confirmed by inspection). The one genuine cross-module dependency —
+      `src/lin.rs`'s `LIN_MAX_DATA` constant, defined as
+      `crate::linbr::LIN_MAX_DATA` — is resolved the same way `can.rs`'s
+      `CAN_FD_MAX_PAYLOAD` was: the physical-fact literal (`8`) is inlined
+      directly into `lin.rs` as its own constant rather than leaving a stub
+      `linbr.rs` behind purely to hold one value; `lin.rs`'s own "Validation
+      against `linbr.rs`" doc-comment section and its test module's now-
+      dangling `crate::linbr::LIN_MAX_DATA` equality assertion are updated to
+      match. No new LIN hardware I/O transport binding is built to replace
+      the old `LinMaster` abstraction, for the same reason the `canbr`
+      cutover built no CAN transport binding: every endpoint-type module
+      this crate has built since Milestone 4 is additive standalone plumbing
+      only, deliberately not wired into any live decoder, dispatch loop, or
+      transport, so building one transport binding for LIN alone here would
+      be inconsistent with that established discipline rather than an
+      extension of it; a real hardware binding remains a later, not-yet-
+      scoped item. `.fusa-reqs.json`'s `REQ-LINBR-001`..`004` describe only
+      the deleted `LinBridge`/`LinMaster`/`Zone`-keyed behavior:
+      `REQ-LINBR-001`'s `LIN_MAX_DATA == 8` fact is already covered by the
+      existing `REQ-LIN-001` (retargeted below), and `REQ-LINBR-002`/`003`/
+      `004` (the `LinMaster` trait shape, `LinBridge::send`'s delegation, and
+      zone-mismatch/oversized-payload/zero-timeout rejection) have no
+      surviving analog in `crate::lin`'s data-shape-only model — so, per this
+      item's own "retarget in place, or explicitly retire if no equivalent
+      behavior exists" instruction, all four are retired (removed) rather
+      than force-mapped onto unrelated behavior. `REQ-LIN-001`'s own text is
+      retargeted to drop its now-stale `crate::linbr::LIN_MAX_DATA` import
+      reference, describing the constant as `lin.rs`'s own directly-stated
+      physical fact instead; `REQ-LIN-004`'s text is likewise updated to
+      describe the legacy `linbr::LinBridge::send`'s enforcement in the past
+      tense. A grep of `.fusa-dfmea.json`, `tara.json`, and
+      `.fusa-iec62443.json` for `linbr`/`LINBR` references before this item
+      landed turned up none — unlike `canbr`'s `T-005` countermeasure swap,
+      no cross-reference in those files needed retargeting. `README.md`'s
+      module index drops its now-inaccurate `linbr` row outright, the same
+      way `canbr`'s row was dropped.
+
+      Remaining REPLACE packages: `udp`'s own deeper rebuild.
 - [ ] All **ADAPT**-disposition packages retargeted to whatever new
       endpoint/RC-Server trait surface replaces `Controller`/`Registry`
 - [ ] All **DEPRECATE**-disposition packages removed, with a migration note

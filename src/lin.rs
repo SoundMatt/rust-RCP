@@ -44,16 +44,16 @@
 //!   in every prior Milestone 1-4 entry.
 //! - Wiring any of the below into an actual decoder, dispatch loop, or
 //!   [`crate::avtp`]/[`crate::acf`]/[`crate::addressing`] caller, and —
-//!   distinct from every Milestone 4 entry — touching [`crate::linbr`]
-//!   itself. `linbr.rs`'s own REPLACE-disposition cutover (deletion/rebuild
-//!   against the new core) is `ROADMAP.md` Milestone 9's job, not this
-//!   item's; this module is examined for validation purposes only, per
-//!   "Validation against `linbr.rs`" below.
+//!   distinct from every Milestone 4 entry — touching the legacy `linbr.rs`
+//!   bridge itself while it still existed. Its REPLACE-disposition cutover
+//!   (deletion/rebuild against the new core) was `ROADMAP.md` Milestone 9's
+//!   job, not this module's; see "Validation against `linbr.rs`
+//!   (historical — see below for its outcome)" below.
 //!
-//! ## Validation against `linbr.rs`
+//! ## Validation against `linbr.rs` (historical — see below for its outcome)
 //!
 //! Per this milestone's checklist bullet's own instruction, this module was
-//! written only after reading [`crate::linbr::LinBridge::send`]'s existing
+//! written only after reading the legacy `linbr::LinBridge::send`'s existing
 //! PID derivation
 //! (`(self.zone.0 << 2) | (cmd.cmd_type.0 as u8 & 0x03)`) and confirming it
 //! is not reusable logic: that formula derives a PID from the old
@@ -69,9 +69,18 @@
 //! response's first returned byte as an implicit OK/ERROR flag) reused
 //! here — that is itself a piece of protocol-level interpretation this
 //! checklist bullet's pass-through behavior does not call for.
-//! [`crate::linbr::LIN_MAX_DATA`] is reused, but only as the plain physical
-//! fact it states (LIN 2.x's real per-frame data ceiling), imported below
-//! as [`LIN_MAX_DATA`] rather than duplicated as a second literal `8`.
+//! `linbr::LIN_MAX_DATA` was reused at that time, but only as the plain
+//! physical fact it stated (LIN 2.x's real per-frame data ceiling).
+//!
+//! Milestone 9's own `linbr` REPLACE cutover has since deleted `linbr.rs`
+//! outright (its `LinBridge`/`LinMaster`/`Zone`-keyed PID scheme had no
+//! surviving analog in this endpoint-addressed model, matching the
+//! `canbr` REPLACE cutover immediately before it), leaving [`LIN_MAX_DATA`]
+//! below as this crate's one live external caller of the deleted module.
+//! Per Guiding Principle 5, that cross-module dependency is resolved by
+//! inlining the physical-fact literal directly here rather than leaving a
+//! stub module behind purely to hold one constant — the same resolution
+//! `can.rs`'s own `CAN_FD_MAX_PAYLOAD` used when `canbr.rs` was deleted.
 //!
 //! ## Relationship to [`crate::regmap`]
 //!
@@ -115,20 +124,22 @@
 //! bytes. The one constraint this module does enforce —
 //! [`LIN_MAX_DATA`]-byte data ceiling, returning
 //! `Err(RcpError::PayloadTooLarge)` above it — is not new protocol-level
-//! smarts; it is the same real LIN 2.x physical ceiling
-//! [`crate::linbr::LinBridge::send`] already enforced, reused here as a
-//! fact about the bus rather than re-derived.
+//! smarts; it is the same real LIN 2.x physical ceiling the legacy
+//! `linbr::LinBridge::send` already enforced, stated here as this module's
+//! own fact about the bus rather than re-derived.
 
 use crate::RcpError;
 
 // ── LIN_MAX_DATA ──────────────────────────────────────────────────────────────
 
-/// Maximum LIN frame data length: LIN 2.x's real per-frame data ceiling,
-/// reused from [`crate::linbr::LIN_MAX_DATA`] as a physical fact about the
-/// bus — see this module's doc comment "Validation against `linbr.rs`" for
-/// why this is the only piece of `linbr.rs` this module reuses.
+/// Maximum LIN frame data length — a genuine physical ceiling of the LIN
+/// 2.x bus, not a spec-defined or otherwise interpreted value. Originally
+/// reused from the legacy `linbr::LIN_MAX_DATA` (see this module's doc
+/// comment "Validation against `linbr.rs` (historical — see below for its
+/// outcome)"); stated directly as this module's own constant since
+/// Milestone 9's `linbr` REPLACE cutover deleted that module.
 // fusa:req REQ-LIN-001
-pub const LIN_MAX_DATA: usize = crate::linbr::LIN_MAX_DATA;
+pub const LIN_MAX_DATA: usize = 8;
 
 // ── LinFrameTransfer ─────────────────────────────────────────────────────────
 
@@ -169,8 +180,8 @@ impl LinFrameTransfer {
     /// present), matching [`crate::spi::SpiStatus::decode`]'s own
     /// too-short-input handling. Returns `Err(RcpError::PayloadTooLarge)`
     /// when the remaining data would exceed [`LIN_MAX_DATA`] bytes, the same
-    /// error variant [`crate::linbr::LinBridge::send`] already used for the
-    /// same physical ceiling. Never panics for any input.
+    /// error variant the legacy `linbr::LinBridge::send` already used for
+    /// the same physical ceiling. Never panics for any input.
     // fusa:req REQ-LIN-003
     // fusa:req REQ-LIN-004
     pub fn decode(b: &[u8]) -> Result<Self, RcpError> {
@@ -254,9 +265,8 @@ mod tests {
 
     #[test]
     // fusa:test REQ-LIN-001
-    fn lin_max_data_is_eight_and_matches_linbr_fact() {
+    fn lin_max_data_is_eight() {
         assert_eq!(LIN_MAX_DATA, 8);
-        assert_eq!(LIN_MAX_DATA, crate::linbr::LIN_MAX_DATA);
     }
 
     // ── LinFrameTransfer: round-trip / never-panic ──────────────────────────
