@@ -2055,16 +2055,78 @@ Make, execute, and document an explicit decision on multi-AVTPDU
 fragmentation support before v1.0 — the spec itself treats this as optional
 for "RCP version 1.0," so silence on it is not acceptable.
 
-- [ ] Decision point: evaluate whether UART RX-FIFO sizing, CAN XL's
+- [x] Decision point: evaluate whether UART RX-FIFO sizing, CAN XL's
       up-to-2054-byte payloads, and full-register-map discovery reads can
       ship as an accepted single-AVTPDU-only limitation for v1.0, or whether
-      multi-AVTPDU reassembly must be built now
-- [ ] **If go:** implement `ms`/`segment_num` reconstruction bounded by
+      multi-AVTPDU reassembly must be built now. **Decision: go.** Done
+      (v0.11.0-dev): `RequestStreamConfigEntry::rx_stream_max_request_size`
+      (`src/regmap.rs`, §3.8) already exists as a real per-stream
+      combined-payload byte bound with no purpose under a permanent
+      single-AVTPDU-only limitation; `CanXlFrame`'s up-to-2048-byte payload
+      (`ROADMAP.md` Milestone 7's CAN controller bullet) routinely exceeds
+      any practical single-AVTPDU MTU on its own, and neither UART RX-FIFO
+      sizing nor a full-register-map discovery read (Milestone 2/3) is
+      bounded to fit inside one AVTPDU either. A silent single-AVTPDU-only
+      ceiling would quietly cap all three below their own already-modeled
+      sizes — an unannounced regression, not an accepted limitation — so
+      this crate builds multi-AVTPDU reassembly now rather than deferring it
+      past v1.0.
+- [x] **If go:** implement `ms`/`segment_num` reconstruction bounded by
       `rx_stream_max_request_size`, and re-verify the Milestone 6
-      last-fragment-carries-the-CRC interaction against it
-- [ ] **If no-go:** document the single-AVTPDU limitation explicitly in the
+      last-fragment-carries-the-CRC interaction against it. Done
+      (v0.11.0-dev): new `src/fragment.rs` — the module `src/request.rs`'s
+      own doc comment already reserved for this milestone (issue #35, PR
+      #37) — adds [`FragmentReassemblyBuffer`], a live per-stream
+      reassembly state machine a caller drives explicitly (additive
+      standalone plumbing only, matching every prior Milestone 1-7 entry's
+      discipline: not wired into any decoder or dispatch loop).
+      `FragmentReassemblyBuffer::accept_fragment` takes each
+      wire-arrival-ordered fragment's already-decoded
+      `acf::ByteMessageInfo` plus payload, validates the dual-purpose
+      `read_size`/`segment_num` byte (`acf::ReadSizeOrSegmentNum::as_segment_num`)
+      as a strictly-incrementing, zero-based consistency check against
+      gaps/duplicates/reordering (a working interpretation, flagged per
+      Guiding Principle 5 — see `fragment.rs`'s own "Provenance note:
+      `segment_num` ordering" and a matching addendum in `acf.rs`'s
+      provenance note), enforces the caller-supplied
+      `rx_stream_max_request_size` bound against the train's running
+      combined length (`RcpError::PayloadTooLarge` on overflow), and
+      returns `FragmentAcceptOutcome::Continuing`/`Complete` by the
+      fragment's own `ms` flag; `combined_payload` composes (never
+      re-derives) `e2e::CombinedFragmentPayload::assemble`. A buffer built
+      with `rx_stream_max_request_size == 0` (that field's own documented
+      "fragmentation unsupported on this stream" sentinel) rejects every
+      fragment with `RcpError::UnsupportedCmd` rather than silently
+      reassembling anyway. `verify_reassembled_train_crc` re-verifies
+      Milestone 6's last-fragment-carries-the-CRC interaction against this
+      real buffer: it composes `e2e::check_fragment_crc_placement` and
+      `e2e::crc32_tc18_for_fragment_train` against the buffer's own
+      wire-collected segments (`FragmentReassemblyBuffer::segment_refs`)
+      rather than the caller-supplied `&[&[u8]]` those two functions' own
+      doc comments flagged as this exact Milestone 8 forward dependency when
+      they first landed — their own signatures are unchanged, Milestone 8
+      composed with them instead of editing them. `e2e.rs` and `can.rs`'s
+      own doc comments (the two places that flagged this forward
+      dependency — `CombinedFragmentPayload`'s "Fragmentation interaction"
+      section and `CanXlCombinedPayload`'s "CAN XL fragmentation
+      interaction" section) are updated to point at `fragment.rs` rather
+      than continuing to describe a still-missing reassembly buffer;
+      neither `CombinedFragmentPayload` nor `CanXlCombinedPayload`
+      themselves are changed, since both already compose cleanly with the
+      new buffer's own segment order. `rust-rcp capabilities`' `features`
+      array gains `"fragmentation"`, and its response-side counterpart,
+      `ResponseStreamConfigEntry::resp_max_avtpdu_size`, is noted as
+      explicitly out of scope (a distinct, unbuilt response-fragmentation
+      problem, not this item's). New `REQ-FRAG-001`..`REQ-FRAG-008` added
+      to `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair in
+      `src/fragment.rs`.
+- [x] **If no-go:** document the single-AVTPDU limitation explicitly in the
       crate's public docs and in `rust-rcp capabilities`' output, matching
-      the spec's own allowance for omitting this feature
+      the spec's own allowance for omitting this feature. **N/A** — the
+      decision above is go, so this bullet's own single-AVTPDU-limitation
+      documentation does not apply; checked off to record that this bullet
+      was evaluated and explicitly not silently skipped, not that its own
+      text was executed.
 
 Success Criteria:
 The roadmap records a written go/no-go decision — not a silent omission —

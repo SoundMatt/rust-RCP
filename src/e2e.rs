@@ -102,9 +102,10 @@
 //! state and validate that placement rule itself, independent of how the
 //! combined-payload CRC is computed.
 //!
-//! This crate has no live multi-AVTPDU reassembly buffer yet (that is
-//! `ROADMAP.md` Milestone 8's job) — matching every Milestone 5/6 entry's
-//! precedent of taking not-yet-built state as a caller-supplied fact (e.g.
+//! At the time this section was written, this crate had no live
+//! multi-AVTPDU reassembly buffer (that was `ROADMAP.md` Milestone 8's
+//! still-undecided job) — matching every Milestone 5/6 entry's precedent of
+//! taking not-yet-built state as a caller-supplied fact (e.g.
 //! `crate::request`'s `SequencerState`/`root_client`), this section takes a
 //! fragment train's per-segment payloads as a caller-supplied, already-
 //! ordered `&[&[u8]]` rather than reading `acf::ReadSizeOrSegmentNum`
@@ -115,6 +116,17 @@
 //! module treats "this is a fragment train, and this is its segment order"
 //! as a fact the caller establishes out of band, rather than silently
 //! resolving that open ambiguity here.
+//!
+//! `ROADMAP.md` Milestone 8 has since decided "go" and landed
+//! [`crate::fragment::FragmentReassemblyBuffer`], a real reassembly buffer
+//! that derives segment order from wire-arrival order plus a validated
+//! `segment_num` sequence rather than a caller-supplied slice.
+//! [`crate::fragment::verify_reassembled_train_crc`] composes
+//! [`crc32_tc18_for_fragment_train`] against that buffer's own
+//! wire-collected segments, re-verifying this section's CRC-placement rule
+//! against real reassembled state. The functions in this section keep their
+//! own `&[&[u8]]`-based signatures unchanged — Milestone 8 composed with
+//! them from `crate::fragment`, rather than editing them here.
 //!
 //! ### Working interpretation: non-payload coverage fields come from the
 //! final fragment's own header (Guiding Principle 5)

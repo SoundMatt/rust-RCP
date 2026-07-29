@@ -144,18 +144,29 @@
 //! dependency)
 //!
 //! [`CanXlFrame`]'s payload is capped at [`CAN_XL_MAX_PAYLOAD`] (2048
-//! bytes) — the ceiling this checklist bullet itself states — but this
-//! crate has no live multi-AVTPDU reassembly buffer yet to reconstruct a
-//! payload that arrives split across more than one AVTPDU (`ROADMAP.md`
-//! Milestone 8's own not-yet-decided go/no-go item). Matching
-//! [`crate::e2e::CombinedFragmentPayload`]'s own precedent for the
-//! analogous forward dependency in Milestone 6's "Fragmentation
-//! interaction" bullet, [`CanXlCombinedPayload::assemble`] takes a fragment
-//! train's per-segment payloads as a caller-supplied, already-ordered
-//! `&[&[u8]]` rather than reading any segment-ordering field itself — this
-//! module models CAN XL's own sub-header/payload framing now, and leaves
-//! real reassembly of a payload spanning more than one AVTPDU as
-//! Milestone 8's job, not this item's.
+//! bytes) — the ceiling this checklist bullet itself states — but at the
+//! time this module was written, this crate had no live multi-AVTPDU
+//! reassembly buffer to reconstruct a payload that arrives split across
+//! more than one AVTPDU (`ROADMAP.md` Milestone 8's own then-undecided
+//! go/no-go item). Matching [`crate::e2e::CombinedFragmentPayload`]'s own
+//! precedent for the analogous forward dependency in Milestone 6's
+//! "Fragmentation interaction" bullet, [`CanXlCombinedPayload::assemble`]
+//! takes a fragment train's per-segment payloads as a caller-supplied,
+//! already-ordered `&[&[u8]]` rather than reading any segment-ordering
+//! field itself — this module models CAN XL's own sub-header/payload
+//! framing only, and leaves real reassembly of a payload spanning more than
+//! one AVTPDU out of scope, matching every prior Milestone 4/7 entry's own
+//! "additive standalone plumbing only" discipline. `ROADMAP.md` Milestone 8
+//! has since decided "go" and landed
+//! [`crate::fragment::FragmentReassemblyBuffer`], a real reassembly buffer
+//! a caller can drive with the same per-fragment `ByteMessageInfo`/payload
+//! pairs a real CAN XL fragment train would carry; this module's own types
+//! are unchanged by that — [`CanXlCombinedPayload::assemble`] keeps taking
+//! its caller-supplied `&[&[u8]]`, and nothing here composes
+//! `crate::fragment` directly, since wiring a decoded [`CanXlFrame`]'s
+//! payload into a live per-stream `FragmentReassemblyBuffer` is dispatch
+//! plumbing this module's own "additive standalone plumbing only" scope
+//! still excludes.
 //!
 //! ## Provenance note: the unpopulated CAN trigger-signal table
 //!

@@ -6012,6 +6012,78 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-FRAG-001",
+      "title": "FragmentReassemblyBuffer::new and fragmentation_supported reflect the rx_stream_max_request_size sentinel",
+      "text": "fragment::FragmentReassemblyBuffer::new(0) constructs successfully but fragmentation_supported() returns false; any nonzero bound makes fragmentation_supported() true; a newly constructed buffer is not in_progress and has no segments",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-FRAG-002",
+      "title": "accept_fragment rejects every fragment on a fragmentation-unsupported stream",
+      "text": "fragment::FragmentReassemblyBuffer::accept_fragment on a buffer constructed with rx_stream_max_request_size == 0 always returns Err(RcpError::UnsupportedCmd), regardless of the fragment's own ms/segment_num, and leaves the buffer not in_progress",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-FRAG-003",
+      "title": "accept_fragment enforces a strictly-incrementing, zero-based segment_num sequence",
+      "text": "fragment::FragmentReassemblyBuffer::accept_fragment accepts a fragment only when its ByteMessageInfo::read_size_segment_num.as_segment_num() equals the buffer's own next-expected value (starting at 0 and incrementing by 1 per accepted fragment); a gap, duplicate, out-of-order, or non-zero first value returns Err(RcpError::InvalidParameter) and leaves the buffer's prior state unchanged",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-FRAG-004",
+      "title": "accept_fragment enforces the rx_stream_max_request_size combined-payload bound",
+      "text": "fragment::FragmentReassemblyBuffer::accept_fragment returns Err(RcpError::PayloadTooLarge) and leaves the buffer's prior state unchanged whenever accepting the fragment would push the train's combined payload length past the configured rx_stream_max_request_size, and accepts a fragment landing exactly at that bound",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-FRAG-005",
+      "title": "accept_fragment reports Continuing/Complete by ms, and combined_payload matches CombinedFragmentPayload::assemble",
+      "text": "fragment::FragmentReassemblyBuffer::accept_fragment returns Ok(FragmentAcceptOutcome::Continuing) when ByteMessageInfo::ms is true and Ok(FragmentAcceptOutcome::Complete) when it is false, including for a single-fragment train; combined_payload() after any sequence of accepted fragments equals crate::e2e::CombinedFragmentPayload::assemble of the same segments in arrival order",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-FRAG-006",
+      "title": "reset clears buffer state for a new train, and a completed buffer rejects further fragments until reset",
+      "text": "fragment::FragmentReassemblyBuffer::reset clears is_in_progress, segment_refs, and the segment_num counter back to their construction-time values without changing the configured bound; calling accept_fragment again after a Complete outcome without an intervening reset returns Err(RcpError::InvalidParameter)",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-FRAG-007",
+      "title": "verify_reassembled_train_crc composes check_fragment_crc_placement and crc32_tc18_for_fragment_train against the buffer's own collected segments",
+      "text": "fragment::verify_reassembled_train_crc(buffer, header, final_fragment, crc_present) returns Err(RcpError::InvalidParameter) when crc_present is false (the final-fragment CRC-presence rule), otherwise returns exactly what crate::e2e::crc32_tc18_for_fragment_train(header, final_fragment, buffer.segment_refs()) returns for the same inputs, including propagating Err(RcpError::InvalidSize) for an out-of-range final_fragment header and behaving correctly for an empty (zero-fragment) buffer",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-FRAG-008",
+      "title": "accept_fragment never panics across arbitrary payload lengths and segment_num wraparound",
+      "text": "fragment::FragmentReassemblyBuffer::accept_fragment never panics for any payload length, including empty payloads, and never panics when the 8-bit segment_num counter wraps past 255 back to 0 during a long-running sequence of accepted fragments",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
