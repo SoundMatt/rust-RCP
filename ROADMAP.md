@@ -1254,8 +1254,40 @@ per-endpoint scheduler, since the spec defines that ordering natively.
       dispatch loop, or the request-lifecycle state machine. New
       `REQ-CHAIN-001`..`REQ-CHAIN-003` (in `src/request.rs`) added to
       `.fusa-reqs.json`, each with a `// fusa:req`/`// fusa:test` pair.
-- [ ] Timed (`0x0A`): presentation-time execution as an alternative to a
-      TSCF header
+- [x] Timed (`0x0A`): presentation-time execution as an alternative to a
+      TSCF header. Done (v0.8.0-dev): `src/request.rs` gains
+      `RequestKind::Timed = 0x0A` alongside the existing `Chained`/
+      `CompoundWait`/`Triggered`/`Compound` variants, with `to_u8`/`from_u8`
+      extended to match; `TimedExecutionTime`, a Timed request's own
+      carried presentation-time execution gate, modeled by composing the
+      existing `crate::timestamp::AvtpTimestamp` newtype (Milestone 1) by
+      value rather than duplicating its shape or adding an
+      unconfirmed-width `u32` placeholder of its own; and
+      `is_timed_request_ready`, a pure function implementing this
+      checklist bullet's own presentation-time-execution readiness rule —
+      whether a caller-supplied current `AvtpTimestamp` has reached or
+      passed a Timed request's own `TimedExecutionTime`, reusing
+      `AvtpTimestamp::is_after`'s existing wraparound-aware ordering and
+      `AvtpTimestamp::is_untimed`'s existing all-zero-means-untimed
+      fallback rather than inventing new ordering or fallback logic.
+      `resolve_compound_exec_delay`/`resolve_trigger_exec_delay` both
+      widen to return `None` for `RequestKind::Timed` to stay exhaustive
+      over the now five-variant `RequestKind` (not yet called from
+      anywhere in this crate, so this is a safe additive-stage widening).
+      One point flagged per Guiding Principle 5: no checklist text states
+      a Timed request's own execution-time field's byte offset, field
+      name, or wire width; this crate reads "alternative to a TSCF
+      header" as "carries the same kind of presentation-time value a TSCF
+      header would have supplied, just sourced from the request itself",
+      and composes `AvtpTimestamp` on that basis — a judgment call, not a
+      confirmed wire fact, so `TimedExecutionTime` is, like `RequestKind`
+      itself, a standalone value type not yet tied to any offset within
+      `crate::acf::ByteMessageInfo` or any other decoded wire shape. Same
+      "additive standalone plumbing only" discipline as every prior
+      Milestone 1-5 entry — not wired into any decoder, dispatch loop, or
+      the request-lifecycle state machine. New `REQ-TIME-001`..
+      `REQ-TIME-003` (in `src/request.rs`) added to `.fusa-reqs.json`,
+      each with a `// fusa:req`/`// fusa:test` pair.
 - [ ] Cancellation: clear-all (`0x05`, mandatory), clear-non-safestate
       (`0x06`, optional), clear-single (`0x07` + `clear_transaction_num`,
       optional)

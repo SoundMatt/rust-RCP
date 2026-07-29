@@ -5130,6 +5130,33 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-TIME-001",
+      "title": "RequestKind gains a Timed = 0x0A variant that round-trips through to_u8/from_u8",
+      "text": "RequestKind::Timed encodes to discriminant byte 0x0A via to_u8, RequestKind::from_u8(0x0A) decodes to RequestKind::Timed, and every RequestKind variant (Chained, Timed, CompoundWait, Triggered, Compound) round-trips through to_u8/from_u8; resolve_compound_exec_delay and resolve_trigger_exec_delay both return None for RequestKind::Timed to stay exhaustive over the now five-variant RequestKind; from_u8 continues to reject every other byte value and never panics across the full 0..=255 range",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-TIME-002",
+      "title": "TimedExecutionTime models a Timed request's own carried presentation-time execution gate by composing AvtpTimestamp",
+      "text": "TimedExecutionTime wraps crate::timestamp::AvtpTimestamp by value rather than duplicating its shape as a separate placeholder type, so a Timed request's presentation-time execution gate reuses AvtpTimestamp's existing rollover-aware comparison and all-zero-means-untimed fallback; TimedExecutionTime::default() is untimed, matching AvtpTimestamp::default()'s own all-zero fallback",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-TIME-003",
+      "title": "is_timed_request_ready implements the presentation-time-execution readiness rule Timed requests use as an alternative to a TSCF header",
+      "text": "is_timed_request_ready(current, exec_time) returns false while current has not yet reached exec_time, true once current equals or has wraparound-aware-logically passed exec_time per AvtpTimestamp::is_after (correctly handling a rollover near the top of the 32-bit range), and always true when exec_time's wrapped AvtpTimestamp is_untimed (the all-zero fallback), regardless of current; never panics for any sampled input",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
