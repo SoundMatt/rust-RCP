@@ -311,7 +311,10 @@ jobs:
       - name: install cargo-cyclonedx
         run: cargo install cargo-cyclonedx --locked
       - name: generate SBOM
-        run: cargo cyclonedx --format json --override-filename bom.json --locked
+        # cargo-cyclonedx has no --locked flag of its own; it reads the
+        # committed Cargo.lock as-is (see the "build" job for the flag that
+        # actually enforces --locked semantics against dependency drift).
+        run: cargo cyclonedx --format json --override-filename bom.json
       - name: upload SBOM
         uses: actions/upload-artifact@v4
         with:
