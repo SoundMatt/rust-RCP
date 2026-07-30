@@ -64,14 +64,14 @@ previous revision of this table:
 |---|---|---|---|---|
 | SG-001 | Requests shall only be delivered to the correct addressed endpoint | ASIL-B | 200 | `REQ-EPLK-*`, `addressing::EndpointTable::register`/`lookup` (per-stream `byte_bus_id` keyspace, per-pair uniqueness) |
 | SG-002 | Safety-tagged requests shall not be silently dropped | ASIL-B | 100 | `REQ-SAFETY-001..005`, `request::check_watchdog_overflow_purge`/`purge_normal_priority_on_watchdog_overflow` (safety-tagged requests are exempt from watchdog-overflow purge) |
-| SG-003 | Replay detection | ASIL-B | 500 | `REQ-SEQENF-003`, `evaluate_rx_enforce_seq` (not yet wired into a live request-acceptance path — see `tara.json` T-RCP-03) |
+| SG-003 | Replay detection | ASIL-A | 500 | `REQ-SEQENF-003`, `evaluate_rx_enforce_seq` (not yet wired into a live request-acceptance path — see `tara.json` T-RCP-03) |
 | SG-004 | Payload integrity | ASIL-B | 200 | `REQ-CRC-004`, TC18 safe-point CRC-32 (`crc32_tc18`) |
 | SG-005 | Watchdog monitoring | ASIL-B | 3000 | `REQ-WDG-*`, per-stream `StreamWatchdogState`/`evaluate_stream_watchdog` |
-| SG-006 | Auth enforcement | ASIL-B | 0 | `REQ-AUTHZ-*`, `authz::Policy`/`AuthzEndpoint` (`(ep_type, is_write)`-keyed allowlist) |
+| SG-006 | Auth enforcement | ASIL-A | 0 | `REQ-AUTHZ-*`, `authz::Policy`/`AuthzEndpoint` (`(ep_type, is_write)`-keyed allowlist) |
 | SG-007 | Atomic power transitions | ASIL-A | 500 | `REQ-PWR-*`/`REQ-PWRSTART-*`/`REQ-WAKE-*`, `try_enter_power_mode`/`try_cold_start`/`try_hot_start` gated by `PowerModeGateInput`, driven at the Wakeup endpoint by `wakeup::request_sleep_via_sleep_cmd`/`wakeup::wake_source_signals_trigger_handshake` |
 | SG-008 | Frame/payload size validation | ASIL-B | 0 | `REQ-WIRE-*`, NTSCF `ntscf_data_length` field-width check in `avtp::encode_ntscf_frame` |
 | SG-009 | Critical-priority preemption | ASIL-B | 100 | `REQ-PRIO-004`, `execution_priority_tier`/`select_next_pending_request` (not yet wired into a live dispatch loop — `prioqueue`/`PrioController` removed by Milestone 9's DEPRECATE disposition, see `tara.json` T-RCP-04) |
-| SG-010 | Register-map access control | ASIL-A | 200 | `REQ-EP0-*`/`REQ-LIFE-*`, `ep0::check_ep0_access_for_stream`/`is_root_client` composed with `lifecycle::is_register_reachable`/`is_register_writable` |
+| SG-010 | Register-map access control | ASIL-B | 200 | `REQ-EP0-*`/`REQ-LIFE-*`, `ep0::check_ep0_access_for_stream`/`is_root_client` composed with `lifecycle::is_register_reachable`/`is_register_writable` |
 
 ## Rationale for Retired Hazards
 

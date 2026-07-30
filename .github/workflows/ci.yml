@@ -175,15 +175,19 @@ jobs:
           output=$(relay interop target/release/rust-rcp 2>&1) || true
           echo "$output"
           if echo "$output" | grep -q "rcp-status"; then
-            # rust-RCP-FS-01 removed the `convert` CLI subcommand outright
-            # (it only ever parsed the retired placeholder Zone-numbered
-            # Status document, with no TC18 counterpart), so `rust-rcp` no
-            # longer advertises `convert` and `relay interop` correctly
-            # reports this vector as SKIP for it, not EQUIVALENT — SKIP is
-            # therefore an expected, passing outcome here, not a failure.
-            # A missing/failing outcome for the *reference* implementation,
-            # or any outcome other than EQUIVALENT/SKIP for rust-rcp, still
-            # fails this step.
+            # `convert` is rebuilt against the real canonical rcp.Message /
+            # ByteBusID addressing (rust-RCP-FS-01) and is expected to show
+            # EQUIVALENT here against a genuine RELAY v2.0 reference build.
+            # It currently shows ERROR instead, because `go install
+            # .../relay@latest` above resolves to a stale pre-v2 release —
+            # SoundMatt/RELAY's go.mod still lacks the /v2 suffix its own
+            # v2.0.0+ tags require (SoundMatt/RELAY#70), a confirmed
+            # external blocker, not a regression here. `relay interop` is
+            # not a required branch-protection check, so this step is
+            # allowed to go red until #70 lands upstream. SKIP is also
+            # accepted below as a defensive allowance for a future state
+            # where `convert` isn't advertised at all; any other outcome
+            # still fails this step.
             rcp_line=$(echo "$output" | grep -A3 "^rcp-status" | grep "rust-rcp")
             echo "$rcp_line" | grep -qE "EQUIVALENT|SKIP" || {
               echo "relay interop: unexpected rcp-status result for rust-rcp: $rcp_line" >&2
@@ -195,7 +199,7 @@ jobs:
 
   # ── RELAY wire+e2e unit tests (spec traceability) ─────────────────────────
   relay-conformance:
-    name: RELAY spec v1.11 unit conformance
+    name: RELAY spec v2.0 unit conformance
     needs: lint
     runs-on: ubuntu-latest
     steps:
