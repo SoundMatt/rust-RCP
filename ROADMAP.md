@@ -17,6 +17,12 @@ happens to reuse the name. The project has decided on a **full replacement**:
 rust-RCP's core is going to become the real OPEN Alliance TC18 RCP, not a
 gap-patched version of the private protocol it is today.
 
+**Status: this replacement is complete.** Milestones 1-10 below carried it
+out in full, and the crate published as `v1.0.0` (see `CHANGELOG.md`); the
+private protocol described above no longer exists anywhere in this crate.
+The rest of this section is left as originally written, describing the
+problem as it stood before Milestone 1 began, for historical context.
+
 This document sequences that replacement, milestone by milestone, and gives
 an explicit disposition — replace, adapt, deprecate, or keep — for every one
 of the 44 satellite packages currently living alongside the core protocol.
@@ -3161,34 +3167,39 @@ Specification's described behavior, and the crate publishes as `v1.0.0`.
 
 ## Satellite Package Disposition
 
-Every package currently listed in this crate's module index gets one of
-four calls: **REPLACE** (rebuilt to be spec-conformant), **ADAPT** (retarget
-to the new core without a full rewrite), **DEPRECATE** (no place in the new
-model), or **KEEP AS-IS** (genuinely orthogonal, unaffected).
+Every package listed in this crate's module index as of the start of this
+roadmap (before Milestone 1) got one of four calls: **REPLACE** (rebuilt to
+be spec-conformant), **ADAPT** (retarget to the new core without a full
+rewrite), **DEPRECATE** (no place in the new model), or **KEEP AS-IS**
+(genuinely orthogonal, unaffected). All ten Milestones are now complete
+(`v1.0.0`); the fourteen rows below marked **— done: deleted** no longer
+exist as files in `src/` — their REPLACE/DEPRECATE disposition has already
+been fully carried out, not merely decided. Every other row's package still
+exists under its original name.
 
 | Package | Call | Reason |
 |---|---|---|
-| `wire` | REPLACE | Becomes IEEE 1722 AVTPDU / ACF_ABB / ACF_GBB framing (Milestone 1) — the current 16-byte header has no equivalent in the spec |
+| `wire` | REPLACE | Becomes IEEE 1722 AVTPDU / ACF_ABB / ACF_GBB framing (Milestone 1) — the current 16-byte header has no equivalent in the spec — **done: deleted**; superseded by `avtp`/`acf` |
 | `e2e` | REPLACE | Becomes the spec's real CRC32 (poly `0xF4ACFB13`) safe-point mechanism (Milestone 6) — current CRC-16 + replay guard is a different algorithm serving a different model |
 | `mock` | REPLACE | Must model an RC Server + Endpoints for testing, not a `Zone`-keyed controller |
 | `config` | REPLACE | Must represent the register-map/lifecycle configuration model, not `RcpConfig{controllers, watchdog, rate_limit}` |
 | `capi` | REPLACE | C FFI types are 1:1 tied to the old `Command`/`Zone` shapes, which disappear |
 | `watchdog` | REPLACE | Ad-hoc periodic WATCHDOG-command dispatcher replaced by the spec's real per-stream watchdog (`rx_wd_*`, liveness reset on every request, safe-state entry) — see Milestone 6 |
 | `powerstate` | REPLACE | Ad-hoc Active/Sleep/Standby via `CommandType::SLEEP`/`WAKE` replaced by the spec's real Normal/StandBy/Sleep/Unpowered model with cold/hot start — see Milestone 6/7 |
-| `canbr` | REPLACE | Becomes the CAN controller endpoint type (Milestone 7); CAN is also a first-class endpoint in the new model, not a bridge underneath Zone/Command framing |
-| `linbr` | REPLACE | Becomes the LIN commander endpoint type (Milestone 7); the spec's raw-byte-passthrough philosophy contradicts the current ad-hoc PID-generation scheme, so this isn't a mechanical port |
+| `canbr` | REPLACE | Becomes the CAN controller endpoint type (Milestone 7); CAN is also a first-class endpoint in the new model, not a bridge underneath Zone/Command framing — **done: deleted**; superseded by `can` |
+| `linbr` | REPLACE | Becomes the LIN commander endpoint type (Milestone 7); the spec's raw-byte-passthrough philosophy contradicts the current ad-hoc PID-generation scheme, so this isn't a mechanical port — **done: deleted**; superseded by `lin` |
 | `udp` | REPLACE | IEEE1722-over-UDP is spec-legal as a transport (§2.1), but every framing call must be rebuilt against Milestone 1's AVTPDU encode/decode instead of `wire::encode_command` |
-| `prioqueue` | DEPRECATE | Critical/High/Normal decorator is superseded by the spec's own native per-endpoint execution-priority ordering (cancellation > triggered > timed > compound > compound-wait > chained > standard), built into the Milestone 5 core scheduler rather than a bolt-on wrapper |
-| `zonegroup` | DEPRECATE | Zone-broadcast has no direct equivalent once `Zone` disappears; multi-endpoint fan-out isn't spec-defined and can be rebuilt later as a generic client-side helper if a real need emerges |
-| `tsn` | DEPRECATE | Current implementation hacks a priority byte into the payload, which is incompatible with real AVTPDU framing; legitimate TSN traffic-class handling (VLAN PCP tagging) belongs at the transport/socket layer and isn't defined by the RCP spec itself |
-| `firmware` | DEPRECATE | Chunked-SET/GET OTA sequencer has no home in the thirteen defined endpoint types; not part of TC18 scope — could return later as an OEM-layer concern built atop a real endpoint, not as core protocol |
-| `someip` | DEPRECATE | SOME/IP is not a spec-defined RCP transport. Ecosystem precedent (go-DDS removed its own MQTT and domain bridges in v0.52.0) is to handle cross-protocol bridging centrally via RELAY's `crossbar` router rather than per-repo bridges |
-| `mqttbr` | DEPRECATE | Same `crossbar`-router precedent as `someip` |
-| `ddsbr` | DEPRECATE | Same `crossbar`-router precedent as `someip` |
-| `grpcbridge` | DEPRECATE | Same `crossbar`-router precedent as `someip` |
-| `restbridge` | DEPRECATE | Same `crossbar`-router precedent as `someip` |
-| `udsbr` | DEPRECATE | UDS/ISO 14229 is a distinct vehicle-diagnostics protocol, not a spec-defined RCP transport; same `crossbar`-router precedent applies |
-| `doipbr` | DEPRECATE | DoIP/ISO 13400-2 is likewise not a spec-defined RCP transport; same `crossbar`-router precedent applies |
+| `prioqueue` | DEPRECATE | Critical/High/Normal decorator is superseded by the spec's own native per-endpoint execution-priority ordering (cancellation > triggered > timed > compound > compound-wait > chained > standard), built into the Milestone 5 core scheduler rather than a bolt-on wrapper — **done: deleted** (Milestone 9) |
+| `zonegroup` | DEPRECATE | Zone-broadcast has no direct equivalent once `Zone` disappears; multi-endpoint fan-out isn't spec-defined and can be rebuilt later as a generic client-side helper if a real need emerges — **done: deleted** (Milestone 9) |
+| `tsn` | DEPRECATE | Current implementation hacks a priority byte into the payload, which is incompatible with real AVTPDU framing; legitimate TSN traffic-class handling (VLAN PCP tagging) belongs at the transport/socket layer and isn't defined by the RCP spec itself — **done: deleted** (Milestone 9) |
+| `firmware` | DEPRECATE | Chunked-SET/GET OTA sequencer has no home in the thirteen defined endpoint types; not part of TC18 scope — could return later as an OEM-layer concern built atop a real endpoint, not as core protocol — **done: deleted** (Milestone 9) |
+| `someip` | DEPRECATE | SOME/IP is not a spec-defined RCP transport. Ecosystem precedent (go-DDS removed its own MQTT and domain bridges in v0.52.0) is to handle cross-protocol bridging centrally via RELAY's `crossbar` router rather than per-repo bridges — **done: deleted** (Milestone 9) |
+| `mqttbr` | DEPRECATE | Same `crossbar`-router precedent as `someip` — **done: deleted** (Milestone 9) |
+| `ddsbr` | DEPRECATE | Same `crossbar`-router precedent as `someip` — **done: deleted** (Milestone 9) |
+| `grpcbridge` | DEPRECATE | Same `crossbar`-router precedent as `someip` — **done: deleted** (Milestone 9) |
+| `restbridge` | DEPRECATE | Same `crossbar`-router precedent as `someip` — **done: deleted** (Milestone 9) |
+| `udsbr` | DEPRECATE | UDS/ISO 14229 is a distinct vehicle-diagnostics protocol, not a spec-defined RCP transport; same `crossbar`-router precedent applies — **done: deleted** (Milestone 9) |
+| `doipbr` | DEPRECATE | DoIP/ISO 13400-2 is likewise not a spec-defined RCP transport; same `crossbar`-router precedent applies — **done: deleted** (Milestone 9) |
 | `ratelimit` | ADAPT | Generic token-bucket decorator; retarget to whatever new endpoint-request dispatch trait replaces `Controller` |
 | `sim` | ADAPT | Deterministic test-double concept persists; rebuild against the new endpoint trait |
 | `deadline` | ADAPT | Generic client-side call-timeout decorator; retarget to the new API, distinct from the spec's own presentation-timestamp semantics |
@@ -3227,7 +3238,7 @@ breaking-change notice above rather than in this table.
 
 | Standard | Target | Status |
 |----------|--------|--------|
-| OPEN Alliance TC18 RCP | v0.5.1_RC → v1.0 | Not started — this roadmap |
-| ISO 26262:2018 | ASIL-B | Complete for the current (private) protocol; requires full re-basing once the core replacement lands (Milestone 10) |
-| IEC 62443-4-2 | SL-2 | Complete for the current (private) protocol; requires re-basing alongside ISO 26262 |
-| ISO 21434:2021 | WP.10 threat model | Complete for the current (private) protocol; TARA content is protocol-specific and needs a fresh pass once the attack surface changes |
+| OPEN Alliance TC18 RCP | v0.5.1_RC → v1.0 | Complete — Milestones 1-10 carried out the full core replacement; the crate published as `v1.0.0` (see `CHANGELOG.md`) |
+| ISO 26262:2018 | ASIL-B | Complete, rebased against the TC18 protocol core as of Milestone 10 (`v1.0.0`) — see `HARA.md` |
+| IEC 62443-4-2 | SL-2 | Complete, rebased against the TC18 protocol core as of Milestone 10 (`v1.0.0`) — see `SECURITY.md`, `.fusa-iec62443.json` |
+| ISO 21434:2021 | WP.10 threat model | Complete, rebased against the TC18 protocol core as of Milestone 10 (`v1.0.0`); TARA content is protocol-specific and reflects the current attack surface — see `tara.json` |
