@@ -58,6 +58,21 @@ independently green.
   interop`'s own comparison method) against a from-source build of the
   RELAY v2.0 reference `relay convert --protocol RCP` across several
   cases, including the published `spec/vectors/rcp-message.json` vector.
+  **Known external blocker**: this repo's CI installs the reference
+  `relay` tool via `go install .../relay@latest`, which currently
+  resolves to a stale, still-Zone-based `v1.14.0` — `SoundMatt/RELAY`'s
+  `go.mod` has not yet added the `/v2` module-path suffix Go's semantic
+  import versioning rules require before any `v2.x` tag becomes
+  `go install`-able at all (confirmed by direct testing: `go install
+  github.com/SoundMatt/RELAY/cmd/relay@v2.0.2`, an explicit pinned
+  version, is refused with the same "module path must match major
+  version" error `@latest` implicitly hits — there is no `go install`
+  invocation from this side that can reach it). Tracked upstream as
+  [`SoundMatt/RELAY#70`](https://github.com/SoundMatt/RELAY/issues/70).
+  Until that lands, the `RELAY interop` CI job (not a required
+  branch-protection check) shows `ERROR` for `convert` against the stale
+  reference rather than `EQUIVALENT` — verified to resolve cleanly
+  against a `/v2`-fixed v2.0 build once available (see above).
 
 ### Fixed
 
