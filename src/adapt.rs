@@ -86,10 +86,13 @@
 //!   resolving this open question) is left to whichever later milestone
 //!   gives `RcServer` a live-notification mechanism to forward, same as
 //!   `crate::mock::RcServer`'s own doc comment already defers it. Until
-//!   then, `rust-rcp capabilities`' `"subscribe_supported": false` field
-//!   (see `src/bin/rcp.rs`) makes this limitation machine-readable rather
-//!   than leaving a caller to discover it only by observing an empty
-//!   channel at runtime.
+//!   then, `rust-rcp capabilities`' `"features"` array carries a
+//!   `"no-live-subscribe"` entry (see `src/bin/rcp.rs`) — a top-level
+//!   `"subscribe_supported"` property was tried first but rejected by
+//!   `relay conform --strict`'s §12.2 schema check, which does not allow
+//!   unrecognized top-level properties — making this limitation
+//!   machine-readable rather than leaving a caller to discover it only by
+//!   observing an empty channel at runtime.
 //! - **Close.** `RcServer` tracks an [`crate::lifecycle::RcServerState`]
 //!   lifecycle position, not an open/closed connection boolean, so there is
 //!   nothing on `RcServer` itself for `Node::close` to delegate to —
