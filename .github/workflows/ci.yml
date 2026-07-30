@@ -148,7 +148,7 @@ jobs:
         with:
           go-version: stable
       - name: install relay
-        run: go install github.com/SoundMatt/RELAY/cmd/relay@latest
+        run: go install github.com/SoundMatt/RELAY/v2/cmd/relay@v2.0.4
       - name: build rcp binary
         run: cargo build --bin rust-rcp --release --locked
       - name: relay conform --strict
@@ -167,30 +167,40 @@ jobs:
         with:
           go-version: stable
       - name: install relay
-        run: go install github.com/SoundMatt/RELAY/cmd/relay@latest
+        run: go install github.com/SoundMatt/RELAY/v2/cmd/relay@v2.0.4
       - name: build rcp binary
         run: cargo build --bin rust-rcp --release --locked
-      - name: relay interop (rcp-status EQUIVALENT or SKIP)
+      - name: relay interop (rcp-message EQUIVALENT or SKIP)
         run: |
           output=$(relay interop target/release/rust-rcp 2>&1) || true
           echo "$output"
-          if echo "$output" | grep -q "rcp-status"; then
+          if echo "$output" | grep -q "rcp-message"; then
             # `convert` is rebuilt against the real canonical rcp.Message /
-            # ByteBusID addressing (rust-RCP-FS-01) and is expected to show
-            # EQUIVALENT here against a genuine RELAY v2.0 reference build.
-            # It currently shows ERROR instead, because `go install
-            # .../relay@latest` above resolves to a stale pre-v2 release —
-            # SoundMatt/RELAY's go.mod still lacks the /v2 suffix its own
-            # v2.0.0+ tags require (SoundMatt/RELAY#70), a confirmed
-            # external blocker, not a regression here. `relay interop` is
-            # not a required branch-protection check, so this step is
-            # allowed to go red until #70 lands upstream. SKIP is also
-            # accepted below as a defensive allowance for a future state
-            # where `convert` isn't advertised at all; any other outcome
-            # still fails this step.
-            rcp_line=$(echo "$output" | grep -A3 "^rcp-status" | grep "rust-rcp")
+            # ByteBusID addressing (rust-RCP-FS-01) and is verified
+            # byte-for-byte EQUIVALENT against a genuine RELAY v2.0
+            # reference build. This job previously showed ERROR instead,
+            # because `go install .../relay@latest` (no /v2 suffix)
+            # resolved to a stale pre-v2 release — SoundMatt/RELAY's
+            # go.mod lacked the /v2 suffix its own v2.0.0+ tags require
+            # under Go's semantic import versioning (SoundMatt/RELAY#70).
+            # Resolved as of RELAY v2.0.4, which the step above now
+            # installs by pinned version via the /v2 module path.
+            #
+            # The vector/case name this check greps for is also updated
+            # here, from the retired `rcp-status` to `rcp-message`: RELAY's
+            # own v2.0 canonical-type replacement renamed the embedded
+            # golden vector `rcp-status.json` -> `rcp-message.json` (see
+            # RELAY's spec/CHANGELOG.md v2.0 entry), so a `relay@latest`
+            # pinned to a real v2.0+ build never emits an `rcp-status` case
+            # for this check to find — it would always have silently fallen
+            # through to the "no RCP vectors found" branch below, never
+            # actually exercising the equivalence check, independent of
+            # the go.mod /v2 bug above. SKIP is still accepted as a
+            # defensive allowance for a future state where `convert` isn't
+            # advertised at all; any other outcome still fails this step.
+            rcp_line=$(echo "$output" | grep -A3 "^rcp-message" | grep "rust-rcp")
             echo "$rcp_line" | grep -qE "EQUIVALENT|SKIP" || {
-              echo "relay interop: unexpected rcp-status result for rust-rcp: $rcp_line" >&2
+              echo "relay interop: unexpected rcp-message result for rust-rcp: $rcp_line" >&2
               exit 1
             }
           else

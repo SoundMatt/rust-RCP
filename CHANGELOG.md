@@ -31,6 +31,26 @@ of explaining the real reason `relay interop` currently shows red
 "RELAY spec v1.11 unit conformance" despite this milestone's own
 `SPEC_VERSION` fix to `"2.0"`.
 
+**Post-release correction (2026-07-30):** `SoundMatt/RELAY#70` — the
+`go.mod` module-path bug that made `go install .../relay@latest` silently
+resolve to a stale pre-`/v2` `v1.14.0` reference binary — is fixed
+upstream as `SoundMatt/RELAY` `v2.0.4`. `ci.yml`'s `relay-conform` and
+`relay-interop` jobs now install
+`github.com/SoundMatt/RELAY/v2/cmd/relay@v2.0.4` (pinned, not
+`@latest`) instead of the unversioned `github.com/SoundMatt/RELAY/cmd/relay@latest`
+path. Verified locally against a from-source build of the RELAY v2.0.4
+tag: `relay conform --strict` passes and `relay interop --strict
+--protocol RCP` now reports `EQUIVALENT` for `rcp-message` (previously
+`ERROR` under the stale `v1.14.0` binary) against this crate's `convert`
+CLI subcommand. Also fixes an independent, previously-latent bug this
+exposed: `ci.yml`'s `relay-interop` job grepped its output for the
+retired `rcp-status` vector name rather than `rcp-message`, the name
+RELAY's own v2.0 canonical-type replacement renamed it to (see
+`spec/vectors/rcp-status.json` -> `rcp-message.json` in RELAY's
+CHANGELOG) — so even with the `/v2` path fixed, the check would have
+silently no-opped ("no RCP vectors found") instead of ever asserting
+`EQUIVALENT`. No source or behavior change in this crate; CI-only fix.
+
 ### Breaking
 
 - **`RcpError::ZoneMismatch` and `is_zone_mismatch()` are removed.**
@@ -75,21 +95,24 @@ of explaining the real reason `relay interop` currently shows red
   interop`'s own comparison method) against a from-source build of the
   RELAY v2.0 reference `relay convert --protocol RCP` across several
   cases, including the published `spec/vectors/rcp-message.json` vector.
-  **Known external blocker**: this repo's CI installs the reference
-  `relay` tool via `go install .../relay@latest`, which currently
-  resolves to a stale, still-Zone-based `v1.14.0` — `SoundMatt/RELAY`'s
-  `go.mod` has not yet added the `/v2` module-path suffix Go's semantic
+  **External blocker (resolved 2026-07-30)**: this repo's CI installed
+  the reference `relay` tool via `go install .../relay@latest`, which
+  resolved to a stale, still-Zone-based `v1.14.0` — `SoundMatt/RELAY`'s
+  `go.mod` had not added the `/v2` module-path suffix Go's semantic
   import versioning rules require before any `v2.x` tag becomes
   `go install`-able at all (confirmed by direct testing: `go install
   github.com/SoundMatt/RELAY/cmd/relay@v2.0.2`, an explicit pinned
-  version, is refused with the same "module path must match major
-  version" error `@latest` implicitly hits — there is no `go install`
-  invocation from this side that can reach it). Tracked upstream as
+  version, was refused with the same "module path must match major
+  version" error `@latest` implicitly hit — there was no `go install`
+  invocation from this side that could reach it). Tracked upstream as
   [`SoundMatt/RELAY#70`](https://github.com/SoundMatt/RELAY/issues/70).
-  Until that lands, the `RELAY interop` CI job (not a required
-  branch-protection check) shows `ERROR` for `convert` against the stale
-  reference rather than `EQUIVALENT` — verified to resolve cleanly
-  against a `/v2`-fixed v2.0 build once available (see above).
+  Until that landed, the `RELAY interop` CI job (not a required
+  branch-protection check) showed `ERROR` for `convert` against the stale
+  reference rather than `EQUIVALENT`. RELAY shipped the `/v2` fix as
+  `v2.0.4`; this repo's CI now installs `github.com/SoundMatt/RELAY/v2/cmd/relay@v2.0.4`
+  and `relay interop` shows `EQUIVALENT` for `rcp-message` (RELAY v2.0
+  renamed the vector from `rcp-status`) against a genuine RELAY v2.0
+  reference build (see "Post-release correction" below).
 
 ### Fixed
 
