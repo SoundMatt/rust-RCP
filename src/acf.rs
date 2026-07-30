@@ -433,7 +433,16 @@ pub fn decode_acf_abb(b: &[u8]) -> Result<AcfAbbMessage, RcpError> {
 /// "treat as untimed" fallback rule; those are the separate "Timestamp
 /// Semantics" checklist item, implemented in
 /// [`crate::timestamp::MessageTimestamp`] as a standalone wrapper over this
-/// field's raw value.
+/// field's raw value. For a GBB *conditional* request specifically,
+/// [`crate::request::RequestKind::from_gbb_message_timestamp`]/
+/// [`crate::request::RequestKind::to_gbb_message_timestamp`] additionally
+/// read/write this field's leading (most significant) byte as a
+/// [`crate::request::RequestKind`] discriminant — see that pair's own doc
+/// comment and [`crate::request`]'s module doc comment "Provenance note:
+/// `RequestKind`'s wire placement" for the full reasoning. This module
+/// itself stays unaware of that meaning: `message_timestamp` is still
+/// encoded/decoded here as one opaque `u64`, with no `RequestKind`-specific
+/// handling of its own.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 // fusa:req REQ-GBB-001
 pub struct AcfGbbMessage {

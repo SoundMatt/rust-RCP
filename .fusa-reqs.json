@@ -3656,6 +3656,15 @@
       "verificationMethod": "test"
     },
     {
+      "id": "REQ-CMP-008",
+      "title": "RequestKind binds to the leading byte of AcfGbbMessage::message_timestamp for GBB conditional requests",
+      "text": "RequestKind::from_gbb_message_timestamp extracts the leading (most significant) byte of an already-decoded AcfGbbMessage::message_timestamp value and decodes it via RequestKind::from_u8, returning Some(kind) for any of the eleven non-Standard discriminants and None for a leading byte of 0x00 or any other unrecognized byte -- never Standard, since 0x00 at this wire position cannot be distinguished from a genuine unconditional request's ordinary timestamp data. RequestKind::to_gbb_message_timestamp is the companion encode-side helper: it writes self's discriminant into the leading byte of a caller-supplied message_timestamp while preserving the low 56 bits unchanged, and returns Err(RcpError::InvalidParameter) for RequestKind::Standard rather than injecting its unconfirmed 0x00 placeholder. Both are internally consistent with encode_acf_gbb/decode_acf_gbb's existing big-endian to_be_bytes()/from_be_bytes() layout of message_timestamp, and neither ever panics for any input.",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
       "id": "REQ-TRIG-001",
       "title": "RequestKind gains a Triggered = 0x0E variant that round-trips through to_u8/from_u8",
       "text": "RequestKind::Triggered encodes to discriminant byte 0x0E via to_u8, RequestKind::from_u8(0x0E) decodes to RequestKind::Triggered, and every RequestKind variant (Compound, CompoundWait, Triggered) round-trips through to_u8/from_u8; from_u8 continues to reject every other byte value and never panics across the full 0..=255 range",
