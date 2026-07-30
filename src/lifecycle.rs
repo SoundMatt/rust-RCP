@@ -196,12 +196,27 @@
 //! crate reasons at the same [`RegisterCategory`] granularity
 //! [`is_register_reachable`] already uses:
 //!
-//! - [`RegisterCategory::General`] is modeled as never writable through
-//!   this module at all (`lock_policy` returns `None`), inferred from this
-//!   module's own doc comment already describing that category as
-//!   server-identity/status fields (`svr_vendor_id`, `svr_device_id`,
-//!   etc.) — read/status data, not configuration a client would plausibly
-//!   write.
+//! - [`RegisterCategory::General`] is modeled as `W`: writable whenever
+//!   reachable, the same category-level policy [`RegisterCategory::RcpConfig`]
+//!   already uses — `General` is reachable in every lifecycle state (see
+//!   [`is_register_reachable`]), so this makes it writable in every state
+//!   too, gated by nothing this module adds beyond reachability. This
+//!   module's own doc comment describes `General` as covering
+//!   server-identity/status fields (`svr_vendor_id`, `svr_device_id`, etc.),
+//!   and a real register map of this kind plausibly mixes read-only
+//!   identity/status fields with client-writable configuration fields even
+//!   within one coarse category — this crate does not yet model per-field
+//!   write granularity within `General` to distinguish the two. Modeling
+//!   the *entire* category as permanently locked (`lock_policy` previously
+//!   returning `None`) was tried and found to be actively wrong rather than
+//!   merely a coarse-grained simplification: it made the register-map write
+//!   path this category exists to exercise permanently unreachable dead
+//!   code for every caller, including the designated root client who is
+//!   otherwise the one caller meant to be able to write EP0. `General` is
+//!   therefore now modeled as `W` at the same category-level granularity
+//!   `RcpConfig` already uses, still gated by the separate, unconditional
+//!   root-client check that any EP0 write goes through regardless of
+//!   category (see [`crate::ep0::check_ep0_access_for_stream`]).
 //! - [`RegisterCategory::HwConfig`] is modeled as `W*`: writable while
 //!   reachable, but permanently locked the moment `RCP_CONFIGURED` is
 //!   reached. This is inferred from `HwConfig` being the *foundation*
@@ -429,7 +444,7 @@ pub enum LockPolicy {
 // fusa:req REQ-LIFE-009
 pub fn lock_policy(category: RegisterCategory) -> Option<LockPolicy> {
     match category {
-        RegisterCategory::General => None,
+        RegisterCategory::General => Some(LockPolicy::W),
         RegisterCategory::HwConfig => Some(LockPolicy::WStar),
         RegisterCategory::RcpConfig => Some(LockPolicy::W),
     }
@@ -718,7 +733,7 @@ mod tests {
     #[test]
     // fusa:test REQ-LIFE-009
     fn lock_policy_matches_the_documented_per_category_assignment() {
-        assert_eq!(lock_policy(RegisterCategory::General), None);
+        assert_eq!(lock_policy(RegisterCategory::General), Some(LockPolicy::W));
         assert_eq!(
             lock_policy(RegisterCategory::HwConfig),
             Some(LockPolicy::WStar)
@@ -732,9 +747,9 @@ mod tests {
     #[test]
     // fusa:test REQ-LIFE-009
     // fusa:test REQ-LIFE-010
-    fn general_registers_are_never_writable_in_any_state() {
+    fn general_registers_are_writable_in_every_state() {
         for state in ALL_STATES {
-            assert!(!is_register_writable(state, RegisterCategory::General));
+            assert!(is_register_writable(state, RegisterCategory::General));
         }
     }
 

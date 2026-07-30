@@ -295,19 +295,16 @@ impl RcServer {
     ///   are never root-client-gated, per [`check_ep0_access_for_stream`]'s
     ///   own doc comment). A write requires the payload to decode as a
     ///   complete [`GeneralRegisters`] block (`Err(RcpError::ShortFrame)`
-    ///   otherwise) and would replace the snapshot wholesale — but
-    ///   [`crate::lifecycle::lock_policy`] assigns
-    ///   [`RegisterCategory::General`] no [`crate::lifecycle::LockPolicy`]
-    ///   at all, which [`crate::lifecycle::is_register_writable`]'s own doc
-    ///   comment states means "never writable regardless of lifecycle
-    ///   state." This test double does not special-case that: an EP0 write
-    ///   is therefore always rejected with `Err(RcpError::LockedMemAccess)`
-    ///   once past the root-client check, for the root client exactly as
-    ///   for anyone else, and the snapshot is never actually replaced by
-    ///   this path today — an honest consequence of modeling only
-    ///   `General`, not a bug, and not this item's to work around by
-    ///   inventing a writable category this crate has not built storage
-    ///   for.
+    ///   otherwise) and replaces the snapshot wholesale, once past the
+    ///   root-client check — [`crate::lifecycle::lock_policy`] assigns
+    ///   [`RegisterCategory::General`] [`crate::lifecycle::LockPolicy::W`],
+    ///   writable whenever reachable, and `General` is reachable in every
+    ///   lifecycle state (see [`crate::lifecycle::is_register_reachable`]),
+    ///   so an EP0 write from the root client succeeds in every state. A
+    ///   write from any other stream is still rejected with
+    ///   `Err(RcpError::UnauthorizedAccess)` by
+    ///   [`check_ep0_access_for_stream`] before category writability is
+    ///   even considered — see that function's own doc comment.
     /// - [`RequestRoute::DeviceEndpoint`]: resolved through
     ///   [`EndpointTable::lookup`], `Err(RcpError::EpNotFound)` if nothing
     ///   is registered under the pair, otherwise dispatched to the
@@ -493,14 +490,13 @@ mod rc_server_tests {
     #[test]
     // fusa:test REQ-MOCKSRV-004
     // fusa:test REQ-MOCKSRV-005
-    fn ep0_write_is_locked_even_for_the_root_client() {
-        // RegisterCategory::General has no LockPolicy at all
-        // (crate::lifecycle::lock_policy), meaning "never writable
-        // regardless of lifecycle state" per is_register_writable's own
-        // doc comment — this holds even for the designated root client,
-        // who is otherwise the only stream ever permitted to write EP0 at
-        // all. See handle_abb's own doc comment for why this test double
-        // does not work around that.
+    fn ep0_write_succeeds_for_the_root_client() {
+        // RegisterCategory::General now has LockPolicy::W
+        // (crate::lifecycle::lock_policy), writable whenever reachable, and
+        // General is reachable in every lifecycle state — so the designated
+        // root client, the only stream ever permitted to write EP0 at all,
+        // can successfully write it. See handle_abb's own doc comment for
+        // the corrected reasoning.
         let srv = RcServer::new(GeneralRegisters::default());
         let sid = stream(1);
         srv.set_root_client(Some(sid));
@@ -510,14 +506,11 @@ mod rc_server_tests {
             ..Default::default()
         };
         let req = abb_request(EP0_BYTE_BUS_ID, true, new_regs.encode().to_vec());
-        let err = srv.handle_abb(sid, &req).unwrap_err();
-        assert_eq!(err, RcpError::LockedMemAccess);
+        let resp = srv.handle_abb(sid, &req).unwrap();
+        assert!(resp.payload.is_empty());
 
-        // The snapshot must be unchanged.
-        assert_eq!(
-            srv.general_registers().svr_vendor_id,
-            GeneralRegisters::default().svr_vendor_id
-        );
+        // The snapshot must reflect the newly written value.
+        assert_eq!(srv.general_registers().svr_vendor_id, 0xBEEF);
     }
 
     #[test]
