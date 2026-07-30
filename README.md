@@ -83,7 +83,7 @@ See [docs/SEMVER.md](docs/SEMVER.md) for which modules carry a semver stability 
 | `lifecycle` | RC Server lifecycle state machine — TC18 register-map model |
 | `regmap` | Three-layer per-endpoint config taxonomy, the RC Server's general register map |
 | `ep0` | EP0 (RC-Server-as-endpoint) whole-register-map read/write addressing |
-| `discovery` | Discovery request/response, discovery-stream claiming, multi-client arbitration |
+| `discovery` | Discovery request/response, discovery-stream claiming, multi-client arbitration — **broadcast addressing and the on-wire register-address encoding are this crate's own unreconciled working interpretations, not confirmed spec conventions; see the module's own "Provenance note" doc comment before relying on either for interop** |
 | `request` | Conditional-request taxonomy: compound / compound-wait, chained requests |
 | `e2e` | End-to-end protection: the OPEN Alliance TC18 safe-point CRC-32 |
 | `fragment` | Multi-AVTPDU fragmentation reassembly |
