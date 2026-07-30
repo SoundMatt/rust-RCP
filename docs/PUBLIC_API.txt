@@ -1624,25 +1624,6 @@ impl core::marker::Unpin for rcp::iseled::IseledFrame
 impl core::marker::UnsafeUnpin for rcp::iseled::IseledFrame
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::iseled::IseledFrame
 impl core::panic::unwind_safe::UnwindSafe for rcp::iseled::IseledFrame
-pub struct rcp::iseled::IseledFrameCrc(pub u8)
-impl core::clone::Clone for rcp::iseled::IseledFrameCrc
-pub fn rcp::iseled::IseledFrameCrc::clone(&self) -> rcp::iseled::IseledFrameCrc
-impl core::cmp::Eq for rcp::iseled::IseledFrameCrc
-impl core::cmp::PartialEq for rcp::iseled::IseledFrameCrc
-pub fn rcp::iseled::IseledFrameCrc::eq(&self, &rcp::iseled::IseledFrameCrc) -> bool
-impl core::default::Default for rcp::iseled::IseledFrameCrc
-pub fn rcp::iseled::IseledFrameCrc::default() -> rcp::iseled::IseledFrameCrc
-impl core::fmt::Debug for rcp::iseled::IseledFrameCrc
-pub fn rcp::iseled::IseledFrameCrc::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::marker::Copy for rcp::iseled::IseledFrameCrc
-impl core::marker::StructuralPartialEq for rcp::iseled::IseledFrameCrc
-impl core::marker::Freeze for rcp::iseled::IseledFrameCrc
-impl core::marker::Send for rcp::iseled::IseledFrameCrc
-impl core::marker::Sync for rcp::iseled::IseledFrameCrc
-impl core::marker::Unpin for rcp::iseled::IseledFrameCrc
-impl core::marker::UnsafeUnpin for rcp::iseled::IseledFrameCrc
-impl core::panic::unwind_safe::RefUnwindSafe for rcp::iseled::IseledFrameCrc
-impl core::panic::unwind_safe::UnwindSafe for rcp::iseled::IseledFrameCrc
 pub struct rcp::iseled::IseledFunctionalConfig
 pub rcp::iseled::IseledFunctionalConfig::native_crc_enabled: bool
 impl rcp::iseled::IseledFunctionalConfig
@@ -1668,7 +1649,6 @@ impl core::panic::unwind_safe::UnwindSafe for rcp::iseled::IseledFunctionalConfi
 pub fn rcp::iseled::decode_4b5b(&[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::iseled::encode_4b5b(&[u8]) -> alloc::vec::Vec<u8>
 pub fn rcp::iseled::iseled_collect_resp(&[rcp::iseled::IseledDeviceResponse]) -> rcp::iseled::IseledCollectedResponse
-pub fn rcp::iseled::iseled_frame_crc8(&rcp::iseled::IseledFrame) -> rcp::iseled::IseledFrameCrc
 pub mod rcp::iso21434
 pub enum rcp::iso21434::Feasibility
 pub rcp::iso21434::Feasibility::Critical
