@@ -865,11 +865,11 @@ mod tests {
 
     #[test]
     // fusa:test REQ-CLI-005
-    fn register_write_is_locked_even_for_the_root_client() {
-        // Mirrors rcp::mock::rc_server_tests::ep0_write_is_locked_even_for_the_root_client
-        // — RegisterCategory::General has no LockPolicy, so a write is
-        // rejected regardless of root-client status. This is the CLI's own
-        // exercise of that same, already-tested gate.
+    fn register_write_succeeds_for_the_root_client() {
+        // Mirrors rcp::mock::rc_server_tests::ep0_write_succeeds_for_the_root_client
+        // — RegisterCategory::General now has LockPolicy::W, writable
+        // whenever reachable, so a write from the root client succeeds.
+        // This is the CLI's own exercise of that same, already-tested gate.
         let server = RcServer::new(GeneralRegisters::default());
         let sid = stream(1);
         server.set_root_client(Some(sid));
@@ -889,8 +889,8 @@ mod tests {
             },
             payload,
         };
-        let err = server.handle_abb(sid, &request).unwrap_err();
-        assert_eq!(err, RcpError::LockedMemAccess);
+        server.handle_abb(sid, &request).unwrap();
+        assert_eq!(server.general_registers().svr_vendor_id, 0xAAAA);
     }
 
     // ── endpoint read / endpoint write ───────────────────────────────────────
