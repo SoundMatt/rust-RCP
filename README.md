@@ -4,18 +4,18 @@
 [![ASIL-B](https://img.shields.io/badge/ISO%2026262-ASIL--B-orange)](SAFETY_PLAN.md)
 [![IEC 62443](https://img.shields.io/badge/IEC%2062443-SL--2-blue)](SECURITY.md)
 
-Rust implementation of the **OPEN Alliance TC18 Remote Control Protocol Specification v0.5.1_RC** for automotive zonal architecture, adapted to the **RELAY specification v1.11**.
+Rust implementation of the **OPEN Alliance TC18 Remote Control Protocol Specification v0.5.1_RC** for automotive zonal architecture, adapted to the **RELAY specification v2.0**.
 
 An RC Client addresses an RC Server's device endpoints by `(stream_id, byte_bus_id)` and exchanges AVTPDU/ACF-framed requests over the RC Server's lifecycle/register-map model — reading and writing endpoints such as GPIO, SPI, CAN, PWM, and others, and reading/writing the RC Server's own register map through EP0.
 
 ## Features
 
-- Full RELAY spec v1.11 compliance, including the `Adapt()` RELAY adapter (§10.3) — `rcp::adapt(server)` wraps an [`mock::RcServer`] as a `relay::Caller`
+- Full RELAY spec v2.0 compliance, including the `Adapt()` RELAY adapter (§10.3) — `rcp::adapt(server)` wraps an [`mock::RcServer`] as a `relay::Caller`
 - **ASIL-B** (ISO 26262:2018) with full FuSa artifact set, including a TARA (ISO/SAE 21434, see [tara.json](tara.json))
 - **IEC 62443 SL-2** cybersecurity controls
 - `#![forbid(unsafe_code)]` — 100% safe Rust
 - The core RC Server dispatch path ([`mock::RcServer::handle_abb`]/[`handle_ntscf_frame`](mock::RcServer::handle_ntscf_frame)) is a plain blocking `fn` interface; the RELAY-facing `relay::Node`/`Caller` adapter is `async fn` per §18.3 and runs on `tokio`
-- 51 modules covering core protocol, device endpoints, transport bridges, safety, and observability
+- 52 modules (51 public + 1 crate-internal) covering core protocol, device endpoints, transport bridges, safety, and observability — see the Module Index below; the crate additionally has one `#[cfg(test)]`-only module (`conformance`) deliberately excluded from this count since it carries no public API surface
 - Public API stability guarantees as of `v1.0.0` — see [docs/SEMVER.md](docs/SEMVER.md)
 
 ## Quick Start

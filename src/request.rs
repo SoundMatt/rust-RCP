@@ -132,7 +132,10 @@
 //! first thing to land in `src/request.rs` — the module name the
 //! naming-reconciliation pass (issue #35, PR #37, "refactor: reconcile
 //! module naming with RELAY spec v1.14 §13.7.2") reserved for this
-//! milestone's request-kind/taxonomy work, mirroring `fragment.rs`'s own
+//! milestone's request-kind/taxonomy work — "v1.14" names the RELAY spec
+//! revision current when PR #37 landed, not the revision this crate
+//! declares today (see [`crate::SPEC_VERSION`] for the current RELAY spec
+//! version this crate implements) — mirroring `fragment.rs`'s own
 //! reservation for Milestone 8. Triggered is the second, added there.
 //! Chained is the third, added there. Timed is the fourth, added there.
 //! Cancellation is the fifth, added there. [`SequencerBank`] is the sixth,
@@ -157,10 +160,12 @@
 //! lifecycle state stay two separate, uncomposed pieces for now). The old
 //! `src/prioqueue.rs` `Zone`/`Command`/`Controller`/`Priority` decorator
 //! this milestone's own Goal text names as the eventual absorption target
-//! for "picking which pending request runs next" is read only as
-//! background for this change — see this module's doc comment
-//! "Deliberately out of scope" section below for why `prioqueue.rs` itself
-//! is still not touched.
+//! for "picking which pending request runs next" was, at the time this
+//! item landed, read only as background for this change — `prioqueue.rs`
+//! itself was left untouched here (see this module's doc comment
+//! "Deliberately out of scope" section below) and was later deleted
+//! outright by Milestone 9's DEPRECATE disposition; it no longer exists
+//! in `src/`.
 //!
 //! Twenty-five named pieces are in scope, all implemented here or in the
 //! seven prior entries this one extends:
@@ -381,12 +386,14 @@
 //!   target for "picking which pending request runs next". This item is
 //!   the "Execution priority ordering" checklist bullet the Goal text
 //!   points at, and [`select_next_pending_request`] is its own
-//!   from-scratch, spec-native implementation of that job — but
-//!   `src/prioqueue.rs` itself is still read only as background, not
-//!   extended, modified, or migrated onto [`select_next_pending_request`];
-//!   that KEEP/DEPRECATE-style migration is `ROADMAP.md`'s own Milestone 9
-//!   satellite-package-migration job (`prioqueue` is DEPRECATE-dispositioned
-//!   in that milestone's satellite table), not this item's.
+//!   from-scratch, spec-native implementation of that job — but, at the
+//!   time this item landed, `src/prioqueue.rs` itself was only read as
+//!   background, not extended, modified, or migrated onto
+//!   [`select_next_pending_request`]; that KEEP/DEPRECATE-style migration
+//!   was `ROADMAP.md`'s own Milestone 9 satellite-package-migration job
+//!   (`prioqueue` was DEPRECATE-dispositioned in that milestone's
+//!   satellite table and has since been deleted outright — it no longer
+//!   exists in `src/`), not this item's.
 //! - Any error/rejection behavior for a pending request that never gets a
 //!   turn (queue overflow, starvation) and any statement of what scope
 //!   execution priority is evaluated across (per-endpoint, per-stream, or

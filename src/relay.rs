@@ -10,7 +10,7 @@
 //! RELAY protocol types, bundled locally until a published `relay-rs` crate
 //! exists to depend on directly.
 //!
-//! These types mirror the RELAY spec v1.11 definitions for Rust (§18.3):
+//! These types mirror the RELAY spec v2.0 definitions for Rust (§18.3):
 //! the universal message envelope, the four mandatory error sentinels, and
 //! the [`Node`]/[`Caller`] application interfaces (§10.1/§10.2).
 
