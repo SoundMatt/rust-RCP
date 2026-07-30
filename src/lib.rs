@@ -133,10 +133,10 @@ use std::fmt;
 
 /// RELAY specification version this crate implements.
 // fusa:req REQ-SPEC-001
-pub const SPEC_VERSION: &str = "1.11";
+pub const SPEC_VERSION: &str = "2.0";
 
 /// Alias for [`SPEC_VERSION`], exported from the crate root per RELAY spec
-/// §18.3 ("`RELAY_SPEC_VERSION` MUST be exported from the crate root").
+/// §19.4 ("`RELAY_SPEC_VERSION` MUST be exported from the crate root").
 // fusa:req REQ-SPEC-001
 pub const RELAY_SPEC_VERSION: &str = SPEC_VERSION;
 

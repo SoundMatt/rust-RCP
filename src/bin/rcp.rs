@@ -794,8 +794,8 @@ mod tests {
 
     #[test]
     // fusa:test REQ-CLI-006
-    fn spec_version_is_relay_1_11() {
-        assert_eq!(rcp::SPEC_VERSION, "1.11", "must track RELAY spec v1.11");
+    fn spec_version_is_relay_2_0() {
+        assert_eq!(rcp::SPEC_VERSION, "2.0", "must track RELAY spec v2.0");
     }
 
     #[test]

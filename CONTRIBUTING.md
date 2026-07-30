@@ -2,7 +2,7 @@
 
 ## Developer Certificate of Origin
 
-All contributions must be signed off per the [DCO](https://developercertificate.org/). Add `Signed-off-by: Your Name <email@example.com>` to your commit message.
+All contributions must be signed off per the [DCO](https://developercertificate.org/). Add `Signed-off-by: Your Name <your.email@example.org>` to your commit message.
 
 ## Code Style
 
@@ -55,6 +55,6 @@ for the full policy, including:
 
 ## Reporting Issues
 
-- Security vulnerabilities: **security@example.com** (see SECURITY.md)
-- Safety concerns: **safety@example.com**
+- Security vulnerabilities: **security@soundmatt.dev** (see SECURITY.md)
+- Safety concerns: **safety@soundmatt.dev**
 - General bugs: GitHub Issues

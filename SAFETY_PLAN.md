@@ -8,9 +8,9 @@ This safety plan covers the **rust-RCP** crate — a Rust implementation of the 
 
 | Role | Contact |
 |---|---|
-| Safety Manager | safety@example.com |
-| Security Contact | security@example.com |
-| CI Owner | devops@example.com |
+| Safety Manager | safety@soundmatt.dev |
+| Security Contact | security@soundmatt.dev |
+| CI Owner | devops@soundmatt.dev |
 
 ## 3. Applicable Standards
 
