@@ -4,13 +4,14 @@
 
 | Version | Supported |
 |---|---|
-| 0.1.x | ✅ Yes |
+| 1.x | ✅ Yes |
+| 0.1.x | ❌ No |
 
 ## Reporting a Vulnerability
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-Email: **security@example.com**
+Email: **security@soundmatt.dev**
 
 Include:
 - Description of the vulnerability
