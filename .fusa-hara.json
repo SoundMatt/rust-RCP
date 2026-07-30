@@ -24,7 +24,7 @@
       "severity": "S2",
       "exposure": "E3",
       "controllability": "C2",
-      "asil": "ASIL-B",
+      "asil": "ASIL-A",
       "safety_goal": "SG-003"
     },
     {
@@ -51,7 +51,7 @@
       "severity": "S2",
       "exposure": "E3",
       "controllability": "C2",
-      "asil": "ASIL-B",
+      "asil": "ASIL-A",
       "safety_goal": "SG-006"
     },
     {
@@ -68,7 +68,7 @@
       "description": "Frame/payload length overflow — a malformed NTSCF/ACF length field enables an oversized allocation or malformed decode",
       "severity": "S3",
       "exposure": "E4",
-      "controllability": "C0",
+      "controllability": "C1",
       "asil": "ASIL-B",
       "safety_goal": "SG-008"
     },
@@ -87,7 +87,7 @@
       "severity": "S1",
       "exposure": "E4",
       "controllability": "C3",
-      "asil": "ASIL-A",
+      "asil": "ASIL-B",
       "safety_goal": "SG-010"
     }
   ],
@@ -102,13 +102,13 @@
   "safety_goals": [
     { "id": "SG-001", "description": "Requests shall only be delivered to the correct addressed endpoint", "asil": "ASIL-B", "ftti_ms": 200 },
     { "id": "SG-002", "description": "Safety-tagged requests shall not be silently dropped", "asil": "ASIL-B", "ftti_ms": 100 },
-    { "id": "SG-003", "description": "Replayed frames shall be detected and rejected", "asil": "ASIL-B", "ftti_ms": 500 },
+    { "id": "SG-003", "description": "Replayed frames shall be detected and rejected", "asil": "ASIL-A", "ftti_ms": 500 },
     { "id": "SG-004", "description": "Payload integrity shall be verified before execution", "asil": "ASIL-B", "ftti_ms": 200 },
     { "id": "SG-005", "description": "Unresponsive endpoints shall be detected within the watchdog window", "asil": "ASIL-B", "ftti_ms": 3000 },
-    { "id": "SG-006", "description": "Only authorized callers may dispatch a given (endpoint-type, request-type) pair", "asil": "ASIL-B", "ftti_ms": 0 },
+    { "id": "SG-006", "description": "Only authorized callers may dispatch a given (endpoint-type, request-type) pair", "asil": "ASIL-A", "ftti_ms": 0 },
     { "id": "SG-007", "description": "Power state transitions shall be atomic with respect to concurrent requests", "asil": "ASIL-A", "ftti_ms": 500 },
     { "id": "SG-008", "description": "Frame/payload length fields shall be validated before memory allocation", "asil": "ASIL-B", "ftti_ms": 0 },
     { "id": "SG-009", "description": "Critical-priority/safety-tagged requests shall not be delayed by lower-priority flooding", "asil": "ASIL-B", "ftti_ms": 100 },
-    { "id": "SG-010", "description": "Register writes shall be rejected unless permitted by both the current lifecycle state and root-client policy", "asil": "ASIL-A", "ftti_ms": 200 }
+    { "id": "SG-010", "description": "Register writes shall be rejected unless permitted by both the current lifecycle state and root-client policy", "asil": "ASIL-B", "ftti_ms": 200 }
   ]
 }

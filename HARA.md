@@ -19,14 +19,44 @@ compatibility shim and is out of scope here.
 |---|---|---|---|---|---|---|
 | H-001 | Endpoint misaddressing — request resolves to the wrong `(stream_id, byte_bus_id)`-addressed endpoint | S2 | E4 | C2 | ASIL-B | SG-001 |
 | H-002 | Safety-tagged request lost — a Critical-priority/safety-tagged request is silently dropped instead of executed or explicitly failed | S2 | E4 | C2 | ASIL-B | SG-002 |
-| H-003 | Replayed request | S2 | E3 | C2 | ASIL-B | SG-003 |
+| H-003 | Replayed request | S2 | E3 | C2 | ASIL-A | SG-003 |
 | H-004 | Payload corruption | S3 | E4 | C1 | ASIL-B | SG-004 |
 | H-005 | Endpoint/stream lockup undetected — per-stream watchdog fails to flag an unresponsive endpoint | S2 | E4 | C2 | ASIL-B | SG-005 |
-| H-006 | Unauthorized request execution — a caller dispatches an `(endpoint-type, request-type)` pair outside its granted allowlist | S2 | E3 | C2 | ASIL-B | SG-006 |
+| H-006 | Unauthorized request execution — a caller dispatches an `(endpoint-type, request-type)` pair outside its granted allowlist | S2 | E3 | C2 | ASIL-A | SG-006 |
 | H-007 | Power-state transition race | S1 | E3 | C3 | ASIL-A | SG-007 |
-| H-008 | Frame/payload length overflow | S3 | E4 | C0 | ASIL-B | SG-008 |
+| H-008 | Frame/payload length overflow | S3 | E4 | C1 | ASIL-B | SG-008 |
 | H-009 | Request flooding DoS — a flood of Standard-priority requests starves Critical-priority/safety-tagged request dispatch | S2 | E4 | C2 | ASIL-B | SG-009 |
-| H-010 | Register-map integrity bypass — a write reaches a register the RC Server's lifecycle state or root-client policy should have blocked | S1 | E4 | C3 | ASIL-A | SG-010 |
+| H-010 | Register-map integrity bypass — a write reaches a register the RC Server's lifecycle state or root-client policy should have blocked | S1 | E4 | C3 | ASIL-B | SG-010 |
+
+All ten rows are re-derived directly from ISO 26262-3:2018 Table 4
+(`scripts/hara_asil_check.py`, run in CI by the `fusa` job, mechanically
+re-checks every row above against that table so an S/E/C-to-ASIL
+transcription error cannot silently reoccur). Two corrections from the
+previous revision of this table:
+
+- **H-003/SG-003 and H-006/SG-006** (`S2`/`E3`/`C2`) were previously
+  over-rated `ASIL-B`; Table 4 gives `S2`/`E3`/`C2` → `ASIL-A`. Both rows
+  are corrected to `ASIL-A` here; this raises no new implementation gap
+  (§`REQ-SEQENF-003`/`REQ-AUTHZ-*` were already carrying `ASIL-B`-level
+  rigor), it only corrects the stated classification to match its own
+  inputs.
+- **H-008/SG-008** was previously recorded with `C0` ("controllable in
+  general"), which — per Table 4 — always resolves to `QM` regardless of
+  `S`/`E`, making the previously-stated `ASIL-B` an internally
+  inconsistent pairing with its own `C0` input. `C0` was never a tenable
+  rating for this hazard in the first place: a caller has no way to
+  detect or avert an untrusted frame/payload length field driving an
+  oversized allocation or malformed decode before that decode has already
+  run, which is the same "no direct control loop" situation the sibling
+  wire-integrity hazard H-004 (payload corruption) already rates `C1`.
+  H-008 is corrected to `C1` here for the same reason, which — per Table
+  4 — keeps its ASIL at `ASIL-B` (`S3`/`E4`/`C1` → `ASIL-B`), now for a
+  defensible rather than self-contradictory reason.
+- **H-010/SG-010** (`S1`/`E4`/`C3`) was previously under-rated `ASIL-A`;
+  Table 4 gives `S1`/`E4`/`C3` → `ASIL-B`. Both rows are corrected to
+  `ASIL-B` here, which raises the required verification rigor for the
+  register-map/EP0 write-gating path (`ep0::check_ep0_access_for_stream`/
+  `lifecycle::is_register_writable`) to match.
 
 ## Safety Goals
 
