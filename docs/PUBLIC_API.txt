@@ -3163,8 +3163,10 @@ pub rcp::request::RequestKind::Standard = 0
 pub rcp::request::RequestKind::Timed = 10
 pub rcp::request::RequestKind::Triggered = 14
 impl rcp::request::RequestKind
+pub fn rcp::request::RequestKind::from_gbb_message_timestamp(u64) -> core::option::Option<Self>
 pub fn rcp::request::RequestKind::from_u8(u8) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::request::RequestKind::is_safety_tagged(self) -> bool
+pub fn rcp::request::RequestKind::to_gbb_message_timestamp(self, u64) -> core::result::Result<u64, rcp::RcpError>
 pub fn rcp::request::RequestKind::to_u8(self) -> u8
 impl core::clone::Clone for rcp::request::RequestKind
 pub fn rcp::request::RequestKind::clone(&self) -> rcp::request::RequestKind

@@ -173,11 +173,15 @@
 //!   = `0x0B`, [`RequestKind::Triggered`] = `0x0E`,
 //!   [`RequestKind::Compound`] = `0x0F`, and — new in this item —
 //!   [`RequestKind::Standard`]). See "Provenance note:
-//!   `RequestKind`'s wire placement" below for why this is modeled as a
-//!   standalone value type, not yet tied to a decoded byte offset, and
-//!   "Provenance note: `RequestKind::Standard`'s discriminant" below for why
-//!   its own numeric value carries even less confidence than the other
-//!   eight.
+//!   `RequestKind`'s wire placement" below for [`RequestKind::
+//!   from_gbb_message_timestamp`]/[`RequestKind::to_gbb_message_timestamp`],
+//!   the pair of functions binding this type to the leading byte of an
+//!   already-decoded [`crate::acf::AcfGbbMessage::message_timestamp`] for
+//!   GBB conditional requests — [`RequestKind`]'s first tie to an actual
+//!   decoded wire shape — and "Provenance note: `RequestKind::Standard`'s
+//!   discriminant" below for why [`RequestKind::Standard`]'s own numeric
+//!   value carries even less confidence than the other eight, and is never
+//!   produced by that decode-side helper.
 //! - [`CompoundGateConfig`] / [`SequencerState`] /
 //!   [`check_sequencer_num_in_bounds`] / [`is_gate_satisfied`] /
 //!   [`check_compound_gate`] — the sequencer-gating rule: a compound(-wait)
@@ -471,21 +475,45 @@
 //! clear-single discriminant values, but — unlike `acf_msg_type`
 //! ([`crate::acf::ACF_ABB_MSG_TYPE`]/[`crate::acf::ACF_GBB_MSG_TYPE`]),
 //! whose byte offset within an ACF message header this crate already
-//! pinned down in Milestone 1 — no checklist text anywhere in this crate's
-//! roadmap states which byte or field of a request actually carries this
-//! discriminant. Per Guiding Principle 5, [`RequestKind`] is therefore
-//! modeled as a standalone value type with its own `to_u8`/`from_u8` pair,
-//! exactly as confident about its named numeric values as the checklist
-//! text is, and no more: it is not attached to any offset within
-//! [`crate::acf::ByteMessageInfo`] or any other already-built wire shape,
-//! and no such offset is guessed here. This reasoning is unchanged by
-//! adding [`RequestKind::Triggered`], [`RequestKind::Chained`],
-//! [`RequestKind::Timed`], or the [`RequestKind::ClearAll`]/
-//! [`RequestKind::ClearNonSafestate`]/[`RequestKind::ClearSingle`] trio;
-//! each is simply one more value under the same still-open question. See
+//! pinned down in Milestone 1 — no checklist text in `ROADMAP.md` itself
+//! ever stated which byte or field of a request actually carries this
+//! discriminant. Per Guiding Principle 5, [`RequestKind`] was therefore
+//! modeled, from its introduction through the eight base variants and the
+//! three MSB-tagged safety variants added later, as a standalone value type
+//! with its own `to_u8`/`from_u8` pair, exactly as confident about its named
+//! numeric values as `ROADMAP.md`'s checklist text was, and no more: not
+//! attached to any offset within [`crate::acf::ByteMessageInfo`] or any
+//! other already-built wire shape, with no such offset guessed.
+//!
+//! This crate's 2026-07-29 ecosystem audit (issue #101) located that missing
+//! offset: for a GBB conditional request, the discriminant this module
+//! already names as [`RequestKind`] is carried in the leading (most
+//! significant) byte of the already-decoded
+//! [`crate::acf::AcfGbbMessage::message_timestamp`] field, not in a
+//! standalone `request_type` register or field of its own — citing the
+//! specification by section number only (§11.2.2), per Guiding Principle 4.
+//! Unlike the `0x0F`/`0x0B`/etc. discriminant values themselves, which
+//! `ROADMAP.md` names directly, this byte-offset finding is not yet
+//! reflected in `ROADMAP.md`'s own checklist text; it is recorded here, in
+//! this module's own provenance note, as this crate's working
+//! interpretation of that audit finding, flagged per Guiding Principle 5 for
+//! reconciliation against real TC18 behavior before being relied on for
+//! interop. [`RequestKind::from_gbb_message_timestamp`]/[`RequestKind::
+//! to_gbb_message_timestamp`] compose this offset against
+//! [`crate::acf::encode_acf_gbb`]'s already-established big-endian
+//! `to_be_bytes()` layout of `message_timestamp`
+//! (`(message_timestamp >> 56) as u8` is the leading byte on the wire), so
+//! the two stay internally consistent with how this crate already encodes
+//! that field, whatever the real TC18 byte order for `message_timestamp`
+//! itself eventually turns out to be. No offset is claimed for ACF_ABB (which
+//! [`crate::acf::AcfAbbMessage`] models as having no `message_timestamp`
+//! region at all — see `crate::acf`'s own module doc comment) or for any
+//! other already-built wire shape; this finding is scoped to GBB conditional
+//! requests specifically, the one case issue #101 confirmed. See
 //! "Provenance note: `RequestKind::Standard`'s discriminant" below for why
-//! [`RequestKind::Standard`] — added by this item — is a step further out
-//! on that same open question, not just one more instance of it.
+//! [`RequestKind::Standard`] is deliberately excluded from this binding
+//! rather than assumed to occupy the same leading byte when it reads as
+//! `0x00`.
 //!
 //! ## Provenance note: `RequestKind::Standard`'s discriminant
 //!
@@ -494,21 +522,39 @@
 //! other six tiers this module already models — but, unlike every other
 //! [`RequestKind`] variant, no `ROADMAP.md` checklist text anywhere in this
 //! crate's roadmap gives "standard" a numeric discriminant byte at all. The
-//! other eight variants at least inherit a roadmap-named hex value each
-//! (`0x01`/`0x05`/`0x06`/`0x07`/`0x0A`/`0x0B`/`0x0E`/`0x0F`) even though
-//! their byte *offset* is unconfirmed (see the provenance note above);
-//! [`RequestKind::Standard`] has neither. Per Guiding Principle 5, this
-//! crate does not invent a plausible-looking spec value for it. The
-//! discriminant assigned here, `0x00`, is a crate-local placeholder chosen
-//! only for two structural reasons — it is the one byte value none of the
-//! other eight named discriminants occupies, and `#[repr(u8)]` requires
-//! every variant to have some concrete value for [`RequestKind::to_u8`]'s
-//! `self as u8` cast to compile — not a transcription of, or a guess at,
-//! any confirmed TC18 wire encoding. Should a future item learn the real
-//! "standard" discriminant (or learn that "standard"/unconditional requests
-//! carry no discriminant byte at all, being whatever a request is when none
-//! of the other eight kinds' bytes match), this placeholder value is
-//! expected to change; nothing in this crate depends on `0x00` specifically
+//! other eight base variants at least inherit a roadmap-named hex value each
+//! (`0x01`/`0x05`/`0x06`/`0x07`/`0x0A`/`0x0B`/`0x0E`/`0x0F`); [`RequestKind::
+//! Standard`] has neither. Per Guiding Principle 5, this crate does not
+//! invent a plausible-looking spec value for it. The discriminant assigned
+//! here, `0x00`, is a crate-local placeholder chosen only for two structural
+//! reasons — it is the one byte value none of the other named discriminants
+//! occupies, and `#[repr(u8)]` requires every variant to have some concrete
+//! value for [`RequestKind::to_u8`]'s `self as u8` cast to compile — not a
+//! transcription of, or a guess at, any confirmed TC18 wire encoding.
+//!
+//! Issue #101's finding (see the provenance note above) sharpens this rather
+//! than resolving it: it confirms that GBB conditional requests carry their
+//! [`RequestKind`] in `message_timestamp`'s leading byte, but says nothing
+//! about what a *standard* (unconditional) GBB request carries there instead
+//! — plausibly nothing at all, if standard requests do not reuse this byte
+//! position for any discriminant purpose, the same way [`crate::acf::
+//! AcfAbbMessage`] carries no `message_timestamp` region whatsoever. Per
+//! Guiding Principle 5, this crate does not resolve that either way:
+//! [`RequestKind::from_gbb_message_timestamp`] never returns
+//! [`RequestKind::Standard`], for any input including a leading byte of
+//! `0x00` — a genuine standard request's `message_timestamp` reading `0x00`
+//! in its leading byte is indistinguishable, from this byte alone, from a
+//! conditional request whose timestamp coincidentally has a zero leading
+//! byte, so neither is asserted; the function returns `None` for both
+//! rather than picking one. [`RequestKind::to_gbb_message_timestamp`]
+//! likewise refuses to encode [`RequestKind::Standard`], returning
+//! `Err(RcpError::InvalidParameter)` rather than writing `0x00` into a real
+//! `message_timestamp` value as though that meant something confirmed on
+//! the wire. Should a future item learn the real "standard" discriminant (or
+//! learn that "standard"/unconditional requests carry no discriminant byte
+//! at all in this or any position), this placeholder value — and these two
+//! functions' treatment of it — is expected to change; nothing in this
+//! crate depends on `0x00` specifically
 //! beyond this enum's own internal round-trip.
 //!
 //! ## Provenance note: `start_state` and the sequencer-state machine
@@ -1376,6 +1422,62 @@ impl RequestKind {
             self,
             Self::SafetyCompound | Self::SafetyCompoundWait | Self::SafetyTriggered
         )
+    }
+
+    /// Decode a [`RequestKind`] from the leading byte of a GBB conditional
+    /// request's already-decoded [`crate::acf::AcfGbbMessage::message_timestamp`].
+    ///
+    /// This is [`RequestKind`]'s first real binding to an already-built wire
+    /// shape — see this module's doc comment "Provenance note: `RequestKind`'s
+    /// wire placement" for the working interpretation this composes with and
+    /// what it does not resolve. The leading byte is `(message_timestamp >>
+    /// 56) as u8`, matching [`crate::acf::encode_acf_gbb`]'s existing
+    /// big-endian `to_be_bytes()` encoding of that field — this function does
+    /// not itself encode or decode an [`crate::acf::AcfGbbMessage`]; it only
+    /// inspects a `message_timestamp` value already produced by
+    /// [`crate::acf::decode_acf_gbb`].
+    ///
+    /// Returns `None`, never [`RequestKind::Standard`], for a leading byte of
+    /// `0x00` or any byte [`RequestKind::from_u8`] does not otherwise
+    /// recognize — see "Provenance note: `RequestKind::Standard`'s
+    /// discriminant" for why `0x00` at this wire position is not treated as
+    /// confirmation of an unconditional/standard request: this crate cannot
+    /// distinguish a genuine standard GBB request (whose `message_timestamp`
+    /// carries no conditional-request-kind byte at all) from a conditional
+    /// GBB request whose leading timestamp byte simply happens to be zero.
+    /// Returns `Some(kind)` only for the eleven other [`RequestKind`]
+    /// discriminants, which — unlike `0x00` — have no such ambiguity: a
+    /// standard request's `message_timestamp` is not expected to collide with
+    /// one of them. Never panics for any input.
+    // fusa:req REQ-CMP-008
+    pub fn from_gbb_message_timestamp(message_timestamp: u64) -> Option<Self> {
+        let raw = (message_timestamp >> 56) as u8;
+        if raw == 0x00 {
+            return None;
+        }
+        Self::from_u8(raw).ok()
+    }
+
+    /// Encode this [`RequestKind`] into the leading byte of a GBB conditional
+    /// request's `message_timestamp`, preserving the low 56 bits of
+    /// `message_timestamp` unchanged.
+    ///
+    /// The companion encode-side helper to [`RequestKind::
+    /// from_gbb_message_timestamp`] — see that method's doc comment for the
+    /// byte-offset reasoning this shares. Returns
+    /// `Err(RcpError::InvalidParameter)` for [`RequestKind::Standard`]:
+    /// unlike the other eleven variants, `Standard` has no confirmed wire
+    /// encoding at all (see "Provenance note: `RequestKind::Standard`'s
+    /// discriminant"), so this function refuses to inject its `0x00`
+    /// placeholder discriminant into a real `message_timestamp` value as
+    /// though it meant something on the wire. Never panics for any input.
+    // fusa:req REQ-CMP-008
+    pub fn to_gbb_message_timestamp(self, message_timestamp: u64) -> Result<u64, RcpError> {
+        if self == Self::Standard {
+            return Err(RcpError::InvalidParameter);
+        }
+        let low_56 = message_timestamp & 0x00FF_FFFF_FFFF_FFFF;
+        Ok(low_56 | ((self.to_u8() as u64) << 56))
     }
 }
 
@@ -2936,6 +3038,122 @@ mod tests {
     fn request_kind_from_u8_never_panics_across_the_full_byte_range() {
         for raw in 0u8..=255 {
             let _ = RequestKind::from_u8(raw);
+        }
+    }
+
+    // ── RequestKind: GBB message_timestamp wire binding ──────────────────────
+
+    const ALL_NON_STANDARD_REQUEST_KINDS: [RequestKind; 11] = [
+        RequestKind::Chained,
+        RequestKind::ClearAll,
+        RequestKind::ClearNonSafestate,
+        RequestKind::ClearSingle,
+        RequestKind::Timed,
+        RequestKind::CompoundWait,
+        RequestKind::Triggered,
+        RequestKind::Compound,
+        RequestKind::SafetyCompoundWait,
+        RequestKind::SafetyTriggered,
+        RequestKind::SafetyCompound,
+    ];
+
+    #[test]
+    // fusa:test REQ-CMP-008
+    fn request_kind_gbb_message_timestamp_round_trips_for_every_non_standard_kind() {
+        for kind in ALL_NON_STANDARD_REQUEST_KINDS {
+            for message_timestamp in [0u64, u64::MAX, 0x0011_2233_4455_6677] {
+                let encoded = kind.to_gbb_message_timestamp(message_timestamp).unwrap();
+                assert_eq!(RequestKind::from_gbb_message_timestamp(encoded), Some(kind));
+            }
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-CMP-008
+    fn request_kind_gbb_message_timestamp_encode_preserves_low_56_bits() {
+        let message_timestamp = 0x00AA_BBCC_DDEE_FF11;
+        let encoded = RequestKind::Compound
+            .to_gbb_message_timestamp(message_timestamp)
+            .unwrap();
+        assert_eq!(encoded & 0x00FF_FFFF_FFFF_FFFF, 0x00AA_BBCC_DDEE_FF11);
+        assert_eq!(encoded >> 56, RequestKind::Compound.to_u8() as u64);
+    }
+
+    #[test]
+    // fusa:test REQ-CMP-008
+    fn request_kind_gbb_message_timestamp_encode_rejects_standard() {
+        assert_eq!(
+            RequestKind::Standard.to_gbb_message_timestamp(0),
+            Err(RcpError::InvalidParameter)
+        );
+        assert_eq!(
+            RequestKind::Standard.to_gbb_message_timestamp(u64::MAX),
+            Err(RcpError::InvalidParameter)
+        );
+    }
+
+    #[test]
+    // fusa:test REQ-CMP-008
+    fn request_kind_gbb_message_timestamp_decode_never_returns_standard() {
+        // A leading byte of 0x00 is ambiguous between "genuinely a standard
+        // request" and "a conditional request whose timestamp coincidentally
+        // has a zero leading byte" -- see this module's doc comment
+        // "Provenance note: `RequestKind::Standard`'s discriminant". Neither
+        // is asserted; this must decode to `None`, never
+        // `Some(RequestKind::Standard)`.
+        assert_eq!(RequestKind::from_gbb_message_timestamp(0), None);
+        assert_eq!(
+            RequestKind::from_gbb_message_timestamp(0x00FF_FFFF_FFFF_FFFF),
+            None
+        );
+        for raw in 0u8..=255 {
+            let ts = (raw as u64) << 56;
+            assert_ne!(
+                RequestKind::from_gbb_message_timestamp(ts),
+                Some(RequestKind::Standard)
+            );
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-CMP-008
+    fn request_kind_gbb_message_timestamp_decode_rejects_unrecognized_leading_byte() {
+        for raw in [0x02u8, 0x03, 0x04, 0x08, 0x0C, 0x10, 0x7F, 0x80, 0xFF] {
+            let ts = (raw as u64) << 56;
+            assert_eq!(RequestKind::from_gbb_message_timestamp(ts), None);
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-CMP-008
+    fn request_kind_gbb_message_timestamp_decode_ignores_low_56_bits() {
+        for kind in ALL_NON_STANDARD_REQUEST_KINDS {
+            let leading = (kind.to_u8() as u64) << 56;
+            assert_eq!(RequestKind::from_gbb_message_timestamp(leading), Some(kind));
+            assert_eq!(
+                RequestKind::from_gbb_message_timestamp(leading | 0x00FF_FFFF_FFFF_FFFF),
+                Some(kind)
+            );
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-CMP-008
+    fn request_kind_gbb_message_timestamp_decode_never_panics_across_the_full_byte_range() {
+        for raw in 0u8..=255 {
+            let ts = (raw as u64) << 56;
+            let _ = RequestKind::from_gbb_message_timestamp(ts);
+            let _ = RequestKind::from_gbb_message_timestamp(ts | 0x1234_5678);
+        }
+    }
+
+    #[test]
+    // fusa:test REQ-CMP-008
+    fn request_kind_gbb_message_timestamp_encode_never_panics_for_any_kind_and_timestamp() {
+        for kind in ALL_REQUEST_KINDS {
+            for message_timestamp in [0u64, u64::MAX, 0x8000_0000_0000_0000] {
+                let _ = kind.to_gbb_message_timestamp(message_timestamp);
+            }
         }
     }
 
