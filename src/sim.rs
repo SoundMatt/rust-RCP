@@ -55,7 +55,7 @@ use crate::RcpError;
 /// A single recorded call.
 #[derive(Clone, Debug)]
 pub enum SimCall {
-    Read { read_size: u8 },
+    Read { read_size: u16 },
     Write { payload: Vec<u8> },
 }
 
@@ -134,7 +134,7 @@ impl Endpoint for SimEndpoint {
     }
 
     // fusa:req REQ-SIM-004
-    fn read(&self, read_size: u8) -> Result<Vec<u8>, RcpError> {
+    fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
         if self.closed.load(Ordering::SeqCst) {
             return Err(RcpError::Closed);
         }

@@ -192,7 +192,7 @@
 //! [`crate::regmap::EndpointType::Dac`]'s reserved status, MDIO's
 //! scope-list omission (`ROADMAP.md` Milestone 7's MDIO bullet), the
 //! `read_size`/`segment_num` field ambiguity
-//! ([`crate::acf::ReadSizeOrSegmentNum`]), and [`crate::i2c::I2cSpeedMode`]'s
+//! ([`crate::acf::ReadSizeOrSegment`]), and [`crate::i2c::I2cSpeedMode`]'s
 //! own ambiguous high-speed rows. A later item that recovers this table's
 //! real content from a future spec revision or OPEN Alliance clarification
 //! is expected to add the corresponding trigger-signal type then, not now.

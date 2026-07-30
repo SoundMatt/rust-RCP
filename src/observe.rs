@@ -67,7 +67,7 @@ impl Metrics {
 
 // ── ObserveEndpoint ────────────────────────────────────────────────────────────
 
-type ReadHookFn = Box<dyn Fn(u8, &Result<Vec<u8>, RcpError>, Duration) + Send + Sync>;
+type ReadHookFn = Box<dyn Fn(u16, &Result<Vec<u8>, RcpError>, Duration) + Send + Sync>;
 type WriteHookFn = Box<dyn Fn(&[u8], &Result<(), RcpError>, Duration) + Send + Sync>;
 
 /// Observing wrapper that records metrics and fires post-call hooks.
@@ -99,7 +99,7 @@ impl ObserveEndpoint {
     // fusa:req REQ-OBS-004
     pub fn add_read_hook(
         &self,
-        f: impl Fn(u8, &Result<Vec<u8>, RcpError>, Duration) + Send + Sync + 'static,
+        f: impl Fn(u16, &Result<Vec<u8>, RcpError>, Duration) + Send + Sync + 'static,
     ) {
         self.read_hooks.lock().unwrap().push(Box::new(f));
     }
@@ -120,7 +120,7 @@ impl Endpoint for ObserveEndpoint {
     }
 
     // fusa:req REQ-OBS-005
-    fn read(&self, read_size: u8) -> Result<Vec<u8>, RcpError> {
+    fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
         let start = Instant::now();
         let result = self.inner.read(read_size);
         let elapsed = start.elapsed();
@@ -161,7 +161,7 @@ mod tests {
         fn ep_type(&self) -> EndpointType {
             EndpointType::Gpio
         }
-        fn read(&self, _read_size: u8) -> Result<Vec<u8>, RcpError> {
+        fn read(&self, _read_size: u16) -> Result<Vec<u8>, RcpError> {
             Err(RcpError::Closed)
         }
         fn write(&self, _payload: &[u8]) -> Result<(), RcpError> {

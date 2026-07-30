@@ -213,7 +213,13 @@ pub mod golden {
     pub fn acf_abb_fields() -> crate::acf::AcfAbbMessage {
         crate::acf::AcfAbbMessage {
             info: crate::acf::ByteMessageInfo {
-                acf_msg_length: 13,
+                // `encode_acf_abb` now derives `acf_msg_length` from
+                // `payload.len()` (ceil(4/4) = 1 quadlet) rather than
+                // trusting this field verbatim — see acf.rs's
+                // `quadlets_for_payload_len`. This value must already agree
+                // with that derivation for this vector's round-trip
+                // equality check to hold.
+                acf_msg_length: 1,
                 pad: false,
                 mtv: false,
                 byte_bus_id: 0x005,
@@ -228,7 +234,7 @@ pub mod golden {
                 rsp: true,
                 err: false,
                 ms: false,
-                read_size_segment_num: crate::acf::ReadSizeOrSegmentNum(0x04),
+                read_size_segment: crate::acf::ReadSizeOrSegment(0x04),
             },
             payload: vec![0xDE, 0xAD, 0xBE, 0xEF],
         }
@@ -238,7 +244,7 @@ pub mod golden {
     /// `acf::encode_acf_abb`. Never recompute — see this module's doc
     /// comment.
     pub const ACF_ABB_GOLDEN_BYTES: [u8; 13] = [
-        0x0E, 0x01, 0xA0, 0x00, 0xB0, 0x10, 0x11, 0x04, 0x00, 0xDE, 0xAD, 0xBE, 0xEF,
+        0x0E, 0x00, 0x20, 0x00, 0xB0, 0x10, 0x11, 0x00, 0x04, 0xDE, 0xAD, 0xBE, 0xEF,
     ];
 
     /// An [`crate::acf::AcfGbbMessage`] whose encoding is pinned by
@@ -249,7 +255,13 @@ pub mod golden {
     pub fn acf_gbb_fields() -> crate::acf::AcfGbbMessage {
         crate::acf::AcfGbbMessage {
             info: crate::acf::ByteMessageInfo {
-                acf_msg_length: 19,
+                // `encode_acf_gbb` now derives `acf_msg_length` from
+                // `payload.len()` (ceil(2/4) = 1 quadlet) rather than
+                // trusting this field verbatim — see acf.rs's
+                // `quadlets_for_payload_len`. This value must already agree
+                // with that derivation for this vector's round-trip
+                // equality check to hold.
+                acf_msg_length: 1,
                 pad: false,
                 mtv: true,
                 byte_bus_id: 0x005,
@@ -264,7 +276,7 @@ pub mod golden {
                 rsp: true,
                 err: false,
                 ms: false,
-                read_size_segment_num: crate::acf::ReadSizeOrSegmentNum(0x00),
+                read_size_segment: crate::acf::ReadSizeOrSegment(0x00),
             },
             message_timestamp: 0x0102_0304_0506_0708,
             payload: vec![0xCA, 0xFE],
@@ -275,7 +287,7 @@ pub mod golden {
     /// `acf::encode_acf_gbb`. Never recompute — see this module's doc
     /// comment.
     pub const ACF_GBB_GOLDEN_BYTES: [u8; 19] = [
-        0x0D, 0x02, 0x68, 0x00, 0xA0, 0x30, 0x12, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+        0x0D, 0x00, 0x28, 0x00, 0xA0, 0x30, 0x12, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
         0x07, 0x08, 0xCA, 0xFE,
     ];
 
@@ -289,7 +301,7 @@ pub mod golden {
     /// message alone. Never recompute — see this module's doc comment.
     pub const NTSCF_ACF_ABB_FRAME_GOLDEN_BYTES: [u8; 29] = [
         0x82, 0x80, 0x07, 0x01, 0xA0, 0x00, 0x00, 0x00, 0x02, 0x42, 0xAC, 0x11, 0x00, 0x02, 0x00,
-        0x07, 0x0E, 0x01, 0xA0, 0x00, 0xB0, 0x10, 0x11, 0x04, 0x00, 0xDE, 0xAD, 0xBE, 0xEF,
+        0x07, 0x0E, 0x00, 0x20, 0x00, 0xB0, 0x10, 0x11, 0x00, 0x04, 0xDE, 0xAD, 0xBE, 0xEF,
     ];
 }
 
@@ -344,7 +356,7 @@ pub mod go_rcp_crosscheck {
     ///     Body: []byte{0xDE, 0xAD, 0xBE, 0xEF},
     /// })
     /// ```
-    /// — `byte_bus_id`/`transaction_num`/`read_size_segment_num`/body bytes
+    /// — `byte_bus_id`/`transaction_num`/`read_size_segment`/body bytes
     /// logically matching [`super::golden::acf_abb_fields`], with `Ack`
     /// mapped from `evt.ack` and `Response` from `rsp`. 14 bytes, not 13;
     /// message-kind tag `0x01`, not `0x0E`: see this module's doc comment's

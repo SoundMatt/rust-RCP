@@ -85,7 +85,7 @@ impl DeadlineEndpoint {
     // fusa:req REQ-DL-005
     pub fn read_with_deadline(
         &self,
-        read_size: u8,
+        read_size: u16,
         timeout: Option<Duration>,
     ) -> Result<Vec<u8>, RcpError> {
         let _effective = self.effective(timeout)?;
@@ -112,7 +112,7 @@ impl Endpoint for DeadlineEndpoint {
     }
 
     // fusa:req REQ-DL-006
-    fn read(&self, read_size: u8) -> Result<Vec<u8>, RcpError> {
+    fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
         self.inner.read(read_size)
     }
 

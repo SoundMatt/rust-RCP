@@ -132,9 +132,9 @@
 //! [`UartReadCompletionReason::Both`] — a consequence of not inventing a
 //! disabling sentinel, not a claim about real RC Server power-on behavior.
 //! [`UartRxQueueConfig::read_size`] itself reuses
-//! [`crate::acf::ReadSizeOrSegmentNum`] rather than a UART-private read-size
+//! [`crate::acf::ReadSizeOrSegment`] rather than a UART-private read-size
 //! type, since the checklist's `read_size` name is the same wire field
-//! [`crate::acf::ByteMessageInfo::read_size_segment_num`] already carries —
+//! [`crate::acf::ByteMessageInfo::read_size_segment`] already carries —
 //! mirroring how [`crate::timestamp::MessageTimestamp`] builds endpoint-
 //! facing semantics atop an already-decoded generic ACF field rather than
 //! reinventing one. `uart_timeout` has no such existing crate-level
@@ -168,7 +168,7 @@
 //! [`validate_uart_read_request`] therefore returns
 //! [`crate::RcpError::UnsupportedCmd`].
 
-use crate::acf::ReadSizeOrSegmentNum;
+use crate::acf::ReadSizeOrSegment;
 use crate::RcpError;
 
 // ── UartTxQueue / UartRxQueue ────────────────────────────────────────────────
@@ -253,15 +253,15 @@ pub struct UartTxQueueConfig;
 ///
 /// See this module's doc comment "Provenance note: the
 /// `read_size`/`uart_timeout` race" for why `read_size` reuses
-/// [`crate::acf::ReadSizeOrSegmentNum`] and for `uart_timeout`'s own
+/// [`crate::acf::ReadSizeOrSegment`] and for `uart_timeout`'s own
 /// unconfirmed width/units.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 // fusa:req REQ-UART-003
 pub struct UartRxQueueConfig {
     /// The read-size completion threshold, reusing the same wire field
-    /// [`crate::acf::ByteMessageInfo::read_size_segment_num`] already
+    /// [`crate::acf::ByteMessageInfo::read_size_segment`] already
     /// carries.
-    pub read_size: ReadSizeOrSegmentNum,
+    pub read_size: ReadSizeOrSegment,
     /// The read-timeout completion threshold, this crate's own unconfirmed
     /// tick-count placeholder.
     pub uart_timeout: u32,
@@ -343,7 +343,7 @@ pub fn resolve_uart_read_completion(
     bytes_collected: u16,
     elapsed: u32,
 ) -> Option<UartReadCompletionReason> {
-    let size_reached = bytes_collected >= u16::from(rx.read_size.as_read_size());
+    let size_reached = bytes_collected >= rx.read_size.as_read_size();
     let timed_out = elapsed >= rx.uart_timeout;
 
     match (size_reached, timed_out) {
@@ -428,7 +428,7 @@ mod tests {
         let config = UartFunctionalConfig::default();
         assert_eq!(config.tx, UartTxQueueConfig);
         assert_eq!(config.rx, UartRxQueueConfig::default());
-        assert_eq!(config.rx.read_size, ReadSizeOrSegmentNum::default());
+        assert_eq!(config.rx.read_size, ReadSizeOrSegment::default());
         assert_eq!(config.rx.uart_timeout, 0);
     }
 
@@ -461,9 +461,9 @@ mod tests {
 
     // ── resolve_uart_read_completion: the three-way race ────────────────────
 
-    fn rx_config(read_size: u8, uart_timeout: u32) -> UartRxQueueConfig {
+    fn rx_config(read_size: u16, uart_timeout: u32) -> UartRxQueueConfig {
         UartRxQueueConfig {
-            read_size: ReadSizeOrSegmentNum(read_size),
+            read_size: ReadSizeOrSegment(read_size),
             uart_timeout,
         }
     }

@@ -55,7 +55,7 @@
 use std::io::Read;
 use std::process;
 
-use rcp::acf::{AcfAbbMessage, ByteMessageInfo, ReadSizeOrSegmentNum};
+use rcp::acf::{AcfAbbMessage, ByteMessageInfo, ReadSizeOrSegment};
 use rcp::avtp::StreamId;
 use rcp::discovery;
 use rcp::ep0::EP0_BYTE_BUS_ID;
@@ -326,7 +326,7 @@ fn cmd_register_read(args: &[String]) {
         info: ByteMessageInfo {
             byte_bus_id: EP0_BYTE_BUS_ID,
             op: false,
-            read_size_segment_num: ReadSizeOrSegmentNum(u8::MAX),
+            read_size_segment: ReadSizeOrSegment(u16::MAX),
             ..ByteMessageInfo::default()
         },
         payload: Vec::new(),
@@ -397,7 +397,7 @@ fn cmd_register_write(args: &[String]) {
         info: ByteMessageInfo {
             byte_bus_id: EP0_BYTE_BUS_ID,
             op: true,
-            read_size_segment_num: ReadSizeOrSegmentNum(payload.len() as u8),
+            read_size_segment: ReadSizeOrSegment(payload.len() as u16),
             ..ByteMessageInfo::default()
         },
         payload,
@@ -454,7 +454,7 @@ fn cmd_endpoint_read(args: &[String]) {
         process::exit(1);
     });
     let initial = parse_hex_arg(args, "--initial").unwrap_or_default();
-    let read_size = parse_u8_arg(args, "--read-size").unwrap_or(u8::MAX);
+    let read_size = parse_u16_arg(args, "--read-size").unwrap_or(u16::MAX);
     let format = flag_value(args, "--format").unwrap_or("text");
 
     let server = RcServer::new(GeneralRegisters::default());
@@ -468,7 +468,7 @@ fn cmd_endpoint_read(args: &[String]) {
         info: ByteMessageInfo {
             byte_bus_id: bus_id,
             op: false,
-            read_size_segment_num: ReadSizeOrSegmentNum(read_size),
+            read_size_segment: ReadSizeOrSegment(read_size),
             ..ByteMessageInfo::default()
         },
         payload: Vec::new(),
@@ -540,7 +540,7 @@ fn cmd_endpoint_write(args: &[String]) {
         info: ByteMessageInfo {
             byte_bus_id: bus_id,
             op: true,
-            read_size_segment_num: ReadSizeOrSegmentNum(payload.len() as u8),
+            read_size_segment: ReadSizeOrSegment(payload.len() as u16),
             ..ByteMessageInfo::default()
         },
         payload,
@@ -853,7 +853,7 @@ mod tests {
             info: ByteMessageInfo {
                 byte_bus_id: EP0_BYTE_BUS_ID,
                 op: false,
-                read_size_segment_num: ReadSizeOrSegmentNum(u8::MAX),
+                read_size_segment: ReadSizeOrSegment(u16::MAX),
                 ..Default::default()
             },
             payload: Vec::new(),
@@ -884,7 +884,7 @@ mod tests {
             info: ByteMessageInfo {
                 byte_bus_id: EP0_BYTE_BUS_ID,
                 op: true,
-                read_size_segment_num: ReadSizeOrSegmentNum(payload.len() as u8),
+                read_size_segment: ReadSizeOrSegment(payload.len() as u16),
                 ..Default::default()
             },
             payload,
@@ -907,7 +907,7 @@ mod tests {
             info: ByteMessageInfo {
                 byte_bus_id: 7,
                 op: false,
-                read_size_segment_num: ReadSizeOrSegmentNum(u8::MAX),
+                read_size_segment: ReadSizeOrSegment(u16::MAX),
                 ..Default::default()
             },
             payload: Vec::new(),
@@ -928,7 +928,7 @@ mod tests {
             info: ByteMessageInfo {
                 byte_bus_id: 7,
                 op: true,
-                read_size_segment_num: ReadSizeOrSegmentNum(2),
+                read_size_segment: ReadSizeOrSegment(2),
                 ..Default::default()
             },
             payload: vec![0xCC, 0xDD],
@@ -939,7 +939,7 @@ mod tests {
             info: ByteMessageInfo {
                 byte_bus_id: 7,
                 op: false,
-                read_size_segment_num: ReadSizeOrSegmentNum(u8::MAX),
+                read_size_segment: ReadSizeOrSegment(u16::MAX),
                 ..Default::default()
             },
             payload: Vec::new(),
@@ -957,7 +957,7 @@ mod tests {
             info: ByteMessageInfo {
                 byte_bus_id: 99,
                 op: false,
-                read_size_segment_num: ReadSizeOrSegmentNum(u8::MAX),
+                read_size_segment: ReadSizeOrSegment(u16::MAX),
                 ..Default::default()
             },
             payload: Vec::new(),
