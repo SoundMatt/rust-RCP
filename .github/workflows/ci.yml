@@ -41,11 +41,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: build
-        run: cargo build --all-targets
+        run: cargo build --all-targets --locked
       - name: test
-        run: cargo test --all-targets
+        run: cargo test --all-targets --locked
       - name: test release
-        run: cargo test --all-targets --release
+        run: cargo test --all-targets --release --locked
 
   # ── Coverage ──────────────────────────────────────────────────────────────
   coverage:
@@ -148,7 +148,7 @@ jobs:
       - name: install relay
         run: go install github.com/SoundMatt/RELAY/cmd/relay@latest
       - name: build rcp binary
-        run: cargo build --bin rust-rcp --release
+        run: cargo build --bin rust-rcp --release --locked
       - name: relay conform --strict
         run: relay conform --strict target/release/rust-rcp
 
@@ -167,7 +167,7 @@ jobs:
       - name: install relay
         run: go install github.com/SoundMatt/RELAY/cmd/relay@latest
       - name: build rcp binary
-        run: cargo build --bin rust-rcp --release
+        run: cargo build --bin rust-rcp --release --locked
       - name: relay interop (rcp-status EQUIVALENT)
         run: |
           output=$(relay interop target/release/rust-rcp 2>&1) || true
@@ -222,8 +222,10 @@ jobs:
       - name: install rsfusa
         run: cargo install --git https://github.com/SoundMatt/rust-FuSa rsfusa --locked
       - name: build release binary (needed for qualify)
-        # Cargo.lock is gitignored (library crate convention), so no --locked.
-        run: cargo build --release
+        # Cargo.lock is committed (this crate ships a binary, src/bin/rcp.rs)
+        # and built --locked so the qualified release artifact matches the
+        # audited/shipped dependency graph exactly.
+        run: cargo build --release --locked
 
       - name: coding standard lint (best-effort)
         run: rsfusa lint --dir . --format json --output lint-report.json || true
@@ -309,7 +311,7 @@ jobs:
       - name: install cargo-cyclonedx
         run: cargo install cargo-cyclonedx --locked
       - name: generate SBOM
-        run: cargo cyclonedx --format json --override-filename bom.json
+        run: cargo cyclonedx --format json --override-filename bom.json --locked
       - name: upload SBOM
         uses: actions/upload-artifact@v4
         with:
