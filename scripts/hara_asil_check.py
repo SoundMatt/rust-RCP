@@ -8,10 +8,19 @@ S/E/C-to-ASIL mapping (as previously happened for H-003/H-006/H-008/H-010)
 cannot silently reoccur — see `HARA.md`'s own note above its Hazard
 Summary table.
 
+Also cross-checks `HARA.md`'s two markdown tables (Hazard Summary and
+Safety Goals) against `.fusa-hara.json`, the CI-enforced source of truth:
+the JSON can be internally correct while the human-readable doc drifts out
+of sync with it (this happened for SG-010, corrected in the Hazard
+Summary table but left stale at ASIL-A in the separate Safety Goals table
+until a later pass caught it) — that specific failure mode isn't caught by
+the S/E/C re-derivation above, since the JSON itself was already right.
+
 Run from the repo root: `python3 scripts/hara_asil_check.py`.
 """
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -46,10 +55,33 @@ def expected_asil(severity: str, exposure: str, controllability: str) -> str:
     return TABLE_4[key]
 
 
+def markdown_asil_by_id(markdown: str, heading: str, id_prefix: str) -> dict:
+    """Extract {id: asil} from the first `| ID | ... | ASIL-x | ... |` table
+    following the given `## heading` in HARA.md. Assumes the row's ID is the
+    first pipe-delimited cell and its ASIL is the first cell matching
+    `QM`/`ASIL-[A-D]` after that."""
+    section = markdown.split(heading, 1)[1]
+    # Stop at the next top-level heading so we don't read past this table.
+    section = re.split(r"\n## ", section, maxsplit=1)[0]
+    out = {}
+    for line in section.splitlines():
+        if not line.startswith(f"| {id_prefix}"):
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        row_id = cells[0]
+        asil_cells = [c for c in cells if c == "QM" or re.fullmatch(r"ASIL-[A-D]", c)]
+        if not asil_cells:
+            continue
+        out[row_id] = asil_cells[0]
+    return out
+
+
 def main() -> int:
     repo_root = Path(__file__).resolve().parent.parent
-    hara_path = repo_root / ".fusa-hara.json"
-    data = json.loads(hara_path.read_text())
+    hara_json_path = repo_root / ".fusa-hara.json"
+    hara_md_path = repo_root / "HARA.md"
+    data = json.loads(hara_json_path.read_text())
+    markdown = hara_md_path.read_text()
 
     failures = []
     for hazard in data["hazards"]:
@@ -64,13 +96,43 @@ def main() -> int:
                 f".fusa-hara.json says {got}"
             )
 
+    # Cross-check HARA.md's two markdown tables against the JSON source of
+    # truth, so a doc that drifts out of sync with an already-correct JSON
+    # (rather than a bad S/E/C-to-ASIL derivation) is also caught.
+    md_hazards = markdown_asil_by_id(markdown, "## Hazard", "H-")
+    md_goals = markdown_asil_by_id(markdown, "## Safety Goals", "SG-")
+
+    for hazard in data["hazards"]:
+        md_asil = md_hazards.get(hazard["id"])
+        if md_asil is None:
+            failures.append(f"{hazard['id']}: missing from HARA.md's Hazard Summary table")
+        elif md_asil != hazard["asil"]:
+            failures.append(
+                f"{hazard['id']}: HARA.md Hazard Summary table says {md_asil}, "
+                f".fusa-hara.json says {hazard['asil']}"
+            )
+
+    for goal in data["safety_goals"]:
+        md_asil = md_goals.get(goal["id"])
+        if md_asil is None:
+            failures.append(f"{goal['id']}: missing from HARA.md's Safety Goals table")
+        elif md_asil != goal["asil"]:
+            failures.append(
+                f"{goal['id']}: HARA.md Safety Goals table says {md_asil}, "
+                f".fusa-hara.json says {goal['asil']}"
+            )
+
     if failures:
         print("HARA ASIL derivation check FAILED:", file=sys.stderr)
         for f in failures:
             print(f"  - {f}", file=sys.stderr)
         return 1
 
-    print(f"OK — {len(data['hazards'])} hazards' ASIL ratings match ISO 26262-3:2018 Table 4")
+    print(
+        f"OK — {len(data['hazards'])} hazards' ASIL ratings match ISO 26262-3:2018 "
+        f"Table 4, and HARA.md's Hazard Summary + Safety Goals tables both match "
+        f".fusa-hara.json"
+    )
     return 0
 
 

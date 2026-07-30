@@ -14,6 +14,23 @@ retired-model (`Zone`/`Controller`/`Registry`) residue from the frozen
 public API. Landed as nine PRs, merged individually once each was
 independently green.
 
+**Post-release correction (2026-07-30):** an independent verification pass
+of this milestone found `HARA.md`'s Safety Goals table had drifted out of
+sync with the already-correct `.fusa-hara.json` for three rows (SG-003,
+SG-006, SG-010 all showed a stale ASIL one band above the JSON source of
+truth) — a documentation-only inconsistency, not a defect in the enforced
+JSON data or its S/E/C derivation. `scripts/hara_asil_check.py` is
+extended to cross-check both of `HARA.md`'s tables against
+`.fusa-hara.json` directly, so this specific drift (doc vs. already-correct
+JSON, as opposed to a bad S/E/C-to-ASIL derivation) can't silently
+reoccur. Also corrected two leftover stale strings from mid-pass drafts:
+a `ci.yml` comment that still described the `convert` CLI subcommand as
+removed (it was rebuilt, not removed — see rust-RCP-FS-01 above) instead
+of explaining the real reason `relay interop` currently shows red
+(`SoundMatt/RELAY#70`, an external blocker), and a CI job still named
+"RELAY spec v1.11 unit conformance" despite this milestone's own
+`SPEC_VERSION` fix to `"2.0"`.
+
 ### Breaking
 
 - **`RcpError::ZoneMismatch` and `is_zone_mismatch()` are removed.**
