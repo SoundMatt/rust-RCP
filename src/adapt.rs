@@ -65,16 +65,31 @@
 //!   deliberately does not model live asynchronous notification — no TC18
 //!   analog has been identified for one in this crate to date — so unlike
 //!   the retired `Controller::subscribe`/`Status` forwarding this replaced,
-//!   there is nothing today for a subscription to forward. Rather than
-//!   invent a notification source or overload one of the four RELAY error
-//!   sentinels to mean "unsupported," [`RcpAdapter`]'s `subscribe`
-//!   (`crate::relay::Node::subscribe`) returns a channel that is
-//!   immediately, legitimately closed — an honest "no events, currently"
+//!   there is nothing today for a subscription to forward. The RELAY spec
+//!   itself anticipates exactly this: §10.4's routing-rules table and
+//!   §15.7.5 both state that RCP has no server-initiated push and that
+//!   `Subscribe()` is expected to return "a well-behaved, permanently-empty
+//!   stream" for this protocol — this is not a rust-RCP-specific gap so
+//!   much as an inherent property of RCP being request/response-only.
+//!   Rather than invent a notification source or overload one of the four
+//!   RELAY error sentinels to mean "unsupported," [`RcpAdapter`]'s
+//!   `subscribe` (`crate::relay::Node::subscribe`) returns a channel that
+//!   is immediately, legitimately closed — an honest "no events, currently"
 //!   answer within `Node::subscribe`'s existing typed contract, not a
-//!   silently-invented notification stream. Building a real one is left to
-//!   whichever later milestone gives `RcServer` a live-notification
-//!   mechanism to forward, same as `crate::mock::RcServer`'s own doc
-//!   comment already defers it.
+//!   silently-invented notification stream. One detail the spec text above
+//!   does not fully pin down, and this binding has not reconciled: whether
+//!   "permanently-empty stream" calls for the channel to close immediately
+//!   (this binding's current choice) or to stay open-but-silent until
+//!   [`crate::relay::Node::close`] is called, matching `Node::subscribe`'s
+//!   general "closed when the node closes" contract for every other
+//!   protocol. Building a real live-notification path (as opposed to
+//!   resolving this open question) is left to whichever later milestone
+//!   gives `RcServer` a live-notification mechanism to forward, same as
+//!   `crate::mock::RcServer`'s own doc comment already defers it. Until
+//!   then, `rust-rcp capabilities`' `"subscribe_supported": false` field
+//!   (see `src/bin/rcp.rs`) makes this limitation machine-readable rather
+//!   than leaving a caller to discover it only by observing an empty
+//!   channel at runtime.
 //! - **Close.** `RcServer` tracks an [`crate::lifecycle::RcServerState`]
 //!   lifecycle position, not an open/closed connection boolean, so there is
 //!   nothing on `RcServer` itself for `Node::close` to delegate to —
@@ -305,6 +320,21 @@ pub fn response_to_message(stream_id: StreamId, resp: &AcfAbbMessage) -> Message
 // whichever later milestone gives `RcServer` a live-notification mechanism
 // can reintroduce the same `crate::relay::BackPressurePolicy`-driven shape
 // once it has something real to buffer.
+//
+// Back-pressure verification (rust-RCP-15): RELAY spec §10.5's
+// `BackPressurePolicy` machinery (rules 3/6) is scoped explicitly to the
+// goroutine/task that forwards a live protocol subscription into the
+// bounded `relay.Message` channel `Node::subscribe` returns — it says
+// nothing about `Caller::call`'s request/response path. `RcpAdapter::call`
+// below has no bounded queue or semaphore of its own; each call dispatches
+// one `spawn_blocking` round trip and is bounded only by `ctx`'s deadline
+// (`Context::done`), the same shape `Node::send` already uses. That is
+// consistent with §10.5's own scope (it never mentions `Caller.Call`), not
+// a demonstrated instance of the spec's back-pressure requirement — this
+// crate has not found a §10.5-equivalent back-pressure requirement that
+// actually applies to `Call`/`Send`, but has also not exhaustively
+// searched the rest of the spec for one, so this remains flagged per
+// Guiding Principle 5 rather than asserted as a closed question.
 // ---------------------------------------------------------------------------
 
 /// Wrap an [`RcServer`] as a `relay::Caller` (which also satisfies
@@ -402,6 +432,17 @@ impl crate::relay::Node for RcpAdapter {
 impl crate::relay::Caller for RcpAdapter {
     /// Dispatch `req` against the wrapped [`RcServer`] and return its reply
     /// as a `relay::Message`, per RELAY spec §10.2/§15.7.5.
+    ///
+    /// No bounded queue or semaphore sits in front of the dispatch below —
+    /// each call is one `spawn_blocking` round trip against the wrapped
+    /// [`RcServer`], bounded only by `ctx`'s deadline. See this module's
+    /// "Back-pressure verification" note (above `adapt()`) for why: RELAY
+    /// spec §10.5's `BackPressurePolicy` machinery is scoped to the
+    /// `Node::subscribe` delivery channel, which this crate has not found
+    /// an equivalent, spec-stated requirement for on the `Caller::call`
+    /// path — flagged per Guiding Principle 5 rather than asserted as a
+    /// closed question, since that absence has not been exhaustively
+    /// confirmed against the rest of the spec.
     // fusa:req REQ-ADAPT-010
     async fn call(&self, ctx: Context, req: Message) -> Result<Message, crate::relay::Error> {
         if self.closed.load(Ordering::SeqCst) {

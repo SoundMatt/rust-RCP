@@ -122,6 +122,18 @@ fn main() {
         // "send"/"zones" -> "discover"/"register"/"endpoint";
         // "Controller"/"Registry" -> "RcServer"/"Endpoint" (this file's new
         // backing types — see this file's own doc comment).
+        //
+        // "subscribe_supported": RELAY spec §10.4/§15.7.5 already documents
+        // that RCP has no server-initiated push and that `Node::subscribe`
+        // is expected to return a permanently-empty stream for this
+        // protocol — see rcp::adapt's own "Provenance note" for how
+        // `RcpAdapter::subscribe` (crate::relay::Node::subscribe) realizes
+        // that as an immediately-closed channel, and for the still-open
+        // question of whether "immediately closed" vs. "stays open but
+        // never yields" is the more faithful reading of "permanently-empty
+        // stream." This field makes that limitation machine-readable here
+        // rather than leaving a caller of the `Adapt()`-wrapped `Node` to
+        // discover it only by observing an empty channel at runtime.
         "capabilities" => {
             println!(
                 concat!(
@@ -137,7 +149,8 @@ fn main() {
                     "    \"features\": [\"loaning\",\"fragmentation\"],\n",
                     "    \"interfaces\": [\"RcServer\",\"Endpoint\"],\n",
                     "    \"optional_interfaces\": [],\n",
-                    "    \"adapt\": true\n",
+                    "    \"adapt\": true,\n",
+                    "    \"subscribe_supported\": false\n",
                     "}}"
                 ),
                 tool = TOOL,
