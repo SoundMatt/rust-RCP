@@ -1757,6 +1757,15 @@
       "verificationMethod": "test"
     },
     {
+      "id": "REQ-CLI-009",
+      "title": "convert --protocol RCP",
+      "text": "The CLI must accept an rcp.Message JSON (\u00a715.5) on stdin and emit the ToMessage() relay.Message JSON (\u00a715.7.5) on stdout when invoked with convert --protocol RCP, addressing by decimal byte_bus_id; exit 1 on invalid input, exit 2 on wrong/missing --protocol",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
       "id": "REQ-RELAY-001",
       "title": "Protocol enum",
       "text": "The relay module shall define a Protocol enum matching RELAY spec \u00a73 identifiers, serializing as its integer value",

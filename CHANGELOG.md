@@ -47,12 +47,17 @@ independently green.
   `Display` text** drops retired `Zone`-model wording (rust-RCP-FS-03) —
   e.g. `"rcp: zone not found"` → `"rcp: not found"`. The variants
   themselves are unchanged.
-- The `rust-rcp convert` CLI subcommand is removed outright
-  (rust-RCP-FS-01) — it parsed the retired placeholder `Zone`-numbered
-  `Status` document (`zone`/`seq`/`healthy`/`payload`) into a
-  `relay.Message`, mapping `zone` to a `FrontLeft`/…/`Central`
-  positional-speaker name with no TC18 counterpart. `convert` was never
-  one of RELAY spec §12's mandatory CLI commands.
+- The `rust-rcp convert` CLI subcommand is rebuilt against the real
+  canonical `rcp.Message` type (RELAY spec §15.5) and its `ToMessage()`
+  conversion (rust-RCP-FS-01), addressing by decimal `byte_bus_id`
+  (matching `rcp.EndpointIDString`/`ParseEndpointID` in RELAY's own Go
+  reference package), in place of the retired placeholder `Zone`-numbered
+  `Status` document (`zone`/`seq`/`healthy`/`payload`) that used to map a
+  `zone` field to a `FrontLeft`/…/`Central` positional-speaker name with
+  no TC18 counterpart. Verified byte-for-byte equivalent (per `relay
+  interop`'s own comparison method) against a from-source build of the
+  RELAY v2.0 reference `relay convert --protocol RCP` across several
+  cases, including the published `spec/vectors/rcp-message.json` vector.
 
 ### Fixed
 

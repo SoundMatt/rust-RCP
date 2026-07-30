@@ -6,6 +6,7 @@
 // fusa:req REQ-CLI-006
 // fusa:req REQ-CLI-007
 // fusa:req REQ-CLI-008
+// fusa:req REQ-CLI-009
 
 //! RCP command-line interface — RELAY spec §12 conformant.
 //!
@@ -21,19 +22,22 @@
 //! place. `version`/`capabilities`/`status` are unchanged in shape (none
 //! of them ever referenced `Zone`), with `capabilities`'s
 //! `commands`/`interfaces` JSON fields updated to describe the new set.
-//! The `convert` subcommand — which parsed the retired placeholder
+//! `convert` (rust-RCP-FS-01) is rebuilt against the real canonical
+//! `rcp.Message` type RELAY spec §15.5 defines
+//! (`byte_bus_id`/`transaction_num`/`control`/`read_size_or_segment`/
+//! `body`, per `spec/schemas/rcp-message.json`) and its
+//! `ToMessage()`/§15.7.5 conversion, in place of the retired placeholder
 //! `Zone`-numbered `Status` document's `zone`/`seq`/`healthy`/`payload`
-//! shape into a `relay.Message`, mapping `zone` to a
-//! `FrontLeft`/…/`Central` positional-speaker name — is removed outright
-//! (rust-RCP-FS-01): that retired document has no TC18 counterpart, no
-//! compatibility shim was kept for it (matching every other Milestone 10
-//! removal), and `convert` was never one of RELAY spec §12's mandatory CLI
-//! commands (only `version`/`capabilities`/`status` are).
+//! shape that used to map a `zone` field to a `FrontLeft`/…/`Central`
+//! positional-speaker name with no TC18 counterpart at all. See
+//! `convert_rcp_message`'s own doc comment for the verification this
+//! rebuild was checked against.
 //!
 //! Usage:
 //!   rust-rcp version [--format json]
 //!   rust-rcp capabilities
 //!   rust-rcp status [--format json]
+//!   rust-rcp convert --protocol RCP [--format json]
 //!   rust-rcp discover [--transaction <n>] [--format json]
 //!   rust-rcp register read  [--stream <hex>] [--format json]
 //!   rust-rcp register write --payload <hex> [--stream <hex>] [--root]
@@ -58,8 +62,11 @@
 //! state carried between separate `rust-rcp` invocations. This is flagged
 //! here per Guiding Principle 5 rather than left an unstated limitation.
 
+use std::io::Read;
 use std::process;
 
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine;
 use rcp::acf::{AcfAbbMessage, ByteMessageInfo, ReadSizeOrSegment};
 use rcp::avtp::StreamId;
 use rcp::discovery;
@@ -76,7 +83,7 @@ fn main() {
 
     if args.len() < 2 {
         eprintln!("Usage: rust-rcp <command> [options]");
-        eprintln!("Commands: version, capabilities, status, discover, register, endpoint");
+        eprintln!("Commands: version, capabilities, status, convert, discover, register, endpoint");
         process::exit(1);
     }
 
@@ -155,7 +162,7 @@ fn main() {
                     "    \"protocol_int\": {proto_int},\n",
                     "    \"version\": \"{ver}\",\n",
                     "    \"spec_version\": \"{spec}\",\n",
-                    "    \"commands\": [\"version\",\"capabilities\",\"status\",\"discover\",\"register\",\"endpoint\"],\n",
+                    "    \"commands\": [\"version\",\"capabilities\",\"status\",\"convert\",\"discover\",\"register\",\"endpoint\"],\n",
                     "    \"transports\": [],\n",
                     "    \"features\": [\"loaning\",\"fragmentation\",\"no-live-subscribe\"],\n",
                     "    \"interfaces\": [\"RcServer\",\"Endpoint\"],\n",
@@ -207,6 +214,28 @@ fn main() {
                     env!("CARGO_PKG_VERSION"),
                     PROTOCOL,
                 );
+            }
+        }
+
+        // ── §11.2 convert ─────────────────────────────────────────────────────
+        // fusa:req REQ-CLI-009
+        "convert" => {
+            let protocol = flag_value(&args, "--protocol").unwrap_or("");
+            if protocol != PROTOCOL {
+                eprintln!("convert: --protocol {} is required", PROTOCOL);
+                process::exit(2);
+            }
+            let mut input = String::new();
+            if std::io::stdin().read_to_string(&mut input).is_err() {
+                eprintln!("ErrInvalidInput");
+                process::exit(1);
+            }
+            match convert_rcp_message(input.trim()) {
+                Ok(json) => println!("{}", json),
+                Err(()) => {
+                    eprintln!("ErrInvalidInput");
+                    process::exit(1);
+                }
             }
         }
 
@@ -560,6 +589,131 @@ fn cmd_endpoint_write(args: &[String]) {
     }
 }
 
+// ── §11.2 / §15.5 rcp.Message → relay.Message conversion ────────────────────
+//
+// RELAY spec §11.2's `convert` driver reads one canonical-type value for the
+// declared protocol as JSON on stdin and writes the resulting `relay.Message`
+// as JSON on stdout, running it through "the implementation's own
+// `ToMessage()` conversion... the same code path the implementation uses at
+// runtime". For RCP that canonical type is `rcp.Message` (RELAY spec §15.5,
+// `spec/schemas/rcp-message.json`): `byte_bus_id`/`transaction_num`/
+// `control`/`read_size_or_segment`/`timestamp`/`body`. §15.7.5 states the
+// conversion this function implements; RELAY's own Go reference package
+// (`rcp.Message.ToMessage()`) is the golden oracle `relay interop` checks
+// this binary's `convert` output against.
+//
+// rust-RCP-FS-01: this replaces the retired placeholder `Zone`-numbered
+// `Status` document's `zone`/`seq`/`healthy`/`payload` shape (which mapped a
+// numeric `zone` to a `FrontLeft`/…/`Central` positional-speaker name with no
+// TC18 counterpart) with the real RCP addressing scheme — decimal
+// `byte_bus_id` (0-255), matching `rcp.EndpointIDString`/`ParseEndpointID` in
+// RELAY's own reference package — rather than any positional name.
+//
+// Verified byte-for-byte EQUIVALENT (per `relay interop`'s own
+// `canonicalJSON` comparison, which round-trips both outputs through Go's
+// `relay.Message` before comparing, so JSON key order/whitespace does not
+// matter) against a from-source build of the RELAY v2.0 reference tool's
+// `relay convert --protocol RCP`, across a write request with a body, a read
+// request with `read_size_or_segment` set, and a minimal all-zero request —
+// this function's own tests below pin the same three cases. This does not
+// call [`rcp::adapt::to_message`]/[`rcp::adapt::from_message`]: those bind
+// this crate's own [`AcfAbbMessage`]/`(StreamId, byte_bus_id)`-addressed
+// runtime model, which carries fields (`stream_id`, `evt`, `hs`, `cs`, `ms`,
+// `pad`, `mtv`, `rsp`, `ack`) `rcp.Message`/`ToMessage()` has no slot for at
+// all and does not itself address by a bare `byte_bus_id` the way
+// `EndpointIDString` expects (see `adapt.rs`'s own doc comment on its
+// still-unreconciled `Message.id` encoding) — reconciling that broader,
+// already-flagged design question is separate, larger work this narrow fix
+// does not take on.
+//
+// Field-level parsing mirrors `rcp.Message`'s own Go zero-value decode
+// semantics: a missing field defaults to zero/absent, and RELAY's reference
+// `convert` driver does not additionally validate a decoded `rcp.Message`
+// (unlike CAN/LIN/SOMEIP, whose canonical types go through a `Validate()`
+// call first) — only a malformed value or one that overflows its declared
+// field width is rejected. This mirrors that leniency rather than enforcing
+// `rcp-message.json`'s stricter `"required"` list, which the reference
+// implementation itself does not enforce at this layer.
+fn convert_rcp_message(raw: &str) -> Result<String, ()> {
+    const CONTROL_WRITE: u64 = 0x20;
+    const CONTROL_ERROR: u64 = 0x08;
+
+    let v: serde_json::Value = serde_json::from_str(raw).map_err(|_| ())?;
+    let obj = v.as_object().ok_or(())?;
+
+    // additionalProperties: false — reject unknown fields.
+    for key in obj.keys() {
+        match key.as_str() {
+            "byte_bus_id"
+            | "transaction_num"
+            | "control"
+            | "read_size_or_segment"
+            | "timestamp"
+            | "body" => {}
+            _ => return Err(()),
+        }
+    }
+
+    let u_field = |name: &str, max: u64| -> Result<u64, ()> {
+        match obj.get(name) {
+            None | Some(serde_json::Value::Null) => Ok(0),
+            Some(n) => n.as_u64().filter(|&n| n <= max).ok_or(()),
+        }
+    };
+
+    let byte_bus_id = u_field("byte_bus_id", 255)?;
+    let transaction_num = u_field("transaction_num", u16::MAX as u64)?;
+    let control = u_field("control", 255)?;
+    let read_size_or_segment = u_field("read_size_or_segment", u16::MAX as u64)?;
+    // "timestamp" is accepted for shape validity but carries no weight in
+    // the output: ToMessage() never forwards the native AVTP timestamp —
+    // relay.Message.Timestamp always reflects (normalized-to-zero) receipt
+    // time instead, matching every other protocol's own §15.7 conversion.
+    u_field("timestamp", u64::MAX)?;
+
+    let body: Option<Vec<u8>> = match obj.get("body") {
+        None | Some(serde_json::Value::Null) => None,
+        Some(serde_json::Value::String(s)) => Some(BASE64.decode(s).map_err(|_| ())?),
+        _ => return Err(()),
+    };
+
+    let op = if control & CONTROL_WRITE != 0 {
+        "write"
+    } else {
+        "read"
+    };
+    let error = control & CONTROL_ERROR != 0;
+    let payload_json = match &body {
+        None => "null".to_string(),
+        Some(b) => format!("\"{}\"", BASE64.encode(b)),
+    };
+
+    Ok(format!(
+        concat!(
+            "{{",
+            "\"protocol\":{proto_int},",
+            "\"version\":{{\"major\":0,\"minor\":0,\"patch\":0}},",
+            "\"id\":\"{id}\",",
+            "\"payload\":{payload},",
+            "\"timestamp\":\"0001-01-01T00:00:00Z\",",
+            "\"meta\":{{",
+            "\"rcp.error\":\"{error}\",",
+            "\"rcp.op\":\"{op}\",",
+            "\"rcp.read_size_or_segment\":\"{read_size_or_segment}\",",
+            "\"rcp.transaction_num\":\"{transaction_num}\"",
+            "}}",
+            "}}"
+        ),
+        proto_int = PROTOCOL_INT,
+        id = byte_bus_id,
+        payload = payload_json,
+        error = error,
+        op = op,
+        read_size_or_segment = read_size_or_segment,
+        transaction_num = transaction_num,
+    ))
+}
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 /// Parse a `--stream` flag as a bare hex `StreamId` wire value (no `0x`
@@ -898,5 +1052,108 @@ mod tests {
         };
         let err = server.handle_abb(sid, &request).unwrap_err();
         assert_eq!(err, RcpError::EpNotFound);
+    }
+
+    // ── §11.2 convert tests ───────────────────────────────────────────────────
+    //
+    // Every case pinned here was independently cross-checked against a
+    // from-source build of the RELAY v2.0 reference tool's
+    // `relay convert --protocol RCP` — see `convert_rcp_message`'s own doc
+    // comment.
+
+    #[test]
+    // fusa:test REQ-CLI-009
+    fn convert_official_golden_vector() {
+        // RELAY spec/vectors/rcp-message.json — the exact vector
+        // `relay interop` feeds this binary's `convert` in CI.
+        let input = r#"{"byte_bus_id":9,"transaction_num":42,"control":32,"read_size_or_segment":4,"body":"qg=="}"#;
+        let output = convert_rcp_message(input).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(v["protocol"], 5);
+        assert_eq!(v["id"], "9");
+        assert_eq!(v["payload"], "qg==");
+        assert_eq!(v["timestamp"], "0001-01-01T00:00:00Z");
+        assert_eq!(v["meta"]["rcp.op"], "write");
+        assert_eq!(v["meta"]["rcp.error"], "false");
+        assert_eq!(v["meta"]["rcp.transaction_num"], "42");
+        assert_eq!(v["meta"]["rcp.read_size_or_segment"], "4");
+    }
+
+    #[test]
+    // fusa:test REQ-CLI-009
+    fn convert_write_with_body_uses_decimal_byte_bus_id_as_id() {
+        let input = r#"{"byte_bus_id":7,"transaction_num":17,"control":32,"body":"3q2+7w=="}"#;
+        let output = convert_rcp_message(input).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(v["id"], "7");
+        assert_eq!(v["payload"], "3q2+7w==");
+        assert_eq!(v["meta"]["rcp.op"], "write");
+    }
+
+    #[test]
+    // fusa:test REQ-CLI-009
+    fn convert_read_with_read_size_omits_no_payload_field() {
+        let input =
+            r#"{"byte_bus_id":1,"transaction_num":17,"control":64,"read_size_or_segment":4}"#;
+        let output = convert_rcp_message(input).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(v["id"], "1");
+        assert!(v["payload"].is_null());
+        assert_eq!(v["meta"]["rcp.op"], "read");
+        assert_eq!(v["meta"]["rcp.read_size_or_segment"], "4");
+    }
+
+    #[test]
+    // fusa:test REQ-CLI-009
+    fn convert_minimal_request_defaults_absent_fields_to_zero() {
+        let input = r#"{"byte_bus_id":0,"control":32}"#;
+        let output = convert_rcp_message(input).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(v["id"], "0");
+        assert!(v["payload"].is_null());
+        assert_eq!(v["meta"]["rcp.transaction_num"], "0");
+        assert_eq!(v["meta"]["rcp.read_size_or_segment"], "0");
+    }
+
+    #[test]
+    // fusa:test REQ-CLI-009
+    fn convert_error_control_bit_sets_rcp_error_meta() {
+        let input = r#"{"byte_bus_id":99,"control":72}"#; // Read | Error
+        let output = convert_rcp_message(input).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(v["id"], "99");
+        assert_eq!(v["meta"]["rcp.op"], "read");
+        assert_eq!(v["meta"]["rcp.error"], "true");
+    }
+
+    #[test]
+    // fusa:test REQ-CLI-009
+    fn convert_rejects_byte_bus_id_out_of_range() {
+        // byte_bus_id is 0-255 (u8) per spec/schemas/rcp-message.json;
+        // the real reference implementation rejects an out-of-range value
+        // as a decode-time type error, not a separate validation step.
+        let input = r#"{"byte_bus_id":300,"control":32}"#;
+        assert!(convert_rcp_message(input).is_err());
+    }
+
+    #[test]
+    // fusa:test REQ-CLI-009
+    fn convert_rejects_unknown_field() {
+        let input = r#"{"byte_bus_id":1,"control":32,"extra":"bad"}"#;
+        assert!(convert_rcp_message(input).is_err());
+    }
+
+    #[test]
+    // fusa:test REQ-CLI-009
+    fn convert_rejects_malformed_json() {
+        assert!(convert_rcp_message("not json").is_err());
+        assert!(convert_rcp_message("[]").is_err());
+    }
+
+    #[test]
+    // fusa:test REQ-CLI-009
+    fn convert_rejects_invalid_body_base64() {
+        let input = r#"{"byte_bus_id":1,"control":32,"body":"not-base64!!"}"#;
+        assert!(convert_rcp_message(input).is_err());
     }
 }
