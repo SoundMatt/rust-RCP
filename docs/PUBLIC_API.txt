@@ -1341,13 +1341,13 @@ impl core::panic::unwind_safe::UnwindSafe for rcp::fragment::FragmentReassemblyB
 pub fn rcp::fragment::verify_reassembled_train_crc(&rcp::fragment::FragmentReassemblyBuffer, &rcp::avtp::HeaderVariant, &rcp::e2e::AcfCoverageMessage<'_>, bool) -> core::result::Result<u32, rcp::RcpError>
 pub mod rcp::gpio
 #[repr(u8)] pub enum rcp::gpio::GpioWriteSemantics
-pub rcp::gpio::GpioWriteSemantics::Add = 4
+pub rcp::gpio::GpioWriteSemantics::AddSaturating = 5
 pub rcp::gpio::GpioWriteSemantics::And = 2
 pub rcp::gpio::GpioWriteSemantics::Or = 1
-pub rcp::gpio::GpioWriteSemantics::Reconfigure = 6
+pub rcp::gpio::GpioWriteSemantics::Reconfigure = 7
 pub rcp::gpio::GpioWriteSemantics::Replace = 0
-pub rcp::gpio::GpioWriteSemantics::SubtractSaturating = 5
-pub rcp::gpio::GpioWriteSemantics::Unnamed8th = 7
+pub rcp::gpio::GpioWriteSemantics::Reserved4 = 4
+pub rcp::gpio::GpioWriteSemantics::SubtractSaturating = 6
 pub rcp::gpio::GpioWriteSemantics::Xor = 3
 impl rcp::gpio::GpioWriteSemantics
 pub fn rcp::gpio::GpioWriteSemantics::from_sub_opcode(u8) -> core::result::Result<Self, rcp::RcpError>
@@ -3580,8 +3580,8 @@ pub rcp::spi::SpiChannelSelect::Channel2 = 2
 pub rcp::spi::SpiChannelSelect::Channel3 = 3
 pub rcp::spi::SpiChannelSelect::Channel4 = 4
 pub rcp::spi::SpiChannelSelect::Channel5 = 5
-pub rcp::spi::SpiChannelSelect::Spare6 = 6
-pub rcp::spi::SpiChannelSelect::Spare7 = 7
+pub rcp::spi::SpiChannelSelect::Reconfigure7 = 7
+pub rcp::spi::SpiChannelSelect::Reserved6 = 6
 impl rcp::spi::SpiChannelSelect
 pub fn rcp::spi::SpiChannelSelect::from_sub_opcode(u8) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::spi::SpiChannelSelect::is_named(self) -> bool

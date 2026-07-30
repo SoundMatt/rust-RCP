@@ -34,9 +34,10 @@
 //!   [`crate::acf::ByteMessageInfo`]).
 //! - [`GpioWriteSemantics`] — the eight write-semantics as an explicit enum,
 //!   with [`apply_gpio_write`] giving each one a pure `(current, operand) ->
-//!   new_value` function. See "Provenance note: the eighth write-semantics"
-//!   below for why one of the eight variants ([`GpioWriteSemantics::Unnamed8th`])
-//!   is deliberately left unresolved rather than guessed.
+//!   new_value` function. See "Provenance note: the spec-reserved
+//!   write-semantics code" below for why one of the eight variants
+//!   ([`GpioWriteSemantics::Reserved4`]) is refused outright rather than
+//!   given an operation.
 //! - [`GpioTriggerConfig`]/[`GpioTriggerSignals`]/[`evaluate_gpio_triggers`]
 //!   — per-pin change/rising/falling trigger-signal modeling: which pins
 //!   have each of the three trigger kinds armed
@@ -92,40 +93,58 @@
 //! semantics directly through the already-generic `sub_opcode` field
 //! ([`GpioWriteSemantics::to_sub_opcode`]/
 //! [`GpioWriteSemantics::from_sub_opcode`]) rather than inventing a
-//! separate GPIO-private semantics-selector byte of its own. This is this
-//! crate's own working interpretation, flagged per Guiding Principle 5: the
-//! roadmap text names the eight-way selection and the eight semantics in
-//! the same breath, but does not itself state that `sub_opcode` is the
-//! selecting field, nor does it give numeric codes for any of the eight
-//! semantics. The specific `0..=6` ordering
-//! [`GpioWriteSemantics::to_sub_opcode`] assigns to the seven named
-//! semantics is this crate's own choice (roadmap listed order), not a
-//! transcription of a confirmed wire encoding.
+//! separate GPIO-private semantics-selector byte of its own. That
+//! `sub_opcode` is the selecting field remains this crate's own working
+//! interpretation, flagged per Guiding Principle 5, since `ROADMAP.md`
+//! itself does not say so explicitly — it names the eight-way selection and
+//! the eight semantics in the same breath but does not itself state that
+//! `sub_opcode` is the selecting field. The specific `0..=7` numeric
+//! assignment [`GpioWriteSemantics::to_sub_opcode`] gives each of the eight
+//! values is not this crate's own choice, though: an earlier revision of
+//! this module guessed a "roadmap listed order" placement for the four
+//! higher codes that contradicted the GPIO/PWM_OUT endpoint-specific
+//! evt-bits table in the OPEN Alliance TC18 Remote Control Protocol
+//! Specification v0.5.1_RC (filed and corrected as issue #99); the mapping
+//! below now follows that table's own numeric order for all eight values.
 //!
-//! ## Provenance note: the eighth write-semantics
+//! ## Provenance note: the spec-reserved write-semantics code
 //!
 //! `ROADMAP.md`'s GPIO bullet states "the eight write-semantics" but then
 //! names only seven in its parenthetical list: replace, OR, AND, XOR, add,
-//! subtract-with-saturation, reconfigure. Per Guiding Principle 5 ("flag
-//! spec ambiguities ... rather than silently guessing at them"), this
-//! module does not invent a plausible eighth name. [`GpioWriteSemantics`]
-//! instead carries an explicit eighth variant,
-//! [`GpioWriteSemantics::Unnamed8th`], occupying the one remaining
-//! `sub_opcode` value (`0x07`) so the type's `sub_opcode` round-trip stays
-//! total over the field's full 3-bit range. [`apply_gpio_write`] refuses
-//! (`Err(RcpError::UnsupportedCmd)`) rather than guessing a behavior for it
-//! — see [`GpioWriteSemantics::is_named`].
+//! subtract-with-saturation, reconfigure — it does not itself say which
+//! `sub_opcode` value is the unnamed eighth one, nor that one of the eight
+//! is reserved rather than a real operation. Issue #99 pins that down: the
+//! GPIO/PWM_OUT endpoint-specific evt-bits table in the OPEN Alliance TC18
+//! Remote Control Protocol Specification v0.5.1_RC reserves `sub_opcode`
+//! value `4` specifically — ahead of the add/subtract/reconfigure codes,
+//! not after them as an earlier revision of this module guessed.
+//! [`GpioWriteSemantics`] carries that reserved slot as an explicit
+//! variant, [`GpioWriteSemantics::Reserved4`], so the type's `sub_opcode`
+//! round-trip stays total over the field's full 3-bit range.
+//! [`apply_gpio_write`] refuses (`Err(RcpError::UnsupportedCmd)`) for it
+//! rather than treating it as an operation — see
+//! [`GpioWriteSemantics::is_named`].
 //!
-//! ## Provenance note: `Add` and `Reconfigure`
+//! ## Provenance note: `AddSaturating` and `Reconfigure`
 //!
 //! - `ROADMAP.md` names saturation only for the subtract semantics
-//!   ("subtract-with-saturation"), not for add. [`apply_gpio_write`]
-//!   therefore models [`GpioWriteSemantics::Add`] with ordinary wrapping
-//!   32-bit addition ([`u32::wrapping_add`]) rather than also saturating it
-//!   — a deliberate asymmetry with [`GpioWriteSemantics::SubtractSaturating`],
-//!   flagged per Guiding Principle 5 as this crate's own reasonable
-//!   default (silent wraparound being the ordinary meaning of unqualified
-//!   fixed-width "add") rather than a confirmed spec fact.
+//!   ("subtract-with-saturation"), not for add, and an earlier revision of
+//!   this module read that as license to give add ordinary wrapping
+//!   behavior instead. Issue #99 corrects that: the GPIO/PWM_OUT
+//!   endpoint-specific evt-bits table in the OPEN Alliance TC18 Remote
+//!   Control Protocol Specification v0.5.1_RC requires both the add and
+//!   subtract write semantics to saturate at the field's bounds rather than
+//!   wrap, so [`apply_gpio_write`] now saturates
+//!   [`GpioWriteSemantics::AddSaturating`] with [`u32::saturating_add`],
+//!   symmetric with [`GpioWriteSemantics::SubtractSaturating`]'s existing
+//!   [`u32::saturating_sub`]. This module does not itself know what the
+//!   specification's own field bounds are: [`GpioBitmask`] is a fixed
+//!   4-byte/`u32` value established in an earlier milestone, and widening
+//!   it to match some narrower spec-defined field width is out of scope for
+//!   this fix. [`apply_gpio_write`] therefore saturates at `u32`'s own
+//!   natural bounds (`0`/[`u32::MAX`]) — flagged per Guiding Principle 5 as
+//!   this crate's own scope-narrowing choice, not a confirmed statement
+//!   that the specification's field bounds are exactly `u32`'s.
 //! - "Reconfigure" is named as a write semantics distinct from "replace",
 //!   which this module reads as it most plausibly reconfiguring per-pin
 //!   direction/function alongside (or instead of) writing output levels —
@@ -135,7 +154,10 @@
 //!   [`GpioWriteSemantics::Replace`] (the operand becomes the new value),
 //!   flagged per Guiding Principle 5 as a placeholder pending reconciliation
 //!   against the specification's actual behavior — not a claim that the two
-//!   semantics are otherwise equivalent.
+//!   semantics are otherwise equivalent. Issue #99 only corrects
+//!   `Reconfigure`'s `sub_opcode` position (`0x07`, not the earlier, wrong
+//!   `0x06`); this module's placeholder-level treatment of what
+//!   reconfiguring actually does at the bitmask-value level is unchanged.
 //!
 //! ## Provenance note: per-pin trigger modeling
 //!
@@ -192,8 +214,9 @@ impl GpioBitmask {
 /// The eight GPIO write-semantics, selected via [`crate::acf::Evt::sub_opcode`].
 ///
 /// See this module's doc comment "Provenance note: write-semantics
-/// selection via `evt.sub_opcode`" and "Provenance note: the eighth
-/// write-semantics" for the two working interpretations this type embodies.
+/// selection via `evt.sub_opcode`", "Provenance note: the spec-reserved
+/// write-semantics code", and "Provenance note: `AddSaturating` and
+/// `Reconfigure`" for the working interpretations this type embodies.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 // fusa:req REQ-GPIO-003
@@ -206,21 +229,24 @@ pub enum GpioWriteSemantics {
     And = 2,
     /// Bitwise XOR the operand into the current value.
     Xor = 3,
-    /// Add the operand to the current value. See this module's doc comment
-    /// "Provenance note: `Add` and `Reconfigure`" for its wrapping
-    /// (non-saturating) behavior.
-    Add = 4,
+    /// The GPIO/PWM_OUT endpoint-specific evt-bits table's reserved
+    /// `sub_opcode` value. See this module's doc comment "Provenance note:
+    /// the spec-reserved write-semantics code" — [`apply_gpio_write`]
+    /// refuses this rather than treating it as an operation.
+    Reserved4 = 4,
+    /// Add the operand to the current value, saturating at [`u32::MAX`]
+    /// rather than wrapping/overflowing. See this module's doc comment
+    /// "Provenance note: `AddSaturating` and `Reconfigure`" for its
+    /// saturating behavior and the `u32`-bounds scope-narrowing choice it
+    /// makes.
+    AddSaturating = 5,
     /// Subtract the operand from the current value, saturating at zero
     /// rather than wrapping/underflowing.
-    SubtractSaturating = 5,
+    SubtractSaturating = 6,
     /// Reconfigure this endpoint using the operand. See this module's doc
-    /// comment "Provenance note: `Add` and `Reconfigure`" for how
+    /// comment "Provenance note: `AddSaturating` and `Reconfigure`" for how
     /// [`apply_gpio_write`] models this at the bitmask-value level.
-    Reconfigure = 6,
-    /// The roadmap-stated eighth write semantics, left unnamed by
-    /// `ROADMAP.md`'s own checklist text. See this module's doc comment
-    /// "Provenance note: the eighth write-semantics".
-    Unnamed8th = 7,
+    Reconfigure = 7,
 }
 
 impl GpioWriteSemantics {
@@ -243,21 +269,21 @@ impl GpioWriteSemantics {
             1 => Ok(Self::Or),
             2 => Ok(Self::And),
             3 => Ok(Self::Xor),
-            4 => Ok(Self::Add),
-            5 => Ok(Self::SubtractSaturating),
-            6 => Ok(Self::Reconfigure),
-            7 => Ok(Self::Unnamed8th),
+            4 => Ok(Self::Reserved4),
+            5 => Ok(Self::AddSaturating),
+            6 => Ok(Self::SubtractSaturating),
+            7 => Ok(Self::Reconfigure),
             _ => Err(RcpError::InvalidParameter),
         }
     }
 
-    /// True for every variant except [`GpioWriteSemantics::Unnamed8th`] —
+    /// True for every variant except [`GpioWriteSemantics::Reserved4`] —
     /// the seven write-semantics `ROADMAP.md`'s checklist text actually
-    /// names. See this module's doc comment "Provenance note: the eighth
-    /// write-semantics".
+    /// names. See this module's doc comment "Provenance note: the
+    /// spec-reserved write-semantics code".
     // fusa:req REQ-GPIO-009
     pub fn is_named(self) -> bool {
-        !matches!(self, Self::Unnamed8th)
+        !matches!(self, Self::Reserved4)
     }
 }
 
@@ -265,11 +291,12 @@ impl GpioWriteSemantics {
 /// bitmask value.
 ///
 /// Returns `Err(RcpError::UnsupportedCmd)` for
-/// [`GpioWriteSemantics::Unnamed8th`] rather than guessing a behavior for
-/// it — see this module's doc comment "Provenance note: the eighth
-/// write-semantics". Never panics for any input, including at the
-/// [`GpioWriteSemantics::Add`]/[`GpioWriteSemantics::SubtractSaturating`]
-/// `u32` overflow/underflow boundaries.
+/// [`GpioWriteSemantics::Reserved4`] rather than treating it as an
+/// operation — see this module's doc comment "Provenance note: the
+/// spec-reserved write-semantics code". Never panics for any input,
+/// including at the
+/// [`GpioWriteSemantics::AddSaturating`]/[`GpioWriteSemantics::SubtractSaturating`]
+/// `u32` saturation boundaries.
 // fusa:req REQ-GPIO-005
 // fusa:req REQ-GPIO-006
 // fusa:req REQ-GPIO-007
@@ -287,10 +314,10 @@ pub fn apply_gpio_write(
         GpioWriteSemantics::Or => current | operand,
         GpioWriteSemantics::And => current & operand,
         GpioWriteSemantics::Xor => current ^ operand,
-        GpioWriteSemantics::Add => current.wrapping_add(operand),
+        GpioWriteSemantics::Reserved4 => return Err(RcpError::UnsupportedCmd),
+        GpioWriteSemantics::AddSaturating => current.saturating_add(operand),
         GpioWriteSemantics::SubtractSaturating => current.saturating_sub(operand),
         GpioWriteSemantics::Reconfigure => operand,
-        GpioWriteSemantics::Unnamed8th => return Err(RcpError::UnsupportedCmd),
     };
     Ok(GpioBitmask(result))
 }
@@ -466,10 +493,10 @@ mod tests {
         GpioWriteSemantics::Or,
         GpioWriteSemantics::And,
         GpioWriteSemantics::Xor,
-        GpioWriteSemantics::Add,
+        GpioWriteSemantics::Reserved4,
+        GpioWriteSemantics::AddSaturating,
         GpioWriteSemantics::SubtractSaturating,
         GpioWriteSemantics::Reconfigure,
-        GpioWriteSemantics::Unnamed8th,
     ];
 
     #[test]
@@ -510,7 +537,7 @@ mod tests {
         for semantics in ALL_WRITE_SEMANTICS {
             assert_eq!(
                 semantics.is_named(),
-                semantics != GpioWriteSemantics::Unnamed8th
+                semantics != GpioWriteSemantics::Reserved4
             );
         }
     }
@@ -549,19 +576,34 @@ mod tests {
 
     #[test]
     // fusa:test REQ-GPIO-006
-    fn apply_gpio_write_add_wraps_rather_than_panics_on_overflow() {
+    fn apply_gpio_write_add_saturating_clamps_at_u32_max() {
         let result = apply_gpio_write(
-            GpioWriteSemantics::Add,
+            GpioWriteSemantics::AddSaturating,
             GpioBitmask(u32::MAX),
             GpioBitmask(1),
         );
-        assert_eq!(result, Ok(GpioBitmask(0)));
+        assert_eq!(result, Ok(GpioBitmask(u32::MAX)));
     }
 
     #[test]
     // fusa:test REQ-GPIO-006
-    fn apply_gpio_write_add_ordinary_case() {
-        let result = apply_gpio_write(GpioWriteSemantics::Add, GpioBitmask(5), GpioBitmask(10));
+    fn apply_gpio_write_add_saturating_exact_u32_max_boundary() {
+        let result = apply_gpio_write(
+            GpioWriteSemantics::AddSaturating,
+            GpioBitmask(u32::MAX - 10),
+            GpioBitmask(10),
+        );
+        assert_eq!(result, Ok(GpioBitmask(u32::MAX)));
+    }
+
+    #[test]
+    // fusa:test REQ-GPIO-006
+    fn apply_gpio_write_add_saturating_ordinary_case() {
+        let result = apply_gpio_write(
+            GpioWriteSemantics::AddSaturating,
+            GpioBitmask(5),
+            GpioBitmask(10),
+        );
         assert_eq!(result, Ok(GpioBitmask(15)));
     }
 
@@ -611,9 +653,9 @@ mod tests {
 
     #[test]
     // fusa:test REQ-GPIO-009
-    fn apply_gpio_write_refuses_the_unnamed_eighth_semantics() {
+    fn apply_gpio_write_refuses_the_spec_reserved_semantics() {
         let result = apply_gpio_write(
-            GpioWriteSemantics::Unnamed8th,
+            GpioWriteSemantics::Reserved4,
             GpioBitmask(0),
             GpioBitmask(0),
         );

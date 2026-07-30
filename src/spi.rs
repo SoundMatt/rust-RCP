@@ -89,24 +89,35 @@
 //! selection already reads. This module follows that same precedent:
 //! [`SpiChannelSelect::to_sub_opcode`]/[`SpiChannelSelect::from_sub_opcode`]
 //! read/write the field directly rather than inventing a separate
-//! SPI-private selector byte. Unlike GPIO's eight-way selection (which used
-//! all eight `sub_opcode` values), SPI's own checklist text caps the
-//! meaningful selection at six, leaving two of the eight `sub_opcode` values
-//! spare. Per Guiding Principle 5 ("flag spec ambiguities ... rather than
-//! silently guessing at them"), this module does not silently accept those
-//! two spare values as if they selected a channel: [`SpiChannelSelect`]
-//! carries them as two explicit, distinctly named variants
-//! ([`SpiChannelSelect::Spare6`]/[`SpiChannelSelect::Spare7`]) rather than
-//! folding them into the six real channel variants or rejecting them at
-//! decode time — mirroring [`crate::gpio::GpioWriteSemantics::Unnamed8th`]'s
-//! own treatment of GPIO's own single spare value. [`resolve_spi_channel_index`]
-//! is the point at which a spare selection is actually refused
-//! (`Err(RcpError::UnsupportedCmd)`), matching
-//! [`crate::gpio::apply_gpio_write`]'s own refusal of
-//! [`crate::gpio::GpioWriteSemantics::Unnamed8th`]. The specific `0..=5`
-//! ordering [`SpiChannelSelect::to_sub_opcode`] assigns to the six channel
-//! variants is this crate's own choice (ascending channel-index order), not
-//! a transcription of a confirmed wire encoding.
+//! SPI-private selector byte. That `sub_opcode` is the selecting field
+//! remains this crate's own working interpretation, flagged per Guiding
+//! Principle 5, since `ROADMAP.md` itself does not say so explicitly.
+//!
+//! `ROADMAP.md`'s own checklist text caps the meaningful channel selection
+//! at six, leaving two of the eight `sub_opcode` values outside the
+//! six-channel range. An earlier revision of this module read those two
+//! remaining values as interchangeable "spare" channel selections, both
+//! silently resolved to `Err(RcpError::UnsupportedCmd)` by
+//! [`resolve_spi_channel_index`] for the same undifferentiated reason.
+//! Issue #100 corrects that: the SPI endpoint-specific evt-bits table in
+//! the OPEN Alliance TC18 Remote Control Protocol Specification v0.5.1_RC
+//! gives those two values two different, spec-confirmed meanings, neither
+//! of which is an ordinary channel selection — one is reserved and must be
+//! rejected, the other reconfigures the endpoint (its payload is used for
+//! configuration, not presented to the interface). [`SpiChannelSelect`]
+//! now carries them as two distinctly named variants,
+//! [`SpiChannelSelect::Reserved6`] and [`SpiChannelSelect::Reconfigure7`],
+//! rather than the earlier interchangeable "spare" naming.
+//! [`resolve_spi_channel_index`] still refuses both
+//! (`Err(RcpError::UnsupportedCmd)`), since neither resolves to a real
+//! channel index and this crate has no compound-wait/dispatch machinery yet
+//! to route [`SpiChannelSelect::Reconfigure7`] to actual endpoint
+//! reconfiguration — see "Deliberately out of scope" above — but the two
+//! are no longer treated as interchangeable. The specific `0..=5` ordering
+//! [`SpiChannelSelect::to_sub_opcode`] assigns to the six channel variants
+//! remains this crate's own choice (ascending channel-index order), not a
+//! transcription of a confirmed wire encoding; only the two high codes'
+//! meanings are spec-confirmed by issue #100.
 //!
 //! ## Provenance note: the compound-wait status truncation
 //!
@@ -136,10 +147,12 @@ pub const SPI_CHANNEL_COUNT: usize = 6;
 /// [`crate::acf::Evt::sub_opcode`]'s full 3-bit (`0..=7`) range.
 ///
 /// See this module's doc comment "Provenance note: channel selection via
-/// `evt.sub_opcode`" for why the two spare values
-/// ([`SpiChannelSelect::Spare6`]/[`SpiChannelSelect::Spare7`]) are modeled
-/// as explicit variants rather than silently accepted as channel selections
-/// or rejected outright at decode time.
+/// `evt.sub_opcode`" for why the two high values
+/// ([`SpiChannelSelect::Reserved6`]/[`SpiChannelSelect::Reconfigure7`]) are
+/// modeled as explicit, distinctly named variants rather than silently
+/// accepted as channel selections, rejected outright at decode time, or
+/// (as an earlier revision of this module did) treated as interchangeable
+/// "spare" values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 // fusa:req REQ-SPI-001
@@ -156,12 +169,20 @@ pub enum SpiChannelSelect {
     Channel4 = 4,
     /// Pre-configured channel 5.
     Channel5 = 5,
-    /// The first of `evt.sub_opcode`'s two spare values, unused by SPI's
-    /// up-to-6 channel selection. See this module's doc comment.
-    Spare6 = 6,
-    /// The second of `evt.sub_opcode`'s two spare values, unused by SPI's
-    /// up-to-6 channel selection. See this module's doc comment.
-    Spare7 = 7,
+    /// The SPI endpoint-specific evt-bits table's reserved `sub_opcode`
+    /// value — not a channel selection. See this module's doc comment
+    /// "Provenance note: channel selection via `evt.sub_opcode`" —
+    /// [`resolve_spi_channel_index`] refuses this rather than treating it
+    /// as a channel.
+    Reserved6 = 6,
+    /// The SPI endpoint-specific evt-bits table's reconfigure-endpoint
+    /// `sub_opcode` value: its payload is used for endpoint configuration,
+    /// not presented to the interface, so it does not select a channel
+    /// either. See this module's doc comment "Provenance note: channel
+    /// selection via `evt.sub_opcode`" — [`resolve_spi_channel_index`]
+    /// refuses this too, since this crate has no compound-wait/dispatch
+    /// machinery yet to route it to actual endpoint reconfiguration.
+    Reconfigure7 = 7,
 }
 
 impl SpiChannelSelect {
@@ -188,18 +209,20 @@ impl SpiChannelSelect {
             3 => Ok(Self::Channel3),
             4 => Ok(Self::Channel4),
             5 => Ok(Self::Channel5),
-            6 => Ok(Self::Spare6),
-            7 => Ok(Self::Spare7),
+            6 => Ok(Self::Reserved6),
+            7 => Ok(Self::Reconfigure7),
             _ => Err(RcpError::InvalidParameter),
         }
     }
 
     /// True for [`SpiChannelSelect::Channel0`]..[`SpiChannelSelect::Channel5`]
     /// — the six real channel selections `ROADMAP.md`'s checklist text
-    /// names. False for the two spare values.
+    /// names. False for [`SpiChannelSelect::Reserved6`] (spec-reserved,
+    /// rejected) and [`SpiChannelSelect::Reconfigure7`] (endpoint
+    /// reconfiguration, not a channel selection).
     // fusa:req REQ-SPI-003
     pub fn is_named(self) -> bool {
-        !matches!(self, Self::Spare6 | Self::Spare7)
+        !matches!(self, Self::Reserved6 | Self::Reconfigure7)
     }
 }
 
@@ -207,10 +230,10 @@ impl SpiChannelSelect {
 /// [`SpiFunctionalConfig::channels`].
 ///
 /// Returns `Err(RcpError::UnsupportedCmd)` for
-/// [`SpiChannelSelect::Spare6`]/[`SpiChannelSelect::Spare7`] rather than
-/// guessing a channel for them — see this module's doc comment "Provenance
-/// note: channel selection via `evt.sub_opcode`". Never panics for any
-/// input.
+/// [`SpiChannelSelect::Reserved6`]/[`SpiChannelSelect::Reconfigure7`] —
+/// neither resolves to a real channel index — rather than guessing a
+/// channel for them; see this module's doc comment "Provenance note:
+/// channel selection via `evt.sub_opcode`". Never panics for any input.
 // fusa:req REQ-SPI-004
 pub fn resolve_spi_channel_index(select: SpiChannelSelect) -> Result<usize, RcpError> {
     match select {
@@ -220,7 +243,9 @@ pub fn resolve_spi_channel_index(select: SpiChannelSelect) -> Result<usize, RcpE
         SpiChannelSelect::Channel3 => Ok(3),
         SpiChannelSelect::Channel4 => Ok(4),
         SpiChannelSelect::Channel5 => Ok(5),
-        SpiChannelSelect::Spare6 | SpiChannelSelect::Spare7 => Err(RcpError::UnsupportedCmd),
+        SpiChannelSelect::Reserved6 | SpiChannelSelect::Reconfigure7 => {
+            Err(RcpError::UnsupportedCmd)
+        }
     }
 }
 
@@ -449,8 +474,8 @@ mod tests {
         SpiChannelSelect::Channel3,
         SpiChannelSelect::Channel4,
         SpiChannelSelect::Channel5,
-        SpiChannelSelect::Spare6,
-        SpiChannelSelect::Spare7,
+        SpiChannelSelect::Reserved6,
+        SpiChannelSelect::Reconfigure7,
     ];
 
     #[test]
@@ -489,9 +514,23 @@ mod tests {
     // fusa:test REQ-SPI-003
     fn spi_channel_select_is_named_true_only_for_the_six_named_channels() {
         for select in ALL_CHANNEL_SELECTS {
-            let expected = !matches!(select, SpiChannelSelect::Spare6 | SpiChannelSelect::Spare7);
+            let expected = !matches!(
+                select,
+                SpiChannelSelect::Reserved6 | SpiChannelSelect::Reconfigure7
+            );
             assert_eq!(select.is_named(), expected);
         }
+    }
+
+    #[test]
+    // fusa:test REQ-SPI-001
+    fn spi_channel_select_reserved6_and_reconfigure7_are_distinct_values() {
+        // Issue #100: the reserved and reconfigure high codes must no longer
+        // be interchangeable "spare" values — they are distinct `sub_opcode`
+        // values with distinct, spec-confirmed meanings.
+        assert_ne!(SpiChannelSelect::Reserved6, SpiChannelSelect::Reconfigure7);
+        assert_eq!(SpiChannelSelect::Reserved6.to_sub_opcode(), 6);
+        assert_eq!(SpiChannelSelect::Reconfigure7.to_sub_opcode(), 7);
     }
 
     // ── resolve_spi_channel_index ────────────────────────────────────────────
@@ -514,8 +553,8 @@ mod tests {
 
     #[test]
     // fusa:test REQ-SPI-004
-    fn resolve_spi_channel_index_refuses_the_two_spare_values() {
-        for select in [SpiChannelSelect::Spare6, SpiChannelSelect::Spare7] {
+    fn resolve_spi_channel_index_refuses_reserved_and_reconfigure() {
+        for select in [SpiChannelSelect::Reserved6, SpiChannelSelect::Reconfigure7] {
             assert_eq!(
                 resolve_spi_channel_index(select),
                 Err(RcpError::UnsupportedCmd)
@@ -554,9 +593,9 @@ mod tests {
 
     #[test]
     // fusa:test REQ-SPI-006
-    fn select_spi_channel_config_refuses_spare_selections() {
+    fn select_spi_channel_config_refuses_reserved_and_reconfigure_selections() {
         let config = SpiFunctionalConfig::default();
-        for select in [SpiChannelSelect::Spare6, SpiChannelSelect::Spare7] {
+        for select in [SpiChannelSelect::Reserved6, SpiChannelSelect::Reconfigure7] {
             assert_eq!(
                 select_spi_channel_config(select, &config),
                 Err(RcpError::UnsupportedCmd)
