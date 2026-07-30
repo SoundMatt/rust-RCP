@@ -22,8 +22,8 @@
 //! - [`CStreamId`] mirrors [`StreamId`]'s two fields verbatim.
 //! - [`CByteMessageInfo`] mirrors every [`ByteMessageInfo`] field, flattened
 //!   — [`crate::acf::Evt`]'s `ack`/`sub_opcode` pair becomes `evt_ack`/
-//!   `evt_sub_opcode`, and [`crate::acf::ReadSizeOrSegment`]'s single
-//!   byte becomes a plain `u8` — since neither of those two small wrapper
+//!   `evt_sub_opcode`, and [`crate::acf::ReadSizeOrSegment`]'s wrapped
+//!   value becomes a plain `u16` — since neither of those two small wrapper
 //!   types is itself `#[repr(C)]`. Field-width validation (`acf_msg_length`/
 //!   `byte_bus_id` fitting 11 bits, `evt_sub_opcode` fitting 3 bits) is
 //!   deliberately not re-checked by either direction's conversion below —
@@ -48,9 +48,11 @@
 //!   is_tc18_error_code`] members) plus every other still-live variant,
 //!   instead of the old `Closed`/`NotFound`/`ZoneMismatch`/etc. set (see
 //!   [`crate::RcpError`]'s own "General-purpose sentinels" doc-comment
-//!   section for why `NotFound`/`AlreadyExists`/`Busy`/
-//!   `ZoneMismatch` specifically have no TC18 analog and collapse to
-//!   [`CError::Other`] below, the same as `RcpError::Other(_)`).
+//!   section for why `NotFound`/`AlreadyExists`/`Busy` specifically have
+//!   no TC18 analog and collapse to [`CError::Other`] below, the same as
+//!   `RcpError::Other(_)`; the fourth sibling variant that used to be
+//!   here, `ZoneMismatch`, had no TC18 or general-purpose meaning at all
+//!   and has been removed from `RcpError` outright, rust-RCP-FS-02).
 //!
 //! Neither `CAbbRequest` nor `CAbbResponse` carries the ACF_ABB message's
 //! variable-length `payload: Vec<u8>` — same scope limit the old
@@ -290,11 +292,11 @@ pub enum CError {
     // ── General errors ──────────────────────────────────────────────────────
     InvalidSize = 24,
 
-    /// Catch-all: the legacy `NotFound`/`AlreadyExists`/`Busy`/
-    /// `ZoneMismatch` Zone/Controller/Registry sentinels (no TC18 analog —
-    /// see this module's doc comment) and `RcpError::Other(String)` (whose
-    /// message this fieldless `#[repr(C)]` enum has no room to carry) both
-    /// map here.
+    /// Catch-all: the legacy `NotFound`/`AlreadyExists`/`Busy`
+    /// Zone/Controller/Registry sentinels (no TC18 analog — see this
+    /// module's doc comment) and `RcpError::Other(String)` (whose message
+    /// this fieldless `#[repr(C)]` enum has no room to carry) both map
+    /// here.
     Other = 99,
 }
 
@@ -322,11 +324,9 @@ impl From<&RcpError> for CError {
             RcpError::ChainError => CError::ChainError,
             RcpError::CrcError => CError::CrcError,
             RcpError::InvalidSize => CError::InvalidSize,
-            RcpError::NotFound
-            | RcpError::AlreadyExists
-            | RcpError::Busy
-            | RcpError::ZoneMismatch
-            | RcpError::Other(_) => CError::Other,
+            RcpError::NotFound | RcpError::AlreadyExists | RcpError::Busy | RcpError::Other(_) => {
+                CError::Other
+            }
         }
     }
 }
@@ -516,7 +516,6 @@ mod tests {
         assert_eq!(CError::from(&RcpError::NotFound), CError::Other);
         assert_eq!(CError::from(&RcpError::AlreadyExists), CError::Other);
         assert_eq!(CError::from(&RcpError::Busy), CError::Other);
-        assert_eq!(CError::from(&RcpError::ZoneMismatch), CError::Other);
         assert_eq!(
             CError::from(&RcpError::Other("x".to_string())),
             CError::Other

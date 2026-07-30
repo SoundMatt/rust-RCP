@@ -101,15 +101,6 @@
       "verificationMethod": "test"
     },
     {
-      "id": "REQ-ERR-011",
-      "title": "ZoneMismatch is distinct",
-      "text": "RcpError::ZoneMismatch.is_zone_mismatch() == true and is also is_relay_not_connected()",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
       "id": "REQ-ERR-012",
       "title": "NotConnected test",
       "text": "Direct test of NotConnected is_relay_not_connected",
@@ -164,15 +155,6 @@
       "verificationMethod": "test"
     },
     {
-      "id": "REQ-ERR-018",
-      "title": "ZoneMismatch is relay-not-connected",
-      "text": "ZoneMismatch wraps NotConnected per RELAY spec",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
       "id": "REQ-ERR-019",
       "title": "AlreadyExists is not relay-timeout",
       "text": "AlreadyExists.is_relay_timeout() == false",
@@ -185,15 +167,6 @@
       "id": "REQ-ERR-020",
       "title": "Busy is relay-timeout",
       "text": "Busy.is_relay_timeout() == true; Busy wraps Timeout",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-ERR-021",
-      "title": "ZoneMismatch is relay-not-connected (named)",
-      "text": "ZoneMismatch.is_relay_not_connected() == true",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1778,15 +1751,6 @@
       "id": "REQ-CLI-008",
       "title": "status --format json",
       "text": "The CLI must emit a valid \u00a712.3 status JSON document when invoked with status --format json containing protocol, tool, version, healthy, connected, endpoint, details fields",
-      "standard": "iso26262",
-      "level": "HLR",
-      "asil": "ASIL-B",
-      "verificationMethod": "test"
-    },
-    {
-      "id": "REQ-CLI-009",
-      "title": "convert --protocol RCP",
-      "text": "The CLI must accept a relay.Status JSON on stdin and emit a relay.Message JSON on stdout when invoked with convert --protocol RCP; exit 1 on invalid input, exit 2 on wrong/missing --protocol",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",

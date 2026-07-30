@@ -4,7 +4,8 @@
 
 | Version | Supported |
 |---|---|
-| 1.x | ✅ Yes |
+| 2.x | ✅ Yes |
+| 1.x | ❌ No (see `CHANGELOG.md` — `RcpError::ZoneMismatch` removed, a breaking change) |
 | 0.1.x | ❌ No |
 
 ## Reporting a Vulnerability

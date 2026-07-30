@@ -5,6 +5,111 @@ the roadmap milestone that produced them (see `ROADMAP.md`), since this
 crate's `Cargo.toml` version does not move until the OPEN Alliance TC18
 core replacement reaches `v1.0.0`.
 
+## v2.0.0 (2026-07-29/30 ecosystem audit fix pass) — closed
+
+A 23-issue fix pass against the 2026-07-29/30 cross-repo ecosystem audit,
+covering wire-conformance defects, HARA/requirements-traceability
+corrections, documentation-honesty fixes, and the removal of the last
+retired-model (`Zone`/`Controller`/`Registry`) residue from the frozen
+public API. Landed as nine PRs, merged individually once each was
+independently green.
+
+### Breaking
+
+- **`RcpError::ZoneMismatch` and `is_zone_mismatch()` are removed.**
+  Neither had a TC18 protocol counterpart — every live construction site
+  was the pre-Milestone-10 `Zone` model itself — and freezing them into
+  the semver-stable public API (`docs/PUBLIC_API.txt`) was itself the
+  defect (rust-RCP-FS-02). No replacement or compatibility shim is
+  provided, matching this crate's established "no shim for retired-model
+  surface" precedent. The three `.fusa-reqs.json` requirements that
+  existed solely to hold this sentinel in the verified ASIL-B baseline
+  (`REQ-ERR-011`/`018`/`021`) are retired alongside it (rust-RCP-FS-04).
+- **`acf::ReadSizeOrSegmentNum` is renamed to `acf::ReadSizeOrSegment` and
+  widened from `u8` to `u16`**, matching the RELAY specification's
+  canonical §15.5 cross-language type. Ripples into every module that
+  reused the type (`uart`, `capi`, `fragment`, every `mock::Endpoint`
+  decorator's `read_size` parameter).
+- **`gpio::GpioWriteSemantics` and `spi::SpiChannelSelect` variants
+  renamed/reassigned** to correct their `evt[2:0]` sub-opcode mapping
+  against the endpoint-specific evt-bits table (rust-RCP-02/03):
+  `GpioWriteSemantics::Add` → `AddSaturating` (now saturating, not
+  wrapping) at a different sub-opcode, a new `Reserved4` rejects the
+  spec-reserved code; `SpiChannelSelect::Spare6`/`Spare7` →
+  `Reserved6`/`Reconfigure7`.
+- **`iseled::iseled_frame_crc8`/`IseledFrameCrc` are removed from the
+  default feature set**, gated behind the new opt-in
+  `iseled-unconfirmed-crc` Cargo feature (rust-RCP-06) — this crate never
+  recovered ISELED's own confirmed CRC parameters, so the invented
+  CRC-8/AUTOSAR stand-in is no longer presented as an ordinary shipped
+  primitive.
+- **`RcpError::Closed`/`Timeout`/`NotFound`/`AlreadyExists`/`Busy`'s
+  `Display` text** drops retired `Zone`-model wording (rust-RCP-FS-03) —
+  e.g. `"rcp: zone not found"` → `"rcp: not found"`. The variants
+  themselves are unchanged.
+- The `rust-rcp convert` CLI subcommand is removed outright
+  (rust-RCP-FS-01) — it parsed the retired placeholder `Zone`-numbered
+  `Status` document (`zone`/`seq`/`healthy`/`payload`) into a
+  `relay.Message`, mapping `zone` to a `FrontLeft`/…/`Central`
+  positional-speaker name with no TC18 counterpart. `convert` was never
+  one of RELAY spec §12's mandatory CLI commands.
+
+### Fixed
+
+- `acf::encode_acf_abb`/`encode_acf_gbb` now derive `acf_msg_length` from
+  the real payload length instead of trusting an unvalidated caller value;
+  `decode_acf_abb`/`decode_acf_gbb` cross-check it against the actual
+  payload present (rust-RCP-N2-05).
+- `ByteMessageInfo::read_size()`/`segment_num()` select the
+  `ReadSizeOrSegment` field's interpretation by the `op` bit, rather than
+  two accessors that returned the same value regardless of which
+  interpretation applied (rust-RCP-05).
+- `lifecycle::lock_policy(RegisterCategory::General)` is now
+  `Some(LockPolicy::W)` — the EP0 register-map write path was previously
+  dead by construction for every caller, including the root client
+  (rust-RCP-12).
+- `Cargo.lock` is committed (previously gitignored despite this crate
+  shipping a binary) and `--locked` is enforced across the release build,
+  cross-platform test job, and SBOM generation (rust-RCP-N2-02).
+- `HARA.md`/`.fusa-hara.json` ASIL misclassifications corrected against
+  ISO 26262-3:2018 Table 4: H-010/SG-010 (S1/E4/C3) was under-classified
+  ASIL-A, corrected to ASIL-B; H-003/SG-003 and H-006/SG-006 (S2/E3/C2)
+  were over-classified ASIL-B, corrected to ASIL-A; H-008/SG-008's
+  untenable `C0` controllability input is corrected to `C1`
+  (rust-RCP-N2-03/N2-04). A new `scripts/hara_asil_check.py`, run in CI,
+  mechanically re-derives every hazard's ASIL from its own S/E/C fields.
+- `RequestKind` is bound to `AcfGbbMessage::message_timestamp`'s leading
+  byte for GBB conditional requests, rather than existing as a
+  wire-unattached value enum (rust-RCP-04).
+- `src/bin/rcp.rs`'s `capabilities` output now carries a
+  `"no-live-subscribe"` entry in `"features"`, documenting that
+  `RcpAdapter::subscribe` has no live asynchronous-notification mechanism
+  (rust-RCP-15).
+
+### Documentation
+
+- Declared RELAY spec version corrected from the stale `"1.11"` (and an
+  internally-inconsistent stray `"v1.14"` citation) to the current `v2.0`
+  across `lib.rs`, `relay.rs`, `README.md`, `.fusa.json`, and the CLI's
+  `capabilities`/`version` output (rust-RCP-07).
+- `ROADMAP.md`'s Compliance Targets table, which contradicted its own
+  milestone checklists by describing the TC18 uplift as "Not started",
+  reconciled to reflect the actual v1.0.0-complete state; its Satellite
+  Package Disposition table's 14 references to already-deleted modules
+  corrected (rust-RCP-08/09).
+- Module count reconciled to 52 (51 public + `base64_serde`) across
+  `README.md`'s prose and module-index table (rust-RCP-10).
+- `SECURITY.md`/`SAFETY_PLAN.md`/`CONTRIBUTING.md`/`.fusa.json` placeholder
+  `*@example.com` contacts replaced; `SECURITY.md`'s supported-versions
+  table updated for the then-current `1.x` release (rust-RCP-11).
+- `discovery.rs`'s invented broadcast-addressing/register-prefix
+  conventions and `ROADMAP.md`'s Milestone 3 section now carry a
+  consistent "unreconciled, not for interop reliance" caveat
+  (rust-RCP-14).
+- Unit tests that had locked in the pre-fix GPIO/SPI evt-mapping bugs and
+  the always-fails EP0 write rewritten to assert the corrected behavior
+  (rust-RCP-13).
+
 ## v1.0.0 (Milestone 10) — closed
 
 ### Changed

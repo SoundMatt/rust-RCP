@@ -11,9 +11,10 @@
       "effect": "Vehicle subsystem receives unintended actuation",
       "severity": "S3",
       "cause": "Zone field corrupted in transit or mis-set by caller",
-      "detection": "Zone mismatch check in every controller send()",
-      "mitigation": "REQ-CTRL-003 zone validation + REQ-CRC-004 CRC-32 safe-point integrity",
-      "residual_risk": "low"
+      "detection": "None — the retired Zone/Controller model this row described no longer exists",
+      "mitigation": "None — REQ-CTRL-003 (this row's original mitigation) was purged along with the retired model; see HARA.md H-001 (endpoint misaddressing) and SG-001 (REQ-EPLK-*, addressing::EndpointTable) for the current endpoint-addressed model's equivalent hazard and mitigation",
+      "residual_risk": "not applicable",
+      "note": "This row presented the retired Zone/Controller model (RELAY spec §15.5) as a live failure mode with a mitigation pointing at REQ-CTRL-003, a requirement that was itself purged when that model was removed (rust-RCP-FS-02/general Zone retirement) — a dangling reference to a hazard that could not recur through the current, endpoint-addressed dispatch path. Retained here for audit-trail continuity rather than deleted outright, per this crate's 'never renumber or reuse' FM-ID discipline (see FM-009's own identical precedent)"
     },
     {
       "id": "FM-002",

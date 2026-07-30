@@ -6,7 +6,6 @@
 // fusa:req REQ-CLI-006
 // fusa:req REQ-CLI-007
 // fusa:req REQ-CLI-008
-// fusa:req REQ-CLI-009
 
 //! RCP command-line interface — RELAY spec §12 conformant.
 //!
@@ -19,15 +18,22 @@
 //! [`rcp::adapt`]'s own Milestone 10 rebuild targets — in place of the
 //! retired `Zone`/`Command`/`Controller`/`Registry` model. `zones`/`send`/
 //! `status --zone` are gone; `discover`/`register`/`endpoint` take their
-//! place. `version`/`capabilities`/`status`/`convert` are unchanged in
-//! shape (none of them ever referenced `Zone`), with `capabilities`'s
+//! place. `version`/`capabilities`/`status` are unchanged in shape (none
+//! of them ever referenced `Zone`), with `capabilities`'s
 //! `commands`/`interfaces` JSON fields updated to describe the new set.
+//! The `convert` subcommand — which parsed the retired placeholder
+//! `Zone`-numbered `Status` document's `zone`/`seq`/`healthy`/`payload`
+//! shape into a `relay.Message`, mapping `zone` to a
+//! `FrontLeft`/…/`Central` positional-speaker name — is removed outright
+//! (rust-RCP-FS-01): that retired document has no TC18 counterpart, no
+//! compatibility shim was kept for it (matching every other Milestone 10
+//! removal), and `convert` was never one of RELAY spec §12's mandatory CLI
+//! commands (only `version`/`capabilities`/`status` are).
 //!
 //! Usage:
 //!   rust-rcp version [--format json]
 //!   rust-rcp capabilities
 //!   rust-rcp status [--format json]
-//!   rust-rcp convert --protocol RCP [--format json]
 //!   rust-rcp discover [--transaction <n>] [--format json]
 //!   rust-rcp register read  [--stream <hex>] [--format json]
 //!   rust-rcp register write --payload <hex> [--stream <hex>] [--root]
@@ -52,7 +58,6 @@
 //! state carried between separate `rust-rcp` invocations. This is flagged
 //! here per Guiding Principle 5 rather than left an unstated limitation.
 
-use std::io::Read;
 use std::process;
 
 use rcp::acf::{AcfAbbMessage, ByteMessageInfo, ReadSizeOrSegment};
@@ -71,7 +76,7 @@ fn main() {
 
     if args.len() < 2 {
         eprintln!("Usage: rust-rcp <command> [options]");
-        eprintln!("Commands: version, capabilities, status, convert, discover, register, endpoint");
+        eprintln!("Commands: version, capabilities, status, discover, register, endpoint");
         process::exit(1);
     }
 
@@ -150,7 +155,7 @@ fn main() {
                     "    \"protocol_int\": {proto_int},\n",
                     "    \"version\": \"{ver}\",\n",
                     "    \"spec_version\": \"{spec}\",\n",
-                    "    \"commands\": [\"version\",\"capabilities\",\"status\",\"convert\",\"discover\",\"register\",\"endpoint\"],\n",
+                    "    \"commands\": [\"version\",\"capabilities\",\"status\",\"discover\",\"register\",\"endpoint\"],\n",
                     "    \"transports\": [],\n",
                     "    \"features\": [\"loaning\",\"fragmentation\",\"no-live-subscribe\"],\n",
                     "    \"interfaces\": [\"RcServer\",\"Endpoint\"],\n",
@@ -202,28 +207,6 @@ fn main() {
                     env!("CARGO_PKG_VERSION"),
                     PROTOCOL,
                 );
-            }
-        }
-
-        // ── §11.2 convert ─────────────────────────────────────────────────────
-        // fusa:req REQ-CLI-009
-        "convert" => {
-            let protocol = flag_value(&args, "--protocol").unwrap_or("");
-            if protocol != PROTOCOL {
-                eprintln!("convert: --protocol {} is required", PROTOCOL);
-                process::exit(2);
-            }
-            let mut input = String::new();
-            if std::io::stdin().read_to_string(&mut input).is_err() {
-                eprintln!("ErrInvalidInput");
-                process::exit(1);
-            }
-            match convert_rcp_status(input.trim()) {
-                Ok(json) => println!("{}", json),
-                Err(()) => {
-                    eprintln!("ErrInvalidInput");
-                    process::exit(1);
-                }
             }
         }
 
@@ -577,73 +560,6 @@ fn cmd_endpoint_write(args: &[String]) {
     }
 }
 
-// ── §11.2 / §15.5 rcp.Status → relay.Message conversion ─────────────────────
-//
-// Unchanged by Milestone 10's CLI rebuild: this conversion is a
-// self-contained RELAY-spec-mandated JSON transform over an rcp.Status
-// wire document (its own "zone"/"seq"/"healthy"/"payload" shape, not the
-// `rcp::Zone` Rust type — nothing here references `rcp::Zone`,
-// `rcp::Command`, or any other retired type), so it needed no rebuild
-// alongside `discover`/`register`/`endpoint`.
-
-fn zone_to_id(zone: u64) -> Option<&'static str> {
-    match zone {
-        0 => Some("Unknown"),
-        1 => Some("FrontLeft"),
-        2 => Some("FrontRight"),
-        3 => Some("RearLeft"),
-        4 => Some("RearRight"),
-        5 => Some("Central"),
-        _ => None,
-    }
-}
-
-fn convert_rcp_status(raw: &str) -> Result<String, ()> {
-    let v: serde_json::Value = serde_json::from_str(raw).map_err(|_| ())?;
-    let obj = v.as_object().ok_or(())?;
-
-    // additionalProperties: false — reject unknown fields
-    for key in obj.keys() {
-        match key.as_str() {
-            "zone" | "seq" | "healthy" | "payload" => {}
-            _ => return Err(()),
-        }
-    }
-
-    // Required fields
-    let zone = obj.get("zone").and_then(|v| v.as_u64()).ok_or(())?;
-    let seq = obj.get("seq").and_then(|v| v.as_u64()).ok_or(())?;
-    let healthy = obj.get("healthy").and_then(|v| v.as_bool()).ok_or(())?;
-
-    let id = zone_to_id(zone).ok_or(())?;
-
-    // Optional payload (base64 string or null)
-    let payload_json = match obj.get("payload") {
-        None | Some(serde_json::Value::Null) => "null".to_string(),
-        Some(serde_json::Value::String(s)) => format!("\"{}\"", s),
-        _ => return Err(()),
-    };
-
-    Ok(format!(
-        concat!(
-            "{{",
-            "\"protocol\":{proto_int},",
-            "\"version\":{{\"major\":0,\"minor\":0,\"patch\":0}},",
-            "\"id\":\"{id}\",",
-            "\"payload\":{payload},",
-            "\"timestamp\":\"0001-01-01T00:00:00Z\",",
-            "\"seq\":{seq},",
-            "\"meta\":{{\"rcp.healthy\":\"{healthy}\"}}",
-            "}}"
-        ),
-        proto_int = PROTOCOL_INT,
-        id = id,
-        payload = payload_json,
-        seq = seq,
-        healthy = healthy,
-    ))
-}
-
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 /// Parse a `--stream` flag as a bare hex `StreamId` wire value (no `0x`
@@ -982,73 +898,5 @@ mod tests {
         };
         let err = server.handle_abb(sid, &request).unwrap_err();
         assert_eq!(err, RcpError::EpNotFound);
-    }
-
-    // ── §11.2 convert tests ───────────────────────────────────────────────────
-
-    #[test]
-    // fusa:test REQ-CLI-009
-    fn convert_golden_vector() {
-        // Golden vector from RELAY spec/vectors/rcp-status.json
-        let input = r#"{"zone":1,"seq":3,"healthy":true,"payload":"AQ=="}"#;
-        let output = convert_rcp_status(input).unwrap();
-        let v: serde_json::Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(v["protocol"], 5);
-        assert_eq!(v["id"], "FrontLeft");
-        assert_eq!(v["seq"], 3);
-        assert_eq!(v["meta"]["rcp.healthy"], "true");
-        assert_eq!(v["payload"], "AQ==");
-        assert_eq!(v["timestamp"], "0001-01-01T00:00:00Z");
-    }
-
-    #[test]
-    // fusa:test REQ-CLI-009
-    fn convert_all_zones() {
-        let zones = [
-            (0, "Unknown"),
-            (1, "FrontLeft"),
-            (2, "FrontRight"),
-            (3, "RearLeft"),
-            (4, "RearRight"),
-            (5, "Central"),
-        ];
-        for (zone_int, zone_name) in zones {
-            let input = format!(r#"{{"zone":{zone_int},"seq":1,"healthy":false}}"#);
-            let out = convert_rcp_status(&input).unwrap();
-            let v: serde_json::Value = serde_json::from_str(&out).unwrap();
-            assert_eq!(v["id"], zone_name, "zone {zone_int}");
-            assert_eq!(v["meta"]["rcp.healthy"], "false");
-        }
-    }
-
-    #[test]
-    // fusa:test REQ-CLI-009
-    fn convert_invalid_zone_rejected() {
-        let input = r#"{"zone":99,"seq":1,"healthy":true}"#;
-        assert!(convert_rcp_status(input).is_err());
-    }
-
-    #[test]
-    // fusa:test REQ-CLI-009
-    fn convert_missing_required_field_rejected() {
-        assert!(convert_rcp_status(r#"{"seq":1,"healthy":true}"#).is_err()); // no zone
-        assert!(convert_rcp_status(r#"{"zone":1,"healthy":true}"#).is_err()); // no seq
-        assert!(convert_rcp_status(r#"{"zone":1,"seq":1}"#).is_err()); // no healthy
-    }
-
-    #[test]
-    // fusa:test REQ-CLI-009
-    fn convert_unknown_field_rejected() {
-        let input = r#"{"zone":1,"seq":1,"healthy":true,"extra":"bad"}"#;
-        assert!(convert_rcp_status(input).is_err());
-    }
-
-    #[test]
-    // fusa:test REQ-CLI-009
-    fn convert_null_payload_outputs_null() {
-        let input = r#"{"zone":1,"seq":1,"healthy":true,"payload":null}"#;
-        let out = convert_rcp_status(input).unwrap();
-        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
-        assert!(v["payload"].is_null());
     }
 }
