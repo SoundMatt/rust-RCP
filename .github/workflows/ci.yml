@@ -249,7 +249,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: install rsfusa
-        run: cargo install --git https://github.com/SoundMatt/rust-FuSa rsfusa --locked
+        run: cargo install --git https://github.com/SoundMatt/rust-FuSa --tag v0.3.17 rsfusa --locked
       - name: build release binary (needed for qualify)
         # Cargo.lock is committed (this crate ships a binary, src/bin/rcp.rs)
         # and built --locked so the qualified release artifact matches the
