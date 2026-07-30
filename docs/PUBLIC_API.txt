@@ -4240,7 +4240,6 @@ pub rcp::RcpError::ShortFrame
 pub rcp::RcpError::Timeout
 pub rcp::RcpError::UnauthorizedAccess
 pub rcp::RcpError::UnsupportedCmd
-pub rcp::RcpError::ZoneMismatch
 impl rcp::RcpError
 pub fn rcp::RcpError::is_already_exists(&self) -> bool
 pub fn rcp::RcpError::is_relay_closed(&self) -> bool
@@ -4248,7 +4247,6 @@ pub fn rcp::RcpError::is_relay_not_connected(&self) -> bool
 pub fn rcp::RcpError::is_relay_payload_too_large(&self) -> bool
 pub fn rcp::RcpError::is_relay_timeout(&self) -> bool
 pub fn rcp::RcpError::is_tc18_error_code(&self) -> bool
-pub fn rcp::RcpError::is_zone_mismatch(&self) -> bool
 impl core::clone::Clone for rcp::RcpError
 pub fn rcp::RcpError::clone(&self) -> rcp::RcpError
 impl core::cmp::PartialEq for rcp::RcpError

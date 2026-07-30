@@ -5,7 +5,7 @@
 
 //! Stub-code generator — emits Rust type definitions from a JSON schema.
 //!
-//! Used in CI to keep generated zone-controller stubs in sync with the spec.
+//! Used in CI to keep generated endpoint/register-map stubs in sync with the spec.
 
 use std::collections::HashMap;
 

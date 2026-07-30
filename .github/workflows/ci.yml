@@ -170,12 +170,25 @@ jobs:
         run: go install github.com/SoundMatt/RELAY/cmd/relay@latest
       - name: build rcp binary
         run: cargo build --bin rust-rcp --release --locked
-      - name: relay interop (rcp-status EQUIVALENT)
+      - name: relay interop (rcp-status EQUIVALENT or SKIP)
         run: |
           output=$(relay interop target/release/rust-rcp 2>&1) || true
           echo "$output"
           if echo "$output" | grep -q "rcp-status"; then
-            echo "$output" | grep -A3 "^rcp-status" | grep "rcp" | grep -q "EQUIVALENT"
+            # rust-RCP-FS-01 removed the `convert` CLI subcommand outright
+            # (it only ever parsed the retired placeholder Zone-numbered
+            # Status document, with no TC18 counterpart), so `rust-rcp` no
+            # longer advertises `convert` and `relay interop` correctly
+            # reports this vector as SKIP for it, not EQUIVALENT — SKIP is
+            # therefore an expected, passing outcome here, not a failure.
+            # A missing/failing outcome for the *reference* implementation,
+            # or any outcome other than EQUIVALENT/SKIP for rust-rcp, still
+            # fails this step.
+            rcp_line=$(echo "$output" | grep -A3 "^rcp-status" | grep "rust-rcp")
+            echo "$rcp_line" | grep -qE "EQUIVALENT|SKIP" || {
+              echo "relay interop: unexpected rcp-status result for rust-rcp: $rcp_line" >&2
+              exit 1
+            }
           else
             echo "relay interop: no RCP vectors found on runner — skipping equivalence check"
           fi

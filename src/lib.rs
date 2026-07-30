@@ -8,17 +8,14 @@
 // fusa:req REQ-ERR-008
 // fusa:req REQ-ERR-009
 // fusa:req REQ-ERR-010
-// fusa:req REQ-ERR-011
 // fusa:req REQ-ERR-012
 // fusa:req REQ-ERR-013
 // fusa:req REQ-ERR-014
 // fusa:req REQ-ERR-015
 // fusa:req REQ-ERR-016
 // fusa:req REQ-ERR-017
-// fusa:req REQ-ERR-018
 // fusa:req REQ-ERR-019
 // fusa:req REQ-ERR-020
-// fusa:req REQ-ERR-021
 // fusa:req REQ-ERRM-001
 // fusa:req REQ-ERRM-002
 // fusa:req REQ-ERRM-003
@@ -146,7 +143,6 @@ pub const RELAY_SPEC_VERSION: &str = SPEC_VERSION;
 ///
 /// Sentinel relationships (mirroring RELAY spec §5 `errors.Is` chains):
 /// - `NotFound`     → `is_not_connected()` (wraps `NotConnected`)
-/// - `ZoneMismatch` → `is_not_connected()` (wraps `NotConnected`)
 /// - `Busy`         → `is_timeout()` (wraps `Timeout`)
 ///
 /// ## TC18 spec error codes (`ROADMAP.md` Milestone 2, "Error Model")
@@ -285,41 +281,44 @@ pub const RELAY_SPEC_VERSION: &str = SPEC_VERSION;
 #[non_exhaustive]
 pub enum RcpError {
     // ── Mandatory RELAY sentinels ─────────────────────────────────────────
-    #[error("rcp: controller closed")]
+    #[error("rcp: server closed")]
     Closed,
 
     #[error("rcp: not connected")]
     NotConnected,
 
-    #[error("rcp: command timeout")]
+    #[error("rcp: request timeout")]
     Timeout,
 
     #[error("rcp: payload too large")]
     PayloadTooLarge,
 
     // ── General-purpose sentinels ────────────────────────────────────────
-    // These four originate from this crate's pre-Milestone-10
+    // These three originate from this crate's pre-Milestone-10
     // `Zone`/`Controller`/`Registry` API (removed outright by Milestone
     // 10's core-surface cutover, `ROADMAP.md` — no compatibility shim was
-    // kept). They are retained here, unchanged, as general-purpose
-    // `RcpError` variants: `capi`, `authz`, `federation`, and other
-    // still-live modules construct and match on them for meanings that
-    // have nothing to do with the removed `Zone` type (e.g. `NotFound` for
-    // "no such federation peer", `Busy` for a full rate-limit token
-    // bucket). Renaming them is out of scope for this item — see
-    // `docs/SEMVER.md` for this crate's stability commitment around them
-    // going forward.
-    #[error("rcp: zone not found")]
+    // kept). They are retained here as general-purpose `RcpError`
+    // variants: `capi`, `authz`, `federation`, and other still-live
+    // modules construct and match on them for meanings that have nothing
+    // to do with the removed `Zone` type (e.g. `NotFound` for "no such
+    // federation peer", `Busy` for a full rate-limit token bucket). Their
+    // `#[error(...)]` Display text below is rewritten to drop the
+    // retired-model "zone" wording (rust-RCP-FS-03) — a fourth sibling
+    // variant, `ZoneMismatch`, existed here with no TC18 or general-purpose
+    // meaning at all (every live construction site was the retired `Zone`
+    // model itself) and has been removed outright, along with
+    // `is_zone_mismatch()` and the three `.fusa-reqs.json` requirements
+    // that existed solely to freeze it into the verified baseline
+    // (rust-RCP-FS-02/FS-04) — a breaking removal from this crate's
+    // frozen public API, see `docs/SEMVER.md` and `CHANGELOG.md`.
+    #[error("rcp: not found")]
     NotFound,
 
-    #[error("rcp: zone already registered")]
+    #[error("rcp: already exists")]
     AlreadyExists,
 
-    #[error("rcp: zone controller busy")]
+    #[error("rcp: busy")]
     Busy,
-
-    #[error("rcp: zone mismatch")]
-    ZoneMismatch,
 
     // ── Wire / E2E errors ────────────────────────────────────────────────
     // `CrcMismatch`/`Replay` were likewise legacy 16-byte-frame-specific
@@ -431,17 +430,12 @@ impl RcpError {
         matches!(self, Self::Closed)
     }
 
-    /// True for `NotConnected`, `NotFound`, and `ZoneMismatch`
-    /// (all wrap `relay::ErrNotConnected`).
+    /// True for `NotConnected` and `NotFound` (both wrap
+    /// `relay::ErrNotConnected`).
     // fusa:req REQ-ERR-008
     // fusa:req REQ-ERR-015
-    // fusa:req REQ-ERR-018
-    // fusa:req REQ-ERR-021
     pub fn is_relay_not_connected(&self) -> bool {
-        matches!(
-            self,
-            Self::NotConnected | Self::NotFound | Self::ZoneMismatch
-        )
+        matches!(self, Self::NotConnected | Self::NotFound)
     }
 
     /// True for `Timeout` and `Busy` (both wrap `relay::ErrTimeout`).
@@ -464,12 +458,6 @@ impl RcpError {
     // fusa:req REQ-ERR-019
     pub fn is_already_exists(&self) -> bool {
         matches!(self, Self::AlreadyExists)
-    }
-
-    /// True for the `ZoneMismatch` sentinel.
-    // fusa:req REQ-ERR-011
-    pub fn is_zone_mismatch(&self) -> bool {
-        matches!(self, Self::ZoneMismatch)
     }
 
     /// True for any of the eleven TC18 RCP spec error codes this crate
@@ -615,12 +603,9 @@ mod tests {
 
     #[test]
     // fusa:test REQ-ERR-008
-    // fusa:test REQ-ERR-018
-    // fusa:test REQ-ERR-021
-    fn err_not_found_and_zone_mismatch_are_relay_not_connected() {
+    fn err_not_found_is_relay_not_connected() {
         assert!(RcpError::NotConnected.is_relay_not_connected());
         assert!(RcpError::NotFound.is_relay_not_connected());
-        assert!(RcpError::ZoneMismatch.is_relay_not_connected());
         assert!(!RcpError::Closed.is_relay_not_connected());
         assert!(!RcpError::Timeout.is_relay_not_connected());
     }
@@ -642,17 +627,6 @@ mod tests {
         assert!(RcpError::Busy.is_relay_timeout());
         assert!(RcpError::Timeout.is_relay_timeout());
         assert!(!RcpError::Busy.is_relay_closed());
-    }
-
-    #[test]
-    // fusa:test REQ-ERR-011
-    fn err_zone_mismatch_is_distinct() {
-        let e = RcpError::ZoneMismatch;
-        assert!(e.is_zone_mismatch());
-        assert!(e.is_relay_not_connected());
-        assert!(!e.is_relay_closed());
-        assert!(!e.is_relay_timeout());
-        assert!(!e.is_already_exists());
     }
 
     #[test]

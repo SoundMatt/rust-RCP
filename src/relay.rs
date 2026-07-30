@@ -285,8 +285,8 @@ mod tests {
     #[test]
     // fusa:test REQ-RELAY-002
     fn message_new_defaults() {
-        let m = Message::new(Protocol::Rcp, "FrontLeft", vec![1, 2, 3]);
-        assert_eq!(m.id, "FrontLeft");
+        let m = Message::new(Protocol::Rcp, "stream-0001", vec![1, 2, 3]);
+        assert_eq!(m.id, "stream-0001");
         assert_eq!(m.payload, vec![1, 2, 3]);
         assert_eq!(m.seq, 0);
         assert!(m.meta.is_empty());
@@ -295,7 +295,7 @@ mod tests {
     #[test]
     // fusa:test REQ-RELAY-002
     fn message_serde_base64_payload() {
-        let m = Message::new(Protocol::Rcp, "Central", vec![0xDE, 0xAD]);
+        let m = Message::new(Protocol::Rcp, "stream-0002", vec![0xDE, 0xAD]);
         let json = serde_json::to_value(&m).unwrap();
         assert_eq!(json["payload"], "3q0=");
         assert_eq!(json["protocol"], 5);
