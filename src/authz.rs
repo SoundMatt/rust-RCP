@@ -106,7 +106,7 @@ impl Endpoint for AuthzEndpoint {
     }
 
     // fusa:req REQ-AUTHZ-005
-    fn read(&self, read_size: u8) -> Result<Vec<u8>, RcpError> {
+    fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
         let ep_type = self.inner.ep_type();
         if !self.policy.read().unwrap().is_allowed(ep_type, false) {
             return Err(RcpError::NotFound);

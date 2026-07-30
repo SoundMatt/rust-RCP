@@ -145,7 +145,7 @@ impl Endpoint for LoanPoolEndpoint {
         self.inner.ep_type()
     }
 
-    fn read(&self, read_size: u8) -> Result<Vec<u8>, RcpError> {
+    fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
         self.inner.read(read_size)
     }
 
@@ -226,7 +226,7 @@ mod tests {
             fn ep_type(&self) -> EndpointType {
                 self.inner.ep_type()
             }
-            fn read(&self, read_size: u8) -> Result<Vec<u8>, RcpError> {
+            fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
                 self.inner.read(read_size)
             }
             fn write(&self, payload: &[u8]) -> Result<(), RcpError> {

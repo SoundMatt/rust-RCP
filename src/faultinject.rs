@@ -126,7 +126,7 @@ impl Endpoint for FaultInjectEndpoint {
     }
 
     // fusa:req REQ-FI-006
-    fn read(&self, read_size: u8) -> Result<Vec<u8>, RcpError> {
+    fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
         if let Some(err) = self.next_fault() {
             return Err(err);
         }

@@ -2117,6 +2117,15 @@
       "verificationMethod": "test"
     },
     {
+      "id": "REQ-BMI-005",
+      "title": "ReadSizeOrSegment selected by the op bit",
+      "text": "ByteMessageInfo::read_size/segment_num select the ReadSizeOrSegment field's read_size vs. segment_num interpretation by the op flag, returning None on the side op does not indicate, rather than an unconditional value under either interpretation",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
       "id": "REQ-ABB-001",
       "title": "AcfAbbMessage field model",
       "text": "AcfAbbMessage models an ACF_ABB message as a ByteMessageInfo plus an opaque payload only, with no timestamp field of any kind and no reserved gap sized for one",

@@ -21,7 +21,7 @@ An RC Client addresses an RC Server's device endpoints by `(stream_id, byte_bus_
 ## Quick Start
 
 ```rust
-use rcp::acf::{AcfAbbMessage, ByteMessageInfo, ReadSizeOrSegmentNum};
+use rcp::acf::{AcfAbbMessage, ByteMessageInfo, ReadSizeOrSegment};
 use rcp::avtp::StreamId;
 use rcp::mock::{MockEndpoint, RcServer};
 use rcp::regmap::{EndpointType, GeneralRegisters};
@@ -36,7 +36,7 @@ let request = AcfAbbMessage {
     info: ByteMessageInfo {
         byte_bus_id: 1,
         op: false, // false = read
-        read_size_segment_num: ReadSizeOrSegmentNum(1),
+        read_size_segment: ReadSizeOrSegment(1),
         ..ByteMessageInfo::default()
     },
     payload: Vec::new(),

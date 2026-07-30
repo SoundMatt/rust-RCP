@@ -31,7 +31,7 @@
 //! [`FragmentReassemblyBuffer`] is the reassembly buffer itself: it accepts
 //! fragments in wire-arrival order, each carrying a decoded
 //! [`crate::acf::ByteMessageInfo`], validates the dual-purpose
-//! `read_size`/`segment_num` byte ([`crate::acf::ReadSizeOrSegmentNum`]) as
+//! `read_size`/`segment_num` byte ([`crate::acf::ReadSizeOrSegment`]) as
 //! a `segment_num` consistency check, enforces the caller-supplied
 //! `rx_stream_max_request_size` bound, and — composing (never
 //! re-deriving) [`crate::e2e::CombinedFragmentPayload`] — assembles the
@@ -65,7 +65,7 @@
 //!   response that would exceed it), a distinct, unbuilt problem from this
 //!   module's inbound-request reassembly, left for whichever later item
 //!   builds response fragmentation.
-//! - Resolving [`crate::acf::ReadSizeOrSegmentNum`]'s general
+//! - Resolving [`crate::acf::ReadSizeOrSegment`]'s general
 //!   direction/type-based ambiguity (see `acf.rs`'s own provenance note).
 //!   This module only narrows that ambiguity for its own, narrower
 //!   question — see "Provenance note: `segment_num` ordering" below.
@@ -80,7 +80,7 @@
 //! source of ordering truth: it consumes fragments in wire-arrival order
 //! (the same order [`crate::e2e::CombinedFragmentPayload::assemble`] already
 //! concatenates caller-supplied segments in), and separately validates that
-//! each arriving fragment's [`crate::acf::ReadSizeOrSegmentNum::as_segment_num`]
+//! each arriving fragment's [`crate::acf::ReadSizeOrSegment::as_segment_num`]
 //! equals a strictly-incrementing counter starting at `0` — a consistency
 //! check against gaps, duplicates, and reordering, not a re-sort. This is
 //! this crate's own working interpretation of the one specific question
@@ -139,7 +139,7 @@ pub struct FragmentReassemblyBuffer {
     max_request_size: u16,
     segments: Vec<Vec<u8>>,
     total_len: usize,
-    next_expected_segment_num: u8,
+    next_expected_segment_num: u16,
 }
 
 impl FragmentReassemblyBuffer {
@@ -181,7 +181,7 @@ impl FragmentReassemblyBuffer {
     /// module's doc comment).
     ///
     /// Returns `Err(RcpError::InvalidParameter)` if `info`'s
-    /// `read_size_segment_num` (read as [`crate::acf::ReadSizeOrSegmentNum::as_segment_num`])
+    /// `read_size_segment` (read as [`crate::acf::ReadSizeOrSegment::as_segment_num`])
     /// does not equal the next expected value in a strictly-incrementing,
     /// zero-based sequence — see this module's "Provenance note:
     /// `segment_num` ordering". The buffer's state is left unchanged when
@@ -208,7 +208,7 @@ impl FragmentReassemblyBuffer {
             return Err(RcpError::UnsupportedCmd);
         }
 
-        let segment_num = info.read_size_segment_num.as_segment_num();
+        let segment_num = info.read_size_segment.as_segment_num();
         if segment_num != self.next_expected_segment_num {
             return Err(RcpError::InvalidParameter);
         }
@@ -289,13 +289,13 @@ pub fn verify_reassembled_train_crc(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::acf::{self, ReadSizeOrSegmentNum};
+    use crate::acf::{self, ReadSizeOrSegment};
     use crate::avtp;
 
-    fn fragment_info(ms: bool, segment_num: u8) -> ByteMessageInfo {
+    fn fragment_info(ms: bool, segment_num: u16) -> ByteMessageInfo {
         ByteMessageInfo {
             ms,
-            read_size_segment_num: ReadSizeOrSegmentNum(segment_num),
+            read_size_segment: ReadSizeOrSegment(segment_num),
             ..Default::default()
         }
     }
@@ -473,7 +473,7 @@ mod tests {
         let segments: [&[u8]; 3] = [b"seg-one-", b"seg-two-", b"seg-three"];
         for (i, seg) in segments.iter().enumerate() {
             let ms = i + 1 != segments.len();
-            buf.accept_fragment(&fragment_info(ms, i as u8), seg)
+            buf.accept_fragment(&fragment_info(ms, i as u16), seg)
                 .unwrap();
         }
         assert_eq!(
@@ -533,16 +533,24 @@ mod tests {
     // fusa:test REQ-FRAG-008
     fn accept_fragment_never_panics_across_segment_num_wraparound() {
         let mut buf = FragmentReassemblyBuffer::new(u16::MAX);
-        // 300 fragments is well past the 8-bit segment_num field's own
-        // 256-value range, so `next_expected_segment_num` wraps mid-loop.
+        // 65540 fragments is well past the 16-bit segment_num field's own
+        // 65536-value range, so `next_expected_segment_num` wraps mid-loop.
         // `segment_num` is derived the same wrapping way the buffer itself
         // derives its expectation, so every call stays in lockstep and
         // succeeds — the property under test is solely that wraparound
         // itself never panics.
-        for expected in 0u16..300 {
-            let segment_num = (expected % 256) as u8;
-            let ms = expected + 1 != 300;
-            let result = buf.accept_fragment(&fragment_info(ms, segment_num), b"x");
+        // Zero-length fragments: this test's only property is that
+        // segment_num arithmetic itself never panics/misbehaves across the
+        // 16-bit wraparound boundary, independent of accumulated payload
+        // size — using empty fragment bodies keeps the combined payload
+        // under the buffer's own `u16` `rx_stream_max_request_size` cap
+        // across all 65,540 iterations, which a non-empty body per
+        // fragment could not.
+        const TOTAL: u32 = 65_540;
+        for expected in 0u32..TOTAL {
+            let segment_num = (expected % 65_536) as u16;
+            let ms = expected + 1 != TOTAL;
+            let result = buf.accept_fragment(&fragment_info(ms, segment_num), b"");
             assert!(result.is_ok());
         }
     }

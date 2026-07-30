@@ -22,7 +22,7 @@
 //! - [`CStreamId`] mirrors [`StreamId`]'s two fields verbatim.
 //! - [`CByteMessageInfo`] mirrors every [`ByteMessageInfo`] field, flattened
 //!   — [`crate::acf::Evt`]'s `ack`/`sub_opcode` pair becomes `evt_ack`/
-//!   `evt_sub_opcode`, and [`crate::acf::ReadSizeOrSegmentNum`]'s single
+//!   `evt_sub_opcode`, and [`crate::acf::ReadSizeOrSegment`]'s single
 //!   byte becomes a plain `u8` — since neither of those two small wrapper
 //!   types is itself `#[repr(C)]`. Field-width validation (`acf_msg_length`/
 //!   `byte_bus_id` fitting 11 bits, `evt_sub_opcode` fitting 3 bits) is
@@ -75,7 +75,7 @@
 //! `wire`/`e2e`/`config` before it — this is a self-contained cutover with
 //! no other file's callers to fix.
 
-use crate::acf::{ByteMessageInfo, Evt, ReadSizeOrSegmentNum};
+use crate::acf::{ByteMessageInfo, Evt, ReadSizeOrSegment};
 use crate::avtp::StreamId;
 use crate::RcpError;
 
@@ -111,7 +111,7 @@ impl From<CStreamId> for StreamId {
 // ── CByteMessageInfo ───────────────────────────────────────────────────────────
 
 /// C-compatible, flattened mirror of [`ByteMessageInfo`]. See this
-/// module's doc comment for why `evt`/`read_size_segment_num` are
+/// module's doc comment for why `evt`/`read_size_segment` are
 /// flattened rather than nested, and why field-width validation is not
 /// repeated here.
 // fusa:req REQ-CAPI-002
@@ -131,7 +131,7 @@ pub struct CByteMessageInfo {
     pub rsp: bool,
     pub err: bool,
     pub ms: bool,
-    pub read_size_segment_num: u8,
+    pub read_size_segment: u16,
 }
 
 impl From<ByteMessageInfo> for CByteMessageInfo {
@@ -151,7 +151,7 @@ impl From<ByteMessageInfo> for CByteMessageInfo {
             rsp: info.rsp,
             err: info.err,
             ms: info.ms,
-            read_size_segment_num: info.read_size_segment_num.0,
+            read_size_segment: info.read_size_segment.0,
         }
     }
 }
@@ -175,7 +175,7 @@ impl From<CByteMessageInfo> for ByteMessageInfo {
             rsp: c.rsp,
             err: c.err,
             ms: c.ms,
-            read_size_segment_num: ReadSizeOrSegmentNum(c.read_size_segment_num),
+            read_size_segment: ReadSizeOrSegment(c.read_size_segment),
         }
     }
 }
@@ -337,7 +337,7 @@ impl From<&RcpError> for CError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::acf::{Evt, ReadSizeOrSegmentNum};
+    use crate::acf::{Evt, ReadSizeOrSegment};
 
     fn stream_id() -> StreamId {
         StreamId::new([0x02, 0x11, 0x22, 0x33, 0x44, 0x55], 0x0007)
@@ -360,7 +360,7 @@ mod tests {
             rsp: !op,
             err: false,
             ms: false,
-            read_size_segment_num: ReadSizeOrSegmentNum(0x22),
+            read_size_segment: ReadSizeOrSegment(0x22),
         }
     }
 
@@ -404,7 +404,7 @@ mod tests {
         assert!(!c.rsp);
         assert!(c.evt_ack);
         assert_eq!(c.evt_sub_opcode, 0x5);
-        assert_eq!(c.read_size_segment_num, 0x22);
+        assert_eq!(c.read_size_segment, 0x22);
         let back: ByteMessageInfo = c.into();
         assert_eq!(back, bmi);
     }

@@ -110,11 +110,11 @@ pub trait Endpoint: Send + Sync {
     /// Answer a read addressed to this endpoint.
     ///
     /// `read_size` is the request's raw
-    /// [`crate::acf::ReadSizeOrSegmentNum::as_read_size`] byte. This trait
+    /// [`crate::acf::ReadSizeOrSegment::as_read_size`] value. This trait
     /// does not itself prescribe what an implementation does with it —
     /// [`MockEndpoint::read`] treats it as a requested byte count, capped
     /// to however much data is actually held.
-    fn read(&self, read_size: u8) -> Result<Vec<u8>, RcpError>;
+    fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError>;
 
     /// Apply a write addressed to this endpoint, given the request's raw
     /// payload bytes.
@@ -154,7 +154,7 @@ impl Endpoint for MockEndpoint {
     }
 
     // fusa:req REQ-MOCKSRV-010
-    fn read(&self, read_size: u8) -> Result<Vec<u8>, RcpError> {
+    fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
         let buf = self.buf.lock().unwrap();
         let n = (read_size as usize).min(buf.len());
         Ok(buf[..n].to_vec())
@@ -362,7 +362,7 @@ impl RcServer {
                     endpoint.write(&request.payload)?;
                     Vec::new()
                 } else {
-                    endpoint.read(request.info.read_size_segment_num.as_read_size())?
+                    endpoint.read(request.info.read_size_segment.as_read_size())?
                 }
             }
         };
@@ -407,7 +407,7 @@ impl RcServer {
 #[cfg(test)]
 mod rc_server_tests {
     use super::*;
-    use crate::acf::{ByteMessageInfo, Evt, ReadSizeOrSegmentNum};
+    use crate::acf::{ByteMessageInfo, Evt, ReadSizeOrSegment};
     use crate::ep0::EP0_BYTE_BUS_ID;
 
     fn stream(unique_id: u16) -> StreamId {
@@ -420,7 +420,7 @@ mod rc_server_tests {
                 byte_bus_id,
                 op,
                 evt: Evt::default(),
-                read_size_segment_num: ReadSizeOrSegmentNum(payload.len() as u8),
+                read_size_segment: ReadSizeOrSegment(payload.len() as u16),
                 ..Default::default()
             },
             payload,
@@ -568,7 +568,7 @@ mod rc_server_tests {
         srv.handle_abb(sid, &write_req).unwrap();
 
         let mut read_req = abb_request(5, false, Vec::new());
-        read_req.info.read_size_segment_num = ReadSizeOrSegmentNum(4);
+        read_req.info.read_size_segment = ReadSizeOrSegment(4);
         let resp = srv.handle_abb(sid, &read_req).unwrap();
         assert_eq!(resp.payload, vec![0xDE, 0xAD, 0xBE, 0xEF]);
     }
@@ -625,7 +625,7 @@ mod rc_server_tests {
         srv.register_endpoint(sid, 3, ep).unwrap();
 
         let mut req = abb_request(3, false, Vec::new());
-        req.info.read_size_segment_num = ReadSizeOrSegmentNum(4);
+        req.info.read_size_segment = ReadSizeOrSegment(4);
         let req_bytes = encode_acf_abb(&req).unwrap();
         let frame = encode_ntscf_frame(sid, 0, &req_bytes).unwrap();
 

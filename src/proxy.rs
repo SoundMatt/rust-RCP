@@ -62,7 +62,7 @@ impl Endpoint for ProxyEndpoint {
     }
 
     // fusa:req REQ-PROXY-003
-    fn read(&self, read_size: u8) -> Result<Vec<u8>, RcpError> {
+    fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
         let guard = self.inner.read().unwrap();
         match guard.as_ref() {
             Some(ep) => ep.read(read_size),

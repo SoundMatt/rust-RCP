@@ -112,7 +112,7 @@ impl Endpoint for RedundancyEndpoint {
     // fusa:req REQ-RED-003
     // fusa:req REQ-RED-004
     // fusa:req REQ-RED-005
-    fn read(&self, read_size: u8) -> Result<Vec<u8>, RcpError> {
+    fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
         self.dispatch(|ep| ep.read(read_size))
     }
 
@@ -139,7 +139,7 @@ mod tests {
         fn ep_type(&self) -> EndpointType {
             EndpointType::Gpio
         }
-        fn read(&self, _read_size: u8) -> Result<Vec<u8>, RcpError> {
+        fn read(&self, _read_size: u16) -> Result<Vec<u8>, RcpError> {
             Err(RcpError::Closed)
         }
         fn write(&self, _payload: &[u8]) -> Result<(), RcpError> {

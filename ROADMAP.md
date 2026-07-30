@@ -175,7 +175,7 @@ shared request-descriptor header that carries all per-message addressing.
       `decode_byte_message_info`. Per Guiding Principle 5, the
       `read_size`/`segment_num` ambiguity is resolved with an explicit,
       documented convention rather than a single ambiguous field:
-      `ReadSizeOrSegmentNum` models the field as one raw byte with two
+      `ReadSizeOrSegment` models the field as one raw byte with two
       same-bit accessor views (`as_read_size`/`as_segment_num`), since this
       crate has not reconciled which bit(s), if any, would select one
       interpretation over the other. All byte offsets/bit widths beyond the
@@ -980,7 +980,7 @@ functional config) before tackling bus-protocol endpoints.
       threshold is not treated as a "disabled" sentinel (so a default,
       zeroed config resolves every read as immediately complete via
       `Both`); (2) `read_size` reuses the already-existing
-      `acf::ReadSizeOrSegmentNum` field rather than a UART-private type,
+      `acf::ReadSizeOrSegment` field rather than a UART-private type,
       while `uart_timeout` (no existing crate-level counterpart) is carried
       as an unconfirmed-width/units `u32`; (3) the roadmap's literal
       `UNKNOWN_CMD` text has no matching variant among Milestone 2's Error
@@ -1611,10 +1611,10 @@ concepts into it rather than treating them as unrelated decorators.
       rather than silently ignoring either). Per Guiding Principle 5, since
       this crate has no live multi-AVTPDU reassembly buffer yet (Milestone
       8's job) and has not resolved which bit(s) of
-      `acf::ReadSizeOrSegmentNum` would select a `segment_num` reading, a
+      `acf::ReadSizeOrSegment` would select a `segment_num` reading, a
       fragment train's segment order is taken as a caller-supplied fact
       (the ordered `&[&[u8]]` itself) rather than derived from
-      `ReadSizeOrSegmentNum::as_segment_num` here; likewise, since the
+      `ReadSizeOrSegment::as_segment_num` here; likewise, since the
       roadmap does not state whether the coverage buffer's non-payload
       region should be drawn from each fragment individually or from one
       fragment alone, this entry takes the entire non-payload region (
@@ -2116,7 +2116,7 @@ for "RCP version 1.0," so silence on it is not acceptable.
       `FragmentReassemblyBuffer::accept_fragment` takes each
       wire-arrival-ordered fragment's already-decoded
       `acf::ByteMessageInfo` plus payload, validates the dual-purpose
-      `read_size`/`segment_num` byte (`acf::ReadSizeOrSegmentNum::as_segment_num`)
+      `read_size`/`segment_num` byte (`acf::ReadSizeOrSegment::as_segment_num`)
       as a strictly-incrementing, zero-based consistency check against
       gaps/duplicates/reordering (a working interpretation, flagged per
       Guiding Principle 5 — see `fragment.rs`'s own "Provenance note:
@@ -2345,7 +2345,7 @@ exists to migrate them onto.
       own disposition-table reason — is deleted outright and replaced with
       `CStreamId` (mirroring `avtp::StreamId`), `CByteMessageInfo`
       (mirroring every `acf::ByteMessageInfo` field, flattening `Evt` and
-      `ReadSizeOrSegmentNum` since neither is itself `#[repr(C)]`), and
+      `ReadSizeOrSegment` since neither is itself `#[repr(C)]`), and
       `CAbbRequest`/`CAbbResponse` (each pairing a `CStreamId` with a
       `CByteMessageInfo`) — kept as two distinct Rust types despite an
       identical field layout, since a real request and its response are

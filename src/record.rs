@@ -34,7 +34,7 @@ use crate::RcpError;
 pub enum Entry {
     Read {
         timestamp: SystemTime,
-        read_size: u8,
+        read_size: u16,
         result: Result<Vec<u8>, RcpError>,
     },
     Write {
@@ -98,7 +98,7 @@ impl Endpoint for RecordEndpoint {
     }
 
     // fusa:req REQ-REC-005
-    fn read(&self, read_size: u8) -> Result<Vec<u8>, RcpError> {
+    fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
         let result = self.inner.read(read_size);
         self.log.lock().unwrap().push(Entry::Read {
             timestamp: SystemTime::now(),
@@ -158,7 +158,7 @@ mod tests {
             fn ep_type(&self) -> EndpointType {
                 EndpointType::Gpio
             }
-            fn read(&self, _read_size: u8) -> Result<Vec<u8>, RcpError> {
+            fn read(&self, _read_size: u16) -> Result<Vec<u8>, RcpError> {
                 Err(RcpError::Closed)
             }
             fn write(&self, _payload: &[u8]) -> Result<(), RcpError> {

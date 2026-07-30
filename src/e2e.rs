@@ -110,9 +110,9 @@
 //! taking not-yet-built state as a caller-supplied fact (e.g.
 //! `crate::request`'s `SequencerState`/`root_client`), this section takes a
 //! fragment train's per-segment payloads as a caller-supplied, already-
-//! ordered `&[&[u8]]` rather than reading `acf::ReadSizeOrSegmentNum`
+//! ordered `&[&[u8]]` rather than reading `acf::ReadSizeOrSegment`
 //! itself to determine ordering. That is a deliberate, additional instance
-//! of Guiding Principle 5: `acf::ReadSizeOrSegmentNum`'s own provenance
+//! of Guiding Principle 5: `acf::ReadSizeOrSegment`'s own provenance
 //! note already flags that this crate has not resolved which bit(s), if
 //! any, select its `read_size` vs. `segment_num` interpretation, so this
 //! module treats "this is a fragment train, and this is its segment order"
@@ -234,20 +234,23 @@ pub enum AcfCoverageMessage<'a> {
 ///   [`HeaderVariant::Tscf`], or, for [`HeaderVariant::Ntscf`] (which has no
 ///   `avtp_timestamp` field to carry), four zero bytes occupying the same
 ///   position in the buffer rather than being omitted.
-/// - The full ACF header is `acf`'s discriminant byte, `byte_message_info`,
-///   and (for [`AcfCoverageMessage::Gbb`] only) the 8-byte
-///   `message_timestamp` — reusing [`acf::encode_acf_abb`]/
-///   [`acf::encode_acf_gbb`] (which also appends the payload, completing
-///   the buffer in the same call) rather than re-deriving either message's
-///   wire layout here. Before encoding, `acf`'s `byte_message_info.
+/// - The full ACF header is `acf`'s discriminant byte, `byte_message_info`
+///   (via [`acf::encode_byte_message_info`]), and (for
+///   [`AcfCoverageMessage::Gbb`] only) the 8-byte `message_timestamp`, with
+///   the payload appended after. Before encoding, `acf`'s `byte_message_info.
 ///   acf_msg_length` is increased by [`CRC32_COVERAGE_LENGTH_PREADJUST_OCTETS`]
-///   — see this module's doc comment for why that field specifically.
+///   — see this module's doc comment for why that field specifically. This
+///   deliberately calls [`acf::encode_byte_message_info`] directly rather
+///   than [`acf::encode_acf_abb`]/[`acf::encode_acf_gbb`]: since
+///   rust-RCP-N2-05, those two derive `acf_msg_length` from the real
+///   payload length for an actual wire frame and would simply discard this
+///   function's pre-adjusted value — this buffer is a CRC-coverage scratch
+///   construction that is never itself transmitted, so it has no reason to
+///   go through that real-frame derivation.
 ///
 /// Returns `Err(RcpError::InvalidSize)` if the pre-adjusted `acf_msg_length`
 /// (or any other `ByteMessageInfo` field) fails
-/// [`acf::encode_byte_message_info`]'s field-width validation — the same
-/// error [`acf::encode_acf_abb`]/[`acf::encode_acf_gbb`] would themselves
-/// return for an out-of-range header.
+/// [`acf::encode_byte_message_info`]'s field-width validation.
 ///
 /// Additive standalone plumbing, matching every prior Milestone 1-6 entry's
 /// discipline: not called from [`crc32_tc18`] or a decoder/dispatch loop —
@@ -270,22 +273,36 @@ pub fn build_crc32_coverage_buffer(
     buf.extend_from_slice(&stream_id.to_be_bytes());
     buf.extend_from_slice(&avtp_timestamp_bytes);
 
+    // This deliberately encodes via `acf::encode_byte_message_info` (which
+    // serializes whatever `acf_msg_length` it is given verbatim) rather
+    // than `acf::encode_acf_abb`/`acf::encode_acf_gbb` (which, since
+    // rust-RCP-N2-05, derive `acf_msg_length` from the real payload length
+    // and reject a caller-supplied value that disagrees). This buffer is a
+    // CRC-coverage scratch construction, not a real wire frame — the
+    // pre-adjusted length below is *never* actually transmitted on the
+    // wire, so it must bypass that real-frame derivation/validation
+    // entirely rather than trying to satisfy it.
     match acf {
         AcfCoverageMessage::Abb(msg) => {
-            let mut adjusted = (*msg).clone();
-            adjusted.info.acf_msg_length = adjusted
-                .info
+            let mut adjusted_info = msg.info;
+            adjusted_info.acf_msg_length = adjusted_info
                 .acf_msg_length
                 .saturating_add(CRC32_COVERAGE_LENGTH_PREADJUST_OCTETS);
-            buf.extend_from_slice(&acf::encode_acf_abb(&adjusted)?);
+            let info_bytes = acf::encode_byte_message_info(&adjusted_info)?;
+            buf.push(acf::ACF_ABB_MSG_TYPE);
+            buf.extend_from_slice(&info_bytes);
+            buf.extend_from_slice(&msg.payload);
         }
         AcfCoverageMessage::Gbb(msg) => {
-            let mut adjusted = (*msg).clone();
-            adjusted.info.acf_msg_length = adjusted
-                .info
+            let mut adjusted_info = msg.info;
+            adjusted_info.acf_msg_length = adjusted_info
                 .acf_msg_length
                 .saturating_add(CRC32_COVERAGE_LENGTH_PREADJUST_OCTETS);
-            buf.extend_from_slice(&acf::encode_acf_gbb(&adjusted)?);
+            let info_bytes = acf::encode_byte_message_info(&adjusted_info)?;
+            buf.push(acf::ACF_GBB_MSG_TYPE);
+            buf.extend_from_slice(&info_bytes);
+            buf.extend_from_slice(&msg.message_timestamp.to_be_bytes());
+            buf.extend_from_slice(&msg.payload);
         }
     }
 
@@ -301,7 +318,7 @@ pub fn build_crc32_coverage_buffer(
 /// This crate has no live multi-AVTPDU reassembly buffer to read segment
 /// order from yet (`ROADMAP.md` Milestone 8), so segment order is a
 /// caller-supplied fact rather than something derived from
-/// `acf::ReadSizeOrSegmentNum::as_segment_num` here — see this module's
+/// `acf::ReadSizeOrSegment::as_segment_num` here — see this module's
 /// doc comment "Fragmentation interaction" section for why.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct CombinedFragmentPayload(pub Vec<u8>);

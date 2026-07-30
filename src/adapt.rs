@@ -58,7 +58,7 @@
 //!   states read/write intent directly.
 //! - **Read size.** A read additionally needs a requested byte count that
 //!   `Command` never carried. `from_message` reads an optional
-//!   `"rcp.read_size"` meta key (decimal `u8`), defaulting to `u8::MAX` —
+//!   `"rcp.read_size"` meta key (decimal `u16`), defaulting to `u16::MAX` —
 //!   "return everything held" — matching [`crate::mock::MockEndpoint::read`]'s
 //!   own already-established "cap to whatever is actually held" behavior.
 //! - **Subscribe.** [`crate::mock::RcServer`]'s own doc comment states it
@@ -90,7 +90,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use tokio::sync::mpsc;
 
-use crate::acf::{AcfAbbMessage, ByteMessageInfo, ReadSizeOrSegmentNum};
+use crate::acf::{AcfAbbMessage, ByteMessageInfo, ReadSizeOrSegment};
 use crate::avtp::StreamId;
 use crate::mock::{Endpoint, RcServer};
 use crate::relay::{Context, Message, Protocol, SubscriberOptions, Version};
@@ -128,7 +128,7 @@ impl<M: Send + Sync + 'static> AdaptEndpoint<M> {
     /// comment for why this is a write-then-read round trip rather than a
     /// single `send`-shaped call.
     // fusa:req REQ-ADAPT-003
-    pub fn send_msg(&self, msg: M, read_size: u8) -> Result<M, RcpError> {
+    pub fn send_msg(&self, msg: M, read_size: u16) -> Result<M, RcpError> {
         let payload = self.adapter.to_write_payload(msg)?;
         self.inner.write(&payload)?;
         let bytes = self.inner.read(read_size)?;
@@ -213,8 +213,8 @@ pub fn parse_endpoint_id(id: &str) -> Result<(StreamId, u16), RcpError> {
 /// - `"rcp.op"` (`"read"` or `"write"`; any other value is
 ///   `Err(RcpError::InvalidParameter)`) — defaults to `"write"` if
 ///   `msg.payload` is non-empty, `"read"` otherwise.
-/// - `"rcp.read_size"` (a decimal `u8`; malformed is
-///   `Err(RcpError::InvalidParameter)`) — defaults to `u8::MAX`, meaningful
+/// - `"rcp.read_size"` (a decimal `u16`; malformed is
+///   `Err(RcpError::InvalidParameter)`) — defaults to `u16::MAX`, meaningful
 ///   only for a read.
 ///
 /// Every other `ByteMessageInfo` field this binding has no `Message`-level
@@ -233,16 +233,16 @@ pub fn from_message(msg: &Message) -> Result<(StreamId, AcfAbbMessage), RcpError
     let read_size = msg
         .meta
         .get("rcp.read_size")
-        .map(|v| v.parse::<u8>().map_err(|_| RcpError::InvalidParameter))
+        .map(|v| v.parse::<u16>().map_err(|_| RcpError::InvalidParameter))
         .transpose()?
-        .unwrap_or(u8::MAX);
+        .unwrap_or(u16::MAX);
     Ok((
         stream_id,
         AcfAbbMessage {
             info: ByteMessageInfo {
                 byte_bus_id,
                 op,
-                read_size_segment_num: ReadSizeOrSegmentNum(read_size),
+                read_size_segment: ReadSizeOrSegment(read_size),
                 ..Default::default()
             },
             payload: msg.payload.clone(),
@@ -570,7 +570,7 @@ mod tests {
         assert_eq!(sid, stream(1));
         assert_eq!(req.info.byte_bus_id, 3);
         assert!(!req.info.op);
-        assert_eq!(req.info.read_size_segment_num.as_read_size(), 16);
+        assert_eq!(req.info.read_size_segment.as_read_size(), 16);
     }
 
     #[test]
