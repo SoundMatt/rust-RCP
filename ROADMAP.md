@@ -691,6 +691,17 @@ the *mandatory* discovery path (mDNS may continue to exist as a
 complementary network-rendezvous helper — see the satellite disposition
 table — but it is not a substitute for this).
 
+**Caveat carried through every checklist item below:** two of this
+subsection's on-wire conventions — broadcast addressing and the
+register-address encoding — have no dedicated field in this crate's
+Milestone 1 wire types to carry them, so `src/discovery.rs` invents its own
+working conventions for both (see that module's own "Provenance note" doc
+comment, per Guiding Principle 5). They are this crate's unreconciled
+interpretations, not confirmed OPEN Alliance TC18 Remote Control Protocol
+Specification v0.5.1_RC conventions, and are not to be relied on for
+interop with a real TC18 RC Server until reconciled against the actual
+specification behavior.
+
 - [x] Discovery request/response: broadcastable ACF_ABB read addressed to
       `byte_bus_id 0`, register address 0, answerable in **any** lifecycle
       state. Done (v0.6.0-dev): new, additive `src/discovery.rs` adds
@@ -706,7 +717,9 @@ table — but it is not a substitute for this).
       0's field content, and its header echoes the request's `byte_bus_id`
       per the existing echo-back rule). Two working interpretations this
       item introduces are flagged per Guiding Principle 5 in the module's
-      own provenance note rather than presented as spec-cited fact: (1)
+      own provenance note rather than presented as spec-cited fact, and
+      neither is to be relied on for interop with a real TC18 RC Server
+      until reconciled against the actual specification behavior: (1)
       "broadcastable" addressing, since `avtp::StreamId` has no
       broadcast/multicast concept of its own — this crate reuses the
       reserved IEEE 802.3 all-ones Ethernet broadcast MAC paired with
@@ -747,7 +760,9 @@ table — but it is not a substitute for this).
       an out-of-order `now`) gates whether an existing claim still blocks a
       different claimant; once lapsed, any claimant — including a new one
       — may claim it. Two working interpretations this item introduces are
-      flagged per Guiding Principle 5 in the module's own provenance note:
+      flagged per Guiding Principle 5 in the module's own provenance note,
+      and are not to be relied on for interop with a real TC18 RC Server
+      until reconciled against the actual specification behavior:
       (1) claim identity is modeled as `avtp::StreamId` (the same type
       the broadcast-addressing sentinel already uses), with the sentinel
       `DISCOVERY_BROADCAST_STREAM_ID` itself always rejected as a claimant
@@ -818,7 +833,9 @@ table — but it is not a substitute for this).
       observed `GeneralRegisters` still agrees with a cached identity, and
       `DiscoveryCache::invalidate` drops a stale-in-the-identity-sense entry
       explicitly. Three working interpretations this item introduces are
-      flagged per Guiding Principle 5 in the module's own provenance note:
+      flagged per Guiding Principle 5 in the module's own provenance note,
+      and are not to be relied on for interop with a real TC18 RC Server
+      until reconciled against the actual specification behavior:
       (1) which `GeneralRegisters` fields are cache-worthy — the five named
       above, chosen as stable-identity fields, deliberately excluding
       reconfigurable state such as `svr_configuration_lock` and the `§3.6`
@@ -841,7 +858,10 @@ table — but it is not a substitute for this).
 Success Criteria:
 A client can broadcast-discover a server in any lifecycle state, claim the
 discovery stream, and observe that claim correctly lapse and reopen per the
-timeout rule.
+timeout rule — against this crate's own reference `mock::RcServer` and this
+module's own unreconciled broadcast-addressing/register-address
+conventions (see the Caveat above), not demonstrated against a real TC18
+RC Server.
 
 ---
 
