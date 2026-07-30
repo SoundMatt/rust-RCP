@@ -33,10 +33,11 @@
 //!   4b/5b-encoded line-level form via [`IseledFrame::encode_line`] /
 //!   [`IseledFrame::decode_line`]. See "Provenance note: `IseledFrame`'s
 //!   field layout" below.
-//! - [`iseled_frame_crc8`] / [`IseledFrameCrc`] — the optional native
-//!   ISELED CRC, kept fully independent of [`crate::e2e::crc32_tc18`]. See
-//!   "Provenance note: the native ISELED CRC is a distinct, additive layer"
-//!   below.
+//! - `iseled_frame_crc8` / `IseledFrameCrc` — the optional native ISELED
+//!   CRC, kept fully independent of [`crate::e2e::crc32_tc18`]. Only
+//!   compiled in under the `iseled-unconfirmed-crc` Cargo feature, **not**
+//!   part of this crate's default build — see "Provenance note: the native
+//!   ISELED CRC is a distinct, additive layer" below for why.
 //! - [`iseled_collect_resp`] / [`IseledDeviceResponse`] /
 //!   [`IseledCollectedResponse`] — multi-device response aggregation, named
 //!   to match `ROADMAP.md`'s own identifier. See "Multi-device response
@@ -113,24 +114,35 @@
 //! CRC, distinct from and additional to the RCP-level CRC32" — i.e. two
 //! independent CRC layers that can both be present on the same message,
 //! neither one replacing the other. [`crate::e2e::crc32_tc18`] (Milestone 6)
-//! already covers the RCP-level safe-point layer; [`iseled_frame_crc8`]
-//! below is a second, unrelated algorithm — different width (8 bits vs. 32),
+//! already covers the RCP-level safe-point layer; `iseled_frame_crc8` would
+//! be a second, unrelated algorithm — different width (8 bits vs. 32),
 //! different input (an [`IseledFrame`]'s own raw bytes, not a safe-point
 //! AVTPDU/ACF coverage buffer), and computed by a wholly separate function
 //! this module does not call from `crc32_tc18` or vice versa. This crate's
 //! spec-extraction pass has not recovered ISELED's own confirmed CRC
 //! polynomial/width/init parameters, so — per Guiding Principle 5 —
-//! [`iseled_frame_crc8`] uses a named, independently well-documented
-//! standard CRC-8 variant ("CRC-8/AUTOSAR": polynomial `0x2F`, init
-//! `0xFF`, non-reflected, final XOR `0xFF`) as its own explicitly flagged
-//! working choice, not asserted as the confirmed ISELED-specified value.
-//! [`IseledFunctionalConfig::native_crc_enabled`] models the "optional" part
-//! of this checklist bullet: whether an endpoint is configured to append
-//! this CRC at all is a per-endpoint functional-config choice, not a
-//! per-frame one this module infers on its own. A later item that recovers
-//! ISELED's real CRC parameters (against this crate's own spec-extraction
-//! pass, never against restated spec prose) is expected to update
-//! [`iseled_frame_crc8`]'s algorithm then, not now.
+//! `iseled_frame_crc8` uses a named, independently well-documented standard
+//! CRC-8 variant ("CRC-8/AUTOSAR": polynomial `0x2F`, init `0xFF`,
+//! non-reflected, final XOR `0xFF`) as its own explicitly flagged working
+//! choice, not asserted as the confirmed ISELED-specified value.
+//!
+//! Because that width/polynomial/init tuple — and even the choice of
+//! CRC-8/AUTOSAR as ISELED's real native algorithm at all — is an unverified
+//! stand-in rather than a confirmed spec value, `iseled_frame_crc8` /
+//! `IseledFrameCrc` / the private `crc8_autosar` helper are gated behind the
+//! opt-in `iseled-unconfirmed-crc` Cargo feature and are **not** part of
+//! this crate's default build. This keeps an invented algorithm from being
+//! indistinguishable, at the API level, from this crate's other
+//! confirmed-correct wire primitives — a caller has to explicitly opt in to
+//! get it, rather than getting it "for free" by depending on this crate at
+//! all. [`IseledFunctionalConfig::native_crc_enabled`] itself carries no
+//! such gate: it models the "optional" part of this checklist bullet as a
+//! per-endpoint functional-config choice — whatever algorithm eventually
+//! backs it — independent of whether `iseled-unconfirmed-crc` is enabled in
+//! any given build. A later item that recovers ISELED's real CRC parameters
+//! (against this crate's own spec-extraction pass, never against restated
+//! spec prose) is expected to update `iseled_frame_crc8`'s algorithm and
+//! reconsider this gate then, not now.
 //!
 //! ## Multi-device response aggregation
 //!
@@ -325,6 +337,11 @@ impl IseledFrame {
 /// fully independent of [`crate::e2e::crc32_tc18`]'s unrelated 32-bit
 /// safe-point layer. See this module's doc comment "Provenance note: the
 /// native ISELED CRC is a distinct, additive layer".
+///
+/// Only compiled in under the `iseled-unconfirmed-crc` Cargo feature — see
+/// that same provenance note for why this is gated out of this crate's
+/// default build rather than shipped as an ordinary, always-available item.
+#[cfg(feature = "iseled-unconfirmed-crc")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 // fusa:req REQ-ISELED-006
 pub struct IseledFrameCrc(pub u8);
@@ -334,6 +351,7 @@ pub struct IseledFrameCrc(pub u8);
 /// See this module's doc comment for why this named, independently
 /// documented standard variant is this module's own flagged working choice
 /// rather than a confirmed ISELED-specified algorithm.
+#[cfg(feature = "iseled-unconfirmed-crc")]
 fn crc8_autosar(data: &[u8]) -> u8 {
     const POLY: u8 = 0x2F;
     let mut crc: u8 = 0xFF;
@@ -355,6 +373,11 @@ fn crc8_autosar(data: &[u8]) -> u8 {
 /// `crc8_autosar` rather than re-deriving either. This is a wholly
 /// separate computation from [`crate::e2e::crc32_tc18`]; neither function
 /// calls the other. Never panics for any input frame.
+///
+/// Only compiled in under the `iseled-unconfirmed-crc` Cargo feature — see
+/// this module's doc comment "Provenance note: the native ISELED CRC is a
+/// distinct, additive layer" for why.
+#[cfg(feature = "iseled-unconfirmed-crc")]
 // fusa:req REQ-ISELED-006
 pub fn iseled_frame_crc8(frame: &IseledFrame) -> IseledFrameCrc {
     IseledFrameCrc(crc8_autosar(&frame.encode()))
@@ -406,16 +429,20 @@ pub fn iseled_collect_resp(per_device: &[IseledDeviceResponse]) -> IseledCollect
 
 /// ISELED's own per-EP-type functional-config content: whether this
 /// endpoint is configured to append the optional native ISELED CRC (see
-/// [`iseled_frame_crc8`]).
+/// `iseled_frame_crc8`, behind the `iseled-unconfirmed-crc` Cargo feature).
 ///
 /// See this module's doc comment "Relationship to `crate::regmap`" for why
 /// this carries a field (unlike [`crate::lin::LinFunctionalConfig`]'s empty
-/// placeholder).
+/// placeholder). This struct and its field are **not** feature-gated — only
+/// the CRC algorithm implementation itself is — see this module's doc
+/// comment "Provenance note: the native ISELED CRC is a distinct, additive
+/// layer".
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 // fusa:req REQ-ISELED-009
 pub struct IseledFunctionalConfig {
-    /// Whether this ISELED endpoint is configured to append the native
-    /// per-frame CRC ([`iseled_frame_crc8`]) in addition to the RCP-level
+    /// Whether this ISELED endpoint is configured to append a native
+    /// per-frame CRC (`iseled_frame_crc8`, when the `iseled-unconfirmed-crc`
+    /// Cargo feature is enabled) in addition to the RCP-level
     /// [`crate::e2e::crc32_tc18`] safe-point CRC. See this module's doc
     /// comment "Provenance note: the native ISELED CRC is a distinct,
     /// additive layer" — enabling this never disables or replaces the
@@ -568,43 +595,52 @@ mod tests {
     }
 
     // ── Native ISELED CRC: distinct from crc32_tc18 ──────────────────────────
+    //
+    // Gated the same as the code under test — see this module's doc comment
+    // "Provenance note: the native ISELED CRC is a distinct, additive layer"
+    // for why `iseled_frame_crc8`/`IseledFrameCrc` only compile in under the
+    // `iseled-unconfirmed-crc` Cargo feature.
+    #[cfg(feature = "iseled-unconfirmed-crc")]
+    mod native_crc {
+        use super::*;
 
-    #[test]
-    // fusa:test REQ-ISELED-006
-    fn iseled_frame_crc8_is_deterministic_and_sensitive_to_frame_content() {
-        let frame_a = IseledFrame {
-            chain_address: 0x01,
-            command: 0x02,
-            data: vec![0x03, 0x04],
-        };
-        let frame_b = IseledFrame {
-            chain_address: 0x01,
-            command: 0x02,
-            data: vec![0x03, 0x05],
-        };
-        assert_eq!(iseled_frame_crc8(&frame_a), iseled_frame_crc8(&frame_a));
-        assert_ne!(iseled_frame_crc8(&frame_a), iseled_frame_crc8(&frame_b));
-    }
+        #[test]
+        // fusa:test REQ-ISELED-006
+        fn iseled_frame_crc8_is_deterministic_and_sensitive_to_frame_content() {
+            let frame_a = IseledFrame {
+                chain_address: 0x01,
+                command: 0x02,
+                data: vec![0x03, 0x04],
+            };
+            let frame_b = IseledFrame {
+                chain_address: 0x01,
+                command: 0x02,
+                data: vec![0x03, 0x05],
+            };
+            assert_eq!(iseled_frame_crc8(&frame_a), iseled_frame_crc8(&frame_a));
+            assert_ne!(iseled_frame_crc8(&frame_a), iseled_frame_crc8(&frame_b));
+        }
 
-    #[test]
-    // fusa:test REQ-ISELED-006
-    fn iseled_frame_crc8_is_independent_of_e2e_crc32_tc18() {
-        // Both CRC layers can be computed over related content without
-        // either function calling the other or the two outputs colliding
-        // in width/type — see this module's doc comment "Provenance note:
-        // the native ISELED CRC is a distinct, additive layer".
-        let frame = IseledFrame {
-            chain_address: 0x07,
-            command: 0x01,
-            data: vec![0xAA, 0xBB, 0xCC],
-        };
-        let native: IseledFrameCrc = iseled_frame_crc8(&frame);
-        let rcp_level: u32 = crate::e2e::crc32_tc18(&frame.encode());
-        // Distinct types (u8-wrapping vs. u32) enforced at compile time;
-        // this assertion documents that computing one has no bearing on
-        // the other's value for the same underlying bytes.
-        assert_eq!(native.0 as u32 & !0xFF, 0);
-        let _ = rcp_level;
+        #[test]
+        // fusa:test REQ-ISELED-006
+        fn iseled_frame_crc8_is_independent_of_e2e_crc32_tc18() {
+            // Both CRC layers can be computed over related content without
+            // either function calling the other or the two outputs colliding
+            // in width/type — see this module's doc comment "Provenance note:
+            // the native ISELED CRC is a distinct, additive layer".
+            let frame = IseledFrame {
+                chain_address: 0x07,
+                command: 0x01,
+                data: vec![0xAA, 0xBB, 0xCC],
+            };
+            let native: IseledFrameCrc = iseled_frame_crc8(&frame);
+            let rcp_level: u32 = crate::e2e::crc32_tc18(&frame.encode());
+            // Distinct types (u8-wrapping vs. u32) enforced at compile time;
+            // this assertion documents that computing one has no bearing on
+            // the other's value for the same underlying bytes.
+            assert_eq!(native.0 as u32 & !0xFF, 0);
+            let _ = rcp_level;
+        }
     }
 
     // ── Multi-device response aggregation ────────────────────────────────────

@@ -99,7 +99,7 @@ See [docs/SEMVER.md](docs/SEMVER.md) for which modules carry a semver stability 
 | `pwm` | The PWM_OUT / PWM_IN endpoint types (`ep_type 0x07`/`0x08`) |
 | `adc` | The ADC endpoint type (`ep_type 0x09`) |
 | `can` | The CAN controller endpoint type (`ep_type 0x0B`) |
-| `iseled` | The ISELED endpoint type (`ep_type 0x0C`) |
+| `iseled` | The ISELED endpoint type (`ep_type 0x0C`). Its native per-frame CRC (`iseled_frame_crc8`/`IseledFrameCrc`) is an unconfirmed stand-in algorithm, gated behind the opt-in `iseled-unconfirmed-crc` Cargo feature and excluded from the default build — see the module's own doc comment |
 | `mdio` | The MDIO endpoint type (`ep_type 0x0D`) |
 | `evtgroup` | The "Groups A/B/C" `evt[2:0]` sub-opcode convention |
 | `ratelimit` | Token-bucket rate limiter endpoint decorator (`RateLimitEndpoint`, over `mock::Endpoint`) |

@@ -12,6 +12,14 @@ categories = ["embedded", "network-programming"]
 name = "rcp"
 path = "src/lib.rs"
 
+[features]
+# Opt-in only: not enabled by any other feature and not part of `default`.
+# Gates `rcp::iseled::iseled_frame_crc8`/`IseledFrameCrc`, this crate's
+# invented CRC-8/AUTOSAR stand-in for ISELED's own (still unrecovered)
+# native per-frame CRC parameters. See `src/iseled.rs`'s module doc comment
+# "Provenance note: the native ISELED CRC is a distinct, additive layer".
+iseled-unconfirmed-crc = []
+
 [[bin]]
 name = "rust-rcp"
 path = "src/bin/rcp.rs"
