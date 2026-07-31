@@ -1136,12 +1136,16 @@ impl core::marker::Unpin for rcp::e2e::CombinedFragmentPayload
 impl core::marker::UnsafeUnpin for rcp::e2e::CombinedFragmentPayload
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::e2e::CombinedFragmentPayload
 impl core::panic::unwind_safe::UnwindSafe for rcp::e2e::CombinedFragmentPayload
+pub const rcp::e2e::CRC_TRAILER_LEN: usize
+pub const rcp::e2e::CRC_TRAILER_QUADLETS: u16
 pub fn rcp::e2e::build_crc32_coverage_buffer(&rcp::avtp::HeaderVariant, &rcp::e2e::AcfCoverageMessage<'_>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::e2e::build_crc32_coverage_buffer_for_fragment_train(&rcp::avtp::HeaderVariant, &rcp::e2e::AcfCoverageMessage<'_>, &[&[u8]]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::e2e::check_fragment_crc_placement(bool, bool) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::e2e::crc32_tc18(&[u8]) -> u32
 pub fn rcp::e2e::crc32_tc18_for_fragment_train(&rcp::avtp::HeaderVariant, &rcp::e2e::AcfCoverageMessage<'_>, &[&[u8]]) -> core::result::Result<u32, rcp::RcpError>
+pub fn rcp::e2e::finalize_crc_trailer(&mut alloc::vec::Vec<u8>, u32) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::e2e::fragment_crc_expectation(bool) -> rcp::e2e::FragmentCrcExpectation
+pub fn rcp::e2e::split_crc_trailer(&[u8]) -> core::result::Result<(alloc::vec::Vec<u8>, u32), rcp::RcpError>
 pub mod rcp::ep0
 pub enum rcp::ep0::Ep0AccessKind
 pub rcp::ep0::Ep0AccessKind::Read

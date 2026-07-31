@@ -105,9 +105,24 @@
 //! CRC32 trailer = 20 bytes = 5 quadlets, `acf_msg_length = 0x05`;
 //! Figure 20: a single ACF_GBB with an 8-byte header + 8-byte timestamp +
 //! 7 payload bytes + 1 pad byte + 4-byte CRC32 trailer = 28 bytes =
-//! 7 quadlets, `acf_msg_length = 0x07`) and pinned by golden-vector tests
-//! below (`acf_abb_matches_figure_19_worked_example`/
-//! `acf_gbb_matches_figure_20_worked_example`).
+//! 7 quadlets, `acf_msg_length = 0x07`). Both figures' real wire byte
+//! order — header (+ `message_timestamp`), payload, `pad`, THEN the CRC32
+//! trailer, pad strictly *before* the CRC — is pinned byte-for-byte by
+//! [`crate::e2e::finalize_crc_trailer`]'s own golden-vector tests
+//! (`finalize_crc_trailer_matches_figure_19_worked_example`/
+//! `finalize_crc_trailer_matches_figure_20_worked_example`), not here: this
+//! module's own `encode_acf_abb`/`encode_acf_gbb` have no CRC-trailer
+//! concept of their own (see the "acf_msg_length quadlet semantics" note
+//! below), so a byte-for-byte CRC-inclusive worked-example test belongs
+//! with the module that actually assembles a CRC-protected frame out of
+//! them, not here. An earlier revision of this module pinned both figures
+//! locally instead, by concatenating `payload + crc_bytes` into one blob
+//! before calling `encode_acf_abb`/`encode_acf_gbb` — which put the
+//! encoder's own automatic `pad` after the CRC instead of before it (the
+//! reversed, non-conformant order) while still passing, since it only
+//! checked total length/quadlet-count/pad-count, all of which stay
+//! identical either way. See `crate::e2e`'s "CRC trailer wire placement"
+//! doc section for the fix and the full explanation.
 //!
 //! ## Provenance note
 //!
@@ -1754,62 +1769,17 @@ mod tests {
 
     // ── Golden vectors: TC18 Figure 19 / Figure 20 worked examples ──────────
     //
-    // Hand-verified against the spec's own two worked examples — see this
-    // module's "Canonical wire layout" doc section.
-
-    #[test]
-    fn acf_abb_matches_figure_19_worked_example() {
-        // Figure 19: ACF_ABB, 8-byte header + 6 payload bytes + 2 pad bytes
-        // + 4-byte CRC32 trailer = 20 bytes total = 5 quadlets.
-        // This crate's `payload` field carries "payload + CRC trailer"
-        // together (this module has no separate CRC-trailer field of its
-        // own — see the "acf_msg_length quadlet semantics" note above), so
-        // payload here is 6 real payload bytes + 4 CRC bytes = 10 bytes.
-        let msg = AcfAbbMessage {
-            info: ByteMessageInfo::default(),
-            payload: vec![
-                0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, // 6 payload bytes
-                0xC1, 0xC2, 0xC3, 0xC4, // 4-byte CRC32 trailer
-            ],
-        };
-        let frame = encode_acf_abb(&msg).unwrap();
-        assert_eq!(frame.len(), 20, "Figure 19: total message is 20 bytes");
-        let decoded_info = decode_byte_message_info(&frame).unwrap();
-        assert_eq!(
-            decoded_info.acf_msg_length, 0x05,
-            "Figure 19: acf_msg_length must be 5 quadlets"
-        );
-        assert_eq!(decoded_info.acf_msg_type, ACF_ABB_MSG_TYPE);
-        assert_eq!(decoded_info.pad, 2, "Figure 19: 2 pad bytes");
-        let decoded = decode_acf_abb(&frame).unwrap();
-        assert_eq!(decoded.payload, msg.payload);
-    }
-
-    #[test]
-    fn acf_gbb_matches_figure_20_worked_example() {
-        // Figure 20: ACF_GBB, 8-byte header + 8-byte timestamp + 7 payload
-        // bytes + 1 pad byte + 4-byte CRC32 trailer = 28 bytes total = 7
-        // quadlets. payload here is 7 real payload bytes + 4 CRC bytes = 11
-        // bytes.
-        let msg = AcfGbbMessage {
-            info: ByteMessageInfo::default(),
-            message_timestamp: 0x0102_0304_0506_0708,
-            payload: vec![
-                0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7, // 7 payload bytes
-                0xD1, 0xD2, 0xD3, 0xD4, // 4-byte CRC32 trailer
-            ],
-        };
-        let frame = encode_acf_gbb(&msg).unwrap();
-        assert_eq!(frame.len(), 28, "Figure 20: total message is 28 bytes");
-        let decoded_info = decode_byte_message_info(&frame).unwrap();
-        assert_eq!(
-            decoded_info.acf_msg_length, 0x07,
-            "Figure 20: acf_msg_length must be 7 quadlets"
-        );
-        assert_eq!(decoded_info.acf_msg_type, ACF_GBB_MSG_TYPE);
-        assert_eq!(decoded_info.pad, 1, "Figure 20: 1 pad byte");
-        let decoded = decode_acf_gbb(&frame).unwrap();
-        assert_eq!(decoded.payload, msg.payload);
-        assert_eq!(decoded.message_timestamp, msg.message_timestamp);
-    }
+    // Moved to `crate::e2e` (`finalize_crc_trailer_matches_figure_19_worked_example`/
+    // `finalize_crc_trailer_matches_figure_20_worked_example`) and
+    // strengthened to pin the ACTUAL byte sequence, not just totals. This
+    // module's own `encode_acf_abb`/`encode_acf_gbb` have no CRC-trailer
+    // concept of their own (see the "acf_msg_length quadlet semantics" note
+    // above), so a worked example that includes the CRC trailer belongs
+    // with the module that actually assembles a CRC-protected frame —
+    // see `crate::e2e`'s "CRC trailer wire placement" doc section for why
+    // the two tests that used to live here (concatenating `payload +
+    // crc_bytes` into one blob before calling `encode_acf_abb`/
+    // `encode_acf_gbb`) produced the wrong, reversed `payload, CRC, pad`
+    // wire order while still passing — they only checked total length,
+    // quadlet count, and pad count, all of which are identical either way.
 }

@@ -93,6 +93,29 @@
 //! get CRC-protected in the first place — that is `ROADMAP.md` Milestone
 //! 6's later "Per-stream safety config" bullet's job, not this one's.
 //!
+//! ## CRC trailer wire placement: `pad` comes before the CRC, not after
+//! (correctness fix, post-Milestone 9)
+//!
+//! TC18's own two worked examples (Figure 19 for ACF_ABB, Figure 20 for
+//! ACF_GBB) show a CRC-protected message's real wire byte order as header
+//! (+ `message_timestamp`), real payload, `pad` zero octets, THEN the
+//! 4-byte CRC32 trailer. [`acf::encode_acf_abb`]/[`acf::encode_acf_gbb`]
+//! have no CRC-trailer concept of their own and always append their own
+//! automatically-derived `pad` after the entire `payload` blob they are
+//! given — so a caller that concatenates `real_payload + crc_bytes` into
+//! one blob before calling either encoder gets the reversed, non-conformant
+//! `payload, CRC, pad` order instead. This module's own now-fixed
+//! `acf::acf_abb_matches_figure_19_worked_example`/
+//! `acf::acf_gbb_matches_figure_20_worked_example` golden vectors
+//! previously did exactly that (their own byte positions went
+//! unchecked, only totals/counts did, which is how the bug hid) before
+//! being moved here as [`finalize_crc_trailer_matches_figure_19_worked_example`]/
+//! [`finalize_crc_trailer_matches_figure_20_worked_example`], now pinning
+//! the real byte sequence. [`finalize_crc_trailer`]/[`split_crc_trailer`]
+//! are the correct, composable encode/decode primitives — see their own
+//! doc comments and this module's "CRC trailer wire placement:
+//! encode/decode" section below.
+//!
 //! ## Fragmentation interaction (`ROADMAP.md` Milestone 6, "Fragmentation
 //! interaction" bullet)
 //!
@@ -318,6 +341,126 @@ pub fn build_crc32_coverage_buffer(
     }
 
     Ok(buf)
+}
+
+// ── CRC trailer wire placement: encode/decode ───────────────────────────────
+//
+// TC18's own two worked examples (Figure 19 for ACF_ABB, Figure 20 for
+// ACF_GBB) show a CRC-protected ACF message's real wire byte order as:
+// header (+ `message_timestamp` for ACF_GBB), real payload, `pad` zero
+// octets (rounding header+payload up to a whole quadlet), THEN the 4-byte
+// CRC32 trailer — pad comes *before* the CRC, not after. `acf::encode_acf_abb`/
+// `acf::encode_acf_gbb` have no CRC-trailer concept of their own (see
+// `acf`'s "acf_msg_length quadlet semantics" note) and always append their
+// own automatically-derived `pad` after the *entire* `payload` they are
+// given; a caller that concatenates `real_payload + crc_bytes` into one
+// blob before calling either encoder therefore gets `pad` appended after
+// the CRC instead of before it — the wrong wire order. [`finalize_crc_trailer`]/
+// [`split_crc_trailer`] are the correct, composable way to get TC18's real
+// order out of those two unmodified encoders: call `encode_acf_abb`/
+// `encode_acf_gbb` with the real payload alone (so its own automatic `pad`
+// already lands immediately after the real payload, before this section's
+// functions ever run), then use these two functions to bump/un-bump
+// `acf_msg_length` by the trailer's one quadlet and append/strip the CRC
+// bytes themselves — matching the two-step "encode the pre-CRC frame, then
+// append the trailer" pattern `cpp-RCP`'s `rcp::e2e::append_crc` and
+// `c-RCP`'s equivalent already use.
+
+/// Number of quadlets (equivalently, [`QUADLET_LEN`]-byte octets) TC18's
+/// trailing CRC32 always occupies on the wire — exactly one quadlet, never
+/// more or fewer. Shared with [`CRC32_COVERAGE_LENGTH_PREADJUST_QUADLETS`]
+/// (the same one-quadlet bump [`build_crc32_coverage_buffer`] applies to
+/// its own scratch coverage header) rather than a second, independently
+/// named constant for the same value.
+pub const CRC_TRAILER_QUADLETS: u16 = CRC32_COVERAGE_LENGTH_PREADJUST_QUADLETS;
+
+/// Number of octets TC18's trailing CRC32 always occupies on the wire —
+/// one quadlet ([`QUADLET_LEN`]).
+pub const CRC_TRAILER_LEN: usize = acf::QUADLET_LEN;
+
+/// Turns an already-encoded, CRC-free ACF_ABB/ACF_GBB `frame` (as returned
+/// by [`acf::encode_acf_abb`]/[`acf::encode_acf_gbb`] called with the
+/// message's real payload only — no CRC bytes mixed in) into its
+/// CRC-protected wire form: bumps `frame`'s own `byte_message_info.
+/// acf_msg_length` by [`CRC_TRAILER_QUADLETS`] (the one quadlet the
+/// about-to-be-appended trailer adds to the message's total length) and
+/// appends `crc`'s 4 big-endian octets.
+///
+/// Because `frame` was built from the real payload alone, the encoder's
+/// own automatic `pad` octets already sit immediately after the real
+/// payload; this function only ever appends bytes after that point, so the
+/// result is always header (+ `message_timestamp`), real payload, `pad`
+/// zero octets, CRC — TC18's real order (Figure 19 / Figure 20) — never
+/// the reversed payload/CRC/pad order a caller gets by concatenating CRC
+/// bytes into the payload before calling `encode_acf_abb`/`encode_acf_gbb`
+/// (see this section's doc comment).
+///
+/// Returns `Err(RcpError::ShortFrame)` if `frame` is shorter than
+/// [`acf::BYTE_MESSAGE_INFO_LEN`], and `Err(RcpError::InvalidSize)` if
+/// bumping `acf_msg_length` would overflow its 9-bit field width.
+// fusa:req REQ-CRC-012
+pub fn finalize_crc_trailer(frame: &mut Vec<u8>, crc: u32) -> Result<(), RcpError> {
+    if frame.len() < acf::BYTE_MESSAGE_INFO_LEN {
+        return Err(RcpError::ShortFrame);
+    }
+    let mut info = acf::decode_byte_message_info(&frame[..acf::BYTE_MESSAGE_INFO_LEN])?;
+    info.acf_msg_length = info
+        .acf_msg_length
+        .checked_add(CRC_TRAILER_QUADLETS)
+        .filter(|&q| q <= acf::ACF_MSG_LENGTH_9BIT_MAX)
+        .ok_or(RcpError::InvalidSize)?;
+    let new_header = acf::encode_byte_message_info(&info)?;
+    frame[..acf::BYTE_MESSAGE_INFO_LEN].copy_from_slice(&new_header);
+    frame.extend_from_slice(&crc.to_be_bytes());
+    Ok(())
+}
+
+/// The mirror-image decode-side operation: splits a CRC-protected ACF
+/// message (as [`finalize_crc_trailer`] produces) into `(body, crc)`,
+/// where `body` is byte-for-byte what [`acf::decode_acf_abb`]/
+/// [`acf::decode_acf_gbb`] already know how to parse on their own — header
+/// (+ `message_timestamp`), real payload, native `pad` octets, with no CRC
+/// trailer involved at all — and `crc` is the real, wire-carried CRC32
+/// value for the caller to check (e.g. via
+/// [`crate::request::check_rx_enforce_e2e`]).
+///
+/// This exists because [`acf::decode_acf_abb`]/[`acf::decode_acf_gbb`]
+/// strip exactly `byte_message_info.pad` octets *from the end of the
+/// region `acf_msg_length` describes* — which, for a message whose
+/// `acf_msg_length` still counts the trailing CRC quadlet, would strip the
+/// CRC's own trailing bytes as if they were `pad` instead of the real
+/// `pad` octets that actually precede the CRC on the wire. Un-adjusting
+/// `acf_msg_length` by the same [`CRC_TRAILER_QUADLETS`]
+/// [`finalize_crc_trailer`] added, and removing the CRC's own 4 octets
+/// from the byte slice first, makes `body` a message
+/// [`acf::decode_acf_abb`]/[`acf::decode_acf_gbb`]'s existing `pad`-stripping
+/// logic parses correctly without any change to either decoder.
+///
+/// Returns `Err(RcpError::ShortFrame)` if `frame` is shorter than a header
+/// plus a full CRC trailer ([`acf::BYTE_MESSAGE_INFO_LEN`] +
+/// [`CRC_TRAILER_LEN`]), and `Err(RcpError::InvalidSize)` if the header's
+/// `acf_msg_length` is smaller than [`CRC_TRAILER_QUADLETS`] (i.e. does not
+/// actually describe a message with room for a CRC trailer at all).
+// fusa:req REQ-CRC-013
+pub fn split_crc_trailer(frame: &[u8]) -> Result<(Vec<u8>, u32), RcpError> {
+    if frame.len() < acf::BYTE_MESSAGE_INFO_LEN + CRC_TRAILER_LEN {
+        return Err(RcpError::ShortFrame);
+    }
+    let mut info = acf::decode_byte_message_info(&frame[..acf::BYTE_MESSAGE_INFO_LEN])?;
+    info.acf_msg_length = info
+        .acf_msg_length
+        .checked_sub(CRC_TRAILER_QUADLETS)
+        .ok_or(RcpError::InvalidSize)?;
+    let new_header = acf::encode_byte_message_info(&info)?;
+
+    let crc_start = frame.len() - CRC_TRAILER_LEN;
+    let mut crc_bytes = [0u8; 4];
+    crc_bytes.copy_from_slice(&frame[crc_start..]);
+    let crc = u32::from_be_bytes(crc_bytes);
+
+    let mut body = frame[..crc_start].to_vec();
+    body[..acf::BYTE_MESSAGE_INFO_LEN].copy_from_slice(&new_header);
+    Ok((body, crc))
 }
 
 // ── Fragmentation interaction ────────────────────────────────────────────────
@@ -754,6 +897,300 @@ mod tests {
         let b1 = build_crc32_coverage_buffer(&h1, &acf).unwrap();
         let b2 = build_crc32_coverage_buffer(&h2, &acf).unwrap();
         assert_ne!(crc32_tc18(&b1), crc32_tc18(&b2));
+    }
+
+    // ── CRC trailer wire placement: encode/decode ────────────────────────────
+    //
+    // Golden vectors: TC18 Figure 19 (ACF_ABB) / Figure 20 (ACF_GBB) worked
+    // examples, moved here from `acf.rs` (see this module's "CRC trailer
+    // wire placement" doc section) and strengthened to pin the ACTUAL byte
+    // sequence — not just total length/quadlet-count/pad-count, which
+    // stayed correct even under the old, reversed `payload, CRC, pad` byte
+    // order and so never caught that bug.
+
+    #[test]
+    // fusa:test REQ-CRC-012
+    // fusa:test REQ-CRC-013
+    fn finalize_crc_trailer_matches_figure_19_worked_example() {
+        // Figure 19: ACF_ABB, 8-byte header + 6 real payload bytes + 2 pad
+        // bytes + 4-byte CRC32 trailer = 20 bytes total = 5 quadlets, wire
+        // order header, payload, pad, THEN CRC.
+        let real_payload: [u8; 6] = [0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6];
+        let msg = AcfAbbMessage {
+            info: acf::ByteMessageInfo::default(),
+            payload: real_payload.to_vec(),
+        };
+
+        // encode_acf_abb, called with the real payload alone, already gets
+        // the pre-CRC part exactly right: its own automatic pad lands
+        // right after the real payload.
+        let mut frame = acf::encode_acf_abb(&msg).unwrap();
+        assert_eq!(frame.len(), 16, "header(8) + payload(6) + native pad(2)");
+        let pre_crc_info =
+            acf::decode_byte_message_info(&frame[..acf::BYTE_MESSAGE_INFO_LEN]).unwrap();
+        assert_eq!(
+            pre_crc_info.acf_msg_length, 4,
+            "base length before the CRC trailer's own quadlet is counted"
+        );
+        assert_eq!(
+            pre_crc_info.pad, 2,
+            "Figure 19: 2 pad bytes, derived from the real payload alone"
+        );
+        assert_eq!(
+            &frame[8..14],
+            &real_payload,
+            "payload right after the header"
+        );
+        assert_eq!(
+            &frame[14..16],
+            &[0x00, 0x00],
+            "native pad right after the payload"
+        );
+
+        let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
+        let coverage_msg = AcfAbbMessage {
+            info: pre_crc_info,
+            payload: real_payload.to_vec(),
+        };
+        let coverage =
+            build_crc32_coverage_buffer(&header, &AcfCoverageMessage::Abb(&coverage_msg)).unwrap();
+        let crc = crc32_tc18(&coverage);
+
+        finalize_crc_trailer(&mut frame, crc).unwrap();
+        assert_eq!(frame.len(), 20, "Figure 19: total message is 20 bytes");
+
+        let final_info =
+            acf::decode_byte_message_info(&frame[..acf::BYTE_MESSAGE_INFO_LEN]).unwrap();
+        assert_eq!(
+            final_info.acf_msg_length, 0x05,
+            "Figure 19: acf_msg_length must be 5 quadlets"
+        );
+        assert_eq!(final_info.acf_msg_type, acf::ACF_ABB_MSG_TYPE);
+        assert_eq!(
+            final_info.pad, 2,
+            "Figure 19: 2 pad bytes — unchanged by finalize_crc_trailer"
+        );
+
+        // The exact TC18 wire byte sequence: header(8), payload(6), pad(2),
+        // CRC(4) — pad strictly BEFORE the CRC, not after it.
+        assert_eq!(
+            &frame[0..8],
+            &acf::encode_byte_message_info(&final_info).unwrap()
+        );
+        assert_eq!(
+            &frame[8..14],
+            &real_payload,
+            "payload comes right after the header"
+        );
+        assert_eq!(
+            &frame[14..16],
+            &[0x00, 0x00],
+            "pad comes right after the payload"
+        );
+        assert_eq!(
+            &frame[16..20],
+            &crc.to_be_bytes(),
+            "CRC comes last, after pad — not before it"
+        );
+
+        // Decode-side mirror: split_crc_trailer + acf::decode_acf_abb
+        // recover the real payload (pad already stripped by the acf
+        // layer's own existing logic) and the same CRC value.
+        let (body, decoded_crc) = split_crc_trailer(&frame).unwrap();
+        assert_eq!(decoded_crc, crc);
+        let decoded = acf::decode_acf_abb(&body).unwrap();
+        assert_eq!(decoded.payload, real_payload.to_vec());
+        assert_eq!(decoded.info.pad, 2);
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-012
+    // fusa:test REQ-CRC-013
+    fn finalize_crc_trailer_matches_figure_20_worked_example() {
+        // Figure 20: ACF_GBB, 8-byte header + 8-byte timestamp + 7 real
+        // payload bytes + 1 pad byte + 4-byte CRC32 trailer = 28 bytes
+        // total = 7 quadlets, wire order header, timestamp, payload, pad,
+        // THEN CRC.
+        let real_payload: [u8; 7] = [0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7];
+        let message_timestamp: u64 = 0x0102_0304_0506_0708;
+        let msg = AcfGbbMessage {
+            info: acf::ByteMessageInfo::default(),
+            message_timestamp,
+            payload: real_payload.to_vec(),
+        };
+
+        let mut frame = acf::encode_acf_gbb(&msg).unwrap();
+        assert_eq!(
+            frame.len(),
+            24,
+            "header(8) + timestamp(8) + payload(7) + native pad(1)"
+        );
+        let pre_crc_info =
+            acf::decode_byte_message_info(&frame[..acf::BYTE_MESSAGE_INFO_LEN]).unwrap();
+        assert_eq!(
+            pre_crc_info.acf_msg_length, 6,
+            "base length before the CRC trailer's own quadlet is counted"
+        );
+        assert_eq!(
+            pre_crc_info.pad, 1,
+            "Figure 20: 1 pad byte, derived from the real payload alone"
+        );
+        let ts_start = acf::BYTE_MESSAGE_INFO_LEN;
+        assert_eq!(
+            &frame[ts_start..ts_start + 8],
+            &message_timestamp.to_be_bytes(),
+            "timestamp right after the header"
+        );
+        assert_eq!(
+            &frame[16..23],
+            &real_payload,
+            "payload right after the timestamp"
+        );
+        assert_eq!(
+            &frame[23..24],
+            &[0x00],
+            "native pad right after the payload"
+        );
+
+        let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
+        let coverage_msg = AcfGbbMessage {
+            info: pre_crc_info,
+            message_timestamp,
+            payload: real_payload.to_vec(),
+        };
+        let coverage =
+            build_crc32_coverage_buffer(&header, &AcfCoverageMessage::Gbb(&coverage_msg)).unwrap();
+        let crc = crc32_tc18(&coverage);
+
+        finalize_crc_trailer(&mut frame, crc).unwrap();
+        assert_eq!(frame.len(), 28, "Figure 20: total message is 28 bytes");
+
+        let final_info =
+            acf::decode_byte_message_info(&frame[..acf::BYTE_MESSAGE_INFO_LEN]).unwrap();
+        assert_eq!(
+            final_info.acf_msg_length, 0x07,
+            "Figure 20: acf_msg_length must be 7 quadlets"
+        );
+        assert_eq!(final_info.acf_msg_type, acf::ACF_GBB_MSG_TYPE);
+        assert_eq!(
+            final_info.pad, 1,
+            "Figure 20: 1 pad byte — unchanged by finalize_crc_trailer"
+        );
+
+        // The exact TC18 wire byte sequence: header(8), timestamp(8),
+        // payload(7), pad(1), CRC(4) — pad strictly BEFORE the CRC.
+        assert_eq!(
+            &frame[ts_start..ts_start + 8],
+            &message_timestamp.to_be_bytes()
+        );
+        assert_eq!(
+            &frame[16..23],
+            &real_payload,
+            "payload comes right after the timestamp"
+        );
+        assert_eq!(&frame[23..24], &[0x00], "pad comes right after the payload");
+        assert_eq!(
+            &frame[24..28],
+            &crc.to_be_bytes(),
+            "CRC comes last, after pad — not before it"
+        );
+
+        let (body, decoded_crc) = split_crc_trailer(&frame).unwrap();
+        assert_eq!(decoded_crc, crc);
+        let decoded = acf::decode_acf_gbb(&body).unwrap();
+        assert_eq!(decoded.payload, real_payload.to_vec());
+        assert_eq!(decoded.message_timestamp, message_timestamp);
+        assert_eq!(decoded.info.pad, 1);
+    }
+
+    #[test]
+    // fusa:test REQ-CRC-012
+    fn finalize_crc_trailer_never_places_pad_after_crc() {
+        // Regression guard for the padding-order bug this module's own
+        // "CRC trailer wire placement" doc section describes: naively
+        // concatenating `real_payload + crc_bytes` into one blob and
+        // handing THAT to `encode_acf_abb` (the old, buggy pattern) puts
+        // the encoder's automatically-derived pad after the CRC instead of
+        // before it. finalize_crc_trailer must never reproduce that order.
+        let real_payload: [u8; 6] = [1, 2, 3, 4, 5, 6];
+        let crc: u32 = 0x1122_3344;
+
+        // The old, buggy construction this fix replaces.
+        let buggy_payload: Vec<u8> = real_payload
+            .iter()
+            .copied()
+            .chain(crc.to_be_bytes())
+            .collect();
+        let buggy_msg = AcfAbbMessage {
+            info: acf::ByteMessageInfo::default(),
+            payload: buggy_payload,
+        };
+        let buggy_frame = acf::encode_acf_abb(&buggy_msg).unwrap();
+        // Buggy order: ...payload(6), CRC(4), pad(2) — CRC bytes land at
+        // [14..18], pad lands at [18..20], both wrong relative to Figure 19.
+        assert_eq!(&buggy_frame[14..18], &crc.to_be_bytes());
+        assert_eq!(&buggy_frame[18..20], &[0x00, 0x00]);
+
+        // The fixed construction.
+        let msg = AcfAbbMessage {
+            info: acf::ByteMessageInfo::default(),
+            payload: real_payload.to_vec(),
+        };
+        let mut frame = acf::encode_acf_abb(&msg).unwrap();
+        finalize_crc_trailer(&mut frame, crc).unwrap();
+        // Correct order: pad(2) at [14..16], THEN CRC(4) at [16..20].
+        assert_eq!(&frame[14..16], &[0x00, 0x00]);
+        assert_eq!(&frame[16..20], &crc.to_be_bytes());
+        assert_ne!(
+            frame, buggy_frame,
+            "the fixed byte order must differ from the old, buggy one"
+        );
+    }
+
+    #[test]
+    fn split_crc_trailer_rejects_short_frame() {
+        let short = vec![0u8; acf::BYTE_MESSAGE_INFO_LEN + CRC_TRAILER_LEN - 1];
+        assert_eq!(split_crc_trailer(&short), Err(RcpError::ShortFrame));
+    }
+
+    #[test]
+    fn split_crc_trailer_rejects_length_without_room_for_crc_trailer() {
+        // acf_msg_length describes a message shorter than the header
+        // itself once the CRC trailer's quadlet is un-adjusted — must be
+        // rejected, not silently underflow.
+        let info = acf::ByteMessageInfo {
+            acf_msg_type: acf::ACF_ABB_MSG_TYPE,
+            acf_msg_length: 0, // < CRC_TRAILER_QUADLETS
+            ..Default::default()
+        };
+        let header = acf::encode_byte_message_info(&info).unwrap();
+        let mut frame = header.to_vec();
+        frame.extend_from_slice(&[0u8; CRC_TRAILER_LEN]);
+        assert_eq!(split_crc_trailer(&frame), Err(RcpError::InvalidSize));
+    }
+
+    #[test]
+    fn finalize_crc_trailer_rejects_length_overflow() {
+        let info = acf::ByteMessageInfo {
+            acf_msg_type: acf::ACF_ABB_MSG_TYPE,
+            acf_msg_length: acf::ACF_MSG_LENGTH_9BIT_MAX,
+            ..Default::default()
+        };
+        let header = acf::encode_byte_message_info(&info).unwrap();
+        let mut frame = header.to_vec();
+        assert_eq!(
+            finalize_crc_trailer(&mut frame, 0),
+            Err(RcpError::InvalidSize)
+        );
+    }
+
+    #[test]
+    fn finalize_crc_trailer_rejects_short_frame() {
+        let mut short = vec![0u8; acf::BYTE_MESSAGE_INFO_LEN - 1];
+        assert_eq!(
+            finalize_crc_trailer(&mut short, 0),
+            Err(RcpError::ShortFrame)
+        );
     }
 
     // ── Fragmentation interaction ────────────────────────────────────────────

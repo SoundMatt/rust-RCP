@@ -5,6 +5,62 @@ the roadmap milestone that produced them (see `ROADMAP.md`), since this
 crate's `Cargo.toml` version does not move until the OPEN Alliance TC18
 core replacement reaches `v1.0.0`.
 
+## v3.1.0 (2026-07-31 E2E CRC trailer wire-order fix) — closed
+
+While independently verifying `v3.0.0`'s `acf` wire-format rework byte-for-
+byte against the real TC18 v0.5.1_RC PDF, a pre-existing correctness bug
+(not introduced by `v3.0.0`) was found in this crate's E2E safety
+mechanism: the two golden-vector tests meant to pin the specification's
+own Figure 19 (ACF_ABB) / Figure 20 (ACF_GBB) worked examples
+(`acf_abb_matches_figure_19_worked_example`/
+`acf_gbb_matches_figure_20_worked_example`, in `src/acf.rs`) built their
+test payload as `real_payload + crc_bytes` concatenated together and
+handed that combined blob straight to `encode_acf_abb`/`encode_acf_gbb` —
+which then appended their own automatically-derived padding *after* that
+whole blob, producing the wire order `payload, CRC, pad`. TC18's own two
+worked examples show the real order is `payload, pad, THEN the CRC32
+trailer` — pad strictly *before* the CRC, not after. Both tests only
+asserted total frame length, `acf_msg_length`, and `pad` count — never
+actual byte positions — so this passed silently: those three values are
+identical either way, since the CRC trailer is always exactly one quadlet
+and doesn't change any padding-count arithmetic mod 4. The same bug class
+was independently found and is being fixed in `go-RCP`'s equivalent
+module; `cpp-RCP`/`c-RCP` already get this right.
+
+- **rust-RCP-E2E-01 (fix):** `src/e2e.rs` gains
+  [`finalize_crc_trailer`]/[`split_crc_trailer`] — the correct, composable
+  encode/decode primitives for a CRC-protected ACF_ABB/ACF_GBB wire frame.
+  `finalize_crc_trailer(frame, crc)` takes an already-encoded, CRC-free
+  frame (built from the real payload alone, so `acf::encode_acf_abb`/
+  `acf::encode_acf_gbb`'s own automatic `pad` already lands immediately
+  after the real payload), bumps its `acf_msg_length` by one quadlet, and
+  appends the CRC — producing TC18's real `payload, pad, CRC` order.
+  `split_crc_trailer(frame)` is the mirror-image decode-side operation:
+  it un-adjusts `acf_msg_length` and strips the trailing CRC octets
+  *before* handing the remaining bytes to `acf::decode_acf_abb`/
+  `acf::decode_acf_gbb`, so their existing `pad`-stripping logic (which
+  strips exactly `byte_message_info.pad` octets from the end of the
+  `acf_msg_length`-described region) recovers the real payload correctly
+  instead of misreading the CRC trailer's own trailing bytes as padding.
+  New `REQ-CRC-012`/`REQ-CRC-013` cover both.
+- **rust-RCP-E2E-02 (test fix):** the two golden-vector tests move from
+  `src/acf.rs` to `src/e2e.rs` (as
+  `finalize_crc_trailer_matches_figure_19_worked_example`/
+  `finalize_crc_trailer_matches_figure_20_worked_example`, since only
+  `e2e.rs` actually assembles a CRC-protected frame — `acf.rs`'s own
+  encoders have no CRC-trailer concept of their own) and now assert the
+  ACTUAL byte sequence at every offset, not just totals — proving
+  `payload, pad, CRC` ordering explicitly, byte for byte, against both
+  worked examples. A new regression-guard test,
+  `finalize_crc_trailer_never_places_pad_after_crc`, reproduces the old,
+  buggy `payload + crc_bytes` concatenation pattern side by side with the
+  fixed construction and asserts they differ.
+- No change to the CRC32 polynomial, algorithm, or `byte_message_info`
+  bit layout — `v3.0.0`'s wire-format rework is untouched. This is a MINOR
+  (additive, non-breaking) release: `finalize_crc_trailer`/
+  `split_crc_trailer` and their two constants are new `pub` items only;
+  `docs/PUBLIC_API.txt` is regenerated accordingly per `docs/SEMVER.md`.
+
 ## v3.0.0 (2026-07-31 TC18 wire-format conformance fix pass) — closed
 
 **Breaking.** A cross-repo gap-audit pass found this crate's `acf` module —
