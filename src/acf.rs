@@ -24,9 +24,7 @@
 //! [`crate::avtp`] finished "AVTPDU Framing". An ACF message is carried
 //! inside the body of an NTSCF- or TSCF-headed AVTPDU (see
 //! [`crate::avtp::NtscfHeader`]/[`crate::avtp::TscfHeader`]); this
-//! module does not itself frame that outer AVTPDU, and nothing here is
-//! wired into [`crate::avtp`]'s decoders yet — that composition is later
-//! work.
+//! module does not itself frame that outer AVTPDU.
 //!
 //! Three items are named on the Milestone 1 "ACF Messages" checklist, all
 //! implemented here:
@@ -43,16 +41,15 @@
 //!   carry a 64-bit `message_timestamp`. Per this Milestone 1 item's own
 //!   scope, `message_timestamp` here is a raw passthrough value only — its
 //!   width/rollover behavior and the all-zero-timestamp fallback rule are
-//!   the separate "Timestamp Semantics" checklist item, now implemented in
+//!   the separate "Timestamp Semantics" checklist item, implemented in
 //!   [`crate::timestamp`] ([`crate::timestamp::MessageTimestamp`]) as a
 //!   standalone newtype consuming this field's raw `u64` value, rather than
 //!   a change to this field's own type.
 //! - **`byte_message_info`** — [`ByteMessageInfo`] /
 //!   [`encode_byte_message_info`] / [`decode_byte_message_info`]. The
-//!   shared header both ACF_ABB and ACF_GBB carry immediately after their
-//!   one-byte `acf_msg_type` discriminant. See "Provenance note" below for
-//!   how this module resolves the `read_size`/`segment_num` dual-purpose
-//!   field, per Guiding Principle 5.
+//!   8-byte header both ACF_ABB and ACF_GBB carry first, including
+//!   `acf_msg_type` itself (see "Canonical wire layout" below) — this is
+//!   *not* preceded by a separate one-byte discriminant.
 //!
 //! This module also implements one further item from the separate
 //! "Addressing" subsection: the **echo-back rule** — [`build_response_info`]
@@ -65,114 +62,129 @@
 //! does and does not claim about *when* in a request/response lifecycle the
 //! rule is enforced.
 //!
-//! Deliberately out of scope for this module (separate, later Milestone 1
-//! bullets, or later milestones entirely):
+//! ## Canonical wire layout (TC18 v0.5.1_RC §11.2.1 Figure 7 / Table 4)
 //!
-//! - `stream_id` construction/parsing and `(stream_id, byte_bus_id)`
-//!   endpoint lookup (the rest of the "Addressing" subsection, in
-//!   [`crate::addressing`]) — `byte_bus_id` is carried here as an opaque
-//!   11-bit value only.
-//! - `avtp_timestamp`/`message_timestamp` width/rollover semantics and the
-//!   all-zero-timestamp fallback rule (the "Timestamp Semantics"
-//!   subsection, in [`crate::timestamp`]) — moot for ACF_ABB, since it has
-//!   no timestamp field to apply that rule to; for ACF_GBB,
-//!   `message_timestamp` is carried as a raw `u64` only, not wired into
-//!   [`crate::timestamp::MessageTimestamp`] at encode/decode time.
-//! - Wiring either message type into [`crate::avtp`]'s AVTPDU decoders —
-//!   this module is additive only, matching the pattern [`crate::avtp`]
-//!   itself established for NTSCF/TSCF. (`ROADMAP.md` Milestone 9's `wire`
-//!   REPLACE cutover later did exactly this composition —
-//!   [`crate::avtp::encode_ntscf_frame`]/[`crate::avtp::decode_ntscf_frame`]
-//!   — and deleted the legacy `crate::wire` module these two message types
-//!   used to coexist alongside.)
+//! `byte_message_info` is 8 octets, laid out as two 32-bit words:
+//!
+//! Row 1 (octets 0-3):
+//! - `acf_msg_type` — 7 bits (octet 0 bits 7:1)
+//! - `acf_msg_length` — 9 bits, in **quadlets** (octet 0 bit 0 = MSB,
+//!   octet 1 bits 7:0 = low 8 bits)
+//! - `pad` — 2 bits (octet 2 bits 7:6) — a *count* of padding octets
+//!   appended after the payload to round the message up to a whole
+//!   quadlet, not a presence flag
+//! - `mtv` — 1 bit (octet 2 bit 5)
+//! - `rsv` — 2 bits (octet 2 bits 4:3), always zero, not a meaningful field
+//! - `byte_bus_id` — 11 bits (octet 2 bits 2:0 = top 3 bits, octet 3 bits
+//!   7:0 = low 8 bits)
+//!
+//! Row 2 (octets 4-7):
+//! - `evt` — 4 bits (octet 4 bits 7:4): a 1-bit `ack` flag + 3-bit
+//!   `sub_opcode`, see [`Evt`]
+//! - `rsv` — 2 bits (octet 4 bits 3:2), always zero
+//! - `hs` — 1 bit (octet 4 bit 1)
+//! - `cs` — 1 bit (octet 4 bit 0)
+//! - `transaction_num` — 8 bits (octet 5, full byte) — comes *before* the
+//!   `op`/`rsp`/`err`/`ms` group
+//! - `op` — 1 bit (octet 6 bit 7)
+//! - `rsp` — 1 bit (octet 6 bit 6)
+//! - `err` — 1 bit (octet 6 bit 5)
+//! - `ms` — 1 bit (octet 6 bit 4)
+//! - `read_size_or_segment_num` — 12 bits (octet 6 bits 3:0 = top 4 bits,
+//!   octet 7 bits 7:0 = low 8 bits)
+//!
+//! `acf_msg_type = 0x0E` is ACF_ABB (no timestamp field); `0x0D` is
+//! ACF_GBB (carries a 64-bit `message_timestamp` immediately after this
+//! 8-byte header).
+//!
+//! `acf_msg_length` counts **quadlets over the entire ACF message** —
+//! header (+ `message_timestamp` for ACF_GBB) + payload + pad, rounded up
+//! to whole quadlets — not payload-only and not octets. This is confirmed
+//! by the specification's own two worked examples (Figure 19: a single
+//! ACF_ABB with an 8-byte header + 6 payload bytes + 2 pad bytes + 4-byte
+//! CRC32 trailer = 20 bytes = 5 quadlets, `acf_msg_length = 0x05`;
+//! Figure 20: a single ACF_GBB with an 8-byte header + 8-byte timestamp +
+//! 7 payload bytes + 1 pad byte + 4-byte CRC32 trailer = 28 bytes =
+//! 7 quadlets, `acf_msg_length = 0x07`) and pinned by golden-vector tests
+//! below (`acf_abb_matches_figure_19_worked_example`/
+//! `acf_gbb_matches_figure_20_worked_example`).
 //!
 //! ## Provenance note
 //!
-//! `acf_msg_type`, `byte_message_info`, and their constituent field names
-//! (`acf_msg_length`, `pad`, `mtv`, `byte_bus_id`, `evt`, `hs`, `cs`,
-//! `transaction_num`, `op`, `rsp`, `err`, `ms`, `read_size`/`segment_num`,
-//! `message_timestamp`) are taken from this crate's `ROADMAP.md`, which
-//! itself cites the OPEN Alliance TC18 Remote Control Protocol
-//! Specification v0.5.1_RC by section number only. Every byte offset, bit
-//! width, and field-packing order implemented below is this crate's own
-//! working interpretation — not a transcription of that (confidential,
-//! OPEN-Members-only) document's text — and, per Guiding Principle 5, is
-//! flagged here for reconciliation against the specification's *behavior*
-//! (never its prose) before being relied on for interop with a real TC18 RC
-//! Server. In particular:
+//! An earlier revision of this module used an invented layout — self-
+//! admitted in this module's own comments at the time — that treated
+//! `acf_msg_type` as a standalone leading byte outside `byte_message_info`,
+//! modeled `acf_msg_length`/`byte_bus_id` as a pair of 11-bit fields, `pad`
+//! as a 1-bit presence flag, `evt` as living in row 1 instead of row 2,
+//! `transaction_num` as coming *after* the `op`/`rsp`/`err`/`ms` flag group,
+//! and `read_size`/`segment_num` as a full 16 bits. That layout was this
+//! crate's own placeholder interpretation, not a transcription of TC18's
+//! text, and has been fully replaced by the canonical layout documented
+//! above (pixel-verified against the real TC18 v0.5.1_RC PDF, Figure 7 /
+//! Table 4, and cross-checked against the two worked examples). This is a
+//! **breaking wire-format change** — see `CHANGELOG.md`.
 //!
-//! - `ByteMessageInfo`'s 8-byte length, its field ordering, and every
-//!   individual bit position are placeholders sized only to fit the
-//!   roadmap-named fields (an 11-bit `acf_msg_length`, an 11-bit
-//!   `byte_bus_id`, and a 4-bit `evt`, by explicit roadmap width; the
-//!   remaining `pad`/`mtv`/`hs`/`cs`/`op`/`rsp`/`err`/`ms` flags as 1 bit
-//!   each; `transaction_num` as 8 bits; `read_size`/`segment_num` as 16
-//!   bits, per the RELAY specification's canonical `ReadSizeOrSegment
-//!   uint16` cross-language type, §15.5) with no reserved bits left over —
-//!   the header's 8 bytes are now fully accounted for by named fields.
-//!   None of these widths (besides the three the roadmap states explicitly,
-//!   and the `read_size`/`segment_num` width now pinned by §15.5) are
-//!   confirmed against real TC18 framing.
-//! - The `ReadSizeOrSegment` dual-purpose field's *selecting condition* is
-//!   no longer left ambiguous: `byte_message_info`'s own `op` flag is
-//!   already the documented selector (RELAY specification §15.5's
-//!   canonical `Message.ReadSizeOrSegment` doc comment states the rule
-//!   directly: read this field as `read_size` when `op` indicates a read,
-//!   `segment_num` otherwise). [`ByteMessageInfo::read_size`]/
-//!   [`ByteMessageInfo::segment_num`] apply that selection, returning
-//!   `None` on the side that does not match `op` rather than returning a
-//!   value under the wrong interpretation. [`ReadSizeOrSegment::as_read_size`]/
-//!   [`ReadSizeOrSegment::as_segment_num`] remain as unconditional,
-//!   op-independent accessors for the field's own raw value — still useful
-//!   where a caller already knows which interpretation applies from
-//!   context other than a live `ByteMessageInfo.op` bit (e.g.
-//!   `crate::uart`'s own `read_size` configuration field, which reuses this
-//!   same type for a UART-local value that is never anything but a read
-//!   size) — but any caller reading the field out of an actual decoded
-//!   [`ByteMessageInfo`] should prefer the op-gated methods on that struct.
-//!   `ROADMAP.md` Milestone 8's `crate::fragment` module already read this
-//!   field as a fragment train's `segment_num` for messages whose `ms` flag
-//!   marks them as part of a train; it now does so through
-//!   [`ByteMessageInfo::segment_num`] instead of the unconditional
-//!   accessor, so a fragment whose `op` disagrees with the `segment_num`
-//!   interpretation is caught rather than silently misread.
-//! - Treating `acf_msg_type` as a standalone full leading byte (rather than
-//!   bit-packing it alongside `pad`/part of `acf_msg_length`, the way real
-//!   IEEE 1722 ACF common-header framing is understood to do) is a
-//!   scope-narrowing simplification carried forward from this module's
-//!   first ACF_ABB-only draft, not a claim about the real wire layout.
+//! - The `ReadSizeOrSegment` dual-purpose field's *selecting condition*:
+//!   `byte_message_info`'s own `op` flag is the documented selector (RELAY
+//!   specification §15.5's canonical `Message.ReadSizeOrSegment` doc
+//!   comment states the rule directly: read this field as `read_size` when
+//!   `op` indicates a read, `segment_num` otherwise).
+//!   [`ByteMessageInfo::read_size`]/[`ByteMessageInfo::segment_num`] apply
+//!   that selection, returning `None` on the side that does not match `op`
+//!   rather than returning a value under the wrong interpretation.
+//!   [`ReadSizeOrSegment::as_read_size`]/[`ReadSizeOrSegment::as_segment_num`]
+//!   remain as unconditional, op-independent accessors for the field's own
+//!   raw value — still useful where a caller already knows which
+//!   interpretation applies from context other than a live
+//!   `ByteMessageInfo.op` bit (e.g. `crate::uart`'s own `read_size`
+//!   configuration field, which reuses this same type for a UART-local
+//!   value that is never anything but a read size).
 //! - This crate's `ROADMAP.md` states the echo-back rule itself (a
 //!   response/ack must carry the same `byte_bus_id` it was received under)
 //!   but not the mechanics of *when* it is checked against a live request/
 //!   response exchange. [`build_response_info`]/[`verify_echo_back`] are
 //!   deliberately plain functions over already-decoded [`ByteMessageInfo`]
 //!   values, with no opinion on whether the real enforcement point ends up
-//!   being at encode time (reject building a malformed response), at decode
-//!   time (reject an inbound response that fails to echo), or purely as an
-//!   application-level helper a later milestone's request/response dispatch
-//!   calls explicitly. Wiring either function into an encoder, a decoder,
-//!   or a dispatch loop is out of scope here and left to whichever later
-//!   milestone actually builds that request/response lifecycle.
+//!   being at encode time, decode time, or purely an application-level
+//!   helper a dispatch loop calls explicitly.
 
 use crate::RcpError;
 
 // ── byte_message_info ─────────────────────────────────────────────────────────
 
-/// `acf_msg_length`/`byte_bus_id` are both 11-bit fields; this is the
-/// maximum value representable in 11 bits.
+/// `acf_msg_type` is a 7-bit field; this is the maximum representable
+/// value.
+pub const ACF_MSG_TYPE_7BIT_MAX: u8 = 0x7F;
+
+/// `acf_msg_length` is a 9-bit field (counted in quadlets over the entire
+/// ACF message); this is the maximum representable value.
+pub const ACF_MSG_LENGTH_9BIT_MAX: u16 = 0x01FF;
+
+/// `pad` is a 2-bit field (a count of padding octets, not a presence
+/// flag); this is the maximum representable value.
+pub const PAD_2BIT_MAX: u8 = 0x03;
+
+/// `byte_bus_id` is an 11-bit field; this is the maximum representable
+/// value.
 pub const BYTE_MESSAGE_INFO_11BIT_MAX: u16 = 0x07FF;
 
 /// `evt.sub_opcode` is a 3-bit field; this is its maximum representable
 /// value.
 pub const EVT_SUB_OPCODE_MAX: u8 = 0x07;
 
+/// `read_size_or_segment_num` is a 12-bit field; this is the maximum
+/// representable value.
+pub const READ_SIZE_SEGMENT_12BIT_MAX: u16 = 0x0FFF;
+
 /// Length, in bytes, of the encoded `byte_message_info` header shared by
-/// [`AcfAbbMessage`] and [`AcfGbbMessage`]. See this module's provenance
-/// note for why 8 bytes specifically.
+/// [`AcfAbbMessage`] and [`AcfGbbMessage`]. `acf_msg_type` is folded into
+/// this 8-byte header (row 1, octet 0) — there is no separate leading
+/// discriminant byte. See this module's "Canonical wire layout" doc
+/// section.
 pub const BYTE_MESSAGE_INFO_LEN: usize = 8;
 
-/// The `evt` field: a 1-bit ack flag + 3-bit sub-opcode pair, per the
-/// roadmap's own description of `byte_message_info`.
+/// The `evt` field: a 1-bit ack flag + 3-bit sub-opcode pair, packed into
+/// row 2's 4-bit `evt` nibble (octet 4 bits 7:4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 // fusa:req REQ-BMI-001
 pub struct Evt {
@@ -182,12 +194,12 @@ pub struct Evt {
     pub sub_opcode: u8,
 }
 
-/// The dual-purpose 16-bit field the RELAY specification's canonical
-/// cross-language type names `ReadSizeOrSegment` (§15.5) — a requested read
-/// byte count when the enclosing [`ByteMessageInfo::op`] flag indicates a
-/// read, or a fragment train's segment index otherwise.
+/// The dual-purpose 12-bit field TC18 Table 4 calls
+/// `read_size_or_segment_num` (row 2, octet 6 bits 3:0 + octet 7) — a
+/// requested read byte count when the enclosing [`ByteMessageInfo::op`]
+/// flag indicates a read, or a fragment train's segment index otherwise.
 ///
-/// This type carries the field's raw 16-bit value unconditionally;
+/// This type carries the field's raw value unconditionally;
 /// [`ReadSizeOrSegment::as_read_size`]/[`ReadSizeOrSegment::as_segment_num`]
 /// are plain, op-independent views of that same value, useful when a caller
 /// already knows which interpretation applies from context other than a
@@ -219,7 +231,8 @@ impl ReadSizeOrSegment {
 }
 
 /// Decoded `byte_message_info` header, shared by [`AcfAbbMessage`] and
-/// [`AcfGbbMessage`].
+/// [`AcfGbbMessage`]. See this module's "Canonical wire layout" doc
+/// section for the exact bit-for-bit packing.
 ///
 /// `byte_bus_id` is carried here as an opaque 11-bit value only — this
 /// module does not implement `(stream_id, byte_bus_id)` addressing or the
@@ -227,12 +240,25 @@ impl ReadSizeOrSegment {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 // fusa:req REQ-BMI-001
 pub struct ByteMessageInfo {
-    /// Length of the ACF message this header belongs to. 11 bits; valid
-    /// range is `0..=BYTE_MESSAGE_INFO_11BIT_MAX`.
+    /// The ACF message-type discriminant (`ACF_ABB_MSG_TYPE`/
+    /// `ACF_GBB_MSG_TYPE`). 7 bits; valid range is
+    /// `0..=ACF_MSG_TYPE_7BIT_MAX`. [`encode_acf_abb`]/[`encode_acf_gbb`]
+    /// always overwrite this with the correct discriminant for the message
+    /// type being encoded, so a caller does not need to set it by hand for
+    /// those two entry points.
+    pub acf_msg_type: u8,
+    /// Length, in quadlets, of the *entire* ACF message this header
+    /// belongs to (header +, for ACF_GBB, `message_timestamp` + payload +
+    /// `pad`). 9 bits; valid range is `0..=ACF_MSG_LENGTH_9BIT_MAX`. See
+    /// this module's "Canonical wire layout" doc section for the Figure
+    /// 19/20 worked-example derivation.
     pub acf_msg_length: u16,
-    /// Padding-present flag.
-    pub pad: bool,
-    /// Message-timestamp-valid flag. Roadmap-shared across both ACF_ABB and
+    /// Count of padding octets appended after the payload to round the
+    /// whole ACF message up to a quadlet boundary. 2 bits; valid range is
+    /// `0..=PAD_2BIT_MAX`. Unlike the layout this module used before this
+    /// item, this is a *count*, not a presence flag.
+    pub pad: u8,
+    /// Message-timestamp-valid flag. Shared across both ACF_ABB and
     /// ACF_GBB even though only ACF_GBB has a `message_timestamp` field to
     /// validate — see this module's provenance note.
     pub mtv: bool,
@@ -256,7 +282,8 @@ pub struct ByteMessageInfo {
     pub err: bool,
     /// More-segments flag.
     pub ms: bool,
-    /// The dual-purpose `read_size`/`segment_num` field. See
+    /// The dual-purpose `read_size`/`segment_num` field. 12 bits; valid
+    /// range is `0..=READ_SIZE_SEGMENT_12BIT_MAX`. See
     /// [`ReadSizeOrSegment`].
     pub read_size_segment: ReadSizeOrSegment,
 }
@@ -298,59 +325,65 @@ impl ByteMessageInfo {
     }
 }
 
-/// Encode a [`ByteMessageInfo`] to its 8-byte wire representation.
+/// Encode a [`ByteMessageInfo`] to its 8-byte wire representation, per this
+/// module's "Canonical wire layout" doc section.
 ///
-/// Returns `Err(RcpError::InvalidSize)` if `acf_msg_length` or
-/// `byte_bus_id` exceeds the 11-bit field width, or `evt.sub_opcode`
-/// exceeds the 3-bit field width.
+/// Returns `Err(RcpError::InvalidSize)` if any field exceeds its bit
+/// width (`acf_msg_type`: 7 bits, `acf_msg_length`: 9 bits, `pad`: 2 bits,
+/// `byte_bus_id`: 11 bits, `evt.sub_opcode`: 3 bits, `read_size_segment`:
+/// 12 bits).
 // fusa:req REQ-BMI-002
 // fusa:req REQ-BMI-003
 pub fn encode_byte_message_info(
     info: &ByteMessageInfo,
 ) -> Result<[u8; BYTE_MESSAGE_INFO_LEN], RcpError> {
-    if info.acf_msg_length > BYTE_MESSAGE_INFO_11BIT_MAX
+    if info.acf_msg_type > ACF_MSG_TYPE_7BIT_MAX
+        || info.acf_msg_length > ACF_MSG_LENGTH_9BIT_MAX
+        || info.pad > PAD_2BIT_MAX
         || info.byte_bus_id > BYTE_MESSAGE_INFO_11BIT_MAX
         || info.evt.sub_opcode > EVT_SUB_OPCODE_MAX
+        || info.read_size_segment.0 > READ_SIZE_SEGMENT_12BIT_MAX
     {
         return Err(RcpError::InvalidSize);
     }
 
     let mut buf = [0u8; BYTE_MESSAGE_INFO_LEN];
 
-    // byte 0: acf_msg_length[10:3] (top 8 bits of the 11-bit field).
-    buf[0] = (info.acf_msg_length >> 3) as u8;
-    // byte 1: acf_msg_length[2:0] | pad | mtv | reserved(3 bits, zero).
-    buf[1] = (((info.acf_msg_length & 0x7) as u8) << 5)
-        | ((info.pad as u8) << 4)
-        | ((info.mtv as u8) << 3);
+    // octet 0: acf_msg_type[6:0] in bits 7:1, acf_msg_length[8] (MSB) in bit 0.
+    buf[0] = (info.acf_msg_type << 1) | (((info.acf_msg_length >> 8) & 0x1) as u8);
+    // octet 1: acf_msg_length[7:0].
+    buf[1] = (info.acf_msg_length & 0xFF) as u8;
 
-    // byte 2: byte_bus_id[10:3] (top 8 bits of the 11-bit field).
-    buf[2] = (info.byte_bus_id >> 3) as u8;
-    // byte 3: byte_bus_id[2:0] | evt (ack:1 + sub_opcode:3) | reserved(1 bit, zero).
+    // octet 2: pad[1:0] in bits 7:6, mtv in bit 5, rsv(2 bits, zero) in
+    // bits 4:3, byte_bus_id[10:8] in bits 2:0.
+    buf[2] = (info.pad << 6) | ((info.mtv as u8) << 5) | (((info.byte_bus_id >> 8) & 0x7) as u8);
+    // octet 3: byte_bus_id[7:0].
+    buf[3] = (info.byte_bus_id & 0xFF) as u8;
+
+    // octet 4: evt (ack:1 + sub_opcode:3) in bits 7:4, rsv(2 bits, zero) in
+    // bits 3:2, hs in bit 1, cs in bit 0.
     let evt_bits = ((info.evt.ack as u8) << 3) | (info.evt.sub_opcode & 0x7);
-    buf[3] = (((info.byte_bus_id & 0x7) as u8) << 5) | (evt_bits << 1);
+    buf[4] = (evt_bits << 4) | ((info.hs as u8) << 1) | (info.cs as u8);
 
-    // byte 4: hs | cs | op | rsp | err | ms | reserved(2 bits, zero).
-    buf[4] = ((info.hs as u8) << 7)
-        | ((info.cs as u8) << 6)
-        | ((info.op as u8) << 5)
-        | ((info.rsp as u8) << 4)
-        | ((info.err as u8) << 3)
-        | ((info.ms as u8) << 2);
-
-    // byte 5: transaction_num, full byte.
+    // octet 5: transaction_num, full byte — comes before the op/rsp/err/ms
+    // group, per Table 4's row-2 ordering.
     buf[5] = info.transaction_num;
-    // bytes 6-7: read_size/segment_num, full 16 bits, big-endian — per the
-    // RELAY specification's canonical `ReadSizeOrSegment uint16` type
-    // (§15.5), widened from this module's earlier 8-bit placeholder. This
-    // consumes what was previously documented as a reserved zero byte
-    // (byte 7); no reserved bits remain in this 8-byte header.
-    buf[6..8].copy_from_slice(&info.read_size_segment.0.to_be_bytes());
+
+    // octet 6: op in bit 7, rsp in bit 6, err in bit 5, ms in bit 4,
+    // read_size_segment[11:8] in bits 3:0.
+    buf[6] = ((info.op as u8) << 7)
+        | ((info.rsp as u8) << 6)
+        | ((info.err as u8) << 5)
+        | ((info.ms as u8) << 4)
+        | (((info.read_size_segment.0 >> 8) & 0xF) as u8);
+    // octet 7: read_size_segment[7:0].
+    buf[7] = (info.read_size_segment.0 & 0xFF) as u8;
 
     Ok(buf)
 }
 
-/// Decode a [`ByteMessageInfo`] from a byte slice.
+/// Decode a [`ByteMessageInfo`] from a byte slice, per this module's
+/// "Canonical wire layout" doc section.
 ///
 /// Never panics on short, truncated, or arbitrary input — always returns
 /// `Err(RcpError::ShortFrame)` for input shorter than
@@ -362,28 +395,31 @@ pub fn decode_byte_message_info(b: &[u8]) -> Result<ByteMessageInfo, RcpError> {
         return Err(RcpError::ShortFrame);
     }
 
-    let acf_msg_length = (u16::from(b[0]) << 3) | u16::from(b[1] >> 5);
-    let pad = (b[1] >> 4) & 0x1 != 0;
-    let mtv = (b[1] >> 3) & 0x1 != 0;
+    let acf_msg_type = b[0] >> 1;
+    let acf_msg_length = (u16::from(b[0] & 0x1) << 8) | u16::from(b[1]);
 
-    let byte_bus_id = (u16::from(b[2]) << 3) | u16::from(b[3] >> 5);
-    let evt_bits = (b[3] >> 1) & 0x0F;
+    let pad = b[2] >> 6;
+    let mtv = (b[2] >> 5) & 0x1 != 0;
+    let byte_bus_id = (u16::from(b[2] & 0x7) << 8) | u16::from(b[3]);
+
+    let evt_bits = b[4] >> 4;
     let evt = Evt {
         ack: (evt_bits >> 3) & 0x1 != 0,
         sub_opcode: evt_bits & 0x7,
     };
-
-    let hs = (b[4] >> 7) & 0x1 != 0;
-    let cs = (b[4] >> 6) & 0x1 != 0;
-    let op = (b[4] >> 5) & 0x1 != 0;
-    let rsp = (b[4] >> 4) & 0x1 != 0;
-    let err = (b[4] >> 3) & 0x1 != 0;
-    let ms = (b[4] >> 2) & 0x1 != 0;
+    let hs = (b[4] >> 1) & 0x1 != 0;
+    let cs = b[4] & 0x1 != 0;
 
     let transaction_num = b[5];
-    let read_size_segment = ReadSizeOrSegment(u16::from_be_bytes([b[6], b[7]]));
+
+    let op = (b[6] >> 7) & 0x1 != 0;
+    let rsp = (b[6] >> 6) & 0x1 != 0;
+    let err = (b[6] >> 5) & 0x1 != 0;
+    let ms = (b[6] >> 4) & 0x1 != 0;
+    let read_size_segment = ReadSizeOrSegment((u16::from(b[6] & 0xF) << 8) | u16::from(b[7]));
 
     Ok(ByteMessageInfo {
+        acf_msg_type,
         acf_msg_length,
         pad,
         mtv,
@@ -408,71 +444,99 @@ pub const ACF_ABB_MSG_TYPE: u8 = 0x0E;
 /// `acf_msg_type` discriminant identifying an ACF_GBB message.
 pub const ACF_GBB_MSG_TYPE: u8 = 0x0D;
 
-/// Length, in bytes, of the ACF_ABB message header: the leading
-/// `acf_msg_type` discriminant plus `byte_message_info`. Deliberately *not*
-/// [`ACF_GBB_HEADER_LEN`]-wide: unlike ACF_GBB, ACF_ABB has no
-/// `message_timestamp` region at all, so there is no reserved gap sized for
-/// one.
-pub const ACF_ABB_HEADER_LEN: usize = 1 + BYTE_MESSAGE_INFO_LEN;
+/// Length, in bytes, of the ACF_ABB message header: just
+/// `byte_message_info` — `acf_msg_type` is folded into it, not a separate
+/// leading byte (see this module's "Canonical wire layout" doc section).
+/// Deliberately *not* [`ACF_GBB_HEADER_LEN`]-wide: unlike ACF_GBB, ACF_ABB
+/// has no `message_timestamp` region at all, so there is no reserved gap
+/// sized for one.
+pub const ACF_ABB_HEADER_LEN: usize = BYTE_MESSAGE_INFO_LEN;
 
-/// Length, in bytes, of the ACF_GBB message header: the leading
-/// `acf_msg_type` discriminant, `byte_message_info`, and the 8-byte
-/// `message_timestamp`.
-pub const ACF_GBB_HEADER_LEN: usize = 1 + BYTE_MESSAGE_INFO_LEN + 8;
+/// Length, in bytes, of the ACF_GBB message header: `byte_message_info`
+/// plus the 8-byte `message_timestamp`.
+pub const ACF_GBB_HEADER_LEN: usize = BYTE_MESSAGE_INFO_LEN + 8;
 
 // ── acf_msg_length quadlet semantics ──────────────────────────────────────────
 //
 // TC18 §11.2.1 Table 4 describes `acf_msg_length` as a count of quadlets
-// (4-byte units) "of data contained in this GBB/ABB message" — not the
-// opaque 11-bit integer this module treated it as before this section was
-// added. This crate reads "data contained in this message" as the
-// `payload` specifically (the shared `byte_message_info` header, and
-// ACF_GBB's further `message_timestamp`, both have their own fixed,
-// separately-known lengths under this crate's framing, so counting them
-// again inside `acf_msg_length` would double-count a length this crate
-// already gets for free from `ACF_ABB_HEADER_LEN`/`ACF_GBB_HEADER_LEN`) —
-// flagged per Guiding Principle 5 as this crate's own working
-// interpretation, not a transcription of the specification's own text.
+// over the *entire* ACF message — header (+ message_timestamp for
+// ACF_GBB) + payload + pad — confirmed by the specification's own Figure
+// 19 (ACF_ABB: 8-byte header + 6 payload + 2 pad + 4-byte CRC32 = 20 bytes
+// = 5 quadlets) and Figure 20 (ACF_GBB: 8-byte header + 8-byte timestamp +
+// 7 payload + 1 pad + 4-byte CRC32 = 28 bytes = 7 quadlets) worked
+// examples. `pad` is the number of zero octets appended after `payload` to
+// round the message up to a whole quadlet; this crate's encoders compute
+// and append it automatically, and its decoders strip it back off using
+// the decoded `pad` count rather than assuming it is always zero.
+//
+// Note: if a caller wants a CRC32 trailer counted into `acf_msg_length`
+// (as both worked examples do), it supplies those trailer bytes as part of
+// `payload` itself — this module has no separate CRC-trailer field of its
+// own (CRC computation itself lives in `crate::e2e`).
 
 /// Number of bytes in one quadlet — the unit `acf_msg_length` counts in.
 pub const QUADLET_LEN: usize = 4;
 
-/// Derive the `acf_msg_length` quadlet count for a payload of
-/// `payload_len` bytes, rounding up to the nearest whole quadlet.
+/// Derive the `(acf_msg_length, pad)` pair for an ACF message whose header
+/// is `header_len` bytes and whose payload is `payload_len` bytes:
+/// `acf_msg_length` is the total octet count (`header_len + payload_len`,
+/// rounded up to the nearest whole quadlet) expressed in quadlets, and
+/// `pad` is how many zero octets that rounding requires.
 ///
-/// Returns `Err(RcpError::InvalidSize)` if the resulting count would not
-/// fit the field's 11-bit width ([`BYTE_MESSAGE_INFO_11BIT_MAX`]).
-fn quadlets_for_payload_len(payload_len: usize) -> Result<u16, RcpError> {
-    let quadlets = payload_len.div_ceil(QUADLET_LEN);
-    u16::try_from(quadlets)
+/// Returns `Err(RcpError::InvalidSize)` if the resulting `acf_msg_length`
+/// would not fit the field's 9-bit width
+/// ([`ACF_MSG_LENGTH_9BIT_MAX`]).
+fn quadlets_and_pad_for_message(
+    header_len: usize,
+    payload_len: usize,
+) -> Result<(u16, u8), RcpError> {
+    let total = header_len + payload_len;
+    let remainder = total % QUADLET_LEN;
+    let pad = if remainder == 0 {
+        0
+    } else {
+        QUADLET_LEN - remainder
+    };
+    let quadlets = (total + pad) / QUADLET_LEN;
+    let acf_msg_length = u16::try_from(quadlets)
         .ok()
-        .filter(|&q| q <= BYTE_MESSAGE_INFO_11BIT_MAX)
-        .ok_or(RcpError::InvalidSize)
+        .filter(|&q| q <= ACF_MSG_LENGTH_9BIT_MAX)
+        .ok_or(RcpError::InvalidSize)?;
+    Ok((acf_msg_length, pad as u8))
 }
 
-/// Validate that a decoded `info.acf_msg_length` is consistent with
-/// `payload_len`, the number of payload bytes actually present in the
-/// frame being decoded.
+/// Given an already-decoded `info` (whose `acf_msg_length`/`pad` describe
+/// the *whole* ACF message, header included) and the full byte slice `b`
+/// starting at that message's first octet, return `(payload, consumed)`:
+/// the message's real payload bytes (with the trailing `pad` octets
+/// stripped back off) and the total number of bytes this one ACF message
+/// occupies in `b` (`header_len + region_len`) — the offset a caller
+/// splitting multiple concatenated ACF messages out of one frame (TC18
+/// §12.9.1.1) should advance by to reach the next message, if any.
 ///
-/// This crate's encoders never transmit literal padding bytes to round a
-/// payload up to a quadlet boundary — `payload_len` is always the exact
-/// real byte count — so a decoded frame is only consistent when its
-/// `acf_msg_length` is exactly the quadlet count [`quadlets_for_payload_len`]
-/// would itself derive for `payload_len`. Returns
-/// `Err(RcpError::InvalidSize)` on any other value, including one that
-/// would only make sense if real padding bytes were being transmitted.
-/// `info.pad` is not consulted here — whatever `pad` means for a sender
-/// that *does* transmit real padding bytes is a still-open question this
-/// function does not resolve (see this module's provenance note), and is
-/// orthogonal to this crate's own never-pad-the-wire encoding model.
-fn check_acf_msg_length_matches_payload(
+/// Returns `Err(RcpError::ShortFrame)` if `b` does not actually contain
+/// `header_len + region_len` bytes, and `Err(RcpError::InvalidSize)` if
+/// `info.acf_msg_length`/`info.pad` describe a message shorter than
+/// `header_len` or shorter than `header_len + pad` — both indicate a
+/// self-inconsistent header rather than merely a short read.
+fn take_message_bytes<'a>(
+    b: &'a [u8],
+    header_len: usize,
     info: &ByteMessageInfo,
-    payload_len: usize,
-) -> Result<(), RcpError> {
-    if info.acf_msg_length != quadlets_for_payload_len(payload_len)? {
-        return Err(RcpError::InvalidSize);
+) -> Result<(&'a [u8], usize), RcpError> {
+    let total_octets = info.acf_msg_length as usize * QUADLET_LEN;
+    let region_len = total_octets
+        .checked_sub(header_len)
+        .ok_or(RcpError::InvalidSize)?;
+    let payload_len = region_len
+        .checked_sub(info.pad as usize)
+        .ok_or(RcpError::InvalidSize)?;
+    let consumed = header_len + region_len;
+    if b.len() < consumed {
+        return Err(RcpError::ShortFrame);
     }
-    Ok(())
+    let payload = &b[header_len..header_len + payload_len];
+    Ok((payload, consumed))
 }
 
 // ── AcfAbbMessage ─────────────────────────────────────────────────────────────
@@ -493,68 +557,116 @@ pub struct AcfAbbMessage {
 
 /// Encode an [`AcfAbbMessage`] to its wire representation.
 ///
-/// The result is always exactly `ACF_ABB_HEADER_LEN + msg.payload.len()`
-/// bytes: the discriminant byte, `byte_message_info`, and `payload`
-/// verbatim, with no timestamp region of any width inserted.
+/// The result is always exactly `ACF_ABB_HEADER_LEN + msg.payload.len() +
+/// pad` bytes: `byte_message_info` (with `acf_msg_type` forced to
+/// [`ACF_ABB_MSG_TYPE`]), `payload` verbatim, then `pad` zero octets
+/// rounding the whole message up to a quadlet boundary — never a
+/// timestamp region of any width.
 ///
-/// `msg.info.acf_msg_length` is *not* trusted verbatim: this function
-/// derives the encoded `acf_msg_length` from `msg.payload.len()` itself
-/// (see [`quadlets_for_payload_len`]), overwriting whatever value
-/// `msg.info` carried, so the emitted frame's length field is always
-/// consistent with what it actually describes. Returns
-/// `Err(RcpError::InvalidSize)` if `msg.payload.len()` doesn't fit the
-/// 11-bit quadlet-count range, or if `msg.info` (with `acf_msg_length` so
-/// overwritten) otherwise fails [`encode_byte_message_info`]'s
-/// field-width validation.
+/// `msg.info.acf_msg_type`/`acf_msg_length`/`pad` are *not* trusted
+/// verbatim: this function always derives and overwrites them
+/// ([`ACF_ABB_MSG_TYPE`]; [`quadlets_and_pad_for_message`] over
+/// `ACF_ABB_HEADER_LEN + msg.payload.len()`), so the emitted frame's
+/// header is always self-consistent with what it actually describes.
+/// Returns `Err(RcpError::InvalidSize)` if `msg.payload.len()` doesn't fit
+/// the 9-bit quadlet-count range, or if `msg.info` (with those three
+/// fields so overwritten) otherwise fails
+/// [`encode_byte_message_info`]'s field-width validation.
 // fusa:req REQ-ABB-002
 // fusa:req REQ-ABB-003
 pub fn encode_acf_abb(msg: &AcfAbbMessage) -> Result<Vec<u8>, RcpError> {
-    let acf_msg_length = quadlets_for_payload_len(msg.payload.len())?;
+    let (acf_msg_length, pad) =
+        quadlets_and_pad_for_message(ACF_ABB_HEADER_LEN, msg.payload.len())?;
     let info = ByteMessageInfo {
+        acf_msg_type: ACF_ABB_MSG_TYPE,
         acf_msg_length,
+        pad,
         ..msg.info
     };
     let info_bytes = encode_byte_message_info(&info)?;
-    let mut buf = Vec::with_capacity(ACF_ABB_HEADER_LEN + msg.payload.len());
-    buf.push(ACF_ABB_MSG_TYPE);
+    let mut buf = Vec::with_capacity(ACF_ABB_HEADER_LEN + msg.payload.len() + pad as usize);
     buf.extend_from_slice(&info_bytes);
     buf.extend_from_slice(&msg.payload);
+    buf.extend(std::iter::repeat(0u8).take(pad as usize));
     Ok(buf)
 }
 
 /// Decode an [`AcfAbbMessage`] from a byte slice.
 ///
 /// Never panics on short, truncated, or arbitrary input — always returns
-/// `Err` instead. Bytes after `byte_message_info` are the `payload`, but
-/// unlike before this function now cross-checks the decoded
-/// `acf_msg_length` against how many such bytes are actually present (see
-/// [`check_acf_msg_length_matches_payload`]) and returns
-/// `Err(RcpError::InvalidSize)` on a mismatch, rather than trusting
-/// `acf_msg_length` as an unvalidated opaque value.
+/// `Err` instead. Only consumes the bytes this one ACF message's own
+/// `acf_msg_length` describes (see [`take_message_bytes`]); any bytes in
+/// `b` past that point (e.g. a second concatenated ACF message, TC18
+/// §12.9.1.1) are left unread rather than folded into `payload` or
+/// rejected — see [`decode_acf_abb_messages`] for splitting a frame that
+/// carries more than one.
 // fusa:req REQ-ABB-002
 // fusa:req REQ-ABB-004
 // fusa:req REQ-ABB-005
 pub fn decode_acf_abb(b: &[u8]) -> Result<AcfAbbMessage, RcpError> {
-    let msg_type = *b.first().ok_or(RcpError::ShortFrame)?;
-    if msg_type != ACF_ABB_MSG_TYPE {
+    if b.len() < ACF_ABB_HEADER_LEN {
+        return Err(RcpError::ShortFrame);
+    }
+    let info = decode_byte_message_info(&b[..ACF_ABB_HEADER_LEN])?;
+    if info.acf_msg_type != ACF_ABB_MSG_TYPE {
         return Err(wrong_discriminant_error(
             "acf_abb",
             ACF_ABB_MSG_TYPE,
-            msg_type,
+            info.acf_msg_type,
             ACF_GBB_MSG_TYPE,
             "ACF_GBB",
         ));
     }
-    if b.len() < ACF_ABB_HEADER_LEN {
-        return Err(RcpError::ShortFrame);
-    }
-    let info = decode_byte_message_info(&b[1..ACF_ABB_HEADER_LEN])?;
-    let payload = &b[ACF_ABB_HEADER_LEN..];
-    check_acf_msg_length_matches_payload(&info, payload.len())?;
+    let (payload, _consumed) = take_message_bytes(b, ACF_ABB_HEADER_LEN, &info)?;
     Ok(AcfAbbMessage {
         info,
         payload: payload.to_vec(),
     })
+}
+
+/// Split zero or more concatenated ACF_ABB messages out of `b`, per TC18
+/// §12.9.1.1 ("Handling multiple requests in incoming messages"): "An RC
+/// Server shall support to handle multiple requests in one frame and check
+/// each of them individually if to be processed or not."
+///
+/// Each message's own `acf_msg_length` (via [`take_message_bytes`]) is the
+/// delimiter — there is no outer count or separator. Returns
+/// `Err(RcpError::ShortFrame)` if `b` is empty or ends mid-message, and
+/// propagates whatever error the first malformed message in the sequence
+/// produces (a message after a malformed one is never reached). An empty
+/// `b` is rejected the same way [`decode_acf_abb`] rejects it, rather than
+/// silently returning zero messages, so a caller cannot mistake "nothing
+/// to parse" for "one legitimately-empty-payload message".
+// fusa:req REQ-ABB-004
+pub fn decode_acf_abb_messages(b: &[u8]) -> Result<Vec<AcfAbbMessage>, RcpError> {
+    if b.is_empty() {
+        return Err(RcpError::ShortFrame);
+    }
+    let mut messages = Vec::new();
+    let mut offset = 0usize;
+    while offset < b.len() {
+        let remaining = &b[offset..];
+        if remaining.len() < ACF_ABB_HEADER_LEN {
+            return Err(RcpError::ShortFrame);
+        }
+        let info = decode_byte_message_info(&remaining[..ACF_ABB_HEADER_LEN])?;
+        if info.acf_msg_type != ACF_ABB_MSG_TYPE {
+            return Err(wrong_discriminant_error(
+                "acf_abb",
+                ACF_ABB_MSG_TYPE,
+                info.acf_msg_type,
+                ACF_GBB_MSG_TYPE,
+                "ACF_GBB",
+            ));
+        }
+        let (payload, consumed) = take_message_bytes(remaining, ACF_ABB_HEADER_LEN, &info)?;
+        messages.push(AcfAbbMessage {
+            info,
+            payload: payload.to_vec(),
+        });
+        offset += consumed;
+    }
+    Ok(messages)
 }
 
 // ── AcfGbbMessage ─────────────────────────────────────────────────────────────
@@ -593,70 +705,69 @@ pub struct AcfGbbMessage {
 
 /// Encode an [`AcfGbbMessage`] to its wire representation.
 ///
-/// The result is always exactly `ACF_GBB_HEADER_LEN + msg.payload.len()`
-/// bytes: the discriminant byte, `byte_message_info`, the 8-byte
-/// `message_timestamp`, and `payload` verbatim.
+/// The result is always exactly `ACF_GBB_HEADER_LEN + msg.payload.len() +
+/// pad` bytes: `byte_message_info` (with `acf_msg_type` forced to
+/// [`ACF_GBB_MSG_TYPE`]), the 8-byte `message_timestamp`, `payload`
+/// verbatim, then `pad` zero octets rounding the whole message up to a
+/// quadlet boundary.
 ///
-/// `msg.info.acf_msg_length` is *not* trusted verbatim: this function
-/// derives the encoded `acf_msg_length` from `msg.payload.len()` itself
-/// (see [`quadlets_for_payload_len`]), overwriting whatever value
-/// `msg.info` carried — see [`encode_acf_abb`]'s doc comment for the same
-/// rule. Returns `Err(RcpError::InvalidSize)` if `msg.payload.len()`
-/// doesn't fit the 11-bit quadlet-count range, or if `msg.info` (with
-/// `acf_msg_length` so overwritten) otherwise fails
-/// [`encode_byte_message_info`]'s field-width validation.
+/// `msg.info.acf_msg_type`/`acf_msg_length`/`pad` are *not* trusted
+/// verbatim — see [`encode_acf_abb`]'s doc comment for the same rule,
+/// applied here over `ACF_GBB_HEADER_LEN + msg.payload.len()`. Returns
+/// `Err(RcpError::InvalidSize)` if `msg.payload.len()` doesn't fit the
+/// 9-bit quadlet-count range, or if `msg.info` (with those three fields so
+/// overwritten) otherwise fails [`encode_byte_message_info`]'s
+/// field-width validation.
 // fusa:req REQ-GBB-002
 // fusa:req REQ-GBB-003
 pub fn encode_acf_gbb(msg: &AcfGbbMessage) -> Result<Vec<u8>, RcpError> {
-    let acf_msg_length = quadlets_for_payload_len(msg.payload.len())?;
+    let (acf_msg_length, pad) =
+        quadlets_and_pad_for_message(ACF_GBB_HEADER_LEN, msg.payload.len())?;
     let info = ByteMessageInfo {
+        acf_msg_type: ACF_GBB_MSG_TYPE,
         acf_msg_length,
+        pad,
         ..msg.info
     };
     let info_bytes = encode_byte_message_info(&info)?;
-    let mut buf = Vec::with_capacity(ACF_GBB_HEADER_LEN + msg.payload.len());
-    buf.push(ACF_GBB_MSG_TYPE);
+    let mut buf = Vec::with_capacity(ACF_GBB_HEADER_LEN + msg.payload.len() + pad as usize);
     buf.extend_from_slice(&info_bytes);
     buf.extend_from_slice(&msg.message_timestamp.to_be_bytes());
     buf.extend_from_slice(&msg.payload);
+    buf.extend(std::iter::repeat(0u8).take(pad as usize));
     Ok(buf)
 }
 
 /// Decode an [`AcfGbbMessage`] from a byte slice.
 ///
 /// Never panics on short, truncated, or arbitrary input — always returns
-/// `Err` instead. Bytes after `message_timestamp` are the `payload`, but
-/// unlike before this function now cross-checks the decoded
-/// `acf_msg_length` against how many such bytes are actually present (see
-/// [`check_acf_msg_length_matches_payload`]) and returns
-/// `Err(RcpError::InvalidSize)` on a mismatch, rather than trusting
-/// `acf_msg_length` as an unvalidated opaque value.
+/// `Err` instead. Only consumes the bytes this one ACF message's own
+/// `acf_msg_length` describes — see [`decode_acf_abb`]'s doc comment for
+/// the same rule, applied here over the region following
+/// `message_timestamp`.
 // fusa:req REQ-GBB-002
 // fusa:req REQ-GBB-004
 // fusa:req REQ-GBB-005
 pub fn decode_acf_gbb(b: &[u8]) -> Result<AcfGbbMessage, RcpError> {
-    let msg_type = *b.first().ok_or(RcpError::ShortFrame)?;
-    if msg_type != ACF_GBB_MSG_TYPE {
+    if b.len() < ACF_GBB_HEADER_LEN {
+        return Err(RcpError::ShortFrame);
+    }
+    let info = decode_byte_message_info(&b[..BYTE_MESSAGE_INFO_LEN])?;
+    if info.acf_msg_type != ACF_GBB_MSG_TYPE {
         return Err(wrong_discriminant_error(
             "acf_gbb",
             ACF_GBB_MSG_TYPE,
-            msg_type,
+            info.acf_msg_type,
             ACF_ABB_MSG_TYPE,
             "ACF_ABB",
         ));
     }
-    if b.len() < ACF_GBB_HEADER_LEN {
-        return Err(RcpError::ShortFrame);
-    }
-    let info_end = 1 + BYTE_MESSAGE_INFO_LEN;
-    let info = decode_byte_message_info(&b[1..info_end])?;
 
     let mut ts_bytes = [0u8; 8];
-    ts_bytes.copy_from_slice(&b[info_end..ACF_GBB_HEADER_LEN]);
+    ts_bytes.copy_from_slice(&b[BYTE_MESSAGE_INFO_LEN..ACF_GBB_HEADER_LEN]);
     let message_timestamp = u64::from_be_bytes(ts_bytes);
 
-    let payload = &b[ACF_GBB_HEADER_LEN..];
-    check_acf_msg_length_matches_payload(&info, payload.len())?;
+    let (payload, _consumed) = take_message_bytes(b, ACF_GBB_HEADER_LEN, &info)?;
 
     Ok(AcfGbbMessage {
         info,
@@ -736,6 +847,44 @@ pub fn verify_echo_back(
     Ok(())
 }
 
+// ── Wire-level error responses (rust-RCP-W04) ─────────────────────────────────
+
+/// Build a wire-level `err=1` ACF_ABB error response for `request`, given
+/// the error that occurred processing it — TC18 §12.9.6 "Handling errors":
+/// "The error response shall contain the byte_bus_id and transaction
+/// number of the request. The error response shall contain a
+/// byte_msg_payload with an error code."
+///
+/// Returns `None` if `error` has no TC18 Table 27 wire code
+/// ([`RcpError::tc18_wire_code`]) — there is no meaningful `err=1` response
+/// to build for an error TC18 itself does not name (e.g. a transport-level
+/// [`RcpError::Timeout`] or [`RcpError::ShortFrame`] from a frame this
+/// crate could not even decode far enough to learn a `byte_bus_id`/
+/// `transaction_num` to echo). Callers (e.g.
+/// [`crate::mock::RcServer::handle_ntscf_frame`]/
+/// [`crate::udp::UdpRcServer::serve_one`]) are expected to fall back to
+/// propagating the original error to their own caller when this returns
+/// `None`, rather than silently dropping it.
+///
+/// `byte_bus_id`/`transaction_num` are echoed from `request` (via
+/// [`build_response_info`], the same echo-back rule every other response
+/// in this crate uses), `rsp`/`err` are forced to `true`/`true`, and the
+/// response payload is the single Table 27 error-code octet. TC18 does not
+/// spell out `byte_msg_payload`'s exact byte layout for an error response
+/// beyond "contains an error code" — this one-octet encoding is this
+/// crate's own working interpretation (Guiding Principle 5), matching the
+/// simplest reading of that text, and flagged here for reconciliation
+/// against real TC18 behavior before being relied on for interop.
+pub fn build_error_response(request: &ByteMessageInfo, error: &RcpError) -> Option<AcfAbbMessage> {
+    let code = error.tc18_wire_code()?;
+    let mut info = build_response_info(request, *request);
+    info.err = true;
+    Some(AcfAbbMessage {
+        info,
+        payload: vec![code],
+    })
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  Tests
 // ─────────────────────────────────────────────────────────────────────────────
@@ -745,8 +894,9 @@ mod tests {
 
     fn sample_info() -> ByteMessageInfo {
         ByteMessageInfo {
-            acf_msg_length: 0x0355,
-            pad: true,
+            acf_msg_type: ACF_ABB_MSG_TYPE,
+            acf_msg_length: 0x0155,
+            pad: 0x2,
             mtv: false,
             byte_bus_id: 0x0123,
             evt: Evt {
@@ -760,7 +910,7 @@ mod tests {
             rsp: false,
             err: true,
             ms: false,
-            read_size_segment: ReadSizeOrSegment(0x99),
+            read_size_segment: ReadSizeOrSegment(0x099),
         }
     }
 
@@ -790,8 +940,9 @@ mod tests {
     // fusa:test REQ-BMI-002
     fn byte_message_info_round_trip_max_values() {
         let info = ByteMessageInfo {
-            acf_msg_length: BYTE_MESSAGE_INFO_11BIT_MAX,
-            pad: true,
+            acf_msg_type: ACF_MSG_TYPE_7BIT_MAX,
+            acf_msg_length: ACF_MSG_LENGTH_9BIT_MAX,
+            pad: PAD_2BIT_MAX,
             mtv: true,
             byte_bus_id: BYTE_MESSAGE_INFO_11BIT_MAX,
             evt: Evt {
@@ -805,7 +956,7 @@ mod tests {
             rsp: true,
             err: true,
             ms: true,
-            read_size_segment: ReadSizeOrSegment(0xFF),
+            read_size_segment: ReadSizeOrSegment(READ_SIZE_SEGMENT_12BIT_MAX),
         };
         let frame = encode_byte_message_info(&info).unwrap();
         let decoded = decode_byte_message_info(&frame).unwrap();
@@ -814,9 +965,29 @@ mod tests {
 
     #[test]
     // fusa:test REQ-BMI-003
+    fn byte_message_info_encode_rejects_oversized_acf_msg_type() {
+        let info = ByteMessageInfo {
+            acf_msg_type: ACF_MSG_TYPE_7BIT_MAX + 1,
+            ..Default::default()
+        };
+        assert_eq!(encode_byte_message_info(&info), Err(RcpError::InvalidSize));
+    }
+
+    #[test]
+    // fusa:test REQ-BMI-003
     fn byte_message_info_encode_rejects_oversized_acf_msg_length() {
         let info = ByteMessageInfo {
-            acf_msg_length: BYTE_MESSAGE_INFO_11BIT_MAX + 1,
+            acf_msg_length: ACF_MSG_LENGTH_9BIT_MAX + 1,
+            ..Default::default()
+        };
+        assert_eq!(encode_byte_message_info(&info), Err(RcpError::InvalidSize));
+    }
+
+    #[test]
+    // fusa:test REQ-BMI-003
+    fn byte_message_info_encode_rejects_oversized_pad() {
+        let info = ByteMessageInfo {
+            pad: PAD_2BIT_MAX + 1,
             ..Default::default()
         };
         assert_eq!(encode_byte_message_info(&info), Err(RcpError::InvalidSize));
@@ -840,6 +1011,16 @@ mod tests {
                 ack: false,
                 sub_opcode: EVT_SUB_OPCODE_MAX + 1,
             },
+            ..Default::default()
+        };
+        assert_eq!(encode_byte_message_info(&info), Err(RcpError::InvalidSize));
+    }
+
+    #[test]
+    // fusa:test REQ-BMI-003
+    fn byte_message_info_encode_rejects_oversized_read_size_segment() {
+        let info = ByteMessageInfo {
+            read_size_segment: ReadSizeOrSegment(READ_SIZE_SEGMENT_12BIT_MAX + 1),
             ..Default::default()
         };
         assert_eq!(encode_byte_message_info(&info), Err(RcpError::InvalidSize));
@@ -902,11 +1083,68 @@ mod tests {
         for op in [false, true] {
             let info = ByteMessageInfo {
                 op,
-                read_size_segment: ReadSizeOrSegment(0xBEEF),
+                read_size_segment: ReadSizeOrSegment(0x0BEF),
                 ..Default::default()
             };
             assert_ne!(info.read_size().is_some(), info.segment_num().is_some());
         }
+    }
+
+    // ── Canonical layout: bit-position pins ─────────────────────────────────
+    //
+    // Directly pins the octet-by-octet packing this module's "Canonical
+    // wire layout" doc section describes, independent of round-trip tests
+    // (which would still pass under a self-consistent but wrong layout).
+
+    #[test]
+    fn encode_pins_row1_octet_positions() {
+        let info = ByteMessageInfo {
+            acf_msg_type: 0x0E,     // 0b0001110
+            acf_msg_length: 0x0155, // 0b0_0001_0101_0101 (9 bits: 1 0101 0101)
+            pad: 0b10,
+            mtv: true,
+            byte_bus_id: 0x0123, // 0b010_0010_0011 (11 bits)
+            ..Default::default()
+        };
+        let buf = encode_byte_message_info(&info).unwrap();
+        // octet0: acf_msg_type<<1 | msg_length bit8. 0x0155 bit8 = 1.
+        assert_eq!(buf[0], (0x0E << 1) | 0x1);
+        // octet1: msg_length low 8 bits = 0x55.
+        assert_eq!(buf[1], 0x55);
+        // octet2: pad(2)<<6 | mtv<<5 | byte_bus_id[10:8].
+        // 0x0123 = 0b1_0010_0011 -> bits[10:8] = 0b001.
+        assert_eq!(buf[2], (0b10 << 6) | (1 << 5) | 0b001);
+        // octet3: byte_bus_id[7:0] = 0x23.
+        assert_eq!(buf[3], 0x23);
+    }
+
+    #[test]
+    fn encode_pins_row2_octet_positions() {
+        let info = ByteMessageInfo {
+            evt: Evt {
+                ack: true,
+                sub_opcode: 0b101,
+            },
+            hs: true,
+            cs: false,
+            transaction_num: 0x77,
+            op: true,
+            rsp: false,
+            err: true,
+            ms: false,
+            read_size_segment: ReadSizeOrSegment(0x0ABC),
+            ..Default::default()
+        };
+        let buf = encode_byte_message_info(&info).unwrap();
+        // octet4: evt(ack<<3|sub)<<4 | hs<<1 | cs.
+        let evt_bits = (1 << 3) | 0b101;
+        assert_eq!(buf[4], (evt_bits << 4) | (1 << 1));
+        // octet5: transaction_num, BEFORE the op/rsp/err/ms group.
+        assert_eq!(buf[5], 0x77);
+        // octet6: op<<7|rsp<<6|err<<5|ms<<4 | read_size[11:8].
+        assert_eq!(buf[6], (1 << 7) | (1 << 5) | 0x0A);
+        // octet7: read_size[7:0].
+        assert_eq!(buf[7], 0xBC);
     }
 
     // ── ACF_ABB round-trip ─────────────────────────────────────────────────
@@ -915,13 +1153,16 @@ mod tests {
     // fusa:test REQ-ABB-001
     // fusa:test REQ-ABB-002
     fn acf_abb_round_trip() {
-        // `acf_msg_length` is derived from the payload at encode time
-        // (rust-RCP-N2-05), not preserved verbatim — set it here to the
-        // value that *will* be derived (ceil(5/4) = 2 quadlets) so this
-        // round-trip equality holds meaningfully rather than by accident.
+        // acf_msg_type/acf_msg_length/pad are all derived/overwritten at
+        // encode time (see encode_acf_abb's doc comment) — set them here to
+        // the values that *will* be derived so this round-trip equality
+        // holds meaningfully rather than by accident. header(8) + 5 payload
+        // = 13 -> pad 3 -> 16 total -> 4 quadlets.
         let msg = AcfAbbMessage {
             info: ByteMessageInfo {
-                acf_msg_length: 2,
+                acf_msg_type: ACF_ABB_MSG_TYPE,
+                acf_msg_length: 4,
+                pad: 3,
                 ..sample_info()
             },
             payload: vec![0x11, 0x22, 0x33, 0x44, 0x55],
@@ -934,8 +1175,15 @@ mod tests {
     #[test]
     // fusa:test REQ-ABB-002
     fn acf_abb_round_trip_empty_payload() {
+        // header(8) + 0 payload = 8 -> already quadlet-aligned -> pad 0 ->
+        // 2 quadlets.
         let msg = AcfAbbMessage {
-            info: ByteMessageInfo::default(),
+            info: ByteMessageInfo {
+                acf_msg_type: ACF_ABB_MSG_TYPE,
+                acf_msg_length: 2,
+                pad: 0,
+                ..Default::default()
+            },
             payload: vec![],
         };
         let frame = encode_acf_abb(&msg).unwrap();
@@ -947,11 +1195,13 @@ mod tests {
     #[test]
     // fusa:test REQ-ABB-002
     fn acf_abb_round_trip_large_payload() {
-        // 256-byte payload -> ceil(256/4) = 64 quadlets; see
-        // acf_abb_round_trip's comment.
+        // header(8) + 256 payload = 264 -> already quadlet-aligned -> pad 0
+        // -> 66 quadlets.
         let msg = AcfAbbMessage {
             info: ByteMessageInfo {
-                acf_msg_length: 64,
+                acf_msg_type: ACF_ABB_MSG_TYPE,
+                acf_msg_length: 66,
+                pad: 0,
                 ..sample_info()
             },
             payload: (0..=255u16).map(|v| v as u8).collect(),
@@ -967,16 +1217,16 @@ mod tests {
     fn acf_abb_encoded_message_has_no_timestamp_region() {
         // The defining Milestone 1 constraint for ACF_ABB: unlike ACF_GBB's
         // 64-bit message_timestamp, there must be no reserved slot for a
-        // timestamp at all — encoded length is exactly the header plus the
-        // payload, never 8 bytes wider.
+        // timestamp at all.
         for payload_len in [0usize, 1, 7, 8, 9, 16, 64] {
             let msg = AcfAbbMessage {
                 info: ByteMessageInfo::default(),
                 payload: vec![0x00; payload_len],
             };
             let frame = encode_acf_abb(&msg).unwrap();
-            assert_eq!(frame.len(), ACF_ABB_HEADER_LEN + payload_len);
             assert_ne!(frame.len(), ACF_GBB_HEADER_LEN + payload_len);
+            assert!(frame.len() >= ACF_ABB_HEADER_LEN + payload_len);
+            assert!(frame.len() < ACF_ABB_HEADER_LEN + payload_len + QUADLET_LEN);
         }
     }
 
@@ -988,16 +1238,17 @@ mod tests {
             payload: vec![0xAA, 0xBB],
         };
         let frame = encode_acf_abb(&msg).unwrap();
-        assert_eq!(frame[0], ACF_ABB_MSG_TYPE);
+        let decoded_info = decode_byte_message_info(&frame).unwrap();
+        assert_eq!(decoded_info.acf_msg_type, ACF_ABB_MSG_TYPE);
     }
 
     #[test]
     // fusa:test REQ-ABB-002
     fn acf_abb_encode_propagates_byte_message_info_validation_error() {
-        // `acf_msg_length` is now always overwritten by the payload-derived
-        // value before this validation runs (rust-RCP-N2-05), so this uses
-        // an oversized `byte_bus_id` instead — a field encode_acf_abb does
-        // not touch — to exercise the propagation of
+        // acf_msg_type/acf_msg_length/pad are always overwritten by the
+        // derived values before this validation runs, so this uses an
+        // oversized byte_bus_id instead — a field encode_acf_abb does not
+        // touch — to exercise the propagation of
         // encode_byte_message_info's own field-width validation.
         let msg = AcfAbbMessage {
             info: ByteMessageInfo {
@@ -1012,9 +1263,9 @@ mod tests {
     #[test]
     // fusa:test REQ-ABB-002
     fn acf_abb_encode_rejects_payload_too_large_for_the_quadlet_field() {
-        // (BYTE_MESSAGE_INFO_11BIT_MAX + 1) quadlets' worth of bytes is one
-        // quadlet past what the 11-bit acf_msg_length field can encode.
-        let payload_len = (BYTE_MESSAGE_INFO_11BIT_MAX as usize + 1) * QUADLET_LEN;
+        // (ACF_MSG_LENGTH_9BIT_MAX + 1) quadlets' worth of bytes is one
+        // quadlet past what the 9-bit acf_msg_length field can encode.
+        let payload_len = (ACF_MSG_LENGTH_9BIT_MAX as usize + 1) * QUADLET_LEN;
         let msg = AcfAbbMessage {
             info: ByteMessageInfo::default(),
             payload: vec![0u8; payload_len],
@@ -1042,7 +1293,13 @@ mod tests {
     #[test]
     // fusa:test REQ-ABB-004
     fn acf_abb_decode_rejects_gbb_discriminant_with_specific_hint() {
-        let err = decode_acf_abb(&[ACF_GBB_MSG_TYPE]).unwrap_err();
+        let msg = AcfGbbMessage {
+            info: ByteMessageInfo::default(),
+            message_timestamp: 0,
+            payload: vec![],
+        };
+        let frame = encode_acf_gbb(&msg).unwrap();
+        let err = decode_acf_abb(&frame).unwrap_err();
         match err {
             RcpError::Other(msg) => assert!(msg.contains("ACF_GBB")),
             other => panic!("expected RcpError::Other, got {other:?}"),
@@ -1052,9 +1309,7 @@ mod tests {
     #[test]
     // fusa:test REQ-ABB-004
     fn acf_abb_decode_rejects_truncated_byte_message_info() {
-        // Correct discriminant, but too short to hold a full byte_message_info.
-        let mut short = vec![ACF_ABB_MSG_TYPE];
-        short.extend_from_slice(&[0u8; BYTE_MESSAGE_INFO_LEN - 1]);
+        let short = vec![0u8; BYTE_MESSAGE_INFO_LEN - 1];
         assert_eq!(decode_acf_abb(&short), Err(RcpError::ShortFrame));
     }
 
@@ -1085,17 +1340,74 @@ mod tests {
         }
     }
 
+    // ── decode_acf_abb_messages: splitting multiple ACF messages ───────────
+
+    #[test]
+    fn decode_acf_abb_messages_rejects_empty_input() {
+        assert_eq!(decode_acf_abb_messages(&[]), Err(RcpError::ShortFrame));
+    }
+
+    #[test]
+    fn decode_acf_abb_messages_splits_two_concatenated_messages() {
+        let msg1 = AcfAbbMessage {
+            info: ByteMessageInfo {
+                transaction_num: 1,
+                ..Default::default()
+            },
+            payload: vec![0xAA; 3],
+        };
+        let msg2 = AcfAbbMessage {
+            info: ByteMessageInfo {
+                transaction_num: 2,
+                ..Default::default()
+            },
+            payload: vec![0xBB; 9],
+        };
+        let mut frame = encode_acf_abb(&msg1).unwrap();
+        frame.extend_from_slice(&encode_acf_abb(&msg2).unwrap());
+
+        let messages = decode_acf_abb_messages(&frame).unwrap();
+        assert_eq!(messages.len(), 2);
+        assert_eq!(messages[0].info.transaction_num, 1);
+        assert_eq!(messages[0].payload, vec![0xAA; 3]);
+        assert_eq!(messages[1].info.transaction_num, 2);
+        assert_eq!(messages[1].payload, vec![0xBB; 9]);
+    }
+
+    #[test]
+    fn decode_acf_abb_messages_single_message_matches_decode_acf_abb() {
+        let msg = AcfAbbMessage {
+            info: ByteMessageInfo::default(),
+            payload: vec![1, 2, 3, 4, 5],
+        };
+        let frame = encode_acf_abb(&msg).unwrap();
+        let messages = decode_acf_abb_messages(&frame).unwrap();
+        assert_eq!(messages, vec![decode_acf_abb(&frame).unwrap()]);
+    }
+
+    #[test]
+    fn decode_acf_abb_messages_rejects_trailing_short_fragment() {
+        let msg = AcfAbbMessage {
+            info: ByteMessageInfo::default(),
+            payload: vec![1, 2, 3],
+        };
+        let mut frame = encode_acf_abb(&msg).unwrap();
+        frame.push(0xFF); // one dangling byte, not a full second header
+        assert_eq!(decode_acf_abb_messages(&frame), Err(RcpError::ShortFrame));
+    }
+
     // ── ACF_GBB round-trip ──────────────────────────────────────────────────
 
     #[test]
     // fusa:test REQ-GBB-001
     // fusa:test REQ-GBB-002
     fn acf_gbb_round_trip() {
-        // See acf_abb_round_trip's comment: acf_msg_length is derived from
-        // the payload (ceil(5/4) = 2 quadlets) at encode time.
+        // header(16) + 5 payload = 21 -> pad 3 -> 24 total -> 6 quadlets.
         let msg = AcfGbbMessage {
             info: ByteMessageInfo {
-                acf_msg_length: 2,
+                acf_msg_type: ACF_GBB_MSG_TYPE,
+                acf_msg_length: 6,
+                pad: 3,
                 ..sample_info()
             },
             message_timestamp: 0x0011_2233_4455_6677,
@@ -1111,7 +1423,12 @@ mod tests {
     fn acf_gbb_round_trip_zero_and_max_timestamp() {
         for message_timestamp in [0u64, u64::MAX] {
             let msg = AcfGbbMessage {
-                info: ByteMessageInfo::default(),
+                info: ByteMessageInfo {
+                    acf_msg_type: ACF_GBB_MSG_TYPE,
+                    acf_msg_length: 4,
+                    pad: 0,
+                    ..Default::default()
+                },
                 message_timestamp,
                 payload: vec![],
             };
@@ -1125,10 +1442,13 @@ mod tests {
     #[test]
     // fusa:test REQ-GBB-002
     fn acf_gbb_round_trip_large_payload() {
-        // 256-byte payload -> ceil(256/4) = 64 quadlets.
+        // header(16) + 256 payload = 272 -> already aligned -> pad 0 -> 68
+        // quadlets.
         let msg = AcfGbbMessage {
             info: ByteMessageInfo {
-                acf_msg_length: 64,
+                acf_msg_type: ACF_GBB_MSG_TYPE,
+                acf_msg_length: 68,
+                pad: 0,
                 ..sample_info()
             },
             message_timestamp: 0xDEAD_BEEF_0000_0001,
@@ -1154,7 +1474,8 @@ mod tests {
             payload: vec![0xAA, 0xBB],
         };
         let frame = encode_acf_gbb(&msg).unwrap();
-        assert_eq!(frame[0], ACF_GBB_MSG_TYPE);
+        let decoded_info = decode_byte_message_info(&frame).unwrap();
+        assert_eq!(decoded_info.acf_msg_type, ACF_GBB_MSG_TYPE);
     }
 
     #[test]
@@ -1191,7 +1512,14 @@ mod tests {
     #[test]
     // fusa:test REQ-GBB-004
     fn acf_gbb_decode_rejects_abb_discriminant_with_specific_hint() {
-        let err = decode_acf_gbb(&[ACF_ABB_MSG_TYPE]).unwrap_err();
+        let msg = AcfAbbMessage {
+            info: ByteMessageInfo::default(),
+            payload: vec![],
+        };
+        let frame = encode_acf_abb(&msg).unwrap();
+        let mut padded = frame.clone();
+        padded.extend_from_slice(&[0u8; 8]); // pad out to GBB header length
+        let err = decode_acf_gbb(&padded).unwrap_err();
         match err {
             RcpError::Other(msg) => assert!(msg.contains("ACF_ABB")),
             other => panic!("expected RcpError::Other, got {other:?}"),
@@ -1203,8 +1531,8 @@ mod tests {
     fn acf_gbb_decode_rejects_truncated_timestamp() {
         // Correct discriminant and full byte_message_info, but truncated
         // before the 8-byte message_timestamp is complete.
-        let mut short = vec![ACF_GBB_MSG_TYPE];
-        short.extend_from_slice(&[0u8; BYTE_MESSAGE_INFO_LEN]);
+        let mut short = vec![0u8; BYTE_MESSAGE_INFO_LEN];
+        short[0] = ACF_GBB_MSG_TYPE << 1;
         short.extend_from_slice(&[0u8; 3]); // only 3 of 8 timestamp bytes
         assert_eq!(decode_acf_gbb(&short), Err(RcpError::ShortFrame));
     }
@@ -1349,5 +1677,139 @@ mod tests {
                 },
             );
         }
+    }
+
+    // ── Wire-level error responses ──────────────────────────────────────────
+
+    #[test]
+    fn build_error_response_echoes_request_and_sets_err_and_rsp() {
+        let request = ByteMessageInfo {
+            byte_bus_id: 0x0042,
+            transaction_num: 0x07,
+            ..sample_info()
+        };
+        let response = build_error_response(&request, &RcpError::InvalidParameter).unwrap();
+        assert_eq!(response.info.byte_bus_id, 0x0042);
+        assert_eq!(response.info.transaction_num, 0x07);
+        assert!(response.info.err);
+        assert!(response.info.rsp);
+        assert_eq!(response.payload, vec![15]); // INVALID_PARAMETER = 15
+    }
+
+    #[test]
+    fn build_error_response_covers_all_seventeen_table_27_codes() {
+        let request = sample_info();
+        let errors_and_codes: &[(RcpError, u8)] = &[
+            (RcpError::UnsupportedCmd, 1),
+            (RcpError::SequencerNotKnown, 2),
+            (RcpError::UnauthorizedAccess, 3),
+            (RcpError::LockedMemAccess, 4),
+            (RcpError::RequestCanceled, 5),
+            (RcpError::RequestNotFound, 6),
+            (RcpError::EpError, 7),
+            (RcpError::EpNotFound, 8),
+            (RcpError::PwmInNoSignal, 9),
+            (RcpError::ReqStorageOvfl, 10),
+            (RcpError::RequestRejected, 11),
+            (RcpError::PociFailure, 12),
+            (RcpError::PresentationTimeTooFar, 13),
+            (RcpError::GptpFail, 14),
+            (RcpError::InvalidParameter, 15),
+            (RcpError::ChainAborted, 16),
+            (RcpError::ChainError, 17),
+        ];
+        for (error, code) in errors_and_codes {
+            let response = build_error_response(&request, error).unwrap();
+            assert_eq!(response.payload, vec![*code], "for {error:?}");
+        }
+    }
+
+    #[test]
+    fn build_error_response_returns_none_for_non_tc18_errors() {
+        let request = sample_info();
+        for error in [
+            RcpError::Timeout,
+            RcpError::ShortFrame,
+            RcpError::InvalidSize,
+            RcpError::Closed,
+            RcpError::CrcError,
+        ] {
+            assert_eq!(
+                build_error_response(&request, &error),
+                None,
+                "for {error:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn build_error_response_is_a_valid_encodable_acf_abb_frame() {
+        let request = sample_info();
+        let response = build_error_response(&request, &RcpError::EpNotFound).unwrap();
+        let frame = encode_acf_abb(&response).unwrap();
+        let decoded = decode_acf_abb(&frame).unwrap();
+        assert!(decoded.info.err);
+        assert_eq!(decoded.payload, vec![8]);
+    }
+
+    // ── Golden vectors: TC18 Figure 19 / Figure 20 worked examples ──────────
+    //
+    // Hand-verified against the spec's own two worked examples — see this
+    // module's "Canonical wire layout" doc section.
+
+    #[test]
+    fn acf_abb_matches_figure_19_worked_example() {
+        // Figure 19: ACF_ABB, 8-byte header + 6 payload bytes + 2 pad bytes
+        // + 4-byte CRC32 trailer = 20 bytes total = 5 quadlets.
+        // This crate's `payload` field carries "payload + CRC trailer"
+        // together (this module has no separate CRC-trailer field of its
+        // own — see the "acf_msg_length quadlet semantics" note above), so
+        // payload here is 6 real payload bytes + 4 CRC bytes = 10 bytes.
+        let msg = AcfAbbMessage {
+            info: ByteMessageInfo::default(),
+            payload: vec![
+                0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, // 6 payload bytes
+                0xC1, 0xC2, 0xC3, 0xC4, // 4-byte CRC32 trailer
+            ],
+        };
+        let frame = encode_acf_abb(&msg).unwrap();
+        assert_eq!(frame.len(), 20, "Figure 19: total message is 20 bytes");
+        let decoded_info = decode_byte_message_info(&frame).unwrap();
+        assert_eq!(
+            decoded_info.acf_msg_length, 0x05,
+            "Figure 19: acf_msg_length must be 5 quadlets"
+        );
+        assert_eq!(decoded_info.acf_msg_type, ACF_ABB_MSG_TYPE);
+        assert_eq!(decoded_info.pad, 2, "Figure 19: 2 pad bytes");
+        let decoded = decode_acf_abb(&frame).unwrap();
+        assert_eq!(decoded.payload, msg.payload);
+    }
+
+    #[test]
+    fn acf_gbb_matches_figure_20_worked_example() {
+        // Figure 20: ACF_GBB, 8-byte header + 8-byte timestamp + 7 payload
+        // bytes + 1 pad byte + 4-byte CRC32 trailer = 28 bytes total = 7
+        // quadlets. payload here is 7 real payload bytes + 4 CRC bytes = 11
+        // bytes.
+        let msg = AcfGbbMessage {
+            info: ByteMessageInfo::default(),
+            message_timestamp: 0x0102_0304_0506_0708,
+            payload: vec![
+                0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7, // 7 payload bytes
+                0xD1, 0xD2, 0xD3, 0xD4, // 4-byte CRC32 trailer
+            ],
+        };
+        let frame = encode_acf_gbb(&msg).unwrap();
+        assert_eq!(frame.len(), 28, "Figure 20: total message is 28 bytes");
+        let decoded_info = decode_byte_message_info(&frame).unwrap();
+        assert_eq!(
+            decoded_info.acf_msg_length, 0x07,
+            "Figure 20: acf_msg_length must be 7 quadlets"
+        );
+        assert_eq!(decoded_info.acf_msg_type, ACF_GBB_MSG_TYPE);
+        assert_eq!(decoded_info.pad, 1, "Figure 20: 1 pad byte");
+        let decoded = decode_acf_gbb(&frame).unwrap();
+        assert_eq!(decoded.payload, msg.payload);
+        assert_eq!(decoded.message_timestamp, msg.message_timestamp);
     }
 }

@@ -412,6 +412,32 @@ pub enum RcpError {
     #[error("rcp/error: CRC_ERROR — end-to-end CRC-32 safe-point verification failed")]
     CrcError,
 
+    // ── Remaining TC18 Table 27 error codes (rust-RCP-W05) ──────────────────
+    // TC18 Table 27 names 17 wire error codes in total; only 13 had an
+    // `RcpError` variant before this item (the eleven
+    // `is_tc18_error_code()` members above, plus `ChainAborted`/
+    // `ChainError`, which are deliberately kept out of that group — see
+    // this enum's own doc comment). These four were previously entirely
+    // unrepresented. Kept out of `is_tc18_error_code()`'s eleven-member
+    // group for the same reason `ChainAborted`/`ChainError`/`CrcError` are:
+    // that method's own doc comment scopes it to exactly the original
+    // eleven, not "every TC18 error code this enum has a variant for". See
+    // [`RcpError::tc18_wire_code`] for the canonical numeric mapping these
+    // four (and every other TC18-coded variant) now have.
+    #[error("rcp/error: PWM_IN_NO_SIGNAL — PWM_IN endpoint has no signal to report")]
+    PwmInNoSignal,
+
+    #[error("rcp/error: POCI_FAILURE — POCI (peripheral-on-chip-interconnect) transaction failed")]
+    PociFailure,
+
+    #[error(
+        "rcp/error: PRESENTATION_TIME_TOO_FAR — requested presentation time is too far in the future"
+    )]
+    PresentationTimeTooFar,
+
+    #[error("rcp/error: GPTP_FAIL — gPTP time is not available or not synchronized")]
+    GptpFail,
+
     // ── General errors ───────────────────────────────────────────────────
     #[error("rcp: invalid size")]
     InvalidSize,
@@ -482,6 +508,51 @@ impl RcpError {
                 | Self::RequestRejected
                 | Self::InvalidParameter
         )
+    }
+
+    /// This error's TC18 Table 27 ("Error codes in responses") numeric wire
+    /// value, for building a real `err=1` response's `byte_msg_payload`
+    /// (rust-RCP-W04/W05) — `None` for every variant Table 27 does not
+    /// name (the RELAY sentinels, the general-purpose/wire variants, and
+    /// this crate's own `ChainAborted`/`ChainError`/`CrcError` additions,
+    /// which have no TC18-numbered counterpart).
+    ///
+    /// This is deliberately independent of [`crate::capi::CError`]'s
+    /// discriminants (an internal, incompatible C-ABI numbering scheme —
+    /// e.g. `UnsupportedCmd` is `10` there, not this method's `1`) and of
+    /// [`RcpError::is_tc18_error_code`] (whose eleven-member group is a
+    /// distinct, narrower, pre-existing partition — this method covers all
+    /// seventeen real Table 27 codes, including the four added alongside
+    /// this method).
+    ///
+    /// Table 27 values: `UNSUPPORTED_CMD` = 1, `SEQUENCER_NOT_KNOWN` = 2,
+    /// `UNAUTHORIZED_ACCESS` = 3, `LOCKED_MEM_ACCESS` = 4,
+    /// `REQUEST_CANCELED` = 5, `REQUEST_NOT_FOUND` = 6, `EP_ERROR` = 7,
+    /// `EP_NOT_FOUND` = 8, `PWM_IN_NO_SIGNAL` = 9, `REQ_STORAGE_OVFL` = 10,
+    /// `REQUEST_REJECTED` = 11, `POCI_FAILURE` = 12,
+    /// `PRESENTATION_TIME_TOO_FAR` = 13, `GPTP_FAIL` = 14,
+    /// `INVALID_PARAMETER` = 15, `CHAIN_ABORTED` = 16, `CHAIN_ERROR` = 17.
+    pub fn tc18_wire_code(&self) -> Option<u8> {
+        match self {
+            Self::UnsupportedCmd => Some(1),
+            Self::SequencerNotKnown => Some(2),
+            Self::UnauthorizedAccess => Some(3),
+            Self::LockedMemAccess => Some(4),
+            Self::RequestCanceled => Some(5),
+            Self::RequestNotFound => Some(6),
+            Self::EpError => Some(7),
+            Self::EpNotFound => Some(8),
+            Self::PwmInNoSignal => Some(9),
+            Self::ReqStorageOvfl => Some(10),
+            Self::RequestRejected => Some(11),
+            Self::PociFailure => Some(12),
+            Self::PresentationTimeTooFar => Some(13),
+            Self::GptpFail => Some(14),
+            Self::InvalidParameter => Some(15),
+            Self::ChainAborted => Some(16),
+            Self::ChainError => Some(17),
+            _ => None,
+        }
     }
 }
 
@@ -746,6 +817,59 @@ mod tests {
         assert!(!RcpError::ShortFrame.is_tc18_error_code());
         assert!(!RcpError::InvalidSize.is_tc18_error_code());
         assert!(!RcpError::Other("x".into()).is_tc18_error_code());
+    }
+
+    #[test]
+    fn tc18_wire_code_covers_all_seventeen_table_27_codes_with_distinct_values() {
+        // rust-RCP-W05.
+        let codes = [
+            (RcpError::UnsupportedCmd, 1u8),
+            (RcpError::SequencerNotKnown, 2),
+            (RcpError::UnauthorizedAccess, 3),
+            (RcpError::LockedMemAccess, 4),
+            (RcpError::RequestCanceled, 5),
+            (RcpError::RequestNotFound, 6),
+            (RcpError::EpError, 7),
+            (RcpError::EpNotFound, 8),
+            (RcpError::PwmInNoSignal, 9),
+            (RcpError::ReqStorageOvfl, 10),
+            (RcpError::RequestRejected, 11),
+            (RcpError::PociFailure, 12),
+            (RcpError::PresentationTimeTooFar, 13),
+            (RcpError::GptpFail, 14),
+            (RcpError::InvalidParameter, 15),
+            (RcpError::ChainAborted, 16),
+            (RcpError::ChainError, 17),
+        ];
+        let mut seen = std::collections::HashSet::new();
+        for (error, expected) in &codes {
+            assert_eq!(error.tc18_wire_code(), Some(*expected), "for {error:?}");
+            assert!(
+                seen.insert(*expected),
+                "wire code {expected} used by more than one variant"
+            );
+        }
+    }
+
+    #[test]
+    fn tc18_wire_code_is_none_for_non_table_27_variants() {
+        // rust-RCP-W05: RELAY sentinels, general-purpose, and wire/E2E
+        // variants have no Table 27 counterpart.
+        for error in [
+            RcpError::Closed,
+            RcpError::NotConnected,
+            RcpError::Timeout,
+            RcpError::PayloadTooLarge,
+            RcpError::NotFound,
+            RcpError::AlreadyExists,
+            RcpError::Busy,
+            RcpError::ShortFrame,
+            RcpError::CrcError,
+            RcpError::InvalidSize,
+            RcpError::Other("x".into()),
+        ] {
+            assert_eq!(error.tc18_wire_code(), None, "for {error:?}");
+        }
     }
 
     #[test]

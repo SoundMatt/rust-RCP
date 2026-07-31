@@ -5,6 +5,103 @@ the roadmap milestone that produced them (see `ROADMAP.md`), since this
 crate's `Cargo.toml` version does not move until the OPEN Alliance TC18
 core replacement reaches `v1.0.0`.
 
+## v3.0.0 (2026-07-31 TC18 wire-format conformance fix pass) — closed
+
+**Breaking.** A cross-repo gap-audit pass found this crate's `acf` module —
+`byte_message_info`'s bit layout and `acf_msg_length`'s unit — was an
+invented placeholder, never actually reconciled against the real OPEN
+Alliance TC18 v0.5.1_RC specification text despite that module's own
+long-standing provenance note flagging it as unconfirmed. This release
+replaces that placeholder with the specification's real layout, pixel-
+verified against TC18 Figure 7 / Table 4 (page 24) and cross-checked
+against the specification's own two worked examples (Figure 19, Figure
+20). No prior rust-RCP release — including `v1.0.0`/`v2.0.0`, both of
+which claimed the Milestone 10 TC18 uplift was complete — actually
+produced TC18-conformant bytes on the wire; this is the first release
+that does.
+
+- **rust-RCP-W01 (BREAKING):** `acf::ByteMessageInfo`'s wire layout is
+  fully rebuilt to match TC18 §11.2.1 Figure 7 / Table 4 exactly, field by
+  field:
+  - `acf_msg_type` (7 bits) is now folded into `byte_message_info`'s own
+    first octet, not a separate leading discriminant byte —
+    `ACF_ABB_HEADER_LEN`/`ACF_GBB_HEADER_LEN` both shrink by one byte (8 and
+    16, was 9 and 17). `ByteMessageInfo` gains a new `acf_msg_type: u8`
+    field; `encode_acf_abb`/`encode_acf_gbb` always overwrite it with the
+    correct discriminant.
+  - `acf_msg_length` is now a 9-bit field (was modeled as 11 bits).
+  - `pad` is now a 2-bit octet *count* (`u8`, `ByteMessageInfo::pad`), not a
+    1-bit presence flag (`bool`) — a real, breaking type change on a public
+    struct field. Same change mirrored onto `capi::CByteMessageInfo::pad`.
+  - `byte_bus_id` (still 11 bits) and `evt` (still a 1-bit `ack` + 3-bit
+    `sub_opcode` pair) move from row 1 to their correct row-2 position
+    relative to the other fields.
+  - `transaction_num` now comes *before* the `op`/`rsp`/`err`/`ms` flag
+    group on the wire (previously placed after).
+  - `read_size_segment` (`ReadSizeOrSegment`) is now a 12-bit field (was
+    modeled as a full 16 bits) sharing its trailing octet with the
+    `op`/`rsp`/`err`/`ms` flags.
+- **rust-RCP-W02 (BREAKING):** `acf_msg_length` is now correctly counted in
+  **quadlets over the entire ACF message** (header + `message_timestamp`
+  for ACF_GBB + payload + pad), confirmed against TC18's own Figure 19
+  (ACF_ABB: 8-byte header + 6 payload + 2 pad + 4-byte CRC32 = 20 bytes = 5
+  quadlets) and Figure 20 (ACF_GBB: 8-byte header + 8-byte timestamp + 7
+  payload + 1 pad + 4-byte CRC32 = 28 bytes = 7 quadlets) worked examples —
+  not the payload-only count the previous placeholder used.
+  `encode_acf_abb`/`encode_acf_gbb` now compute and append real, non-zero
+  padding octets to round the message up to a quadlet boundary (rather than
+  the strict "never transmit padding" rule the placeholder implementation
+  enforced), and the decoder honors a peer's real `pad` count instead of
+  rejecting anything but zero padding. Golden-vector tests
+  (`acf_abb_matches_figure_19_worked_example`/
+  `acf_gbb_matches_figure_20_worked_example`) pin both worked examples
+  byte-for-byte.
+- **rust-RCP-W03:** an RC Server must support multiple ACF_ABB requests
+  concatenated in a single frame (TC18 §12.9.1.1). `acf::decode_acf_abb_messages`
+  splits a frame body into as many self-delimited ACF_ABB messages as it
+  actually contains (using each message's own `acf_msg_length` as the
+  delimiter, the same self-describing scheme the wire format itself uses);
+  `mock::RcServer::handle_ntscf_frame` and `udp::UdpRcServer::serve_one`
+  both now dispatch every request in a frame and concatenate every response
+  into the one outgoing frame, instead of processing only the first (and
+  only) message a frame was previously assumed to carry.
+- **rust-RCP-W04/W05:** wire-level `err=1` error responses. `RcpError`
+  gains a `tc18_wire_code(&self) -> Option<u8>` method mapping every one of
+  TC18 Table 27's seventeen named error codes to its real wire value
+  (independent of `capi::CError`'s own, incompatible internal C-ABI
+  numbering) — including four codes with no prior `RcpError` variant at
+  all (`PwmInNoSignal`, `PociFailure`, `PresentationTimeTooFar`,
+  `GptpFail`). `acf::build_error_response` builds a real `err=1` ACF_ABB
+  response (echoing `byte_bus_id`/`transaction_num`, `byte_msg_payload` =
+  the Table 27 code) for any dispatch failure that has one. Both
+  `RcServer::handle_ntscf_frame` and `UdpRcServer::serve_one` now answer a
+  per-request dispatch failure this way instead of only ever surfacing it
+  as a local `Result` to their own caller — per TC18 §12.9.1.1's "check
+  each of them individually if to be processed or not" and §12.9.6
+  "Handling errors", this also means one bad request inside a
+  multi-request frame (rust-RCP-W03) no longer silently drops the
+  responses to its neighbors.
+
+Every existing golden-vector/round-trip test that baked in the old
+(invented) layout is updated to the corrected one, not deleted —
+`conformance.rs`'s frozen golden byte arrays are recomputed against the
+new encoder and re-pinned, with their previous byte values kept out of the
+file (not silently dropped: see this entry and `docs/PUBLIC_API.txt`'s own
+diff for what changed).
+
+**Deferred, not part of this pass** (tracked, not silently dropped):
+rust-RCP-W06 (no peripheral endpoint type has a concrete `Endpoint` trait
+implementation reachable from live dispatch), rust-RCP-W09 (the
+conditional-request/execution-priority machinery in `request.rs` is not
+wired into `RcServer`'s real dispatch path), rust-RCP-W10 (`e2e`'s CRC
+verification and `fragment`'s reassembly buffer are not wired into the
+real dispatch path), rust-RCP-W07/W08 (GPIO/PWM request-level
+exactly-N-bytes enforcement) — all four are large, standalone dispatch-
+architecture rebuilds blocked on rust-RCP-W06 existing first, out of scope
+for a single wire-format-focused pass. rust-RCP-W11 (CI action SHA-pinning,
+bench-fallback masking) and rust-RCP-W12 (DAC endpoint, correctly
+out-of-scope) are low-severity/non-mandatory and also deferred.
+
 ## v2.0.0 (2026-07-29/30 ecosystem audit fix pass) — closed
 
 A 23-issue fix pass against the 2026-07-29/30 cross-repo ecosystem audit,

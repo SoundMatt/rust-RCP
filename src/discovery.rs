@@ -931,15 +931,17 @@ mod tests {
         let request = build_discovery_request(0x11);
         let frame = crate::acf::encode_acf_abb(&request).unwrap();
         let decoded = crate::acf::decode_acf_abb(&frame).unwrap();
-        // `encode_acf_abb` derives `acf_msg_length` from the payload
-        // (rust-RCP-N2-05) rather than preserving `request.info`'s
-        // caller-supplied (here, default-zero) value verbatim, so the
-        // decoded header's `acf_msg_length` is expected to differ from
-        // `request`'s — every other field, and the payload, must still
-        // round-trip exactly.
+        // `encode_acf_abb` derives `acf_msg_type`/`acf_msg_length`/`pad`
+        // from the message itself (rust-RCP-W01/W02) rather than preserving
+        // `request.info`'s caller-supplied (here, default-zero) values
+        // verbatim, so the decoded header's these three fields are expected
+        // to differ from `request`'s — every other field, and the payload,
+        // must still round-trip exactly.
         let expected = crate::acf::AcfAbbMessage {
             info: crate::acf::ByteMessageInfo {
+                acf_msg_type: decoded.info.acf_msg_type,
                 acf_msg_length: decoded.info.acf_msg_length,
+                pad: decoded.info.pad,
                 ..request.info
             },
             ..request
@@ -1093,11 +1095,13 @@ mod tests {
         let frame = crate::acf::encode_acf_abb(&response).unwrap();
         let decoded = crate::acf::decode_acf_abb(&frame).unwrap();
         // See build_discovery_request_round_trips_through_acf_abb_encode_decode's
-        // comment: `acf_msg_length` is derived at encode time, not
-        // preserved verbatim.
+        // comment: `acf_msg_type`/`acf_msg_length`/`pad` are derived at
+        // encode time, not preserved verbatim.
         let expected = crate::acf::AcfAbbMessage {
             info: crate::acf::ByteMessageInfo {
+                acf_msg_type: decoded.info.acf_msg_type,
                 acf_msg_length: decoded.info.acf_msg_length,
+                pad: decoded.info.pad,
                 ..response.info
             },
             ..response

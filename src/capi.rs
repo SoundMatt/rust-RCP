@@ -120,8 +120,9 @@ impl From<CStreamId> for StreamId {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CByteMessageInfo {
+    pub acf_msg_type: u8,
     pub acf_msg_length: u16,
-    pub pad: bool,
+    pub pad: u8,
     pub mtv: bool,
     pub byte_bus_id: u16,
     pub evt_ack: bool,
@@ -140,6 +141,7 @@ impl From<ByteMessageInfo> for CByteMessageInfo {
     // fusa:req REQ-CAPI-003
     fn from(info: ByteMessageInfo) -> Self {
         CByteMessageInfo {
+            acf_msg_type: info.acf_msg_type,
             acf_msg_length: info.acf_msg_length,
             pad: info.pad,
             mtv: info.mtv,
@@ -162,6 +164,7 @@ impl From<CByteMessageInfo> for ByteMessageInfo {
     // fusa:req REQ-CAPI-003
     fn from(c: CByteMessageInfo) -> Self {
         ByteMessageInfo {
+            acf_msg_type: c.acf_msg_type,
             acf_msg_length: c.acf_msg_length,
             pad: c.pad,
             mtv: c.mtv,
@@ -292,6 +295,12 @@ pub enum CError {
     // ── General errors ──────────────────────────────────────────────────────
     InvalidSize = 24,
 
+    // ── Remaining TC18 Table 27 error codes (rust-RCP-W05) ───────────────────
+    PwmInNoSignal = 25,
+    PociFailure = 26,
+    PresentationTimeTooFar = 27,
+    GptpFail = 28,
+
     /// Catch-all: the legacy `NotFound`/`AlreadyExists`/`Busy`
     /// Zone/Controller/Registry sentinels (no TC18 analog — see this
     /// module's doc comment) and `RcpError::Other(String)` (whose message
@@ -324,6 +333,10 @@ impl From<&RcpError> for CError {
             RcpError::ChainError => CError::ChainError,
             RcpError::CrcError => CError::CrcError,
             RcpError::InvalidSize => CError::InvalidSize,
+            RcpError::PwmInNoSignal => CError::PwmInNoSignal,
+            RcpError::PociFailure => CError::PociFailure,
+            RcpError::PresentationTimeTooFar => CError::PresentationTimeTooFar,
+            RcpError::GptpFail => CError::GptpFail,
             RcpError::NotFound | RcpError::AlreadyExists | RcpError::Busy | RcpError::Other(_) => {
                 CError::Other
             }
@@ -345,8 +358,9 @@ mod tests {
 
     fn info(byte_bus_id: u16, op: bool) -> ByteMessageInfo {
         ByteMessageInfo {
+            acf_msg_type: crate::acf::ACF_ABB_MSG_TYPE,
             acf_msg_length: 12,
-            pad: false,
+            pad: 0,
             mtv: true,
             byte_bus_id,
             evt: Evt {
@@ -491,6 +505,18 @@ mod tests {
             CError::from(&RcpError::InvalidParameter),
             CError::InvalidParameter
         );
+        // rust-RCP-W05: the four TC18 Table 27 codes with no prior
+        // RcpError variant at all.
+        assert_eq!(
+            CError::from(&RcpError::PwmInNoSignal),
+            CError::PwmInNoSignal
+        );
+        assert_eq!(CError::from(&RcpError::PociFailure), CError::PociFailure);
+        assert_eq!(
+            CError::from(&RcpError::PresentationTimeTooFar),
+            CError::PresentationTimeTooFar
+        );
+        assert_eq!(CError::from(&RcpError::GptpFail), CError::GptpFail);
     }
 
     #[test]

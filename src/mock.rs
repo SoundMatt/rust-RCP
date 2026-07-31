@@ -60,7 +60,7 @@ use crate::RcpError;
 // `Zone`.
 
 use crate::acf::{
-    build_response_info, decode_acf_abb, encode_acf_abb, verify_echo_back, AcfAbbMessage,
+    build_response_info, decode_acf_abb_messages, encode_acf_abb, verify_echo_back, AcfAbbMessage,
 };
 use crate::addressing::{EndpointId, EndpointTable};
 use crate::avtp::{decode_ntscf_frame, encode_ntscf_frame, StreamId};
@@ -375,14 +375,42 @@ impl RcServer {
         })
     }
 
-    /// Answer one whole on-wire NTSCF-framed ACF_ABB request, given
-    /// `stream_id` and the raw AVTPDU bytes a transport received.
+    /// Answer one whole on-wire NTSCF-framed request, given `stream_id` and
+    /// the raw AVTPDU bytes a transport received.
     ///
-    /// Composes [`decode_ntscf_frame`] -> [`decode_acf_abb`] ->
-    /// [`Self::handle_abb`] -> [`encode_acf_abb`] -> [`encode_ntscf_frame`]
-    /// so a caller never has to touch any intermediate decoded type — the
-    /// same reuse of Milestone 1's already-built AVTPDU/ACF stack the
-    /// `wire` REPLACE cutover established for [`crate::udp::UdpTransport`].
+    /// Composes [`decode_ntscf_frame`] -> [`decode_acf_abb_messages`] ->
+    /// [`Self::handle_abb`] (once per decoded message) ->
+    /// [`encode_acf_abb`] -> [`encode_ntscf_frame`] so a caller never has to
+    /// touch any intermediate decoded type — the same reuse of Milestone
+    /// 1's already-built AVTPDU/ACF stack the `wire` REPLACE cutover
+    /// established for [`crate::udp::UdpTransport`].
+    ///
+    /// TC18 §12.9.1.1 ("Handling multiple requests in incoming messages")
+    /// requires an RC Server to support more than one ACF_ABB request
+    /// concatenated in a single frame (rust-RCP-W03); this method uses
+    /// [`decode_acf_abb_messages`] rather than a single [`crate::acf::decode_acf_abb`]
+    /// call so it can. Each decoded request is dispatched through
+    /// [`Self::handle_abb`] in wire order, and every response is encoded
+    /// and concatenated into the one outgoing frame, in the same order —
+    /// TC18 does not otherwise say how multiple responses within one frame
+    /// are meant to be told apart on the wire, so this crate's working
+    /// interpretation is the same self-describing `acf_msg_length`
+    /// delimiting scheme the request side uses.
+    ///
+    /// Per TC18 §12.9.1.1's own "check each of them individually if to be
+    /// processed or not" and §12.9.6 "Handling errors" (rust-RCP-W04), a
+    /// request that fails to dispatch does *not* abort the whole batch: if
+    /// [`Self::handle_abb`]'s error has a TC18 Table 27 wire code
+    /// ([`crate::acf::build_error_response`]), this method answers that one
+    /// request with a wire-level `err=1` response and continues dispatching
+    /// the rest of the batch, so one bad request in a multi-request frame
+    /// does not silently swallow the responses to its neighbors. An error
+    /// with no Table 27 code (e.g. a decode-level [`RcpError::ShortFrame`]
+    /// this method itself hits before any request-level `byte_bus_id`/
+    /// `transaction_num` is even known) still aborts the whole call and
+    /// propagates to the caller, since there is no request context left to
+    /// answer on the wire.
+    ///
     /// The response frame's `sequence_num` is this server's own
     /// free-running counter (see [`Self`]'s doc comment), unrelated to the
     /// request frame's.
@@ -393,9 +421,18 @@ impl RcServer {
         frame: &[u8],
     ) -> Result<Vec<u8>, RcpError> {
         let (_hdr, acf_bytes) = decode_ntscf_frame(frame)?;
-        let request = decode_acf_abb(acf_bytes)?;
-        let response = self.handle_abb(stream_id, &request)?;
-        let response_bytes = encode_acf_abb(&response)?;
+        let requests = decode_acf_abb_messages(acf_bytes)?;
+        let mut response_bytes = Vec::new();
+        for request in &requests {
+            let response = match self.handle_abb(stream_id, request) {
+                Ok(response) => response,
+                Err(e) => match crate::acf::build_error_response(&request.info, &e) {
+                    Some(error_response) => error_response,
+                    None => return Err(e),
+                },
+            };
+            response_bytes.extend_from_slice(&encode_acf_abb(&response)?);
+        }
         let seq = self.sequence_num.fetch_add(1, Ordering::SeqCst) as u8;
         encode_ntscf_frame(stream_id, seq, &response_bytes)
     }
@@ -631,9 +668,64 @@ mod rc_server_tests {
 
         let response_frame = srv.handle_ntscf_frame(sid, &frame).unwrap();
         let (_hdr, resp_acf_bytes) = decode_ntscf_frame(&response_frame).unwrap();
-        let resp = decode_acf_abb(resp_acf_bytes).unwrap();
+        let resp = crate::acf::decode_acf_abb(resp_acf_bytes).unwrap();
         assert_eq!(resp.payload, vec![0xAA, 0xBB, 0xCC, 0xDD]);
         assert_eq!(resp.info.byte_bus_id, 3);
+    }
+
+    #[test]
+    // fusa:test REQ-MOCKSRV-008
+    fn handle_ntscf_frame_dispatches_multiple_requests_concatenated_in_one_frame() {
+        // TC18 §12.9.1.1: an RC Server must support multiple requests
+        // concatenated in a single frame (rust-RCP-W03).
+        let srv = RcServer::new(GeneralRegisters::default());
+        let sid = stream(1);
+        let ep_a = MockEndpoint::new(EndpointType::Gpio, vec![0xAA, 0xBB, 0xCC, 0xDD]);
+        let ep_b = MockEndpoint::new(EndpointType::Gpio, vec![0x11, 0x22, 0x33, 0x44]);
+        srv.register_endpoint(sid, 3, ep_a).unwrap();
+        srv.register_endpoint(sid, 4, ep_b).unwrap();
+
+        let mut req_a = abb_request(3, false, Vec::new());
+        req_a.info.read_size_segment = ReadSizeOrSegment(4);
+        req_a.info.transaction_num = 0x01;
+        let mut req_b = abb_request(4, false, Vec::new());
+        req_b.info.read_size_segment = ReadSizeOrSegment(4);
+        req_b.info.transaction_num = 0x02;
+
+        let mut frame_body = encode_acf_abb(&req_a).unwrap();
+        frame_body.extend_from_slice(&encode_acf_abb(&req_b).unwrap());
+        let frame = encode_ntscf_frame(sid, 0, &frame_body).unwrap();
+
+        let response_frame = srv.handle_ntscf_frame(sid, &frame).unwrap();
+        let (_hdr, resp_acf_bytes) = decode_ntscf_frame(&response_frame).unwrap();
+        let responses = decode_acf_abb_messages(resp_acf_bytes).unwrap();
+
+        assert_eq!(responses.len(), 2);
+        assert_eq!(responses[0].info.transaction_num, 0x01);
+        assert_eq!(responses[0].payload, vec![0xAA, 0xBB, 0xCC, 0xDD]);
+        assert_eq!(responses[1].info.transaction_num, 0x02);
+        assert_eq!(responses[1].payload, vec![0x11, 0x22, 0x33, 0x44]);
+    }
+
+    #[test]
+    // fusa:test REQ-MOCKSRV-008
+    fn handle_ntscf_frame_answers_a_dispatch_failure_with_a_wire_error_response_not_a_local_err() {
+        // TC18 §12.9.6 "Handling errors" / rust-RCP-W04: a dispatch failure
+        // that has a Table 27 wire code must be answered on the wire with
+        // err=1, not just surfaced as a local Result to the caller.
+        let srv = RcServer::new(GeneralRegisters::default());
+        let sid = stream(1);
+        let req = abb_request(9, false, Vec::new()); // no endpoint registered at 9
+        let req_bytes = encode_acf_abb(&req).unwrap();
+        let frame = encode_ntscf_frame(sid, 0, &req_bytes).unwrap();
+
+        let response_frame = srv.handle_ntscf_frame(sid, &frame).unwrap();
+        let (_hdr, resp_acf_bytes) = decode_ntscf_frame(&response_frame).unwrap();
+        let resp = crate::acf::decode_acf_abb(resp_acf_bytes).unwrap();
+        assert!(resp.info.err);
+        assert!(resp.info.rsp);
+        assert_eq!(resp.info.byte_bus_id, 9);
+        assert_eq!(resp.payload, vec![8]); // EP_NOT_FOUND = 8
     }
 
     #[test]

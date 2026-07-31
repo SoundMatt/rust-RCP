@@ -43,6 +43,7 @@ impl core::panic::unwind_safe::RefUnwindSafe for rcp::acf::AcfGbbMessage
 impl core::panic::unwind_safe::UnwindSafe for rcp::acf::AcfGbbMessage
 pub struct rcp::acf::ByteMessageInfo
 pub rcp::acf::ByteMessageInfo::acf_msg_length: u16
+pub rcp::acf::ByteMessageInfo::acf_msg_type: u8
 pub rcp::acf::ByteMessageInfo::byte_bus_id: u16
 pub rcp::acf::ByteMessageInfo::cs: bool
 pub rcp::acf::ByteMessageInfo::err: bool
@@ -51,7 +52,7 @@ pub rcp::acf::ByteMessageInfo::hs: bool
 pub rcp::acf::ByteMessageInfo::ms: bool
 pub rcp::acf::ByteMessageInfo::mtv: bool
 pub rcp::acf::ByteMessageInfo::op: bool
-pub rcp::acf::ByteMessageInfo::pad: bool
+pub rcp::acf::ByteMessageInfo::pad: u8
 pub rcp::acf::ByteMessageInfo::read_size_segment: rcp::acf::ReadSizeOrSegment
 pub rcp::acf::ByteMessageInfo::rsp: bool
 pub rcp::acf::ByteMessageInfo::transaction_num: u8
@@ -127,12 +128,18 @@ pub const rcp::acf::ACF_ABB_HEADER_LEN: usize
 pub const rcp::acf::ACF_ABB_MSG_TYPE: u8
 pub const rcp::acf::ACF_GBB_HEADER_LEN: usize
 pub const rcp::acf::ACF_GBB_MSG_TYPE: u8
+pub const rcp::acf::ACF_MSG_LENGTH_9BIT_MAX: u16
+pub const rcp::acf::ACF_MSG_TYPE_7BIT_MAX: u8
 pub const rcp::acf::BYTE_MESSAGE_INFO_11BIT_MAX: u16
 pub const rcp::acf::BYTE_MESSAGE_INFO_LEN: usize
 pub const rcp::acf::EVT_SUB_OPCODE_MAX: u8
+pub const rcp::acf::PAD_2BIT_MAX: u8
 pub const rcp::acf::QUADLET_LEN: usize
+pub const rcp::acf::READ_SIZE_SEGMENT_12BIT_MAX: u16
+pub fn rcp::acf::build_error_response(&rcp::acf::ByteMessageInfo, &rcp::RcpError) -> core::option::Option<rcp::acf::AcfAbbMessage>
 pub fn rcp::acf::build_response_info(&rcp::acf::ByteMessageInfo, rcp::acf::ByteMessageInfo) -> rcp::acf::ByteMessageInfo
 pub fn rcp::acf::decode_acf_abb(&[u8]) -> core::result::Result<rcp::acf::AcfAbbMessage, rcp::RcpError>
+pub fn rcp::acf::decode_acf_abb_messages(&[u8]) -> core::result::Result<alloc::vec::Vec<rcp::acf::AcfAbbMessage>, rcp::RcpError>
 pub fn rcp::acf::decode_acf_gbb(&[u8]) -> core::result::Result<rcp::acf::AcfGbbMessage, rcp::RcpError>
 pub fn rcp::acf::decode_byte_message_info(&[u8]) -> core::result::Result<rcp::acf::ByteMessageInfo, rcp::RcpError>
 pub fn rcp::acf::encode_acf_abb(&rcp::acf::AcfAbbMessage) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
@@ -669,6 +676,7 @@ pub rcp::capi::CError::Closed = 1
 pub rcp::capi::CError::CrcError = 23
 pub rcp::capi::CError::EpError = 16
 pub rcp::capi::CError::EpNotFound = 17
+pub rcp::capi::CError::GptpFail = 28
 pub rcp::capi::CError::InvalidParameter = 20
 pub rcp::capi::CError::InvalidSize = 24
 pub rcp::capi::CError::LockedMemAccess = 13
@@ -676,6 +684,9 @@ pub rcp::capi::CError::NotConnected = 2
 pub rcp::capi::CError::Ok = 0
 pub rcp::capi::CError::Other = 99
 pub rcp::capi::CError::PayloadTooLarge = 4
+pub rcp::capi::CError::PociFailure = 26
+pub rcp::capi::CError::PresentationTimeTooFar = 27
+pub rcp::capi::CError::PwmInNoSignal = 25
 pub rcp::capi::CError::ReqStorageOvfl = 18
 pub rcp::capi::CError::RequestCanceled = 14
 pub rcp::capi::CError::RequestNotFound = 15
@@ -755,6 +766,7 @@ impl core::panic::unwind_safe::RefUnwindSafe for rcp::capi::CAbbResponse
 impl core::panic::unwind_safe::UnwindSafe for rcp::capi::CAbbResponse
 #[repr(C)] pub struct rcp::capi::CByteMessageInfo
 pub rcp::capi::CByteMessageInfo::acf_msg_length: u16
+pub rcp::capi::CByteMessageInfo::acf_msg_type: u8
 pub rcp::capi::CByteMessageInfo::byte_bus_id: u16
 pub rcp::capi::CByteMessageInfo::cs: bool
 pub rcp::capi::CByteMessageInfo::err: bool
@@ -764,7 +776,7 @@ pub rcp::capi::CByteMessageInfo::hs: bool
 pub rcp::capi::CByteMessageInfo::ms: bool
 pub rcp::capi::CByteMessageInfo::mtv: bool
 pub rcp::capi::CByteMessageInfo::op: bool
-pub rcp::capi::CByteMessageInfo::pad: bool
+pub rcp::capi::CByteMessageInfo::pad: u8
 pub rcp::capi::CByteMessageInfo::read_size_segment: u16
 pub rcp::capi::CByteMessageInfo::rsp: bool
 pub rcp::capi::CByteMessageInfo::transaction_num: u8
@@ -4224,6 +4236,7 @@ pub rcp::RcpError::Closed
 pub rcp::RcpError::CrcError
 pub rcp::RcpError::EpError
 pub rcp::RcpError::EpNotFound
+pub rcp::RcpError::GptpFail
 pub rcp::RcpError::InvalidParameter
 pub rcp::RcpError::InvalidSize
 pub rcp::RcpError::LockedMemAccess
@@ -4231,6 +4244,9 @@ pub rcp::RcpError::NotConnected
 pub rcp::RcpError::NotFound
 pub rcp::RcpError::Other(alloc::string::String)
 pub rcp::RcpError::PayloadTooLarge
+pub rcp::RcpError::PociFailure
+pub rcp::RcpError::PresentationTimeTooFar
+pub rcp::RcpError::PwmInNoSignal
 pub rcp::RcpError::ReqStorageOvfl
 pub rcp::RcpError::RequestCanceled
 pub rcp::RcpError::RequestNotFound
@@ -4247,6 +4263,7 @@ pub fn rcp::RcpError::is_relay_not_connected(&self) -> bool
 pub fn rcp::RcpError::is_relay_payload_too_large(&self) -> bool
 pub fn rcp::RcpError::is_relay_timeout(&self) -> bool
 pub fn rcp::RcpError::is_tc18_error_code(&self) -> bool
+pub fn rcp::RcpError::tc18_wire_code(&self) -> core::option::Option<u8>
 impl core::clone::Clone for rcp::RcpError
 pub fn rcp::RcpError::clone(&self) -> rcp::RcpError
 impl core::cmp::PartialEq for rcp::RcpError
