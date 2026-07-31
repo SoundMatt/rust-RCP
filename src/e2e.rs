@@ -39,14 +39,14 @@
 //! [`crc32_tc18`] is meant to run over for a real safe-point AVTPDU/ACF
 //! frame: `stream_id`, then `avtp_timestamp` (or, for an NTSCF-headed
 //! frame — which carries no `avtp_timestamp` field at all — four zero
-//! bytes in its place), then the full ACF header (the `acf_msg_type`
-//! discriminant, `byte_message_info`, and — for ACF_GBB only —
-//! `message_timestamp`), then the payload. It reuses
+//! bytes in its place), then the full ACF header (`byte_message_info`,
+//! which folds in the `acf_msg_type` discriminant, and — for ACF_GBB only
+//! — `message_timestamp`), then the payload. It reuses
 //! [`crate::avtp::HeaderVariant`] to decide which of `stream_id`/
 //! `avtp_timestamp` apply, and [`AcfCoverageMessage`] to decide which ACF
 //! header shape applies, rather than re-deriving either decision.
 //!
-//! ### Working interpretation: which length field gets the `+4` octet
+//! ### Working interpretation: which length field gets the one-quadlet
 //! pre-adjustment (Guiding Principle 5)
 //!
 //! The Milestone 6 checklist states a length field is pre-adjusted by one
@@ -60,10 +60,12 @@
 //! function does not re-encode. [`build_crc32_coverage_buffer`] therefore
 //! treats `acf_msg_length` as the field being pre-adjusted: the value it
 //! encodes into the coverage buffer's ACF header is the caller-supplied
-//! `ByteMessageInfo::acf_msg_length` plus 4, not the raw as-decoded value.
-//! This is this crate's own working interpretation, not a spec-confirmed
-//! fact, and is flagged here for reconciliation against real TC18 behavior
-//! (never against spec prose) before being relied on for interop.
+//! `ByteMessageInfo::acf_msg_length` plus one quadlet (since
+//! rust-RCP-W01/W02, `acf_msg_length` is itself counted in quadlets, so
+//! this is a raw `+1`, not `+4`). This is this crate's own working
+//! interpretation, not a spec-confirmed fact, and is flagged here for
+//! reconciliation against real TC18 behavior (never against spec prose)
+//! before being relied on for interop.
 //!
 //! ## Provenance note: `crc32_tc18` verified by cross-implementation, not
 //! by a published check value
@@ -199,13 +201,19 @@ pub fn crc32_tc18(data: &[u8]) -> u32 {
 
 // ── CRC-32 coverage rule ─────────────────────────────────────────────────────
 
-/// Number of octets the "length-field pre-adjustment" in `ROADMAP.md`
+/// Number of quadlets the "length-field pre-adjustment" in `ROADMAP.md`
 /// Milestone 6's "Coverage rule" bullet adds to a length field before the
-/// CRC is computed: one quadlet (4 octets). See this module's doc comment
-/// for which length field [`build_crc32_coverage_buffer`] applies this to,
-/// and why — this crate's own working interpretation, flagged per Guiding
-/// Principle 5.
-const CRC32_COVERAGE_LENGTH_PREADJUST_OCTETS: u16 = 4;
+/// CRC is computed: one quadlet. See this module's doc comment for which
+/// length field [`build_crc32_coverage_buffer`] applies this to, and why —
+/// this crate's own working interpretation, flagged per Guiding Principle
+/// 5. Since `acf::ByteMessageInfo::acf_msg_length` is itself counted in
+/// quadlets (rust-RCP-W01/W02, TC18 §11.2.1 Table 4), this pre-adjustment
+/// is a raw `+1` to that field, not `+4` — before that reconciliation,
+/// this module treated `acf_msg_length` as an opaque, undefined-unit
+/// field and added `4` directly to it; that was already just as much a
+/// working interpretation as this one, but the wrong one now that the
+/// field's real unit is confirmed.
+const CRC32_COVERAGE_LENGTH_PREADJUST_QUADLETS: u16 = 1;
 
 /// Which of the two Milestone 1 ACF message shapes a
 /// [`build_crc32_coverage_buffer`] call's "full ACF header" is drawn from.
@@ -216,10 +224,11 @@ const CRC32_COVERAGE_LENGTH_PREADJUST_OCTETS: u16 = 4;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AcfCoverageMessage<'a> {
     /// An ACF_ABB message (no `message_timestamp`; `ACF_ABB_HEADER_LEN` ==
-    /// 9-byte header before payload).
+    /// 8-byte header before payload — `acf_msg_type` is folded into that
+    /// header, not a separate leading byte, since rust-RCP-W01).
     Abb(&'a AcfAbbMessage),
     /// An ACF_GBB message (carries `message_timestamp`;
-    /// `ACF_GBB_HEADER_LEN` == 17-byte header before payload).
+    /// `ACF_GBB_HEADER_LEN` == 16-byte header before payload).
     Gbb(&'a AcfGbbMessage),
 }
 
@@ -234,17 +243,19 @@ pub enum AcfCoverageMessage<'a> {
 ///   [`HeaderVariant::Tscf`], or, for [`HeaderVariant::Ntscf`] (which has no
 ///   `avtp_timestamp` field to carry), four zero bytes occupying the same
 ///   position in the buffer rather than being omitted.
-/// - The full ACF header is `acf`'s discriminant byte, `byte_message_info`
-///   (via [`acf::encode_byte_message_info`]), and (for
+/// - The full ACF header is `acf`'s `byte_message_info` (via
+///   [`acf::encode_byte_message_info`], which folds the `acf_msg_type`
+///   discriminant into that same 8-byte header — see
+///   [`crate::acf`]'s "Canonical wire layout" doc section), and (for
 ///   [`AcfCoverageMessage::Gbb`] only) the 8-byte `message_timestamp`, with
 ///   the payload appended after. Before encoding, `acf`'s `byte_message_info.
-///   acf_msg_length` is increased by [`CRC32_COVERAGE_LENGTH_PREADJUST_OCTETS`]
+///   acf_msg_length` is increased by [`CRC32_COVERAGE_LENGTH_PREADJUST_QUADLETS`]
 ///   — see this module's doc comment for why that field specifically. This
 ///   deliberately calls [`acf::encode_byte_message_info`] directly rather
-///   than [`acf::encode_acf_abb`]/[`acf::encode_acf_gbb`]: since
-///   rust-RCP-N2-05, those two derive `acf_msg_length` from the real
-///   payload length for an actual wire frame and would simply discard this
-///   function's pre-adjusted value — this buffer is a CRC-coverage scratch
+///   than [`acf::encode_acf_abb`]/[`acf::encode_acf_gbb`]: those two derive
+///   `acf_msg_length`/`pad` from the real payload length for an actual wire
+///   frame and would simply discard this function's pre-adjusted value —
+///   this buffer is a CRC-coverage scratch
 ///   construction that is never itself transmitted, so it has no reason to
 ///   go through that real-frame derivation.
 ///
@@ -285,21 +296,21 @@ pub fn build_crc32_coverage_buffer(
     match acf {
         AcfCoverageMessage::Abb(msg) => {
             let mut adjusted_info = msg.info;
+            adjusted_info.acf_msg_type = acf::ACF_ABB_MSG_TYPE;
             adjusted_info.acf_msg_length = adjusted_info
                 .acf_msg_length
-                .saturating_add(CRC32_COVERAGE_LENGTH_PREADJUST_OCTETS);
+                .saturating_add(CRC32_COVERAGE_LENGTH_PREADJUST_QUADLETS);
             let info_bytes = acf::encode_byte_message_info(&adjusted_info)?;
-            buf.push(acf::ACF_ABB_MSG_TYPE);
             buf.extend_from_slice(&info_bytes);
             buf.extend_from_slice(&msg.payload);
         }
         AcfCoverageMessage::Gbb(msg) => {
             let mut adjusted_info = msg.info;
+            adjusted_info.acf_msg_type = acf::ACF_GBB_MSG_TYPE;
             adjusted_info.acf_msg_length = adjusted_info
                 .acf_msg_length
-                .saturating_add(CRC32_COVERAGE_LENGTH_PREADJUST_OCTETS);
+                .saturating_add(CRC32_COVERAGE_LENGTH_PREADJUST_QUADLETS);
             let info_bytes = acf::encode_byte_message_info(&adjusted_info)?;
-            buf.push(acf::ACF_GBB_MSG_TYPE);
             buf.extend_from_slice(&info_bytes);
             buf.extend_from_slice(&msg.message_timestamp.to_be_bytes());
             buf.extend_from_slice(&msg.payload);
@@ -642,8 +653,11 @@ mod tests {
         let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
         // 8 (stream_id) + 4 (avtp_timestamp) + ACF_ABB_HEADER_LEN + payload.
         assert_eq!(buf.len(), 12 + acf::ACF_ABB_HEADER_LEN + payload.len());
-        // The ACF discriminant byte sits right after the 12-byte prefix.
-        assert_eq!(buf[12], acf::ACF_ABB_MSG_TYPE);
+        // `acf_msg_type` is folded into byte_message_info's first octet
+        // (rust-RCP-W01), not a separate leading byte — decode it back out
+        // rather than comparing a raw byte.
+        let decoded_info = acf::decode_byte_message_info(&buf[12..]).unwrap();
+        assert_eq!(decoded_info.acf_msg_type, acf::ACF_ABB_MSG_TYPE);
         assert_eq!(&buf[buf.len() - payload.len()..], payload);
     }
 
@@ -657,11 +671,15 @@ mod tests {
         let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
         // 8 (stream_id) + 4 (avtp_timestamp) + ACF_GBB_HEADER_LEN + payload.
         assert_eq!(buf.len(), 12 + acf::ACF_GBB_HEADER_LEN + payload.len());
-        assert_eq!(buf[12], acf::ACF_GBB_MSG_TYPE);
+        // `acf_msg_type` is folded into byte_message_info's first octet
+        // (rust-RCP-W01), not a separate leading byte — decode it back out
+        // rather than comparing a raw byte.
+        let decoded_info = acf::decode_byte_message_info(&buf[12..]).unwrap();
+        assert_eq!(decoded_info.acf_msg_type, acf::ACF_GBB_MSG_TYPE);
         // message_timestamp occupies the 8 bytes just before the payload
         // (ACF_GBB_HEADER_LEN already accounts for byte_message_info's
         // width, so it starts right after that).
-        let ts_start = 12 + 1 + acf::BYTE_MESSAGE_INFO_LEN;
+        let ts_start = 12 + acf::BYTE_MESSAGE_INFO_LEN;
         let ts_end = ts_start + 8;
         assert_eq!(
             &buf[ts_start..ts_end],
@@ -678,28 +696,28 @@ mod tests {
         let acf = AcfCoverageMessage::Abb(&sample_abb_message(acf_msg_length, b"x"));
         let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
         // The ACF header region starts at byte 12 (after stream_id +
-        // avtp_timestamp); byte_message_info follows the 1-byte
-        // discriminant.
-        let info_start = 12 + 1;
+        // avtp_timestamp); byte_message_info starts immediately there —
+        // `acf_msg_type` is folded into it, not a separate leading byte
+        // (rust-RCP-W01).
+        let info_start = 12;
         let decoded = acf::decode_byte_message_info(
             &buf[info_start..info_start + acf::BYTE_MESSAGE_INFO_LEN],
         )
         .unwrap();
         assert_eq!(
             decoded.acf_msg_length,
-            acf_msg_length + CRC32_COVERAGE_LENGTH_PREADJUST_OCTETS
+            acf_msg_length + CRC32_COVERAGE_LENGTH_PREADJUST_QUADLETS
         );
     }
 
     #[test]
     // fusa:test REQ-CRC-006
-    fn coverage_buffer_rejects_length_that_overflows_11_bits_after_preadjustment() {
+    fn coverage_buffer_rejects_length_that_overflows_9_bits_after_preadjustment() {
         let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
-        // Max legal 11-bit acf_msg_length; +4 pushes it past the field
+        // Max legal 9-bit acf_msg_length; +1 pushes it past the field
         // width, so encoding must fail the same way
         // `acf::encode_byte_message_info` itself would.
-        let acf =
-            AcfCoverageMessage::Abb(&sample_abb_message(acf::BYTE_MESSAGE_INFO_11BIT_MAX, b"x"));
+        let acf = AcfCoverageMessage::Abb(&sample_abb_message(acf::ACF_MSG_LENGTH_9BIT_MAX, b"x"));
         assert_eq!(
             build_crc32_coverage_buffer(&header, &acf),
             Err(RcpError::InvalidSize)
@@ -880,8 +898,11 @@ mod tests {
             build_crc32_coverage_buffer_for_fragment_train(&header, &final_fragment, &segments)
                 .unwrap();
 
-        assert_eq!(buf[12], acf::ACF_GBB_MSG_TYPE);
-        let ts_start = 12 + 1 + acf::BYTE_MESSAGE_INFO_LEN;
+        // `acf_msg_type` is folded into byte_message_info's first octet
+        // (rust-RCP-W01), not a separate leading byte.
+        let decoded_info = acf::decode_byte_message_info(&buf[12..]).unwrap();
+        assert_eq!(decoded_info.acf_msg_type, acf::ACF_GBB_MSG_TYPE);
+        let ts_start = 12 + acf::BYTE_MESSAGE_INFO_LEN;
         let ts_end = ts_start + 8;
         assert_eq!(
             &buf[ts_start..ts_end],
@@ -894,7 +915,7 @@ mod tests {
     // fusa:test REQ-CRC-010
     fn coverage_buffer_for_fragment_train_propagates_length_overflow_error() {
         let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
-        let final_fragment_msg = sample_abb_message(acf::BYTE_MESSAGE_INFO_11BIT_MAX, b"unused");
+        let final_fragment_msg = sample_abb_message(acf::ACF_MSG_LENGTH_9BIT_MAX, b"unused");
         let final_fragment = AcfCoverageMessage::Abb(&final_fragment_msg);
         let segments: [&[u8]; 1] = [b"x"];
         assert_eq!(

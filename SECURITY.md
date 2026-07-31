@@ -4,7 +4,8 @@
 
 | Version | Supported |
 |---|---|
-| 2.x | ✅ Yes |
+| 3.x | ✅ Yes |
+| 2.x | ❌ No (see `CHANGELOG.md` — TC18-conformant ACF wire format, a breaking change) |
 | 1.x | ❌ No (see `CHANGELOG.md` — `RcpError::ZoneMismatch` removed, a breaking change) |
 | 0.1.x | ❌ No |
 

@@ -612,7 +612,7 @@ mod tests {
         let mut buf = FragmentReassemblyBuffer::new(64);
         buf.accept_fragment(&fragment_info(false, 0), b"x").unwrap();
         let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
-        let final_msg = sample_final_fragment(acf::BYTE_MESSAGE_INFO_11BIT_MAX);
+        let final_msg = sample_final_fragment(acf::ACF_MSG_LENGTH_9BIT_MAX);
         let final_fragment = AcfCoverageMessage::Abb(&final_msg);
         assert_eq!(
             verify_reassembled_train_crc(&buf, &header, &final_fragment, true),

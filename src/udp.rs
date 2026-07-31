@@ -363,16 +363,26 @@ impl UdpRcServer {
     /// method makes, matching that module's own "no real-clock read of its
     /// own" discipline.
     ///
-    /// This method handles exactly one request/response cycle; it spawns no
-    /// thread and runs no loop of its own, matching every other transport in
-    /// this crate (`UdpTransport` included) — a caller composes it into
-    /// whatever receive loop or async task fits its own runtime. Returns
-    /// whatever error the receive, decode, dispatch, or send step first
-    /// produces; this crate has no wire-level NAK/error-response encoding
-    /// defined yet (`ROADMAP.md` does not name one), so a rejected or
-    /// malformed request is surfaced to the caller rather than answered with
-    /// an error frame — the same limitation [`RcServer::handle_ntscf_frame`]
-    /// already has.
+    /// This method handles exactly one request-frame/response-frame cycle;
+    /// it spawns no thread and runs no loop of its own, matching every
+    /// other transport in this crate (`UdpTransport` included) — a caller
+    /// composes it into whatever receive loop or async task fits its own
+    /// runtime. Returns whatever error the receive or decode step first
+    /// produces (there is no request context yet to answer those on the
+    /// wire); a per-request dispatch failure with a TC18 Table 27 wire code
+    /// is instead answered with a real `err=1` response frame
+    /// (rust-RCP-W04, [`acf::build_error_response`]) rather than returned
+    /// to this method's own caller — see [`Self::dispatch_request`]'s doc
+    /// comment.
+    ///
+    /// A single inbound *frame* may carry more than one concatenated
+    /// ACF_ABB request (TC18 §12.9.1.1, "Handling multiple requests in
+    /// incoming messages" — rust-RCP-W03); this method uses
+    /// [`acf::decode_acf_abb_messages`] and dispatches each decoded request
+    /// through [`Self::dispatch_request`] in wire order, concatenating
+    /// every response into the one outgoing frame in the same order. See
+    /// [`crate::mock::RcServer::handle_ntscf_frame`]'s own doc comment for
+    /// the same multi-request handling.
     // fusa:req REQ-UDP-008
     // fusa:req REQ-UDP-009
     // fusa:req REQ-UDP-010
@@ -387,11 +397,21 @@ impl UdpRcServer {
         let (frame, peer_addr) = self.socket.recv_from(recv_timeout)?;
         let (hdr, acf_bytes) = avtp::decode_ntscf_frame(&frame)?;
         let requester_stream = StreamId::from_u64(hdr.stream_id);
-        let request = acf::decode_acf_abb(acf_bytes)?;
+        let requests = acf::decode_acf_abb_messages(acf_bytes)?;
 
-        let response = self.dispatch_request(requester_stream, &request, now, discovery_timeout)?;
+        let mut response_bytes = Vec::new();
+        for request in &requests {
+            let response =
+                match self.dispatch_request(requester_stream, request, now, discovery_timeout) {
+                    Ok(response) => response,
+                    Err(e) => match acf::build_error_response(&request.info, &e) {
+                        Some(error_response) => error_response,
+                        None => return Err(e),
+                    },
+                };
+            response_bytes.extend_from_slice(&acf::encode_acf_abb(&response)?);
+        }
 
-        let response_bytes = acf::encode_acf_abb(&response)?;
         let response_frame =
             avtp::encode_ntscf_frame(self.local_stream, sequence_num, &response_bytes)?;
         self.socket.send_to(&response_frame, peer_addr)?;
@@ -760,17 +780,63 @@ mod tests {
 
         #[test]
         // fusa:test REQ-UDP-008
-        fn serve_one_propagates_ep_not_found_for_unregistered_endpoint() {
+        fn serve_one_dispatches_multiple_requests_concatenated_in_one_frame() {
+            // TC18 §12.9.1.1: an RC Server must support multiple requests
+            // concatenated in a single frame (rust-RCP-W03).
+            let rc = RcServer::new(GeneralRegisters::default());
+            let sid = client_stream(2);
+            let ep_a = MockEndpoint::new(EndpointType::Gpio, vec![0xAA, 0xBB, 0xCC, 0xDD]);
+            let ep_b = MockEndpoint::new(EndpointType::Gpio, vec![0x11, 0x22, 0x33, 0x44]);
+            rc.register_endpoint(sid, 3, ep_a).unwrap();
+            rc.register_endpoint(sid, 4, ep_b).unwrap();
+
+            let mut req_a = abb(3, false, Vec::new());
+            req_a.info.read_size_segment = acf::ReadSizeOrSegment(4);
+            req_a.info.transaction_num = 0x01;
+            let mut req_b = abb(4, false, Vec::new());
+            req_b.info.read_size_segment = acf::ReadSizeOrSegment(4);
+            req_b.info.transaction_num = 0x02;
+
+            let mut body = acf::encode_acf_abb(&req_a).unwrap();
+            body.extend_from_slice(&acf::encode_acf_abb(&req_b).unwrap());
+            let frame = avtp::encode_ntscf_frame(sid, 0, &body).unwrap();
+            let socket = QueuedUdpSocket::with_inbound(vec![(frame, client_addr())]);
+            let srv = UdpRcServer::new(server_stream(), socket.clone(), rc);
+
+            srv.serve_one(None, 0, Instant::now(), discovery::DISCOVERY_TIME_OUT)
+                .unwrap();
+
+            let sent = socket.sent();
+            assert_eq!(sent.len(), 1);
+            let (bytes, _addr) = &sent[0];
+            let (_hdr, acf_bytes) = avtp::decode_ntscf_frame(bytes).unwrap();
+            let responses = acf::decode_acf_abb_messages(acf_bytes).unwrap();
+            assert_eq!(responses.len(), 2);
+            assert_eq!(responses[0].info.transaction_num, 0x01);
+            assert_eq!(responses[0].payload, vec![0xAA, 0xBB, 0xCC, 0xDD]);
+            assert_eq!(responses[1].info.transaction_num, 0x02);
+            assert_eq!(responses[1].payload, vec![0x11, 0x22, 0x33, 0x44]);
+        }
+
+        #[test]
+        // fusa:test REQ-UDP-008
+        fn serve_one_answers_unregistered_endpoint_with_a_wire_error_response() {
+            // rust-RCP-W04: EpNotFound has a TC18 Table 27 wire code, so it
+            // is answered with a real err=1 response frame, not just
+            // propagated to serve_one's own caller as a local Result.
             let rc = RcServer::new(GeneralRegisters::default());
             let request = abb(9, false, Vec::new());
             let frame = frame_for(client_stream(3), &request);
             let socket = QueuedUdpSocket::with_inbound(vec![(frame, client_addr())]);
-            let srv = UdpRcServer::new(server_stream(), socket, rc);
+            let srv = UdpRcServer::new(server_stream(), socket.clone(), rc);
 
-            let err = srv
-                .serve_one(None, 0, Instant::now(), discovery::DISCOVERY_TIME_OUT)
-                .unwrap_err();
-            assert_eq!(err, RcpError::EpNotFound);
+            srv.serve_one(None, 0, Instant::now(), discovery::DISCOVERY_TIME_OUT)
+                .unwrap();
+
+            let sent = socket.sent();
+            let (_, resp) = decode_response(&sent[0].0);
+            assert!(resp.info.err);
+            assert_eq!(resp.payload, vec![8]); // EP_NOT_FOUND = 8
         }
 
         // ── discovery integration: broadcast read ────────────────────────
@@ -876,7 +942,7 @@ mod tests {
                 (first_frame, client_addr()),
                 (second_frame, client_addr()),
             ]);
-            let srv = UdpRcServer::new(server_stream(), socket, rc);
+            let srv = UdpRcServer::new(server_stream(), socket.clone(), rc);
 
             // client_stream(6) claims the discovery stream first.
             srv.serve_one(None, 0, now, discovery::DISCOVERY_TIME_OUT)
@@ -884,12 +950,16 @@ mod tests {
             assert_eq!(srv.discovery_claim().unwrap().claimant(), client_stream(6));
 
             // client_stream(7) attempts to configure while that claim is
-            // still live and is rejected; the existing claim is unaffected.
+            // still live and is rejected with a wire error response
+            // (UnauthorizedAccess has a TC18 Table 27 wire code —
+            // rust-RCP-W04); the existing claim is unaffected.
             let still_live = now + (discovery::DISCOVERY_TIME_OUT / 2);
-            let err = srv
-                .serve_one(None, 0, still_live, discovery::DISCOVERY_TIME_OUT)
-                .unwrap_err();
-            assert_eq!(err, RcpError::UnauthorizedAccess);
+            srv.serve_one(None, 0, still_live, discovery::DISCOVERY_TIME_OUT)
+                .unwrap();
+            let sent = socket.sent();
+            let (_, resp) = decode_response(&sent[1].0);
+            assert!(resp.info.err);
+            assert_eq!(resp.payload, vec![3]); // UNAUTHORIZED_ACCESS = 3
             assert_eq!(srv.discovery_claim().unwrap().claimant(), client_stream(6));
         }
 
@@ -902,12 +972,17 @@ mod tests {
             let request = abb(7, false, Vec::new());
             let frame = frame_for(discovery::DISCOVERY_BROADCAST_STREAM_ID, &request);
             let socket = QueuedUdpSocket::with_inbound(vec![(frame, client_addr())]);
-            let srv = UdpRcServer::new(server_stream(), socket, rc);
+            let srv = UdpRcServer::new(server_stream(), socket.clone(), rc);
 
-            let err = srv
-                .serve_one(None, 0, Instant::now(), discovery::DISCOVERY_TIME_OUT)
-                .unwrap_err();
-            assert_eq!(err, RcpError::InvalidParameter);
+            // InvalidParameter has a TC18 Table 27 wire code, so this is
+            // answered with a wire error response, not propagated as a
+            // local Result (rust-RCP-W04).
+            srv.serve_one(None, 0, Instant::now(), discovery::DISCOVERY_TIME_OUT)
+                .unwrap();
+            let sent = socket.sent();
+            let (_, resp) = decode_response(&sent[0].0);
+            assert!(resp.info.err);
+            assert_eq!(resp.payload, vec![15]); // INVALID_PARAMETER = 15
         }
     }
 }

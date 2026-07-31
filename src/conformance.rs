@@ -162,13 +162,13 @@ pub mod golden {
     pub const UNIQUE_ID_2: u16 = 0x0008;
 
     /// An [`crate::avtp::NtscfHeader`] whose encoding is pinned by
-    /// [`NTSCF_GOLDEN_BYTES`]. `ntscf_data_length` (13) is the exact length
+    /// [`NTSCF_GOLDEN_BYTES`]. `ntscf_data_length` (12) is the exact length
     /// of [`ACF_ABB_GOLDEN_BYTES`] below, matching how a real NTSCF header
     /// would describe the ACF_ABB message it carries.
     pub fn ntscf_header_fields() -> crate::avtp::NtscfHeader {
         crate::avtp::NtscfHeader {
             sequence_num: 0x07,
-            ntscf_data_length: 13,
+            ntscf_data_length: 12,
             stream_id: crate::avtp::StreamId::new(SENDER_MAC_1, UNIQUE_ID_1).to_u64(),
         }
     }
@@ -178,7 +178,7 @@ pub mod golden {
     /// Never recompute this array by calling the encoder — see this
     /// module's doc comment.
     pub const NTSCF_GOLDEN_BYTES: [u8; 16] = [
-        0x82, 0x80, 0x07, 0x01, 0xA0, 0x00, 0x00, 0x00, 0x02, 0x42, 0xAC, 0x11, 0x00, 0x02, 0x00,
+        0x82, 0x80, 0x07, 0x01, 0x80, 0x00, 0x00, 0x00, 0x02, 0x42, 0xAC, 0x11, 0x00, 0x02, 0x00,
         0x07,
     ];
 
@@ -213,14 +213,17 @@ pub mod golden {
     pub fn acf_abb_fields() -> crate::acf::AcfAbbMessage {
         crate::acf::AcfAbbMessage {
             info: crate::acf::ByteMessageInfo {
-                // `encode_acf_abb` now derives `acf_msg_length` from
-                // `payload.len()` (ceil(4/4) = 1 quadlet) rather than
-                // trusting this field verbatim — see acf.rs's
-                // `quadlets_for_payload_len`. This value must already agree
-                // with that derivation for this vector's round-trip
-                // equality check to hold.
-                acf_msg_length: 1,
-                pad: false,
+                // `encode_acf_abb` always derives/overwrites
+                // `acf_msg_type`/`acf_msg_length`/`pad` from the message
+                // itself rather than trusting these fields verbatim — see
+                // `acf.rs`'s `quadlets_and_pad_for_message`. Header (8) +
+                // 4-byte payload = 12 bytes, already quadlet-aligned: 3
+                // quadlets, 0 pad. These values must already agree with
+                // that derivation for this vector's round-trip equality
+                // check to hold.
+                acf_msg_type: crate::acf::ACF_ABB_MSG_TYPE,
+                acf_msg_length: 3,
+                pad: 0,
                 mtv: false,
                 byte_bus_id: 0x005,
                 evt: crate::acf::Evt {
@@ -243,8 +246,8 @@ pub mod golden {
     /// Golden bytes for [`acf_abb_fields`], captured from
     /// `acf::encode_acf_abb`. Never recompute — see this module's doc
     /// comment.
-    pub const ACF_ABB_GOLDEN_BYTES: [u8; 13] = [
-        0x0E, 0x00, 0x20, 0x00, 0xB0, 0x10, 0x11, 0x00, 0x04, 0xDE, 0xAD, 0xBE, 0xEF,
+    pub const ACF_ABB_GOLDEN_BYTES: [u8; 12] = [
+        0x1C, 0x03, 0x00, 0x05, 0x80, 0x11, 0x40, 0x04, 0xDE, 0xAD, 0xBE, 0xEF,
     ];
 
     /// An [`crate::acf::AcfGbbMessage`] whose encoding is pinned by
@@ -255,14 +258,16 @@ pub mod golden {
     pub fn acf_gbb_fields() -> crate::acf::AcfGbbMessage {
         crate::acf::AcfGbbMessage {
             info: crate::acf::ByteMessageInfo {
-                // `encode_acf_gbb` now derives `acf_msg_length` from
-                // `payload.len()` (ceil(2/4) = 1 quadlet) rather than
-                // trusting this field verbatim — see acf.rs's
-                // `quadlets_for_payload_len`. This value must already agree
+                // `encode_acf_gbb` always derives/overwrites
+                // `acf_msg_type`/`acf_msg_length`/`pad` from the message
+                // itself — see `acf_abb_fields`'s comment above. Header
+                // (16) + 2-byte payload = 18 bytes -> pad 2 -> 20 bytes
+                // total -> 5 quadlets. These values must already agree
                 // with that derivation for this vector's round-trip
                 // equality check to hold.
-                acf_msg_length: 1,
-                pad: false,
+                acf_msg_type: crate::acf::ACF_GBB_MSG_TYPE,
+                acf_msg_length: 5,
+                pad: 2,
                 mtv: true,
                 byte_bus_id: 0x005,
                 evt: crate::acf::Evt {
@@ -285,10 +290,12 @@ pub mod golden {
 
     /// Golden bytes for [`acf_gbb_fields`], captured from
     /// `acf::encode_acf_gbb`. Never recompute — see this module's doc
-    /// comment.
-    pub const ACF_GBB_GOLDEN_BYTES: [u8; 19] = [
-        0x0D, 0x00, 0x28, 0x00, 0xA0, 0x30, 0x12, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
-        0x07, 0x08, 0xCA, 0xFE,
+    /// comment. Note the trailing two `0x00` octets: this vector's `pad`
+    /// count (2) is real, encoded padding — not present in the pre-TC18
+    /// -reconciliation layout this array used to pin.
+    pub const ACF_GBB_GOLDEN_BYTES: [u8; 20] = [
+        0x1A, 0x05, 0xA0, 0x05, 0x00, 0x12, 0xC0, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x08, 0xCA, 0xFE, 0x00, 0x00,
     ];
 
     /// Golden bytes for a composed AVTPDU frame — [`ntscf_header_fields`]'s
@@ -299,9 +306,9 @@ pub mod golden {
     /// ([`crate::avtp::encode_ntscf_frame`]/
     /// [`crate::avtp::decode_ntscf_frame`]) rather than a bare header or
     /// message alone. Never recompute — see this module's doc comment.
-    pub const NTSCF_ACF_ABB_FRAME_GOLDEN_BYTES: [u8; 29] = [
-        0x82, 0x80, 0x07, 0x01, 0xA0, 0x00, 0x00, 0x00, 0x02, 0x42, 0xAC, 0x11, 0x00, 0x02, 0x00,
-        0x07, 0x0E, 0x00, 0x20, 0x00, 0xB0, 0x10, 0x11, 0x00, 0x04, 0xDE, 0xAD, 0xBE, 0xEF,
+    pub const NTSCF_ACF_ABB_FRAME_GOLDEN_BYTES: [u8; 28] = [
+        0x82, 0x80, 0x07, 0x01, 0x80, 0x00, 0x00, 0x00, 0x02, 0x42, 0xAC, 0x11, 0x00, 0x02, 0x00,
+        0x07, 0x1C, 0x03, 0x00, 0x05, 0x80, 0x11, 0x40, 0x04, 0xDE, 0xAD, 0xBE, 0xEF,
     ];
 }
 
@@ -358,7 +365,10 @@ pub mod go_rcp_crosscheck {
     /// ```
     /// — `byte_bus_id`/`transaction_num`/`read_size_segment`/body bytes
     /// logically matching [`super::golden::acf_abb_fields`], with `Ack`
-    /// mapped from `evt.ack` and `Response` from `rsp`. 14 bytes, not 13;
+    /// mapped from `evt.ack` and `Response` from `rsp`. 14 bytes, not 12
+    /// (rust-RCP-W01/W02's TC18-reconciled header shrank
+    /// [`super::golden::ACF_ABB_GOLDEN_BYTES`] to 12 bytes; go-RCP's own
+    /// layout, and this vector, are unaffected by that reconciliation);
     /// message-kind tag `0x01`, not `0x0E`: see this module's doc comment's
     /// "Header/message length", "Message-kind discriminant", and
     /// "`byte_bus_id`/endpoint-address width" divergences.
@@ -376,9 +386,14 @@ pub mod go_rcp_crosscheck {
     /// ```
     /// — `byte_bus_id`/`transaction_num`/`message_timestamp`/body bytes
     /// logically matching [`super::golden::acf_gbb_fields`], with `Write`
-    /// mapped from `op` and `Response` from `rsp`. 20 bytes, not 19;
-    /// message-kind tag `0x02`, not `0x0D`: same divergences as
-    /// [`GO_RCP_KIND_SHORT_MESSAGE_BYTES`] above.
+    /// mapped from `op` and `Response` from `rsp`. Coincidentally also 20
+    /// bytes after rust-RCP-W01/W02's TC18-reconciled header (previously
+    /// 19; see [`super::golden::ACF_GBB_GOLDEN_BYTES`]'s own doc comment
+    /// for why 20 is now correct: 2 real pad octets, not merely a shorter
+    /// header) — the byte *contents* still diverge completely, which is
+    /// what [`super::tests::go_rcp_bytes_diverge_from_this_crates_own_encoding`]
+    /// actually checks; message-kind tag `0x02`, not `0x0D`: same
+    /// remaining divergences as [`GO_RCP_KIND_SHORT_MESSAGE_BYTES`] above.
     pub const GO_RCP_KIND_LONG_MESSAGE_BYTES: [u8; 20] = [
         0x02, 0x00, 0x00, 0x14, 0x05, 0x00, 0x12, 0x30, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05,
         0x06, 0x07, 0x08, 0xCA, 0xFE,
