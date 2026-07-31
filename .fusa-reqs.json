@@ -4914,6 +4914,24 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CRC-012",
+      "title": "finalize_crc_trailer places the CRC32 trailer after pad, matching TC18's real wire order",
+      "text": "finalize_crc_trailer(frame, crc), given an already-encoded CRC-free ACF_ABB/ACF_GBB frame built from the real payload alone, bumps that frame's own byte_message_info.acf_msg_length by CRC_TRAILER_QUADLETS (one quadlet) and appends crc's 4 big-endian octets after the encoder's own already-correctly-placed pad octets, producing the wire order header (+ message_timestamp), payload, pad, CRC \u2014 never payload, CRC, pad, which is what a caller gets by concatenating payload and CRC bytes into one blob before calling encode_acf_abb/encode_acf_gbb; returns Err(RcpError::ShortFrame) for a frame shorter than the byte_message_info header and Err(RcpError::InvalidSize) when bumping acf_msg_length would overflow its 9-bit field",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CRC-013",
+      "title": "split_crc_trailer recovers the real payload and CRC from a CRC-protected frame without misreading trailer bytes as pad",
+      "text": "split_crc_trailer(frame) un-adjusts byte_message_info.acf_msg_length by CRC_TRAILER_QUADLETS and removes the trailing 4 CRC octets before returning (body, crc), so that acf::decode_acf_abb/acf::decode_acf_gbb's existing pad-stripping logic (which strips exactly byte_message_info.pad octets from the end of the acf_msg_length-described region) correctly recovers the real payload from body instead of misreading the CRC trailer's own bytes as padding; round-trips finalize_crc_trailer's output back to the original real payload and CRC value, and returns Err(RcpError::ShortFrame)/Err(RcpError::InvalidSize) for a frame too short to hold a header plus CRC trailer or whose acf_msg_length is smaller than CRC_TRAILER_QUADLETS",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
