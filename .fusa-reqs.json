@@ -391,7 +391,7 @@
     {
       "id": "REQ-WIRE-001",
       "title": "NTSCF frame identifies itself by subtype",
-      "text": "encode_ntscf_frame's output starts with avtp::NTSCF_SUBTYPE (0x82) with the sv bit set, via its delegation to encode_ntscf_header; encode_ntscf_frame rejects an acf_payload exceeding the 11-bit ntscf_data_length field width with Err(InvalidSize)",
+      "text": "encode_ntscf_frame's output starts with avtp::NTSCF_SUBTYPE (0x82, TC18 v0.5.1_RC §11.1 Figure 6 (NTSCF-Header Version 0, p.22)) with the sv bit set, via its delegation to encode_ntscf_header; encode_ntscf_frame rejects an acf_payload exceeding the 11-bit ntscf_data_length field width (Figure 6, bits 13-23) with Err(InvalidSize)",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -409,7 +409,7 @@
     {
       "id": "REQ-WIRE-003",
       "title": "NTSCF frame payload is opaque to the composition step",
-      "text": "encode_ntscf_frame/decode_ntscf_frame carry the ACF payload bytes verbatim without parsing them as any specific ACF message type \u2014 that remains acf::decode_acf_abb/decode_acf_gbb's job on the split payload decode_ntscf_frame returns",
+      "text": "encode_ntscf_frame/decode_ntscf_frame carry the ACF payload bytes verbatim without parsing them as any specific ACF message type — that remains acf::decode_acf_abb/decode_acf_gbb's job on the split payload decode_ntscf_frame returns",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -418,7 +418,7 @@
     {
       "id": "REQ-WIRE-004",
       "title": "NTSCF frame length is header length plus payload length",
-      "text": "encode_ntscf_frame's output is always exactly avtp::NTSCF_HEADER_LEN + acf_payload.len() bytes, with no padding or reserved gap inserted",
+      "text": "encode_ntscf_frame's output is always exactly avtp::NTSCF_HEADER_LEN + acf_payload.len() bytes, with no padding or reserved gap inserted — TC18 v0.5.1_RC §11.1 Figure 6 (NTSCF-Header Version 0, p.22) places acf_payload_data immediately after stream_id, at octet 12",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -445,7 +445,7 @@
     {
       "id": "REQ-WIRE-007",
       "title": "NTSCF frame payload size limit",
-      "text": "encode_ntscf_frame rejects an acf_payload longer than avtp::NTSCF_DATA_LENGTH_MAX (0x07FF, the 11-bit ntscf_data_length field width) with Err(InvalidSize)",
+      "text": "encode_ntscf_frame rejects an acf_payload longer than avtp::NTSCF_DATA_LENGTH_MAX (0x07FF, the 11-bit ntscf_data_length field width at bits 13-23 of TC18 v0.5.1_RC §11.1 Figure 6 (NTSCF-Header Version 0, p.22)) with Err(InvalidSize)",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -463,7 +463,7 @@
     {
       "id": "REQ-WIRE-009",
       "title": "NTSCF frame functions never panic on arbitrary/truncated input",
-      "text": "decode_ntscf_frame never panics for input shorter than avtp::NTSCF_HEADER_LEN (returns Err(ShortFrame)) or for arbitrary byte content at any length, matching the fuzz-style discipline the deleted wire.rs originally established (carried forward by fuzz/fuzz_targets/fuzz_wire_decode.rs, repointed at this function)",
+      "text": "decode_ntscf_frame never panics for input shorter than avtp::NTSCF_HEADER_LEN (12 octets per TC18 v0.5.1_RC §11.1 Figure 6 (NTSCF-Header Version 0, p.22); returns Err(ShortFrame)) or for arbitrary byte content at any length, matching the fuzz-style discipline the deleted wire.rs originally established (carried forward by fuzz/fuzz_targets/fuzz_wire_decode.rs, repointed at this function)",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1165,7 +1165,7 @@
     {
       "id": "REQ-CFG-005",
       "title": "JSON and YAML parsing",
-      "text": "from_json() and from_yaml() parse RcServerConfig (GeneralRegisters, the five \u00a73.7-\u00a73.11 config-table row lists, and initial_state) from text",
+      "text": "from_json() and from_yaml() parse RcServerConfig (GeneralRegisters, the five §3.7-§3.11 config-table row lists, and initial_state) from text",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1444,7 +1444,7 @@
     {
       "id": "REQ-UDP-004",
       "title": "Echo-back mismatch rejected",
-      "text": "UdpTransport::send_acf_abb/send_acf_gbb reject a response whose byte_bus_id does not echo the request's, via acf::verify_echo_back (Err(EpError)) \u2014 the StreamId-addressed replacement for the old Zone-mismatch check",
+      "text": "UdpTransport::send_acf_abb/send_acf_gbb reject a response whose byte_bus_id does not echo the request's, via acf::verify_echo_back (Err(EpError)) — the StreamId-addressed replacement for the old Zone-mismatch check",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1471,7 +1471,7 @@
     {
       "id": "REQ-UDP-007",
       "title": "resolve_endpoint rejects an unregistered device endpoint",
-      "text": "resolve_endpoint returns Err(EpNotFound) when byte_bus_id is not the reserved EP0 address and no endpoint is registered under (stream_id, byte_bus_id) \u2014 including when the same byte_bus_id is registered only under a different stream_id",
+      "text": "resolve_endpoint returns Err(EpNotFound) when byte_bus_id is not the reserved EP0 address and no endpoint is registered under (stream_id, byte_bus_id) — including when the same byte_bus_id is registered only under a different stream_id",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1588,7 +1588,7 @@
     {
       "id": "REQ-TLS-004",
       "title": "TlsBridge uses NTSCF/ACF encoding, addressed by StreamId",
-      "text": "TlsBridge.send_acf_abb()/send_acf_gbb() use avtp::encode_ntscf_frame + acf::encode_acf_abb/encode_acf_gbb, and decode responses via avtp::decode_ntscf_frame + acf::decode_acf_abb/decode_acf_gbb, verified via acf::verify_echo_back \u2014 the same framing crate::udp::UdpTransport uses, over a TlsStream instead of a UDP socket",
+      "text": "TlsBridge.send_acf_abb()/send_acf_gbb() use avtp::encode_ntscf_frame + acf::encode_acf_abb/encode_acf_gbb, and decode responses via avtp::decode_ntscf_frame + acf::decode_acf_abb/decode_acf_gbb, verified via acf::verify_echo_back — the same framing crate::udp::UdpTransport uses, over a TlsStream instead of a UDP socket",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1732,7 +1732,7 @@
     {
       "id": "REQ-CLI-006",
       "title": "version --format json",
-      "text": "The CLI must emit a valid \u00a712.1 JSON document when invoked with version --format json containing tool, version, spec_version, language, runtime fields",
+      "text": "The CLI must emit a valid §12.1 JSON document when invoked with version --format json containing tool, version, spec_version, language, runtime fields",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1741,7 +1741,7 @@
     {
       "id": "REQ-CLI-007",
       "title": "capabilities subcommand",
-      "text": "The CLI must emit a valid \u00a712.2 capabilities JSON document when invoked with capabilities",
+      "text": "The CLI must emit a valid §12.2 capabilities JSON document when invoked with capabilities",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1750,7 +1750,7 @@
     {
       "id": "REQ-CLI-008",
       "title": "status --format json",
-      "text": "The CLI must emit a valid \u00a712.3 status JSON document when invoked with status --format json containing protocol, tool, version, healthy, connected, endpoint, details fields",
+      "text": "The CLI must emit a valid §12.3 status JSON document when invoked with status --format json containing protocol, tool, version, healthy, connected, endpoint, details fields",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1759,7 +1759,7 @@
     {
       "id": "REQ-CLI-009",
       "title": "convert --protocol RCP",
-      "text": "The CLI must accept an rcp.Message JSON (\u00a715.5) on stdin and emit the ToMessage() relay.Message JSON (\u00a715.7.5) on stdout when invoked with convert --protocol RCP, addressing by decimal byte_bus_id; exit 1 on invalid input, exit 2 on wrong/missing --protocol",
+      "text": "The CLI must accept an rcp.Message JSON (§15.5) on stdin and emit the ToMessage() relay.Message JSON (§15.7.5) on stdout when invoked with convert --protocol RCP, addressing by decimal byte_bus_id; exit 1 on invalid input, exit 2 on wrong/missing --protocol",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1768,7 +1768,7 @@
     {
       "id": "REQ-RELAY-001",
       "title": "Protocol enum",
-      "text": "The relay module shall define a Protocol enum matching RELAY spec \u00a73 identifiers, serializing as its integer value",
+      "text": "The relay module shall define a Protocol enum matching RELAY spec §3 identifiers, serializing as its integer value",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1777,7 +1777,7 @@
     {
       "id": "REQ-RELAY-002",
       "title": "Message envelope",
-      "text": "The relay module shall define a Message type matching the RELAY spec \u00a74 universal envelope, with base64-encoded payload",
+      "text": "The relay module shall define a Message type matching the RELAY spec §4 universal envelope, with base64-encoded payload",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1786,7 +1786,7 @@
     {
       "id": "REQ-RELAY-003",
       "title": "BackPressurePolicy",
-      "text": "The relay module shall define a BackPressurePolicy enum (DropNewest/DropOldest/Block) per RELAY spec \u00a714, defaulting to DropNewest",
+      "text": "The relay module shall define a BackPressurePolicy enum (DropNewest/DropOldest/Block) per RELAY spec §14, defaulting to DropNewest",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1795,7 +1795,7 @@
     {
       "id": "REQ-RELAY-004",
       "title": "SubscriberOptions",
-      "text": "The relay module shall define a SubscriberOptions type per RELAY spec \u00a718.3 with a channel_depth default of 64",
+      "text": "The relay module shall define a SubscriberOptions type per RELAY spec §18.3 with a channel_depth default of 64",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1804,7 +1804,7 @@
     {
       "id": "REQ-RELAY-005",
       "title": "relay::Error sentinels",
-      "text": "The relay module shall define the four mandatory RELAY error sentinels (Closed, NotConnected, Timeout, PayloadTooLarge) per \u00a75.1, mutually distinct",
+      "text": "The relay module shall define the four mandatory RELAY error sentinels (Closed, NotConnected, Timeout, PayloadTooLarge) per §5.1, mutually distinct",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1813,7 +1813,7 @@
     {
       "id": "REQ-RELAY-006",
       "title": "Context",
-      "text": "The relay module shall define a Context type carrying an optional deadline per RELAY spec \u00a718.3",
+      "text": "The relay module shall define a Context type carrying an optional deadline per RELAY spec §18.3",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1822,7 +1822,7 @@
     {
       "id": "REQ-RELAY-007",
       "title": "relay::Node trait",
-      "text": "The relay module shall define an async Node trait (protocol/send/subscribe/close) per RELAY spec \u00a710.1",
+      "text": "The relay module shall define an async Node trait (protocol/send/subscribe/close) per RELAY spec §10.1",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1831,7 +1831,7 @@
     {
       "id": "REQ-RELAY-008",
       "title": "relay::Caller trait",
-      "text": "The relay module shall define an async Caller trait extending Node with call() per RELAY spec \u00a710.2",
+      "text": "The relay module shall define an async Caller trait extending Node with call() per RELAY spec §10.2",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1840,7 +1840,7 @@
     {
       "id": "REQ-RELAY-009",
       "title": "Base64 payload serde",
-      "text": "Message and Command/Response/Status payload fields shall serialize as base64 strings per RELAY spec \u00a715.1, matching Go's []byte JSON marshalling",
+      "text": "Message and Command/Response/Status payload fields shall serialize as base64 strings per RELAY spec §15.1, matching Go's []byte JSON marshalling",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1849,7 +1849,7 @@
     {
       "id": "REQ-ADAPT-006",
       "title": "AcfAbbMessage response ToMessage()",
-      "text": "to_message() shall convert an addressed ACF_ABB response to a relay::Message per RELAY spec \u00a715.7.5 (stream_id+byte_bus_id encoded as ID, op surfaced via the rcp.op meta key, payload)",
+      "text": "to_message() shall convert an addressed ACF_ABB response to a relay::Message per RELAY spec §15.7.5 (stream_id+byte_bus_id encoded as ID, op surfaced via the rcp.op meta key, payload)",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1858,7 +1858,7 @@
     {
       "id": "REQ-ADAPT-007",
       "title": "Message.FromMessage() to AcfAbbMessage",
-      "text": "from_message() shall convert a relay::Message to an addressed ACF_ABB request per RELAY spec \u00a715.7.5 (stream_id+byte_bus_id decoded from ID, op/read_size from meta keys), returning InvalidParameter for a malformed ID or an unrecognized rcp.op value",
+      "text": "from_message() shall convert a relay::Message to an addressed ACF_ABB request per RELAY spec §15.7.5 (stream_id+byte_bus_id decoded from ID, op/read_size from meta keys), returning InvalidParameter for a malformed ID or an unrecognized rcp.op value",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1867,7 +1867,7 @@
     {
       "id": "REQ-ADAPT-008",
       "title": "AcfAbbMessage response.ToMessage() reply half",
-      "text": "response_to_message() shall convert an addressed ACF_ABB response to a relay::Message per RELAY spec \u00a715.7.5 (Caller.Call reply half), matching to_message()'s own conversion",
+      "text": "response_to_message() shall convert an addressed ACF_ABB response to a relay::Message per RELAY spec §15.7.5 (Caller.Call reply half), matching to_message()'s own conversion",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1876,7 +1876,7 @@
     {
       "id": "REQ-ADAPT-009",
       "title": "Adapt()",
-      "text": "adapt() shall wrap an RcServer as a relay::Node/Caller per RELAY spec \u00a710.3, addressed by (StreamId, byte_bus_id), dispatching blocking RcServer calls via spawn_blocking, honoring an already-expired Context as Timeout, tracking its own closed state since RcServer has no open/closed connection concept of its own, and returning an immediately-closed channel from subscribe() since RcServer has no live-notification mechanism to forward",
+      "text": "adapt() shall wrap an RcServer as a relay::Node/Caller per RELAY spec §10.3, addressed by (StreamId, byte_bus_id), dispatching blocking RcServer calls via spawn_blocking, honoring an already-expired Context as Timeout, tracking its own closed state since RcServer has no open/closed connection concept of its own, and returning an immediately-closed channel from subscribe() since RcServer has no live-notification mechanism to forward",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1885,7 +1885,7 @@
     {
       "id": "REQ-ADAPT-010",
       "title": "Caller.Call()",
-      "text": "The Adapt() adapter's call() shall dispatch an addressed ACF_ABB request derived from the request Message against the wrapped RcServer and return its response as a relay::Message per RELAY spec \u00a710.2/\u00a715.7.5",
+      "text": "The Adapt() adapter's call() shall dispatch an addressed ACF_ABB request derived from the request Message against the wrapped RcServer and return its response as a relay::Message per RELAY spec §10.2/§15.7.5",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1903,7 +1903,7 @@
     {
       "id": "REQ-NTSCF-001",
       "title": "NtscfHeader field model",
-      "text": "NtscfHeader models sequence_num, ntscf_data_length, and stream_id for the NTSCF AVTPDU header variant",
+      "text": "NtscfHeader models sequence_num, ntscf_data_length, and stream_id for the NTSCF AVTPDU header variant — the three named fields TC18 v0.5.1_RC §11.1 Figure 6 (NTSCF-Header Version 0, p.22) defines, with no others.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1912,7 +1912,7 @@
     {
       "id": "REQ-NTSCF-002",
       "title": "NTSCF header encode/decode round-trip",
-      "text": "encode_ntscf_header(hdr) followed by decode_ntscf_header() recovers the original header, and out-of-range ntscf_data_length is rejected with InvalidSize",
+      "text": "encode_ntscf_header emits the exact 12-octet layout of TC18 v0.5.1_RC §11.1 Figure 6 (NTSCF-Header Version 0, p.22): octet 0 subtype, octet 1 sv(1)|version(3)|r(1)|ntscf_data_length[10:8](3), octet 2 ntscf_data_length[7:0], octet 3 sequence_num, octets 4-11 stream_id big-endian — with no reserved gap anywhere. decode_ntscf_header of that output recovers the original header, and an ntscf_data_length above the 11-bit field width (bits 13-23 of the first quadlet) is rejected with InvalidSize.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1921,7 +1921,7 @@
     {
       "id": "REQ-NTSCF-003",
       "title": "NTSCF subtype and sv bit",
-      "text": "Encoded NTSCF headers carry subtype 0x82 and set the sv bit, identifying the AVTPDU as NTSCF with a valid stream_id",
+      "text": "Encoded NTSCF headers carry subtype 0x82 and set the sv bit, identifying the AVTPDU as NTSCF with a valid stream_id. Both values are read from TC18 v0.5.1_RC §11.1 Figure 6 (NTSCF-Header Version 0, p.22) ('subtype(0x82)', bits 0-7; 'sv', bit 8) and confirmed by the worked example in TC18 Figure 20 (p.79).",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1930,7 +1930,7 @@
     {
       "id": "REQ-NTSCF-004",
       "title": "NTSCF decode rejects malformed input",
-      "text": "decode_ntscf_header rejects frames shorter than 16 bytes, wrong subtype, or an unset sv bit",
+      "text": "decode_ntscf_header rejects frames shorter than avtp::NTSCF_HEADER_LEN (12 octets, the header length TC18 v0.5.1_RC §11.1 Figure 6 (NTSCF-Header Version 0, p.22) specifies), a subtype other than 0x82, or an unset sv bit.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1957,7 +1957,7 @@
     {
       "id": "REQ-TSCF-001",
       "title": "TscfHeader field model",
-      "text": "TscfHeader models sequence_num, avtp_timestamp, stream_data_length, and stream_id for the TSCF AVTPDU header variant",
+      "text": "TscfHeader models sequence_num, avtp_timestamp, stream_data_length, and stream_id for the TSCF AVTPDU header variant — the four value-carrying fields TC18 v0.5.1_RC §11.1 Figure 5 (TSCF-Header Version 0, p.22) defines. The figure's tv bit is derived from avtp_timestamp rather than stored, and its mr/tu/rsv/reserved bits are transmitted as zero.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1966,7 +1966,7 @@
     {
       "id": "REQ-TSCF-002",
       "title": "TSCF header encode/decode round-trip",
-      "text": "encode_tscf_header(hdr) followed by decode_tscf_header() recovers the original header, and out-of-range stream_data_length is rejected with InvalidSize",
+      "text": "encode_tscf_header emits the exact 24-octet layout of TC18 v0.5.1_RC §11.1 Figure 5 (TSCF-Header Version 0, p.22): octet 0 subtype, octet 1 sv(1)|version(3)|mr(1)|rsv(2)|tv(1), octet 2 sequence_num, octet 3 reserved(7)|tu(1), octets 4-11 stream_id, octets 12-15 avtp_timestamp, octets 16-19 reserved, octets 20-21 stream_data_length as a full 16-bit big-endian field, octets 22-23 reserved. decode_tscf_header of that output recovers the original header. Because stream_data_length's wire field is a full 16 bits (avtp::TSCF_DATA_LENGTH_MAX == u16::MAX), every representable value is in range and the call never returns InvalidSize.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1975,7 +1975,7 @@
     {
       "id": "REQ-TSCF-003",
       "title": "TSCF subtype and sv bit",
-      "text": "Encoded TSCF headers carry subtype 0x83 and set the sv bit, identifying the AVTPDU as TSCF with a valid stream_id, distinct from the NTSCF subtype",
+      "text": "Encoded TSCF headers carry subtype 0x05 and set the sv bit, identifying the AVTPDU as TSCF with a valid stream_id, distinct from the NTSCF subtype. The value is read from TC18 v0.5.1_RC §11.1 Figure 5 (TSCF-Header Version 0, p.22) ('subtype(0x05)', bits 0-7) and confirmed by the worked example in TC18 Figure 19 (p.79); it is unrelated to NTSCF's 0x82 and is the smaller of the two. The tv bit (Figure 5, bit 15) is set exactly when avtp_timestamp is non-zero.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -1984,7 +1984,7 @@
     {
       "id": "REQ-TSCF-004",
       "title": "TSCF decode rejects malformed input",
-      "text": "decode_tscf_header rejects frames shorter than 24 bytes, wrong subtype, or an unset sv bit",
+      "text": "decode_tscf_header rejects frames shorter than avtp::TSCF_HEADER_LEN (24 octets, the header length TC18 v0.5.1_RC §11.1 Figure 5 (TSCF-Header Version 0, p.22) specifies), a subtype other than 0x05, or an unset sv bit.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -2631,8 +2631,8 @@
     },
     {
       "id": "REQ-RMAP-008",
-      "title": "GeneralRegisters models the full \u00a73.6 general register-map field set",
-      "text": "GeneralRegisters carries the six ROADMAP.md-quoted fields (svr_oa_tc18_magic_nr, svr_version, svr_vendor_id, svr_device_id, svr_ep_count, svr_implemented_options) plus the remaining rows of this crate's own \u00a73.6 table extraction, each independently settable/readable, defaults to an all-zero value, and reports CATEGORY == lifecycle::RegisterCategory::General",
+      "title": "GeneralRegisters models the full §3.6 general register-map field set",
+      "text": "GeneralRegisters carries the six ROADMAP.md-quoted fields (svr_oa_tc18_magic_nr, svr_version, svr_vendor_id, svr_device_id, svr_ep_count, svr_implemented_options) plus the remaining rows of this crate's own §3.6 table extraction, each independently settable/readable, defaults to an all-zero value, and reports CATEGORY == lifecycle::RegisterCategory::General",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -2667,7 +2667,7 @@
     },
     {
       "id": "REQ-RMAP-012",
-      "title": "HwPinMappingEntry models the \u00a73.7 per-pin mapping row",
+      "title": "HwPinMappingEntry models the §3.7 per-pin mapping row",
       "text": "HwPinMappingEntry carries hw_ep_nr, hw_ep_pin_nr, and an undecomposed hw_pin_props byte, and reports CATEGORY == lifecycle::RegisterCategory::HwConfig",
       "standard": "iso26262",
       "level": "HLR",
@@ -2694,8 +2694,8 @@
     },
     {
       "id": "REQ-RMAP-015",
-      "title": "RequestStreamConfigEntry models the \u00a73.8 per-stream config row",
-      "text": "RequestStreamConfigEntry carries rx_stream_id and the remaining fifteen per-stream fields this crate's own \u00a73.8 extraction names, and reports CATEGORY == lifecycle::RegisterCategory::RcpConfig",
+      "title": "RequestStreamConfigEntry models the §3.8 per-stream config row",
+      "text": "RequestStreamConfigEntry carries rx_stream_id and the remaining fifteen per-stream fields this crate's own §3.8 extraction names, and reports CATEGORY == lifecycle::RegisterCategory::RcpConfig",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -2721,7 +2721,7 @@
     },
     {
       "id": "REQ-RMAP-018",
-      "title": "EpByteBusIdMapEntry models the \u00a73.9 stream/byte_bus_id-to-endpoint row and its end-of-table sentinel",
+      "title": "EpByteBusIdMapEntry models the §3.9 stream/byte_bus_id-to-endpoint row and its end-of-table sentinel",
       "text": "EpByteBusIdMapEntry carries map_stream_index, map_byte_bus_id, and map_ep_nr, reports CATEGORY == lifecycle::RegisterCategory::RcpConfig, and is_end_of_table returns true iff map_stream_index == END_OF_TABLE_STREAM_INDEX (0); this module defines no ascending-order validation or enforcement over a table's rows",
       "standard": "iso26262",
       "level": "HLR",
@@ -2748,7 +2748,7 @@
     },
     {
       "id": "REQ-RMAP-021",
-      "title": "ResponseStreamConfigEntry models the \u00a73.10 response/ack queue config row",
+      "title": "ResponseStreamConfigEntry models the §3.10 response/ack queue config row",
       "text": "ResponseStreamConfigEntry carries resp_stream_uid, resp_max_avtpdu_size, resp_queue_size, resp_flush_on_count, and resp_flush_time, and reports CATEGORY == lifecycle::RegisterCategory::RcpConfig",
       "standard": "iso26262",
       "level": "HLR",
@@ -2775,7 +2775,7 @@
     },
     {
       "id": "REQ-RMAP-024",
-      "title": "SequencerStateEntry models the \u00a73.11 per-sequencer state register and its power-on default",
+      "title": "SequencerStateEntry models the §3.11 per-sequencer state register and its power-on default",
       "text": "SequencerStateEntry carries seq_state, reports CATEGORY == lifecycle::RegisterCategory::RcpConfig, and power_on_default() returns seq_state == 1",
       "standard": "iso26262",
       "level": "HLR",
@@ -3927,7 +3927,7 @@
     },
     {
       "id": "REQ-BUNDLE-001",
-      "title": "check_compound_bundle_claim requires compound-wait support, \u22654 sequencers, and clear-non-safestate support together before accepting a \"compound request support\" claim",
+      "title": "check_compound_bundle_claim requires compound-wait support, ≥4 sequencers, and clear-non-safestate support together before accepting a \"compound request support\" claim",
       "text": "check_compound_bundle_claim(has_compound_wait, svr_sequencers_max, has_clear_non_safestate) returns Ok(()) only when has_compound_wait is true, svr_sequencers_max is greater than or equal to MIN_SEQUENCERS_FOR_COMPOUND_BUNDLE, and has_clear_non_safestate is true, all three simultaneously; returns Err(RcpError::InvalidParameter) whenever any one of the three does not hold, including when none of them hold; never panics for any sampled input",
       "standard": "iso26262",
       "level": "HLR",
@@ -3936,7 +3936,7 @@
     },
     {
       "id": "REQ-BUNDLE-002",
-      "title": "MIN_SEQUENCERS_FOR_COMPOUND_BUNDLE fixes the \"\u22654 sequencers\" threshold check_compound_bundle_claim enforces",
+      "title": "MIN_SEQUENCERS_FOR_COMPOUND_BUNDLE fixes the \"≥4 sequencers\" threshold check_compound_bundle_claim enforces",
       "text": "MIN_SEQUENCERS_FOR_COMPOUND_BUNDLE equals 4; check_compound_bundle_claim rejects every svr_sequencers_max value strictly below MIN_SEQUENCERS_FOR_COMPOUND_BUNDLE (with the other two prerequisites otherwise satisfied) and accepts every svr_sequencers_max value at or above it, up to and including u8::MAX; never panics for any sampled svr_sequencers_max value",
       "standard": "iso26262",
       "level": "HLR",
@@ -4864,7 +4864,7 @@
     {
       "id": "REQ-CONF-001",
       "title": "NTSCF header golden vector",
-      "text": "conformance::golden::NTSCF_GOLDEN_BYTES is a frozen literal byte array; avtp::encode_ntscf_header(conformance::golden::ntscf_header_fields()) must equal it, and avtp::decode_ntscf_header of it must recover ntscf_header_fields() unchanged",
+      "text": "conformance::golden::NTSCF_GOLDEN_BYTES is a frozen literal byte array whose 12 octets are derived by hand from TC18 v0.5.1_RC §11.1 Figure 6 (NTSCF-Header Version 0, p.22) and cross-checked against the worked example in TC18 Figure 20 (p.79), not captured from this crate's own encoder; avtp::encode_ntscf_header(conformance::golden::ntscf_header_fields()) must equal it, and avtp::decode_ntscf_header of it must recover ntscf_header_fields() unchanged",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -4873,7 +4873,7 @@
     {
       "id": "REQ-CONF-002",
       "title": "TSCF header golden vector with non-degenerate avtp_timestamp",
-      "text": "conformance::golden::TSCF_GOLDEN_BYTES is a frozen literal byte array for a TscfHeader whose avtp_timestamp is non-zero; avtp::encode_tscf_header(conformance::golden::tscf_header_fields()) must equal it, and avtp::decode_tscf_header of it must recover tscf_header_fields() unchanged",
+      "text": "conformance::golden::TSCF_GOLDEN_BYTES is a frozen literal byte array for a TscfHeader whose avtp_timestamp is non-zero, whose 24 octets are derived by hand from TC18 v0.5.1_RC §11.1 Figure 5 (TSCF-Header Version 0, p.22) and cross-checked against the worked example in TC18 Figure 19 (p.79), not captured from this crate's own encoder; avtp::encode_tscf_header(conformance::golden::tscf_header_fields()) must equal it, and avtp::decode_tscf_header of it must recover tscf_header_fields() unchanged",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -4900,7 +4900,7 @@
     {
       "id": "REQ-CONF-005",
       "title": "Composed NTSCF+ACF_ABB frame golden vector",
-      "text": "conformance::golden::NTSCF_ACF_ABB_FRAME_GOLDEN_BYTES is a frozen literal byte array combining ntscf_header_fields() and the encoded acf_abb_fields() message via avtp::encode_ntscf_frame; encoding must equal it, and avtp::decode_ntscf_frame of it must split back into the original header and ACF_ABB payload bytes",
+      "text": "conformance::golden::NTSCF_ACF_ABB_FRAME_GOLDEN_BYTES is a frozen literal byte array combining ntscf_header_fields() and the encoded acf_abb_fields() message via avtp::encode_ntscf_frame; its 24 octets are the concatenation of the spec-derived NTSCF_GOLDEN_BYTES (TC18 v0.5.1_RC §11.1 Figure 6, p.22) and ACF_ABB_GOLDEN_BYTES (TC18 §11.2.1 Figure 7 / Table 4, p.24), with nothing between them because Figure 6 places acf_payload_data immediately after stream_id; encoding must equal it, and avtp::decode_ntscf_frame of it must split back into the original header and ACF_ABB payload bytes",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -4918,7 +4918,7 @@
     {
       "id": "REQ-CRC-012",
       "title": "finalize_crc_trailer places the CRC32 trailer after pad, matching TC18's real wire order",
-      "text": "finalize_crc_trailer(frame, crc), given an already-encoded CRC-free ACF_ABB/ACF_GBB frame built from the real payload alone, bumps that frame's own byte_message_info.acf_msg_length by CRC_TRAILER_QUADLETS (one quadlet) and appends crc's 4 big-endian octets after the encoder's own already-correctly-placed pad octets, producing the wire order header (+ message_timestamp), payload, pad, CRC \u2014 never payload, CRC, pad, which is what a caller gets by concatenating payload and CRC bytes into one blob before calling encode_acf_abb/encode_acf_gbb; returns Err(RcpError::ShortFrame) for a frame shorter than the byte_message_info header and Err(RcpError::InvalidSize) when bumping acf_msg_length would overflow its 9-bit field",
+      "text": "finalize_crc_trailer(frame, crc), given an already-encoded CRC-free ACF_ABB/ACF_GBB frame built from the real payload alone, bumps that frame's own byte_message_info.acf_msg_length by CRC_TRAILER_QUADLETS (one quadlet) and appends crc's 4 big-endian octets after the encoder's own already-correctly-placed pad octets, producing the wire order header (+ message_timestamp), payload, pad, CRC — never payload, CRC, pad, which is what a caller gets by concatenating payload and CRC bytes into one blob before calling encode_acf_abb/encode_acf_gbb; returns Err(RcpError::ShortFrame) for a frame shorter than the byte_message_info header and Err(RcpError::InvalidSize) when bumping acf_msg_length would overflow its 9-bit field",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -4963,7 +4963,7 @@
     {
       "id": "REQ-L2-001",
       "title": "ETHERTYPE_AVTP names the real IEEE 1722 EtherType and is placed big-endian in the Ethernet header",
-      "text": "ETHERTYPE_AVTP is 0x22F0, matching TC18 \u00a710.1 (\u201can AVTPDU is marked by an EtherType value of 0x22F0\u201d); encode_ethernet_frame writes it as bytes 12-13 of the frame in big-endian order, and decode_ethernet_frame reads bytes 12-13 the same way when validating a frame's EtherType",
+      "text": "ETHERTYPE_AVTP is 0x22F0, matching TC18 §10.1 (“an AVTPDU is marked by an EtherType value of 0x22F0”); encode_ethernet_frame writes it as bytes 12-13 of the frame in big-endian order, and decode_ethernet_frame reads bytes 12-13 the same way when validating a frame's EtherType",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
