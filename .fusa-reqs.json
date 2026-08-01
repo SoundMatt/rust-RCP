@@ -5427,6 +5427,15 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-RESP-004",
+      "title": "ByteMessageInfo::response_kind classifies per TC18 Table 15",
+      "text": "ByteMessageInfo::response_kind() shall return ResponseKind::Acknowledge whenever evt.raw_nibble() equals 0xF, regardless of err or op, per TC18 Table 15/\u00a711.3.1 -- a rejected Acknowledge (err=true) is still an Acknowledge, not a ResponseKind::Error. Otherwise it shall return ResponseKind::Error whenever err is true, and otherwise ResponseKind::Write when op is true or ResponseKind::Read.",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }
