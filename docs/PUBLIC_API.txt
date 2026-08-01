@@ -1,5 +1,26 @@
 pub mod rcp
 pub mod rcp::acf
+pub enum rcp::acf::ResponseKind
+pub rcp::acf::ResponseKind::Acknowledge
+pub rcp::acf::ResponseKind::Error
+pub rcp::acf::ResponseKind::Read
+pub rcp::acf::ResponseKind::Write
+impl core::clone::Clone for rcp::acf::ResponseKind
+pub fn rcp::acf::ResponseKind::clone(&self) -> rcp::acf::ResponseKind
+impl core::cmp::Eq for rcp::acf::ResponseKind
+impl core::cmp::PartialEq for rcp::acf::ResponseKind
+pub fn rcp::acf::ResponseKind::eq(&self, &rcp::acf::ResponseKind) -> bool
+impl core::fmt::Debug for rcp::acf::ResponseKind
+pub fn rcp::acf::ResponseKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::acf::ResponseKind
+impl core::marker::StructuralPartialEq for rcp::acf::ResponseKind
+impl core::marker::Freeze for rcp::acf::ResponseKind
+impl core::marker::Send for rcp::acf::ResponseKind
+impl core::marker::Sync for rcp::acf::ResponseKind
+impl core::marker::Unpin for rcp::acf::ResponseKind
+impl core::marker::UnsafeUnpin for rcp::acf::ResponseKind
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::acf::ResponseKind
+impl core::panic::unwind_safe::UnwindSafe for rcp::acf::ResponseKind
 pub struct rcp::acf::AcfAbbMessage
 pub rcp::acf::AcfAbbMessage::info: rcp::acf::ByteMessageInfo
 pub rcp::acf::AcfAbbMessage::payload: alloc::vec::Vec<u8>
@@ -58,6 +79,7 @@ pub rcp::acf::ByteMessageInfo::rsp: bool
 pub rcp::acf::ByteMessageInfo::transaction_num: u8
 impl rcp::acf::ByteMessageInfo
 pub fn rcp::acf::ByteMessageInfo::read_size(&self) -> core::option::Option<u16>
+pub fn rcp::acf::ByteMessageInfo::response_kind(&self) -> rcp::acf::ResponseKind
 pub fn rcp::acf::ByteMessageInfo::segment_num(&self) -> core::option::Option<u16>
 impl core::clone::Clone for rcp::acf::ByteMessageInfo
 pub fn rcp::acf::ByteMessageInfo::clone(&self) -> rcp::acf::ByteMessageInfo
@@ -84,6 +106,8 @@ impl core::panic::unwind_safe::UnwindSafe for rcp::acf::ByteMessageInfo
 pub struct rcp::acf::Evt
 pub rcp::acf::Evt::ack: bool
 pub rcp::acf::Evt::sub_opcode: u8
+impl rcp::acf::Evt
+pub fn rcp::acf::Evt::raw_nibble(&self) -> u8
 impl core::clone::Clone for rcp::acf::Evt
 pub fn rcp::acf::Evt::clone(&self) -> rcp::acf::Evt
 impl core::cmp::Eq for rcp::acf::Evt
@@ -132,6 +156,7 @@ pub const rcp::acf::ACF_MSG_LENGTH_9BIT_MAX: u16
 pub const rcp::acf::ACF_MSG_TYPE_7BIT_MAX: u8
 pub const rcp::acf::BYTE_MESSAGE_INFO_11BIT_MAX: u16
 pub const rcp::acf::BYTE_MESSAGE_INFO_LEN: usize
+pub const rcp::acf::EVT_RESPONSE_ACKNOWLEDGE: u8
 pub const rcp::acf::EVT_SUB_OPCODE_MAX: u8
 pub const rcp::acf::PAD_2BIT_MAX: u8
 pub const rcp::acf::QUADLET_LEN: usize
