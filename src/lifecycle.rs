@@ -1,15 +1,15 @@
-// fusa:req REQ-LIFE-001
-// fusa:req REQ-LIFE-002
-// fusa:req REQ-LIFE-003
-// fusa:req REQ-LIFE-004
-// fusa:req REQ-LIFE-005
-// fusa:req REQ-LIFE-006
-// fusa:req REQ-LIFE-007
-// fusa:req REQ-LIFE-008
-// fusa:req REQ-LIFE-009
-// fusa:req REQ-LIFE-010
-// fusa:req REQ-LIFE-011
-// fusa:req REQ-LIFE-012
+//fusa:req REQ-LIFE-001
+//fusa:req REQ-LIFE-002
+//fusa:req REQ-LIFE-003
+//fusa:req REQ-LIFE-004
+//fusa:req REQ-LIFE-005
+//fusa:req REQ-LIFE-006
+//fusa:req REQ-LIFE-007
+//fusa:req REQ-LIFE-008
+//fusa:req REQ-LIFE-009
+//fusa:req REQ-LIFE-010
+//fusa:req REQ-LIFE-011
+//fusa:req REQ-LIFE-012
 
 //! RC Server lifecycle state machine — TC18 register-map model
 //! (`ROADMAP.md` Milestone 2, "Lifecycle State Machine" subsection, now in
@@ -268,7 +268,7 @@ use crate::RcpError;
 /// including the `HW_CONFIGURED` -> `HW_UNCONFIGURED` demotion path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
-// fusa:req REQ-LIFE-001
+//fusa:req REQ-LIFE-001
 pub enum RcServerState {
     /// No hardware configuration has been applied yet. Only [`RegisterCategory::General`]
     /// registers are reachable (see [`is_register_reachable`]).
@@ -291,6 +291,17 @@ impl RcServerState {
     /// default (per Guiding Principle 5, flagged rather than asserted as
     /// spec fact) given `HW_UNCONFIGURED`'s name and `0x00` encoding both
     /// suggest a power-on/reset default.
+    ///
+    /// TC18 §12.3 (TC18.txt line 2059) settles the surrounding rule this
+    /// default serves: "After a power cycle or restart ... the RC Server
+    /// shall start in the life-cycle state it is actually configured in",
+    /// where a device with no NVM "may incorporate default settings which
+    /// allow it to be also starting in an advanced state". A configured
+    /// start state reaches this type through its
+    /// `Serialize`/`Deserialize` derive (see this module's doc comment's
+    /// `config` REPLACE section); this constant is the no-stored-
+    /// configuration default that rule falls back to.
+    //fusa:req REQ-LIFE-015
     pub const INITIAL: Self = Self::HwUnconfigured;
 
     /// Encode this state as its wire-level byte value.
@@ -304,7 +315,7 @@ impl RcServerState {
     /// defined encodings, mirroring
     /// [`crate::avtp::select_header_variant`]'s handling of an
     /// unrecognized subtype byte. Never panics for any input.
-    // fusa:req REQ-LIFE-002
+    //fusa:req REQ-LIFE-002
     pub fn from_u8(raw: u8) -> Result<Self, RcpError> {
         match raw {
             0x00 => Ok(Self::HwUnconfigured),
@@ -333,7 +344,7 @@ impl Default for RcServerState {
 /// See this module's doc comment for how this split — and the reachability
 /// rule [`is_register_reachable`] derives from it — was inferred.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-LIFE-003
+//fusa:req REQ-LIFE-003
 pub enum RegisterCategory {
     /// Server-identity/status registers (e.g. the eventual
     /// `svr_oa_tc18_magic_nr`, `svr_version`, `svr_vendor_id`,
@@ -354,8 +365,8 @@ pub enum RegisterCategory {
 /// about whether a *write* to a reachable register is further locked (see
 /// this module's doc comment for why that is separate, later work).
 /// Never panics for any input.
-// fusa:req REQ-LIFE-003
-// fusa:req REQ-LIFE-004
+//fusa:req REQ-LIFE-003
+//fusa:req REQ-LIFE-004
 pub fn is_register_reachable(state: RcServerState, category: RegisterCategory) -> bool {
     match (state, category) {
         // General registers are reachable in every state (see this
@@ -386,7 +397,7 @@ pub fn is_register_reachable(state: RcServerState, category: RegisterCategory) -
 /// crate-invented `RegisterUnreachable` sentinel, since remapped; see
 /// [`crate::RcpError`]'s own doc comment for the full provenance/mapping
 /// note.
-// fusa:req REQ-LIFE-004
+//fusa:req REQ-LIFE-004
 pub fn check_register_reachable(
     state: RcServerState,
     category: RegisterCategory,
@@ -409,7 +420,7 @@ pub fn check_register_reachable(
 /// policy combines with reachability to produce a final writable/not
 /// answer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-LIFE-009
+//fusa:req REQ-LIFE-009
 pub enum LockPolicy {
     /// `W` — write access may still vary with lifecycle state (through
     /// [`is_register_reachable`]'s reachability gate) but this policy never
@@ -441,7 +452,7 @@ pub enum LockPolicy {
 ///
 /// See this module's doc comment for the per-category reasoning behind
 /// each assignment. Never panics for any input.
-// fusa:req REQ-LIFE-009
+//fusa:req REQ-LIFE-009
 pub fn lock_policy(category: RegisterCategory) -> Option<LockPolicy> {
     match category {
         RegisterCategory::General => Some(LockPolicy::W),
@@ -459,8 +470,8 @@ pub fn lock_policy(category: RegisterCategory) -> Option<LockPolicy> {
 /// whenever reachable; `W*` categories are writable whenever reachable
 /// except while `RcServerState::RcpConfigured`, where they are permanently
 /// locked. Never panics for any input.
-// fusa:req REQ-LIFE-009
-// fusa:req REQ-LIFE-010
+//fusa:req REQ-LIFE-009
+//fusa:req REQ-LIFE-010
 pub fn is_register_writable(state: RcServerState, category: RegisterCategory) -> bool {
     if !is_register_reachable(state, category) {
         return false;
@@ -486,7 +497,7 @@ pub fn is_register_writable(state: RcServerState, category: RegisterCategory) ->
 /// this function originally called `RegisterLocked`; see
 /// [`crate::RcpError`]'s own doc comment for the full provenance/mapping
 /// note.
-// fusa:req REQ-LIFE-010
+//fusa:req REQ-LIFE-010
 pub fn check_register_writable(
     state: RcServerState,
     category: RegisterCategory,
@@ -515,8 +526,16 @@ pub fn check_register_writable(
 /// the same state, any move originating at `RCP_CONFIGURED` (backward or
 /// otherwise), and skipping `HW_CONFIGURED` entirely on the way up. Never
 /// panics for any input.
-// fusa:req REQ-LIFE-006
-// fusa:req REQ-LIFE-012
+///
+/// One of the excluded pairs is excluded by TC18 itself, not merely by
+/// this crate's reading of `ROADMAP.md`: TC18 §12.3.1.1 (TC18.txt line
+/// 2168) states that, from `HW_UNCONFIGURED`, "a request to advance the
+/// state directly to RCP_CONFIGURED will be rejected with an error
+/// response" — the two-hop route through `HW_CONFIGURED` is the only way
+/// up.
+//fusa:req REQ-LIFE-006
+//fusa:req REQ-LIFE-012
+//fusa:req REQ-LIFE-019
 pub fn is_transition_defined(from: RcServerState, to: RcServerState) -> bool {
     matches!(
         (from, to),
@@ -561,10 +580,11 @@ impl RcServerState {
     /// `is_consistent` is deliberately a caller-supplied placeholder,
     /// mirroring [`crate::formal::Invariant`]'s predicate shape. Never
     /// panics for any input, including a `target` equal to `self`.
-    // fusa:req REQ-LIFE-006
-    // fusa:req REQ-LIFE-007
-    // fusa:req REQ-LIFE-008
-    // fusa:req REQ-LIFE-012
+    //fusa:req REQ-LIFE-006
+    //fusa:req REQ-LIFE-007
+    //fusa:req REQ-LIFE-008
+    //fusa:req REQ-LIFE-012
+    //fusa:req REQ-LIFE-019
     pub fn try_transition(
         self,
         target: Self,
@@ -620,7 +640,7 @@ mod tests {
     // ── Numeric encoding / round-trip ────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-LIFE-001
+    //fusa:test REQ-LIFE-001
     fn state_encodings_match_roadmap_values() {
         assert_eq!(RcServerState::HwUnconfigured.to_u8(), 0x00);
         assert_eq!(RcServerState::HwConfigured.to_u8(), 0x55);
@@ -628,7 +648,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIFE-001
+    //fusa:test REQ-LIFE-001
     fn from_u8_round_trips_every_valid_encoding() {
         for state in ALL_STATES {
             let raw = state.to_u8();
@@ -637,16 +657,90 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIFE-001
+    //fusa:test REQ-LIFE-001
     fn initial_state_is_hw_unconfigured() {
         assert_eq!(RcServerState::INITIAL, RcServerState::HwUnconfigured);
         assert_eq!(RcServerState::default(), RcServerState::HwUnconfigured);
     }
 
+    // ── TC18 §12.3: start state after a power cycle or restart ───────────
+
+    /// TC18 §12.3 (TC18.txt line 2059): "After a power cycle or restart,
+    /// depending on the RC Server's implementation, the RC Server shall
+    /// start in the life-cycle state it is actually configured in.
+    /// Depending on the devices physical implementation it may have either
+    /// NVM memory in which configurations and the life-cycle state were
+    /// stored and recovered after reset or power-on or a device has no NVM,
+    /// but may incorporate default settings which allow it to be also
+    /// starting in an advanced state."
+    ///
+    /// Both halves are asserted against literal values: the no-stored-
+    /// configuration default is `HW_UNCONFIGURED`/`0x00`, and each of the
+    /// three state names TC18 §12.3 lists (TC18.txt lines 2065-2067) can be
+    /// restored by name as a configured start state.
+    #[test]
+    //fusa:test REQ-LIFE-015
+    fn tc18_12_3_start_state_is_the_configured_one_or_the_no_nvm_default() {
+        // No stored configuration: the built-in default settings.
+        assert_eq!(RcServerState::INITIAL, RcServerState::HwUnconfigured);
+        assert_eq!(RcServerState::default(), RcServerState::HwUnconfigured);
+        assert_eq!(RcServerState::default().to_u8(), 0x00);
+
+        // A stored/configured start state, restored by name — including the
+        // "advanced state" case TC18 explicitly permits a device to start
+        // in.
+        for (stored, expected) in [
+            ("\"HwUnconfigured\"", RcServerState::HwUnconfigured),
+            ("\"HwConfigured\"", RcServerState::HwConfigured),
+            ("\"RcpConfigured\"", RcServerState::RcpConfigured),
+        ] {
+            let restored: RcServerState =
+                serde_json::from_str(stored).expect("a configured start state must be restorable");
+            assert_eq!(restored, expected, "{stored}");
+        }
+    }
+
+    // ── TC18 §12.3.1.1: no direct advance to RCP_CONFIGURED ──────────────
+
+    /// TC18 §12.3.1.1 (TC18.txt line 2168): from `HW_UNCONFIGURED`, "per
+    /// write request to the server functional configuration entry
+    /// svr_lifecycle_state the life-cycle state can be advanced to
+    /// HW_CONFIGURED. A request to advance the state directly to
+    /// RCP_CONFIGURED will be rejected with an error response."
+    #[test]
+    //fusa:test REQ-LIFE-019
+    fn tc18_12_3_1_1_direct_advance_to_rcp_configured_is_rejected() {
+        assert!(!is_transition_defined(
+            RcServerState::HwUnconfigured,
+            RcServerState::RcpConfigured
+        ));
+
+        // Rejected outright, without even consulting the plausibility
+        // guard: the transition shape itself is not admissible.
+        let mut guard_called = false;
+        let result =
+            RcServerState::HwUnconfigured.try_transition(RcServerState::RcpConfigured, || {
+                guard_called = true;
+                true
+            });
+        assert_eq!(result, Err(RcpError::RequestRejected));
+        assert!(!guard_called);
+
+        // The two-hop route TC18 does define is the only way up.
+        let hw_configured = RcServerState::HwUnconfigured
+            .try_transition(RcServerState::HwConfigured, || true)
+            .unwrap();
+        assert_eq!(hw_configured, RcServerState::HwConfigured);
+        assert_eq!(
+            hw_configured.try_transition(RcServerState::RcpConfigured, || true),
+            Ok(RcServerState::RcpConfigured)
+        );
+    }
+
     // ── Rejection of unrecognized encodings ──────────────────────────────
 
     #[test]
-    // fusa:test REQ-LIFE-002
+    //fusa:test REQ-LIFE-002
     fn from_u8_rejects_every_byte_other_than_the_three_valid_ones() {
         for raw in 0u8..=255 {
             let result = RcServerState::from_u8(raw);
@@ -660,7 +754,7 @@ mod tests {
     // ── Per-state register reachability ──────────────────────────────────
 
     #[test]
-    // fusa:test REQ-LIFE-003
+    //fusa:test REQ-LIFE-003
     fn general_registers_are_reachable_in_every_state() {
         for state in ALL_STATES {
             assert!(is_register_reachable(state, RegisterCategory::General));
@@ -668,7 +762,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIFE-003
+    //fusa:test REQ-LIFE-003
     fn hw_config_registers_are_reachable_in_every_state() {
         for state in ALL_STATES {
             assert!(is_register_reachable(state, RegisterCategory::HwConfig));
@@ -676,7 +770,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIFE-003
+    //fusa:test REQ-LIFE-003
     fn rcp_config_registers_are_unreachable_only_while_hw_unconfigured() {
         assert!(!is_register_reachable(
             RcServerState::HwUnconfigured,
@@ -693,7 +787,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIFE-004
+    //fusa:test REQ-LIFE-004
     fn check_register_reachable_agrees_with_is_register_reachable() {
         for state in ALL_STATES {
             for category in ALL_CATEGORIES {
@@ -710,7 +804,7 @@ mod tests {
     // ── Fuzz-style: arbitrary inputs never panic ─────────────────────────
 
     #[test]
-    // fusa:test REQ-LIFE-005
+    //fusa:test REQ-LIFE-005
     fn from_u8_never_panics_across_the_full_byte_range() {
         for raw in 0u8..=255 {
             let _ = RcServerState::from_u8(raw);
@@ -718,7 +812,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIFE-005
+    //fusa:test REQ-LIFE-005
     fn reachability_checks_never_panic_for_any_state_category_pair() {
         for state in ALL_STATES {
             for category in ALL_CATEGORIES {
@@ -731,7 +825,7 @@ mod tests {
     // ── Register write-locking (W vs W*) ──────────────────────────────────
 
     #[test]
-    // fusa:test REQ-LIFE-009
+    //fusa:test REQ-LIFE-009
     fn lock_policy_matches_the_documented_per_category_assignment() {
         assert_eq!(lock_policy(RegisterCategory::General), Some(LockPolicy::W));
         assert_eq!(
@@ -745,8 +839,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIFE-009
-    // fusa:test REQ-LIFE-010
+    //fusa:test REQ-LIFE-009
+    //fusa:test REQ-LIFE-010
     fn general_registers_are_writable_in_every_state() {
         for state in ALL_STATES {
             assert!(is_register_writable(state, RegisterCategory::General));
@@ -754,8 +848,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIFE-009
-    // fusa:test REQ-LIFE-010
+    //fusa:test REQ-LIFE-009
+    //fusa:test REQ-LIFE-010
     fn hw_config_registers_are_writable_until_permanently_locked_at_rcp_configured() {
         assert!(is_register_writable(
             RcServerState::HwUnconfigured,
@@ -772,8 +866,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIFE-009
-    // fusa:test REQ-LIFE-010
+    //fusa:test REQ-LIFE-009
+    //fusa:test REQ-LIFE-010
     fn rcp_config_registers_are_writable_whenever_reachable_including_at_rcp_configured() {
         // Unreachable in HW_UNCONFIGURED, so not writable either -- but for
         // reachability's reason, not a write-lock.
@@ -794,7 +888,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIFE-010
+    //fusa:test REQ-LIFE-010
     fn is_register_writable_never_true_for_an_unreachable_category() {
         for state in ALL_STATES {
             for category in ALL_CATEGORIES {
@@ -806,7 +900,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIFE-010
+    //fusa:test REQ-LIFE-010
     fn check_register_writable_agrees_with_is_register_writable_and_distinguishes_the_reason() {
         for state in ALL_STATES {
             for category in ALL_CATEGORIES {
@@ -826,7 +920,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIFE-011
+    //fusa:test REQ-LIFE-011
     fn write_lock_checks_never_panic_for_any_state_category_pair() {
         for state in ALL_STATES {
             for category in ALL_CATEGORIES {
@@ -840,8 +934,8 @@ mod tests {
     // ── Transition guard: which shapes are defined ───────────────────────
 
     #[test]
-    // fusa:test REQ-LIFE-006
-    // fusa:test REQ-LIFE-012
+    //fusa:test REQ-LIFE-006
+    //fusa:test REQ-LIFE-012
     fn is_transition_defined_true_only_for_the_three_implemented_transitions() {
         for from in ALL_STATES {
             for to in ALL_STATES {
@@ -858,7 +952,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIFE-006
+    //fusa:test REQ-LIFE-006
     fn try_transition_success_agrees_with_is_transition_defined_when_guard_passes() {
         for from in ALL_STATES {
             for to in ALL_STATES {
@@ -872,7 +966,7 @@ mod tests {
     // ── Transition guard: round-trip on the two guarded transitions ──────
 
     #[test]
-    // fusa:test REQ-LIFE-007
+    //fusa:test REQ-LIFE-007
     fn hw_unconfigured_to_hw_configured_succeeds_when_guard_passes() {
         let result =
             RcServerState::HwUnconfigured.try_transition(RcServerState::HwConfigured, || true);
@@ -880,7 +974,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIFE-007
+    //fusa:test REQ-LIFE-007
     fn hw_unconfigured_to_hw_configured_rejected_when_guard_fails() {
         let result =
             RcServerState::HwUnconfigured.try_transition(RcServerState::HwConfigured, || false);
@@ -888,7 +982,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIFE-007
+    //fusa:test REQ-LIFE-007
     fn hw_configured_to_rcp_configured_succeeds_when_guard_passes() {
         let result =
             RcServerState::HwConfigured.try_transition(RcServerState::RcpConfigured, || true);
@@ -896,7 +990,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIFE-007
+    //fusa:test REQ-LIFE-007
     fn hw_configured_to_rcp_configured_rejected_when_guard_fails() {
         let result =
             RcServerState::HwConfigured.try_transition(RcServerState::RcpConfigured, || false);
@@ -906,7 +1000,7 @@ mod tests {
     // ── Transition guard: round-trip on the demotion path ────────────────
 
     #[test]
-    // fusa:test REQ-LIFE-012
+    //fusa:test REQ-LIFE-012
     fn hw_configured_to_hw_unconfigured_succeeds_regardless_of_guard_result() {
         // Unconditional: the demotion path is not gated by any consistency
         // guard (see this module's doc comment Provenance note), so it
@@ -922,7 +1016,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIFE-012
+    //fusa:test REQ-LIFE-012
     fn hw_configured_to_hw_unconfigured_never_consults_the_guard() {
         let mut guard_called = false;
         let result =
@@ -940,7 +1034,7 @@ mod tests {
     // ── Transition guard: rejection of every undefined transition ────────
 
     #[test]
-    // fusa:test REQ-LIFE-008
+    //fusa:test REQ-LIFE-008
     fn undefined_transitions_are_rejected_without_consulting_the_guard() {
         let undefined_pairs = [
             // Full rollback in one step -- out of scope for this item, which
@@ -975,8 +1069,8 @@ mod tests {
     // ── Fuzz-style: arbitrary (state, state, guard-result) never panics ──
 
     #[test]
-    // fusa:test REQ-LIFE-008
-    // fusa:test REQ-LIFE-012
+    //fusa:test REQ-LIFE-008
+    //fusa:test REQ-LIFE-012
     fn try_transition_never_panics_for_any_state_pair_or_guard_result() {
         for from in ALL_STATES {
             for to in ALL_STATES {

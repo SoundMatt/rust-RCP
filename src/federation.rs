@@ -1,8 +1,8 @@
-// fusa:req REQ-FED-001
-// fusa:req REQ-FED-002
-// fusa:req REQ-FED-003
-// fusa:req REQ-FED-004
-// fusa:req REQ-FED-005
+//fusa:req REQ-FED-001
+//fusa:req REQ-FED-002
+//fusa:req REQ-FED-003
+//fusa:req REQ-FED-004
+//fusa:req REQ-FED-005
 
 //! Multi-vehicle federation — routes lookups to remote vehicles' own
 //! discovery caches.
@@ -38,7 +38,7 @@ use crate::RcpError;
 // ── FederationRouter ──────────────────────────────────────────────────────────
 
 /// Routes lookups to one of several remote vehicles' own discovery caches.
-// fusa:req REQ-FED-001
+//fusa:req REQ-FED-001
 pub struct FederationRouter {
     peers: RwLock<HashMap<String, Arc<Mutex<DiscoveryCache>>>>,
 }
@@ -51,19 +51,19 @@ impl FederationRouter {
     }
 
     /// Register a remote vehicle's discovery cache under `vehicle_id`.
-    // fusa:req REQ-FED-002
+    //fusa:req REQ-FED-002
     pub fn add_peer(&self, vehicle_id: impl Into<String>, cache: Arc<Mutex<DiscoveryCache>>) {
         self.peers.write().unwrap().insert(vehicle_id.into(), cache);
     }
 
     /// Remove a peer.
-    // fusa:req REQ-FED-003
+    //fusa:req REQ-FED-003
     pub fn remove_peer(&self, vehicle_id: &str) -> Option<Arc<Mutex<DiscoveryCache>>> {
         self.peers.write().unwrap().remove(vehicle_id)
     }
 
     /// List all registered vehicle IDs.
-    // fusa:req REQ-FED-004
+    //fusa:req REQ-FED-004
     pub fn peer_ids(&self) -> Vec<String> {
         self.peers.read().unwrap().keys().cloned().collect()
     }
@@ -74,7 +74,7 @@ impl FederationRouter {
     /// Returns `Err(RcpError::NotFound)` if `vehicle_id` names no
     /// registered peer, or if `stream_id` has no cached entry in that
     /// peer's cache.
-    // fusa:req REQ-FED-005
+    //fusa:req REQ-FED-005
     pub fn lookup_peer(
         &self,
         vehicle_id: &str,
@@ -118,8 +118,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FED-001
-    // fusa:test REQ-FED-002
+    //fusa:test REQ-FED-001
+    //fusa:test REQ-FED-002
     fn add_and_list_peers() {
         let r = FederationRouter::new();
         r.add_peer("VIN-001", Arc::new(Mutex::new(DiscoveryCache::new())));
@@ -130,7 +130,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FED-003
+    //fusa:test REQ-FED-003
     fn remove_peer() {
         let r = FederationRouter::new();
         r.add_peer("VIN-001", Arc::new(Mutex::new(DiscoveryCache::new())));
@@ -139,7 +139,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FED-005
+    //fusa:test REQ-FED-005
     fn lookup_unknown_peer_returns_not_found() {
         let r = FederationRouter::new();
         let err = r.lookup_peer("VIN-999", stream(1)).err().unwrap();
@@ -147,7 +147,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FED-005
+    //fusa:test REQ-FED-005
     fn lookup_unknown_stream_in_known_peer_returns_not_found() {
         let r = FederationRouter::new();
         r.add_peer("VIN-001", Arc::new(Mutex::new(DiscoveryCache::new())));
@@ -156,7 +156,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FED-005
+    //fusa:test REQ-FED-005
     fn lookup_peer_stream_returns_cached_entry() {
         let r = FederationRouter::new();
         let sid = stream(7);
@@ -169,7 +169,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FED-004
+    //fusa:test REQ-FED-004
     fn peer_ids_empty_initially() {
         let r = FederationRouter::new();
         assert!(r.peer_ids().is_empty());

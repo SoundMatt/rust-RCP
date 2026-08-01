@@ -1,14 +1,14 @@
-// fusa:req REQ-CAN-001
-// fusa:req REQ-CAN-002
-// fusa:req REQ-CAN-003
-// fusa:req REQ-CAN-004
-// fusa:req REQ-CAN-005
-// fusa:req REQ-CAN-006
-// fusa:req REQ-CAN-007
-// fusa:req REQ-CAN-008
-// fusa:req REQ-CAN-009
-// fusa:req REQ-CAN-010
-// fusa:req REQ-CAN-011
+//fusa:req REQ-CAN-001
+//fusa:req REQ-CAN-002
+//fusa:req REQ-CAN-003
+//fusa:req REQ-CAN-004
+//fusa:req REQ-CAN-005
+//fusa:req REQ-CAN-006
+//fusa:req REQ-CAN-007
+//fusa:req REQ-CAN-008
+//fusa:req REQ-CAN-009
+//fusa:req REQ-CAN-010
+//fusa:req REQ-CAN-011
 
 //! The CAN controller endpoint type (`ep_type 0x0B`) — `ROADMAP.md`
 //! Milestone 7 ("Remaining Endpoint Types"), second checklist bullet:
@@ -114,19 +114,21 @@
 //! [`CanFunctionalConfig`] carries one [`FrameFormat`] field rather than
 //! being left empty.
 //!
-//! ## Provenance note: `FrameFormat` wire encoding
+//! ## `FrameFormat` wire encoding (confirmed against TC18 Table 54)
 //!
 //! `ROADMAP.md`'s checklist bullet names the six [`FrameFormat`] variants by
-//! their standard CAN abbreviations but states no numeric byte value for
-//! any of them. Per Guiding Principle 5, [`FrameFormat::to_u8`]/
-//! [`FrameFormat::from_u8`] assign each variant a stable, sequential byte
-//! value (`0`..=`5`, declaration order) rather than this crate guessing at
-//! a specific spec-defined encoding — the same discipline
-//! [`crate::i2c::I2cSpeedMode::to_u8`] already applies to its own
-//! spec-unconfirmed `i2c_mode` byte values. A later item that recovers the
-//! real wire encoding (against this crate's own spec-extraction pass, never
-//! against restated spec prose) is expected to update this mapping then,
-//! not now.
+//! their standard CAN abbreviations but states no numeric byte value for any
+//! of them, so [`FrameFormat::to_u8`]/[`FrameFormat::from_u8`] originally
+//! assigned each variant a stable, sequential byte value (`0`..=`5`,
+//! declaration order) as this crate's own working choice. TC18 §13.7.11.3
+//! Table 54 (TC18.txt line 5447) has since been reconciled against that
+//! mapping and confirms it exactly: `CBFF = 0`, `CEFF = 1`, `FBFF = 2`,
+//! `FEFF = 3`, `XL (classic physical layer) = 4`, `XL (new physical
+//! layer) = 5`, with `6` and `7` both Reserved. The two XL rows also settle
+//! what `ROADMAP.md`'s "XL-classical"/"XL-new" naming meant: which physical
+//! layer the XL frame uses, not two different XL frame shapes.
+//! [`FrameFormat::from_u8`]'s rejection of `6`/`7` is therefore Table 54's
+//! own Reserved rows, not merely an out-of-enum range check.
 //!
 //! [`FrameFormat::is_extended_id`] additionally distinguishes the base
 //! (11-bit arbitration ID) vs. extended (29-bit arbitration ID) rows among
@@ -137,6 +139,43 @@
 //! That base-vs-extended split is what the "B"/"E" letters in CBFF/CEFF/
 //! FBFF/FEFF themselves already name, so this one piece is treated as a
 //! genuine CAN physical fact rather than a further guessed encoding.
+//!
+//! ## TC18 reconciliation note (§13.7.11)
+//!
+//! Reconciling this module against TC18 §13.7.11 confirms three further
+//! behaviors and records four gaps.
+//!
+//! Confirmed: TC18 §13.7.11.3 (TC18.txt line 5471) states "Sending remote
+//! frames is not supported", matching this module's own "Data frames only"
+//! section below; the same line states "In case the CAN ID is 11bits, then
+//! it shall be right aligned in the CAN ID field", which
+//! [`CanDataFrame::encode`]'s big-endian [`CanDataFrame::id`] field
+//! satisfies; and line 5443 plus line 5472 together give CAN XL's total
+//! "CAN data" field size as 2054 bytes — up to 2048 payload bytes plus the
+//! 6 additional ISO 11898-1 bytes (RRS, SDT, VCID, AF) — matching
+//! [`CAN_XL_MAX_PAYLOAD`] + [`CAN_XL_SUB_HEADER_LEN`].
+//!
+//! Not implemented, and recorded as explicit not-implemented requirement
+//! entries rather than silently omitted:
+//!
+//! - The exact request-payload bit layout of TC18 Figure 39 (line 5428),
+//!   which carries `FrameFormat` and the CAN ID together in the payload's
+//!   first 32-bit word. This module instead emits a full format-tag byte
+//!   followed by a 4-byte big-endian CAN ID (5 bytes), so a
+//!   [`CanDataFrame::encode`] buffer is **not** byte-compatible with Figure
+//!   39's own word layout; the figure's column rendering does not survive
+//!   text extraction, so the exact bit positions are not transcribed here.
+//! - Naming the 6 XL bytes as RRS/SDT/VCID/AF — [`CanXlSubHeader`] keeps
+//!   them opaque.
+//! - Segmentation of an over-long CAN XL payload via the `ms` and
+//!   `segment_num` fields (line 5444); [`CanXlCombinedPayload::assemble`]
+//!   takes caller-ordered segments and reads neither field.
+//! - TC18 Table 53's functional-config register layout (§13.7.11.2, lines
+//!   5363-5419: bit-time registers 1-3, TDCC, EP/FIFO status, acceptance
+//!   filters 1-4, receive filters 1-4) and the six configuration
+//!   capabilities §13.7.11.2 enumerates (lines 5351-5356) — see
+//!   [`CanFunctionalConfig`], which carries a [`FrameFormat`] and nothing
+//!   else.
 //!
 //! ## Provenance note: the CAN XL sub-header is carried opaque
 //!
@@ -217,7 +256,7 @@ use crate::RcpError;
 /// interpreted value. See this module's doc comment "Validation against
 /// `canbr.rs`" for why this is stated fresh here rather than imported from
 /// anywhere else.
-// fusa:req REQ-CAN-003
+//fusa:req REQ-CAN-003
 pub const CLASSICAL_CAN_MAX_DATA: usize = 8;
 
 /// Maximum CAN FD payload in bytes — a genuine physical ceiling of the CAN
@@ -226,29 +265,35 @@ pub const CLASSICAL_CAN_MAX_DATA: usize = 8;
 /// comment "Validation against `canbr.rs`"); stated directly as this
 /// module's own constant since Milestone 9's canbr REPLACE cutover deleted
 /// that module.
-// fusa:req REQ-CAN-003
+//fusa:req REQ-CAN-003
 pub const CAN_FD_MAX_PAYLOAD: usize = 64;
 
 /// Maximum CAN XL payload in bytes, per `ROADMAP.md`'s own stated ceiling
-/// for this checklist bullet.
-// fusa:req REQ-CAN-006
+/// for this checklist bullet and confirmed by TC18 §13.7.11.3 (TC18.txt
+/// line 5443): "For CAN XL this can be up to 2054 bytes (2048 + 6)".
+//fusa:req REQ-CAN-006
+//fusa:req REQ-CAN-016
 pub const CAN_XL_MAX_PAYLOAD: usize = 2048;
 
 /// CAN XL's sub-header length in bytes, per `ROADMAP.md`'s own stated
-/// ceiling for this checklist bullet. See [`CanXlSubHeader`].
-// fusa:req REQ-CAN-006
+/// ceiling for this checklist bullet and confirmed by TC18 §13.7.11.3
+/// (TC18.txt line 5472): the "CAN data" field includes 6 additional bytes
+/// (RRS, SDT, VCID, AF — see ISO 11898-1) for either XL frame format. See
+/// [`CanXlSubHeader`].
+//fusa:req REQ-CAN-006
+//fusa:req REQ-CAN-016
 pub const CAN_XL_SUB_HEADER_LEN: usize = 6;
 
 /// Maximum standard (base-format, 11-bit) CAN arbitration ID — a genuine
 /// physical fact about classical/FD CAN's base frame formats, not a
 /// spec-defined or otherwise interpreted value.
-// fusa:req REQ-CAN-004
+//fusa:req REQ-CAN-004
 pub const CAN_STANDARD_ID_MAX: u32 = 0x7FF;
 
 /// Maximum extended (extended-format, 29-bit) CAN arbitration ID — a
 /// genuine physical fact about classical/FD CAN's extended frame formats,
 /// not a spec-defined or otherwise interpreted value.
-// fusa:req REQ-CAN-004
+//fusa:req REQ-CAN-004
 pub const CAN_EXTENDED_ID_MAX: u32 = 0x1FFF_FFFF;
 
 // ── FrameFormat ──────────────────────────────────────────────────────────────
@@ -261,7 +306,8 @@ pub const CAN_EXTENDED_ID_MAX: u32 = 0x1FFF_FFFF;
 /// own working interpretation rather than a confirmed spec encoding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-// fusa:req REQ-CAN-001
+//fusa:req REQ-CAN-001
+//fusa:req REQ-CAN-012
 pub enum FrameFormat {
     /// Classic Base Frame Format: classical CAN 2.0, 11-bit (standard)
     /// arbitration ID.
@@ -284,9 +330,11 @@ pub enum FrameFormat {
 }
 
 impl FrameFormat {
-    /// Encode this frame format as its wire byte value. See this module's
-    /// doc comment "Provenance note: `FrameFormat` wire encoding".
-    // fusa:req REQ-CAN-001
+    /// Encode this frame format as its wire byte value, per TC18 §13.7.11.3
+    /// Table 54 (TC18.txt line 5447). See this module's doc comment
+    /// "`FrameFormat` wire encoding (confirmed against TC18 Table 54)".
+    //fusa:req REQ-CAN-001
+    //fusa:req REQ-CAN-012
     pub fn to_u8(self) -> u8 {
         self as u8
     }
@@ -294,9 +342,11 @@ impl FrameFormat {
     /// Decode a wire byte value into a [`FrameFormat`].
     ///
     /// Returns `Err(RcpError::InvalidParameter)` for any byte outside
-    /// `0..=5`, matching [`crate::i2c::I2cSpeedMode::from_u8`]'s own
-    /// range-check discipline. Never panics for any input.
-    // fusa:req REQ-CAN-002
+    /// `0..=5` — `6` and `7` are Table 54's own two Reserved rows (TC18
+    /// §13.7.11.3, TC18.txt line 5454), and no `FrameFormat` value wider
+    /// than 3 bits exists. Never panics for any input.
+    //fusa:req REQ-CAN-002
+    //fusa:req REQ-CAN-013
     pub fn from_u8(raw: u8) -> Result<Self, RcpError> {
         match raw {
             0 => Ok(Self::Cbff),
@@ -310,19 +360,19 @@ impl FrameFormat {
     }
 
     /// Is this one of the two classical (non-FD, non-XL) formats?
-    // fusa:req REQ-CAN-001
+    //fusa:req REQ-CAN-001
     pub fn is_classical(self) -> bool {
         matches!(self, Self::Cbff | Self::Ceff)
     }
 
     /// Is this one of the two CAN FD formats?
-    // fusa:req REQ-CAN-001
+    //fusa:req REQ-CAN-001
     pub fn is_fd(self) -> bool {
         matches!(self, Self::Fbff | Self::Feff)
     }
 
     /// Is this one of the two CAN XL formats?
-    // fusa:req REQ-CAN-001
+    //fusa:req REQ-CAN-001
     pub fn is_xl(self) -> bool {
         matches!(self, Self::XlClassical | Self::XlNew)
     }
@@ -331,7 +381,7 @@ impl FrameFormat {
     /// an 11-bit standard one)? Meaningful only for the four non-XL
     /// variants — see this module's doc comment "Provenance note:
     /// `FrameFormat` wire encoding".
-    // fusa:req REQ-CAN-004
+    //fusa:req REQ-CAN-004
     pub fn is_extended_id(self) -> bool {
         matches!(self, Self::Ceff | Self::Feff)
     }
@@ -342,7 +392,7 @@ impl FrameFormat {
     /// [`FrameFormat::Fbff`]/[`FrameFormat::Feff`], and `None` for either
     /// XL variant (which use [`CAN_XL_MAX_PAYLOAD`] via [`CanXlFrame`]
     /// instead — see [`CanDataFrame`]).
-    // fusa:req REQ-CAN-004
+    //fusa:req REQ-CAN-004
     pub fn max_data_len(self) -> Option<usize> {
         if self.is_classical() {
             Some(CLASSICAL_CAN_MAX_DATA)
@@ -363,7 +413,8 @@ impl FrameFormat {
 /// representation" — this type has no field or variant that could represent
 /// a remote frame.
 #[derive(Debug, Clone, PartialEq, Eq)]
-// fusa:req REQ-CAN-004
+//fusa:req REQ-CAN-004
+//fusa:req REQ-CAN-015
 pub struct CanDataFrame {
     /// This frame's format. Always one of [`FrameFormat::Cbff`],
     /// [`FrameFormat::Ceff`], [`FrameFormat::Fbff`], [`FrameFormat::Feff`]
@@ -387,7 +438,17 @@ impl CanDataFrame {
     /// [`crate::lin::LinFrameTransfer::encode`]'s own trust-the-caller
     /// discipline; [`CanDataFrame::decode`] is where this module's
     /// validation lives. Never panics.
-    // fusa:req REQ-CAN-004
+    ///
+    /// The big-endian `id` field right-aligns an 11-bit CAN ID within the
+    /// CAN ID field, as TC18 §13.7.11.3 (TC18.txt line 5471) requires: "In
+    /// case the CAN ID is 11bits, then it shall be right aligned in the CAN
+    /// ID field." No remote-frame (RTR) indication is emitted anywhere in
+    /// this encoding — the same line states remote frames are not supported.
+    /// See this module's doc comment "TC18 reconciliation note (§13.7.11)"
+    /// for how this 5-byte form relates to Figure 39's own 32-bit word.
+    //fusa:req REQ-CAN-004
+    //fusa:req REQ-CAN-014
+    //fusa:req REQ-CAN-015
     pub fn encode(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(1 + 4 + self.data.len());
         buf.push(self.format.to_u8());
@@ -407,7 +468,7 @@ impl CanDataFrame {
     /// [`FrameFormat::is_extended_id`]). Returns
     /// `Err(RcpError::PayloadTooLarge)` when `data` exceeds `format`'s own
     /// [`FrameFormat::max_data_len`] ceiling. Never panics for any input.
-    // fusa:req REQ-CAN-005
+    //fusa:req REQ-CAN-005
     pub fn decode(b: &[u8]) -> Result<Self, RcpError> {
         if b.len() < 5 {
             return Err(RcpError::ShortFrame);
@@ -445,12 +506,12 @@ impl CanDataFrame {
 /// CAN XL's 6-byte sub-header, carried opaque — see this module's doc
 /// comment "Provenance note: the CAN XL sub-header is carried opaque".
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-CAN-006
+//fusa:req REQ-CAN-006
 pub struct CanXlSubHeader(pub [u8; CAN_XL_SUB_HEADER_LEN]);
 
 impl CanXlSubHeader {
     /// Encode this sub-header to its raw 6-byte wire representation.
-    // fusa:req REQ-CAN-006
+    //fusa:req REQ-CAN-006
     pub fn encode(&self) -> [u8; CAN_XL_SUB_HEADER_LEN] {
         self.0
     }
@@ -460,7 +521,7 @@ impl CanXlSubHeader {
     ///
     /// Returns `Err(RcpError::ShortFrame)` for input shorter than
     /// [`CAN_XL_SUB_HEADER_LEN`] bytes. Never panics for any input.
-    // fusa:req REQ-CAN-006
+    //fusa:req REQ-CAN-006
     pub fn decode(b: &[u8]) -> Result<Self, RcpError> {
         if b.len() < CAN_XL_SUB_HEADER_LEN {
             return Err(RcpError::ShortFrame);
@@ -482,7 +543,7 @@ impl CanXlSubHeader {
 /// remote-frame representation" — this type has no field or variant that
 /// could represent a remote frame.
 #[derive(Debug, Clone, PartialEq, Eq)]
-// fusa:req REQ-CAN-007
+//fusa:req REQ-CAN-007
 pub struct CanXlFrame {
     /// This frame's format. Always one of [`FrameFormat::XlClassical`] or
     /// [`FrameFormat::XlNew`] — [`CanXlFrame::decode`] rejects any other
@@ -502,7 +563,7 @@ impl CanXlFrame {
     /// Performs no validation of its own, mirroring
     /// [`CanDataFrame::encode`]'s trust-the-caller discipline. Never
     /// panics.
-    // fusa:req REQ-CAN-007
+    //fusa:req REQ-CAN-007
     pub fn encode(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(1 + CAN_XL_SUB_HEADER_LEN + self.payload.len());
         buf.push(self.format.to_u8());
@@ -520,8 +581,8 @@ impl CanXlFrame {
     /// of the two XL variants (use [`CanDataFrame::decode`] instead).
     /// Returns `Err(RcpError::PayloadTooLarge)` when the remaining payload
     /// exceeds [`CAN_XL_MAX_PAYLOAD`] bytes. Never panics for any input.
-    // fusa:req REQ-CAN-008
-    // fusa:req REQ-CAN-009
+    //fusa:req REQ-CAN-008
+    //fusa:req REQ-CAN-009
     pub fn decode(b: &[u8]) -> Result<Self, RcpError> {
         if b.len() < 1 + CAN_XL_SUB_HEADER_LEN {
             return Err(RcpError::ShortFrame);
@@ -554,7 +615,7 @@ impl CanXlFrame {
 /// not-yet-built multi-AVTPDU reassembly buffer — see this module's doc
 /// comment "CAN XL fragmentation interaction".
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-// fusa:req REQ-CAN-010
+//fusa:req REQ-CAN-010
 pub struct CanXlCombinedPayload(pub Vec<u8>);
 
 impl CanXlCombinedPayload {
@@ -562,7 +623,7 @@ impl CanXlCombinedPayload {
     /// concatenating `segments` verbatim, in the order given. An empty
     /// `segments` slice yields an empty combined payload; this function
     /// never panics for any input, including empty per-segment payloads.
-    // fusa:req REQ-CAN-010
+    //fusa:req REQ-CAN-010
     pub fn assemble(segments: &[&[u8]]) -> Self {
         let mut combined = Vec::new();
         for segment in segments {
@@ -581,7 +642,7 @@ impl CanXlCombinedPayload {
 /// this carries a field (unlike [`crate::lin::LinFunctionalConfig`]'s empty
 /// placeholder).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-CAN-011
+//fusa:req REQ-CAN-011
 pub struct CanFunctionalConfig {
     /// The [`FrameFormat`] this CAN controller endpoint is configured to
     /// use.
@@ -596,7 +657,7 @@ impl CanFunctionalConfig {
     /// This module does not itself call that function — it only shows how a
     /// caller would obtain the matching tag, per this module's doc comment
     /// "Relationship to `crate::regmap`".
-    // fusa:req REQ-CAN-011
+    //fusa:req REQ-CAN-011
     pub fn layer_tag(&self) -> crate::regmap::PerEpTypeFunctionalConfig {
         crate::regmap::PerEpTypeFunctionalConfig::new(crate::regmap::EndpointType::Can)
     }
@@ -609,7 +670,7 @@ mod tests {
     // ── Physical-fact constants ──────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-CAN-003
+    //fusa:test REQ-CAN-003
     fn physical_fact_constants_match_real_can_ceilings() {
         assert_eq!(CLASSICAL_CAN_MAX_DATA, 8);
         assert_eq!(CAN_FD_MAX_PAYLOAD, 64);
@@ -622,8 +683,8 @@ mod tests {
     // ── FrameFormat: encoding / classification round-trip ───────────────────
 
     #[test]
-    // fusa:test REQ-CAN-001
-    // fusa:test REQ-CAN-002
+    //fusa:test REQ-CAN-001
+    //fusa:test REQ-CAN-002
     fn frame_format_round_trips_through_to_u8_from_u8() {
         for format in [
             FrameFormat::Cbff,
@@ -638,15 +699,63 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CAN-002
+    //fusa:test REQ-CAN-002
     fn frame_format_from_u8_rejects_out_of_range_byte() {
         for raw in [6u8, 7, 255] {
             assert_eq!(FrameFormat::from_u8(raw), Err(RcpError::InvalidParameter));
         }
     }
 
+    // ── TC18 Table 54: confirmed FrameFormat wire values ────────────────────
+
     #[test]
-    // fusa:test REQ-CAN-001
+    //fusa:test REQ-CAN-012
+    fn frame_format_wire_values_match_tc18_table_54() {
+        // TC18 §13.7.11.3 Table 54 "can frame formats" (TC18.txt line 5447),
+        // transcribed row by row:
+        //   CBFF                          -> 0
+        //   CEFF                          -> 1
+        //   FBFF                          -> 2
+        //   FEFF                          -> 3
+        //   XL (classic physical layer)   -> 4
+        //   XL (new physical layer)       -> 5
+        assert_eq!(FrameFormat::Cbff.to_u8(), 0);
+        assert_eq!(FrameFormat::Ceff.to_u8(), 1);
+        assert_eq!(FrameFormat::Fbff.to_u8(), 2);
+        assert_eq!(FrameFormat::Feff.to_u8(), 3);
+        assert_eq!(FrameFormat::XlClassical.to_u8(), 4);
+        assert_eq!(FrameFormat::XlNew.to_u8(), 5);
+
+        assert_eq!(FrameFormat::from_u8(0), Ok(FrameFormat::Cbff));
+        assert_eq!(FrameFormat::from_u8(1), Ok(FrameFormat::Ceff));
+        assert_eq!(FrameFormat::from_u8(2), Ok(FrameFormat::Fbff));
+        assert_eq!(FrameFormat::from_u8(3), Ok(FrameFormat::Feff));
+        assert_eq!(FrameFormat::from_u8(4), Ok(FrameFormat::XlClassical));
+        assert_eq!(FrameFormat::from_u8(5), Ok(FrameFormat::XlNew));
+
+        // Table 54's rows 4 and 5 are the two physical-layer variants of the
+        // same XL frame format, so both classify as XL and neither as FD.
+        assert!(FrameFormat::from_u8(4).unwrap().is_xl());
+        assert!(FrameFormat::from_u8(5).unwrap().is_xl());
+    }
+
+    #[test]
+    //fusa:test REQ-CAN-013
+    fn frame_format_from_u8_rejects_table_54_reserved_rows_6_and_7() {
+        // TC18 §13.7.11.3 Table 54 (TC18.txt lines 5454-5455): FrameFormat 6
+        // and 7 are both "Reserved" — the only two of the 3-bit field's eight
+        // code points without an assigned frame format.
+        for reserved in [6u8, 7] {
+            assert_eq!(
+                FrameFormat::from_u8(reserved),
+                Err(RcpError::InvalidParameter),
+                "Table 54 row {reserved} is Reserved"
+            );
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-CAN-001
     fn frame_format_classification_helpers_partition_all_six_variants() {
         assert!(FrameFormat::Cbff.is_classical());
         assert!(FrameFormat::Ceff.is_classical());
@@ -672,7 +781,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CAN-004
+    //fusa:test REQ-CAN-004
     fn frame_format_is_extended_id_matches_ceff_feff_only() {
         assert!(!FrameFormat::Cbff.is_extended_id());
         assert!(FrameFormat::Ceff.is_extended_id());
@@ -681,7 +790,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CAN-004
+    //fusa:test REQ-CAN-004
     fn frame_format_max_data_len_matches_classical_fd_ceilings_and_none_for_xl() {
         assert_eq!(
             FrameFormat::Cbff.max_data_len(),
@@ -700,8 +809,8 @@ mod tests {
     // ── CanDataFrame: round-trip / never-panic ───────────────────────────────
 
     #[test]
-    // fusa:test REQ-CAN-004
-    // fusa:test REQ-CAN-005
+    //fusa:test REQ-CAN-004
+    //fusa:test REQ-CAN-005
     fn can_data_frame_round_trips_through_encode_decode() {
         for (format, id, data) in [
             (FrameFormat::Cbff, 0x000u32, vec![]),
@@ -723,7 +832,62 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CAN-005
+    //fusa:test REQ-CAN-014
+    fn can_data_frame_encode_right_aligns_an_11_bit_can_id() {
+        // TC18 §13.7.11.3 (TC18.txt line 5471): "In case the CAN ID is
+        // 11bits, then it shall be right aligned in the CAN ID field."
+        //
+        // 11-bit ID 0x123 in a 4-byte big-endian CAN ID field is
+        // 0x00 0x00 0x01 0x23 — the ID's least-significant bit sits in the
+        // field's least-significant bit, and the 21 leading bits are zero.
+        let frame = CanDataFrame {
+            format: FrameFormat::Cbff,
+            id: 0x123,
+            data: vec![0xDE, 0xAD],
+        };
+        assert_eq!(
+            frame.encode(),
+            vec![0x00, 0x00, 0x00, 0x01, 0x23, 0xDE, 0xAD]
+        );
+
+        // The widest 11-bit ID, 0x7FF, likewise occupies the field's low
+        // bits — not the left-aligned 0xFFE0_0000 a 29-bit-field
+        // left-justification would produce.
+        let widest = CanDataFrame {
+            format: FrameFormat::Fbff,
+            id: CAN_STANDARD_ID_MAX,
+            data: vec![],
+        };
+        assert_eq!(widest.encode(), vec![0x02, 0x00, 0x00, 0x07, 0xFF]);
+        assert_ne!(&widest.encode()[1..5], &0xFFE0_0000u32.to_be_bytes()[..]);
+    }
+
+    #[test]
+    //fusa:test REQ-CAN-015
+    fn can_data_frame_encoding_carries_no_remote_frame_indication() {
+        // TC18 §13.7.11.3 (TC18.txt line 5471): "Sending remote frames is not
+        // supported." The encoded form is exactly one Table 54 format byte,
+        // four CAN ID bytes, and the data bytes — there is no RTR bit, byte,
+        // or trailing flag anywhere in it, for any of the four data-frame
+        // formats.
+        for (tag, format) in [
+            (0u8, FrameFormat::Cbff),
+            (1, FrameFormat::Ceff),
+            (2, FrameFormat::Fbff),
+            (3, FrameFormat::Feff),
+        ] {
+            let frame = CanDataFrame {
+                format,
+                id: 0x001,
+                data: vec![0x11],
+            };
+            assert_eq!(frame.encode(), vec![tag, 0x00, 0x00, 0x00, 0x01, 0x11]);
+            assert_eq!(frame.encode().len(), 5 + frame.data.len());
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-CAN-005
     fn can_data_frame_decode_rejects_short_input() {
         for len in [0usize, 1, 2, 3, 4] {
             assert_eq!(
@@ -734,7 +898,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CAN-005
+    //fusa:test REQ-CAN-005
     fn can_data_frame_decode_rejects_xl_format_tags() {
         for format in [FrameFormat::XlClassical, FrameFormat::XlNew] {
             let mut buf = vec![format.to_u8()];
@@ -744,7 +908,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CAN-005
+    //fusa:test REQ-CAN-005
     fn can_data_frame_decode_rejects_id_wider_than_format_allows() {
         let mut buf = vec![FrameFormat::Cbff.to_u8()];
         buf.extend_from_slice(&(CAN_STANDARD_ID_MAX + 1).to_be_bytes());
@@ -756,7 +920,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CAN-005
+    //fusa:test REQ-CAN-005
     fn can_data_frame_decode_rejects_data_exceeding_format_ceiling() {
         let mut buf = vec![FrameFormat::Cbff.to_u8()];
         buf.extend_from_slice(&0u32.to_be_bytes());
@@ -770,7 +934,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CAN-005
+    //fusa:test REQ-CAN-005
     fn can_data_frame_decode_never_panics_for_any_sampled_input() {
         for len in [0usize, 1, 4, 5, 6, 13, 200] {
             let buf = vec![0x5Au8; len];
@@ -781,14 +945,14 @@ mod tests {
     // ── CanXlSubHeader / CanXlFrame: round-trip / never-panic ───────────────
 
     #[test]
-    // fusa:test REQ-CAN-006
+    //fusa:test REQ-CAN-006
     fn can_xl_sub_header_round_trips_through_encode_decode() {
         let header = CanXlSubHeader([0x01, 0x02, 0x03, 0x04, 0x05, 0x06]);
         assert_eq!(CanXlSubHeader::decode(&header.encode()).unwrap(), header);
     }
 
     #[test]
-    // fusa:test REQ-CAN-006
+    //fusa:test REQ-CAN-006
     fn can_xl_sub_header_decode_rejects_short_input() {
         for len in [0usize, 1, 5] {
             assert_eq!(
@@ -799,8 +963,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CAN-007
-    // fusa:test REQ-CAN-008
+    //fusa:test REQ-CAN-007
+    //fusa:test REQ-CAN-008
     fn can_xl_frame_round_trips_through_encode_decode() {
         for (format, payload) in [
             (FrameFormat::XlClassical, vec![]),
@@ -820,7 +984,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CAN-008
+    //fusa:test REQ-CAN-008
     fn can_xl_frame_decode_rejects_non_xl_format_tags() {
         for format in [
             FrameFormat::Cbff,
@@ -835,7 +999,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CAN-008
+    //fusa:test REQ-CAN-008
     fn can_xl_frame_decode_rejects_short_input() {
         for len in [0usize, 1, 3, 6] {
             assert_eq!(
@@ -846,7 +1010,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CAN-009
+    //fusa:test REQ-CAN-009
     fn can_xl_frame_decode_rejects_payload_exceeding_2048_bytes() {
         let mut buf = vec![FrameFormat::XlClassical.to_u8()];
         buf.extend_from_slice(&[0u8; CAN_XL_SUB_HEADER_LEN]);
@@ -855,7 +1019,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CAN-009
+    //fusa:test REQ-CAN-009
     fn can_xl_frame_decode_accepts_payload_at_exactly_2048_bytes() {
         let mut buf = vec![FrameFormat::XlNew.to_u8()];
         buf.extend_from_slice(&[0u8; CAN_XL_SUB_HEADER_LEN]);
@@ -865,7 +1029,30 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CAN-008
+    //fusa:test REQ-CAN-016
+    fn can_xl_can_data_field_totals_2054_bytes() {
+        // TC18 §13.7.11.3 (TC18.txt line 5443): "For CAN XL this can be up to
+        // 2054 bytes (2048 + 6, see below)", and line 5472: the "CAN data"
+        // field includes 6 additional bytes (RRS, SDT, VCID, AF — see
+        // ISO 11898-1) for either XL frame format.
+        assert_eq!(CAN_XL_SUB_HEADER_LEN + CAN_XL_MAX_PAYLOAD, 2054);
+
+        let frame = CanXlFrame {
+            format: FrameFormat::XlNew,
+            sub_header: CanXlSubHeader([0u8; CAN_XL_SUB_HEADER_LEN]),
+            payload: vec![0xA5; CAN_XL_MAX_PAYLOAD],
+        };
+        // 2054 CAN-data bytes, plus this module's own leading format tag.
+        assert_eq!(frame.encode().len(), 1 + 2054);
+        let decoded = CanXlFrame::decode(&frame.encode()).unwrap();
+        assert_eq!(
+            decoded.sub_header.encode().len() + decoded.payload.len(),
+            2054
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-CAN-008
     fn can_xl_frame_decode_never_panics_for_any_sampled_input() {
         for len in [0usize, 1, 6, 7, 20, 300] {
             let buf = vec![0x5Au8; len];
@@ -876,7 +1063,7 @@ mod tests {
     // ── CanXlCombinedPayload ──────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-CAN-010
+    //fusa:test REQ-CAN-010
     fn can_xl_combined_payload_concatenates_segments_in_caller_supplied_order() {
         let segments: Vec<&[u8]> = vec![&[1, 2, 3], &[], &[4, 5]];
         let combined = CanXlCombinedPayload::assemble(&segments);
@@ -884,7 +1071,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CAN-010
+    //fusa:test REQ-CAN-010
     fn can_xl_combined_payload_empty_segments_yields_empty_payload() {
         assert_eq!(
             CanXlCombinedPayload::assemble(&[]),
@@ -895,7 +1082,7 @@ mod tests {
     // ── CanFunctionalConfig / layer_tag ──────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-CAN-011
+    //fusa:test REQ-CAN-011
     fn can_functional_config_layer_tag_matches_ep_type_can() {
         let functional = CanFunctionalConfig {
             format: FrameFormat::Fbff,
@@ -913,7 +1100,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CAN-011
+    //fusa:test REQ-CAN-011
     fn can_functional_config_layer_tag_rejects_mismatched_ep_type() {
         let functional = CanFunctionalConfig {
             format: FrameFormat::Cbff,

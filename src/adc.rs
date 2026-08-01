@@ -1,13 +1,13 @@
-// fusa:req REQ-ADC-001
-// fusa:req REQ-ADC-002
-// fusa:req REQ-ADC-003
-// fusa:req REQ-ADC-004
-// fusa:req REQ-ADC-005
-// fusa:req REQ-ADC-006
-// fusa:req REQ-ADC-007
-// fusa:req REQ-ADC-008
-// fusa:req REQ-ADC-009
-// fusa:req REQ-ADC-010
+//fusa:req REQ-ADC-001
+//fusa:req REQ-ADC-002
+//fusa:req REQ-ADC-003
+//fusa:req REQ-ADC-004
+//fusa:req REQ-ADC-005
+//fusa:req REQ-ADC-006
+//fusa:req REQ-ADC-007
+//fusa:req REQ-ADC-008
+//fusa:req REQ-ADC-009
+//fusa:req REQ-ADC-010
 
 //! The ADC endpoint type (`ep_type 0x09`) — `ROADMAP.md` Milestone 4
 //! ("Basic Endpoint Types"), fifth checklist bullet: "≤16-bit resolution;
@@ -174,7 +174,7 @@ use crate::RcpError;
 /// type rather than this module assuming every sample is a full 16-bit
 /// value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-ADC-001
+//fusa:req REQ-ADC-001
 pub struct AdcResolutionBits(u8);
 
 impl AdcResolutionBits {
@@ -184,8 +184,8 @@ impl AdcResolutionBits {
     /// meaningful resolution) or any value above `16` (wider than
     /// `ROADMAP.md`'s "≤16-bit resolution" upper bound). Never panics for
     /// any input.
-    // fusa:req REQ-ADC-001
-    // fusa:req REQ-ADC-002
+    //fusa:req REQ-ADC-001
+    //fusa:req REQ-ADC-002
     pub fn new(bits: u8) -> Result<Self, RcpError> {
         if (1..=16).contains(&bits) {
             Ok(Self(bits))
@@ -195,7 +195,7 @@ impl AdcResolutionBits {
     }
 
     /// This resolution's bit width, `1..=16`.
-    // fusa:req REQ-ADC-001
+    //fusa:req REQ-ADC-001
     pub fn to_u8(self) -> u8 {
         self.0
     }
@@ -205,7 +205,7 @@ impl AdcResolutionBits {
     ///
     /// Never panics for any valid [`AdcResolutionBits`] — the widest
     /// modeled resolution, 16 bits, yields `u16::MAX` exactly.
-    // fusa:req REQ-ADC-003
+    //fusa:req REQ-ADC-003
     pub fn max_raw_value(self) -> u16 {
         let bits = u32::from(self.0);
         ((1u32 << bits) - 1) as u16
@@ -232,7 +232,7 @@ impl Default for AdcResolutionBits {
 /// regardless of `resolution`, matching [`crate::gpio::GpioBitmask`]'s own
 /// fixed-width, big-endian discipline.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-ADC-004
+//fusa:req REQ-ADC-004
 pub struct AdcSampleValue {
     /// The raw sample reading.
     pub raw: u16,
@@ -246,7 +246,7 @@ impl AdcSampleValue {
     ///
     /// Returns `Err(RcpError::InvalidParameter)` if `raw` exceeds that
     /// maximum. Never panics for any input.
-    // fusa:req REQ-ADC-004
+    //fusa:req REQ-ADC-004
     pub fn new(raw: u16, resolution: AdcResolutionBits) -> Result<Self, RcpError> {
         if raw > resolution.max_raw_value() {
             Err(RcpError::InvalidParameter)
@@ -256,7 +256,7 @@ impl AdcSampleValue {
     }
 
     /// Encode this sample to its 2-byte big-endian wire representation.
-    // fusa:req REQ-ADC-004
+    //fusa:req REQ-ADC-004
     pub fn encode(&self) -> [u8; 2] {
         self.raw.to_be_bytes()
     }
@@ -267,7 +267,7 @@ impl AdcSampleValue {
     /// Returns `Err(RcpError::InvalidParameter)` if the decoded raw value
     /// exceeds `resolution`'s [`AdcResolutionBits::max_raw_value`]. Never
     /// panics for any input.
-    // fusa:req REQ-ADC-004
+    //fusa:req REQ-ADC-004
     pub fn decode(bytes: [u8; 2], resolution: AdcResolutionBits) -> Result<Self, RcpError> {
         Self::new(u16::from_be_bytes(bytes), resolution)
     }
@@ -283,7 +283,7 @@ impl AdcSampleValue {
 /// averaging chain" for each field's unconfirmed width/units and for how
 /// the two resolving functions connect them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-ADC-005
+//fusa:req REQ-ADC-005
 pub struct AdcAveragingConfig {
     /// How often one raw sample is taken, in this crate's own unconfirmed
     /// tick-count units.
@@ -303,7 +303,7 @@ pub struct AdcAveragingConfig {
 /// this is a dedicated type rather than content added directly to
 /// [`crate::regmap::PerEpTypeFunctionalConfig`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-ADC-005
+//fusa:req REQ-ADC-005
 pub struct AdcFunctionalConfig {
     /// This endpoint's configured sample resolution.
     pub resolution: AdcResolutionBits,
@@ -319,7 +319,7 @@ impl AdcFunctionalConfig {
     /// This module does not itself call that function — it only shows how a
     /// caller would obtain the matching tag, per this module's doc comment
     /// "Relationship to `crate::regmap`".
-    // fusa:req REQ-ADC-006
+    //fusa:req REQ-ADC-006
     pub fn layer_tag(&self) -> crate::regmap::PerEpTypeFunctionalConfig {
         crate::regmap::PerEpTypeFunctionalConfig::new(crate::regmap::EndpointType::Adc)
     }
@@ -341,7 +341,7 @@ impl AdcFunctionalConfig {
 /// protects a future field-width revision from silently wrapping instead.
 /// See this module's doc comment "Provenance note: the three-level
 /// averaging chain".
-// fusa:req REQ-ADC-007
+//fusa:req REQ-ADC-007
 pub fn resolve_adc_sample_window_ticks(averaging: &AdcAveragingConfig) -> Option<u64> {
     let raw_samples_needed = u64::from(averaging.adc_avg_intervals_per_request)
         .checked_mul(u64::from(averaging.adc_combine_avg_values))?;
@@ -363,8 +363,8 @@ pub fn resolve_adc_sample_window_ticks(averaging: &AdcAveragingConfig) -> Option
 /// arithmetic even though the `u16 * u16` product this function multiplies
 /// cannot overflow `usize` on any platform this crate targets — if that
 /// product would overflow. Never panics for any input.
-// fusa:req REQ-ADC-008
-// fusa:req REQ-ADC-009
+//fusa:req REQ-ADC-008
+//fusa:req REQ-ADC-009
 pub fn resolve_adc_averaged_value(
     raw_samples: &[u16],
     averaging: &AdcAveragingConfig,
@@ -403,7 +403,7 @@ pub fn resolve_adc_averaged_value(
 /// only" for why [`AdcSamplingMode::Continuous`] exists here at all despite
 /// this endpoint type never actually running one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-ADC-010
+//fusa:req REQ-ADC-010
 pub enum AdcSamplingMode {
     /// One sample (or one fully-combined result) per request — the only
     /// mode `ROADMAP.md`'s ADC checklist bullet allows.
@@ -429,7 +429,7 @@ impl Default for AdcSamplingMode {
 /// "Provenance note: request-driven sampling only" for why this crate reads
 /// the checklist's unstated violation code onto this already-defined
 /// variant. Never panics for any input.
-// fusa:req REQ-ADC-010
+//fusa:req REQ-ADC-010
 pub fn validate_adc_sample_request(mode: AdcSamplingMode) -> Result<(), RcpError> {
     match mode {
         AdcSamplingMode::RequestDriven => Ok(()),
@@ -444,7 +444,7 @@ mod tests {
     // ── AdcResolutionBits: construction / round trip ─────────────────────────
 
     #[test]
-    // fusa:test REQ-ADC-001
+    //fusa:test REQ-ADC-001
     fn adc_resolution_bits_round_trips_through_new_to_u8_for_the_full_1_to_16_range() {
         for bits in 1u8..=16 {
             let resolution = AdcResolutionBits::new(bits).unwrap();
@@ -453,7 +453,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADC-002
+    //fusa:test REQ-ADC-002
     fn adc_resolution_bits_new_rejects_zero_and_above_sixteen() {
         for bits in [0u8, 17, 32, 255] {
             assert_eq!(
@@ -464,7 +464,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADC-002
+    //fusa:test REQ-ADC-002
     fn adc_resolution_bits_new_never_panics_for_any_sampled_input() {
         for bits in [0u8, 1, 8, 16, 17, 128, 255] {
             let _ = AdcResolutionBits::new(bits);
@@ -472,7 +472,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADC-003
+    //fusa:test REQ-ADC-003
     fn adc_resolution_bits_max_raw_value_is_two_pow_bits_minus_one() {
         for bits in 1u8..=16 {
             let resolution = AdcResolutionBits::new(bits).unwrap();
@@ -487,7 +487,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADC-003
+    //fusa:test REQ-ADC-003
     fn adc_resolution_bits_default_is_sixteen_bits() {
         assert_eq!(AdcResolutionBits::default().to_u8(), 16);
         assert_eq!(AdcResolutionBits::default().max_raw_value(), u16::MAX);
@@ -496,7 +496,7 @@ mod tests {
     // ── AdcSampleValue: construction / round trip ────────────────────────────
 
     #[test]
-    // fusa:test REQ-ADC-004
+    //fusa:test REQ-ADC-004
     fn adc_sample_value_round_trips_through_encode_decode_within_resolution() {
         let resolution = AdcResolutionBits::new(12).unwrap();
         for raw in [0u16, 1, 2048, resolution.max_raw_value()] {
@@ -507,7 +507,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADC-004
+    //fusa:test REQ-ADC-004
     fn adc_sample_value_new_rejects_raw_wider_than_resolution() {
         let resolution = AdcResolutionBits::new(8).unwrap();
         assert_eq!(
@@ -522,7 +522,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADC-004
+    //fusa:test REQ-ADC-004
     fn adc_sample_value_decode_never_panics_for_any_sampled_input() {
         for resolution_bits in [1u8, 8, 16] {
             let resolution = AdcResolutionBits::new(resolution_bits).unwrap();
@@ -535,7 +535,7 @@ mod tests {
     // ── AdcFunctionalConfig / layer_tag ──────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-ADC-005
+    //fusa:test REQ-ADC-005
     fn adc_functional_config_default_uses_default_resolution_and_zeroed_averaging() {
         let config = AdcFunctionalConfig::default();
         assert_eq!(config.resolution, AdcResolutionBits::default());
@@ -546,7 +546,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADC-006
+    //fusa:test REQ-ADC-006
     fn adc_functional_config_layer_tag_matches_ep_type_adc() {
         let functional = AdcFunctionalConfig::default();
         let generic = crate::regmap::PerEpConfigBlock::new(crate::regmap::EndpointType::Adc);
@@ -562,7 +562,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADC-006
+    //fusa:test REQ-ADC-006
     fn adc_functional_config_layer_tag_rejects_mismatched_ep_type() {
         let functional = AdcFunctionalConfig::default();
         let generic = crate::regmap::PerEpConfigBlock::new(crate::regmap::EndpointType::Uart);
@@ -575,7 +575,7 @@ mod tests {
     // ── resolve_adc_sample_window_ticks: the timing chain ────────────────────
 
     #[test]
-    // fusa:test REQ-ADC-007
+    //fusa:test REQ-ADC-007
     fn resolve_adc_sample_window_ticks_multiplies_all_three_fields() {
         let averaging = AdcAveragingConfig {
             adc_sample_interval: 10,
@@ -587,7 +587,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADC-007
+    //fusa:test REQ-ADC-007
     fn resolve_adc_sample_window_ticks_does_not_overflow_at_max_field_widths() {
         // With AdcAveragingConfig's current u16/u16/u32 field widths, the
         // full product never exceeds u64::MAX (see this function's doc
@@ -603,7 +603,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADC-007
+    //fusa:test REQ-ADC-007
     fn resolve_adc_sample_window_ticks_never_panics_for_any_sampled_input() {
         let intervals = [0u32, 1, 1000, u32::MAX];
         let counts = [0u16, 1, 255, u16::MAX];
@@ -624,7 +624,7 @@ mod tests {
     // ── resolve_adc_averaged_value: the value chain ──────────────────────────
 
     #[test]
-    // fusa:test REQ-ADC-008
+    //fusa:test REQ-ADC-008
     fn resolve_adc_averaged_value_computes_the_two_stage_average() {
         let averaging = AdcAveragingConfig {
             adc_sample_interval: 1,
@@ -638,7 +638,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADC-008
+    //fusa:test REQ-ADC-008
     fn resolve_adc_averaged_value_ignores_trailing_samples_beyond_what_the_pipeline_needs() {
         let averaging = AdcAveragingConfig {
             adc_sample_interval: 1,
@@ -654,7 +654,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADC-008
+    //fusa:test REQ-ADC-008
     fn resolve_adc_averaged_value_single_sample_groups_return_the_samples_own_value() {
         let averaging = AdcAveragingConfig {
             adc_sample_interval: 1,
@@ -665,7 +665,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADC-009
+    //fusa:test REQ-ADC-009
     fn resolve_adc_averaged_value_rejects_zero_avg_intervals_per_request() {
         let averaging = AdcAveragingConfig {
             adc_sample_interval: 1,
@@ -679,7 +679,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADC-009
+    //fusa:test REQ-ADC-009
     fn resolve_adc_averaged_value_rejects_zero_combine_avg_values() {
         let averaging = AdcAveragingConfig {
             adc_sample_interval: 1,
@@ -693,7 +693,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADC-009
+    //fusa:test REQ-ADC-009
     fn resolve_adc_averaged_value_rejects_insufficient_raw_samples() {
         let averaging = AdcAveragingConfig {
             adc_sample_interval: 1,
@@ -708,7 +708,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADC-009
+    //fusa:test REQ-ADC-009
     fn resolve_adc_averaged_value_rejects_insufficient_samples_at_max_field_widths() {
         // group_size * group_count at u16::MAX/u16::MAX does not actually
         // overflow usize (see this function's doc comment) — this exercises
@@ -726,7 +726,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADC-009
+    //fusa:test REQ-ADC-009
     fn resolve_adc_averaged_value_never_panics_for_any_sampled_input() {
         let averagings = [
             AdcAveragingConfig {
@@ -756,13 +756,13 @@ mod tests {
     // ── AdcSamplingMode / validate_adc_sample_request ────────────────────────
 
     #[test]
-    // fusa:test REQ-ADC-010
+    //fusa:test REQ-ADC-010
     fn adc_sampling_mode_defaults_to_request_driven() {
         assert_eq!(AdcSamplingMode::default(), AdcSamplingMode::RequestDriven);
     }
 
     #[test]
-    // fusa:test REQ-ADC-010
+    //fusa:test REQ-ADC-010
     fn validate_adc_sample_request_accepts_request_driven() {
         assert_eq!(
             validate_adc_sample_request(AdcSamplingMode::RequestDriven),
@@ -771,7 +771,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADC-010
+    //fusa:test REQ-ADC-010
     fn validate_adc_sample_request_rejects_continuous() {
         assert_eq!(
             validate_adc_sample_request(AdcSamplingMode::Continuous),

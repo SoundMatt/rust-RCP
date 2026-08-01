@@ -1,14 +1,14 @@
-// fusa:req REQ-EP0-001
-// fusa:req REQ-EP0-002
-// fusa:req REQ-EP0-003
-// fusa:req REQ-EP0-004
-// fusa:req REQ-EP0-005
-// fusa:req REQ-EP0-006
-// fusa:req REQ-EP0-007
-// fusa:req REQ-EP0-008
-// fusa:req REQ-EP0-009
-// fusa:req REQ-EP0-010
-// fusa:req REQ-EP0-011
+//fusa:req REQ-EP0-001
+//fusa:req REQ-EP0-002
+//fusa:req REQ-EP0-003
+//fusa:req REQ-EP0-004
+//fusa:req REQ-EP0-005
+//fusa:req REQ-EP0-006
+//fusa:req REQ-EP0-007
+//fusa:req REQ-EP0-008
+//fusa:req REQ-EP0-009
+//fusa:req REQ-EP0-010
+//fusa:req REQ-EP0-011
 
 //! EP0 (RC-Server-as-endpoint) whole-register-map read/write addressing,
 //! plus the root-client access-control axis layered on top of it —
@@ -237,7 +237,7 @@ pub const EP0_BYTE_BUS_ID: u16 = 0;
 /// Is `byte_bus_id` the reserved EP0 address?
 ///
 /// Never panics for any input.
-// fusa:req REQ-EP0-001
+//fusa:req REQ-EP0-001
 pub fn is_ep0_address(byte_bus_id: u16) -> bool {
     byte_bus_id == EP0_BYTE_BUS_ID
 }
@@ -250,7 +250,7 @@ pub fn is_ep0_address(byte_bus_id: u16) -> bool {
 /// module's doc comment for why it must be made *before*
 /// [`crate::addressing::EndpointTable`] is ever consulted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-EP0-002
+//fusa:req REQ-EP0-002
 pub enum RequestRoute {
     /// `byte_bus_id` is the reserved EP0 address. Route to this module's
     /// whole-register-map read/write path ([`check_ep0_access`]), not to
@@ -270,7 +270,7 @@ pub enum RequestRoute {
 /// which is itself the point: the EP0/device-endpoint routing decision must
 /// not depend on, or be overridable by, whatever a table happens to have
 /// registered. Never panics for any input.
-// fusa:req REQ-EP0-002
+//fusa:req REQ-EP0-002
 pub fn route_byte_bus_id(byte_bus_id: u16) -> RequestRoute {
     if is_ep0_address(byte_bus_id) {
         RequestRoute::Ep0
@@ -287,7 +287,7 @@ pub fn route_byte_bus_id(byte_bus_id: u16) -> RequestRoute {
 /// See this module's provenance note for why `op`'s direction convention is
 /// this crate's own working interpretation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-EP0-003
+//fusa:req REQ-EP0-003
 pub enum Ep0AccessKind {
     /// `op = false`.
     Read,
@@ -299,7 +299,7 @@ pub enum Ep0AccessKind {
 ///
 /// Never panics: `info` is an already-decoded value, not raw bytes, so
 /// there is no truncated-input shape to reject.
-// fusa:req REQ-EP0-003
+//fusa:req REQ-EP0-003
 pub fn access_kind(info: &ByteMessageInfo) -> Ep0AccessKind {
     if info.op {
         Ep0AccessKind::Write
@@ -328,9 +328,9 @@ pub fn access_kind(info: &ByteMessageInfo) -> Ep0AccessKind {
 /// [`EP0_BYTE_BUS_ID`] (that is [`route_byte_bus_id`]'s job, expected to
 /// have already run before this function is called). Never panics for any
 /// input.
-// fusa:req REQ-EP0-004
-// fusa:req REQ-EP0-005
-// fusa:req REQ-EP0-006
+//fusa:req REQ-EP0-004
+//fusa:req REQ-EP0-005
+//fusa:req REQ-EP0-006
 pub fn check_ep0_access(
     state: RcServerState,
     category: RegisterCategory,
@@ -351,7 +351,7 @@ pub fn check_ep0_access(
 /// module's Provenance note. `None` means no stream currently holds
 /// root-client status, in which case this always answers `false`. Never
 /// panics for any input.
-// fusa:req REQ-EP0-007
+//fusa:req REQ-EP0-007
 pub fn is_root_client(root_client: Option<StreamId>, stream: StreamId) -> bool {
     root_client == Some(stream)
 }
@@ -376,10 +376,10 @@ pub fn is_root_client(root_client: Option<StreamId>, stream: StreamId) -> bool {
 /// Like [`check_ep0_access`], this function performs no register I/O and
 /// does not itself verify that `info`'s `byte_bus_id` is actually
 /// [`EP0_BYTE_BUS_ID`]. Never panics for any input.
-// fusa:req REQ-EP0-008
-// fusa:req REQ-EP0-009
-// fusa:req REQ-EP0-010
-// fusa:req REQ-EP0-011
+//fusa:req REQ-EP0-008
+//fusa:req REQ-EP0-009
+//fusa:req REQ-EP0-010
+//fusa:req REQ-EP0-011
 pub fn check_ep0_access_for_stream(
     state: RcServerState,
     category: RegisterCategory,
@@ -430,7 +430,7 @@ mod tests {
     // ── Reserved address ──────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-EP0-001
+    //fusa:test REQ-EP0-001
     fn is_ep0_address_true_only_for_zero() {
         assert!(is_ep0_address(0));
         for byte_bus_id in [1u16, 2, 7, 0x0123, crate::acf::BYTE_MESSAGE_INFO_11BIT_MAX] {
@@ -439,7 +439,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-EP0-001
+    //fusa:test REQ-EP0-001
     fn is_ep0_address_never_panics_across_the_full_range() {
         for byte_bus_id in 0u16..=crate::acf::BYTE_MESSAGE_INFO_11BIT_MAX {
             let _ = is_ep0_address(byte_bus_id);
@@ -449,7 +449,7 @@ mod tests {
     // ── Routing ───────────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-EP0-002
+    //fusa:test REQ-EP0-002
     fn route_byte_bus_id_is_ep0_only_for_zero() {
         assert_eq!(route_byte_bus_id(0), RequestRoute::Ep0);
         for byte_bus_id in [1u16, 2, 7, 0x0123, crate::acf::BYTE_MESSAGE_INFO_11BIT_MAX] {
@@ -458,7 +458,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-EP0-002
+    //fusa:test REQ-EP0-002
     fn ep0_route_is_decided_before_and_independent_of_endpoint_table_contents() {
         use crate::addressing::{EndpointId, EndpointTable};
         use crate::avtp::StreamId;
@@ -484,7 +484,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-EP0-002
+    //fusa:test REQ-EP0-002
     fn route_byte_bus_id_never_panics_across_the_full_range() {
         for byte_bus_id in 0u16..=crate::acf::BYTE_MESSAGE_INFO_11BIT_MAX {
             let _ = route_byte_bus_id(byte_bus_id);
@@ -494,7 +494,7 @@ mod tests {
     // ── Access direction ─────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-EP0-003
+    //fusa:test REQ-EP0-003
     fn access_kind_matches_op_flag() {
         assert_eq!(access_kind(&info_with_op(false)), Ep0AccessKind::Read);
         assert_eq!(access_kind(&info_with_op(true)), Ep0AccessKind::Write);
@@ -503,7 +503,7 @@ mod tests {
     // ── Whole-register-map access check ─────────────────────────────────
 
     #[test]
-    // fusa:test REQ-EP0-004
+    //fusa:test REQ-EP0-004
     fn ep0_read_agrees_with_check_register_reachable() {
         for state in ALL_STATES {
             for category in ALL_CATEGORIES {
@@ -522,7 +522,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-EP0-005
+    //fusa:test REQ-EP0-005
     fn ep0_write_agrees_with_check_register_writable() {
         for state in ALL_STATES {
             for category in ALL_CATEGORIES {
@@ -541,7 +541,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-EP0-005
+    //fusa:test REQ-EP0-005
     fn ep0_write_to_unreachable_category_reports_unreachable_not_locked() {
         // RcpConfig is unreachable (not merely locked) while
         // HwUnconfigured -- check_ep0_access must surface that specific
@@ -559,7 +559,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-EP0-005
+    //fusa:test REQ-EP0-005
     fn ep0_write_to_permanently_locked_category_reports_locked() {
         // HwConfig is reachable but W*-locked once RcpConfigured.
         let info = info_with_op(true);
@@ -574,7 +574,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-EP0-006
+    //fusa:test REQ-EP0-006
     fn check_ep0_access_never_panics_for_any_state_category_op_combination() {
         for state in ALL_STATES {
             for category in ALL_CATEGORIES {
@@ -589,7 +589,7 @@ mod tests {
     // ── Interop with the existing echo-back rule ─────────────────────────
 
     #[test]
-    // fusa:test REQ-EP0-002
+    //fusa:test REQ-EP0-002
     fn ep0_addressed_request_round_trips_through_the_existing_echo_back_rule() {
         // No EP0-specific echo-back logic is needed: build_response_info/
         // verify_echo_back already operate purely on byte_bus_id, and 0
@@ -611,7 +611,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-EP0-007
+    //fusa:test REQ-EP0-007
     fn is_root_client_true_only_for_the_designated_stream() {
         let root = stream(1);
         let other = stream(2);
@@ -622,7 +622,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-EP0-008
+    //fusa:test REQ-EP0-008
     fn root_client_read_agrees_with_check_ep0_access_regardless_of_root_status() {
         let root = stream(1);
         let non_root = stream(2);
@@ -650,7 +650,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-EP0-009
+    //fusa:test REQ-EP0-009
     fn root_client_write_agrees_with_check_ep0_access_for_the_root_stream() {
         let root = stream(1);
         for state in ALL_STATES {
@@ -666,7 +666,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-EP0-010
+    //fusa:test REQ-EP0-010
     fn non_root_write_is_always_rejected_with_root_client_required() {
         let root = stream(1);
         let non_root = stream(2);
@@ -688,7 +688,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-EP0-010
+    //fusa:test REQ-EP0-010
     fn root_client_write_can_still_be_rejected_by_lifecycle_state() {
         // Root-client status only clears the root-client gate -- it does
         // not bypass the lifecycle-state gating check_ep0_access already
@@ -709,7 +709,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-EP0-011
+    //fusa:test REQ-EP0-011
     fn check_ep0_access_for_stream_never_panics_for_any_combination() {
         let root = stream(1);
         let non_root = stream(2);

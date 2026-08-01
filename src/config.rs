@@ -1,8 +1,8 @@
-// fusa:req REQ-CFG-001
-// fusa:req REQ-CFG-005
-// fusa:req REQ-CFG-006
-// fusa:req REQ-CFG-007
-// fusa:req REQ-CFG-008
+//fusa:req REQ-CFG-001
+//fusa:req REQ-CFG-005
+//fusa:req REQ-CFG-006
+//fusa:req REQ-CFG-007
+//fusa:req REQ-CFG-008
 
 //! Configuration loader and validator for the RC Server register-map/
 //! lifecycle model (`ROADMAP.md` Milestone 9, Satellite Package Migration,
@@ -95,7 +95,7 @@ use crate::RcpError;
 /// [`crate::regmap::GeneralRegisters`], the five `§3.7`-`§3.11` child
 /// config-table row types, and [`crate::lifecycle::RcServerState`] rather
 /// than reinventing them.
-// fusa:req REQ-CFG-001
+//fusa:req REQ-CFG-001
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct RcServerConfig {
     /// Lifecycle state to bring a freshly loaded RC Server up in.
@@ -136,7 +136,7 @@ pub struct RcServerConfig {
 ///
 /// Returns `Err(RcpError::Other(_))` wrapping the underlying `serde_json`
 /// message on malformed input. Never panics.
-// fusa:req REQ-CFG-005
+//fusa:req REQ-CFG-005
 pub fn from_json(s: &str) -> Result<RcServerConfig, RcpError> {
     serde_json::from_str(s).map_err(|e| RcpError::Other(format!("config: invalid JSON: {e}")))
 }
@@ -145,7 +145,7 @@ pub fn from_json(s: &str) -> Result<RcServerConfig, RcpError> {
 ///
 /// Returns `Err(RcpError::Other(_))` wrapping the underlying `serde_yaml`
 /// message on malformed input. Never panics.
-// fusa:req REQ-CFG-005
+//fusa:req REQ-CFG-005
 pub fn from_yaml(s: &str) -> Result<RcServerConfig, RcpError> {
     serde_yaml::from_str(s).map_err(|e| RcpError::Other(format!("config: invalid YAML: {e}")))
 }
@@ -161,9 +161,9 @@ pub fn from_yaml(s: &str) -> Result<RcServerConfig, RcpError> {
 /// [`crate::lifecycle::check_register_reachable`]'s own error choice for
 /// exactly this "not reachable in this state" shape), `Ok(())` otherwise.
 /// Never panics for any input.
-// fusa:req REQ-CFG-006
-// fusa:req REQ-CFG-007
-// fusa:req REQ-CFG-008
+//fusa:req REQ-CFG-006
+//fusa:req REQ-CFG-007
+//fusa:req REQ-CFG-008
 pub fn validate(cfg: &RcServerConfig) -> Result<(), RcpError> {
     // ── Table row counts vs. declared capacity ──────────────────────────────
     check_capacity(cfg.hw_pin_mapping.len(), cfg.general.svr_hw_cfg.capacity)?;
@@ -220,7 +220,7 @@ mod tests {
     use crate::regmap::TableDescriptor;
 
     #[test]
-    // fusa:test REQ-CFG-001
+    //fusa:test REQ-CFG-001
     fn default_config_is_valid() {
         let cfg = RcServerConfig::default();
         validate(&cfg).unwrap();
@@ -228,7 +228,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CFG-005
+    //fusa:test REQ-CFG-005
     fn parse_json_minimal() {
         let json = r#"{"initial_state": "HwConfigured"}"#;
         let cfg = from_json(json).unwrap();
@@ -237,7 +237,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CFG-005
+    //fusa:test REQ-CFG-005
     fn parse_yaml_minimal() {
         let yaml = "initial_state: RcpConfigured\n";
         let cfg = from_yaml(yaml).unwrap();
@@ -245,19 +245,19 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CFG-005
+    //fusa:test REQ-CFG-005
     fn invalid_json_returns_error() {
         assert!(from_json("{invalid}").is_err());
     }
 
     #[test]
-    // fusa:test REQ-CFG-005
+    //fusa:test REQ-CFG-005
     fn invalid_yaml_returns_error() {
         assert!(from_yaml(":\n  - not: [valid").is_err());
     }
 
     #[test]
-    // fusa:test REQ-CFG-005
+    //fusa:test REQ-CFG-005
     fn round_trips_through_json_with_table_rows() {
         let mut cfg = RcServerConfig::default();
         cfg.general.svr_hw_cfg = TableDescriptor {
@@ -276,7 +276,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CFG-006
+    //fusa:test REQ-CFG-006
     fn validate_rejects_hw_pin_mapping_exceeding_capacity() {
         let mut cfg = RcServerConfig::default();
         cfg.general.svr_hw_cfg = TableDescriptor {
@@ -288,7 +288,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CFG-006
+    //fusa:test REQ-CFG-006
     fn validate_rejects_request_streams_exceeding_capacity() {
         let mut cfg = RcServerConfig::default();
         cfg.general.svr_request_stream_cfg = TableDescriptor {
@@ -301,7 +301,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CFG-006
+    //fusa:test REQ-CFG-006
     fn validate_rejects_ep_bytebus_id_map_exceeding_capacity() {
         let mut cfg = RcServerConfig::default();
         cfg.general.svr_ep_bytebus_id_map = TableDescriptor {
@@ -314,7 +314,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CFG-006
+    //fusa:test REQ-CFG-006
     fn validate_rejects_response_streams_exceeding_capacity() {
         let mut cfg = RcServerConfig::default();
         cfg.general.svr_response_stream_cfg = TableDescriptor {
@@ -327,7 +327,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CFG-007
+    //fusa:test REQ-CFG-007
     fn validate_rejects_sequencer_state_exceeding_svr_sequencers_max() {
         let mut cfg = RcServerConfig {
             initial_state: RcServerState::HwConfigured,
@@ -342,7 +342,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CFG-007
+    //fusa:test REQ-CFG-007
     fn validate_accepts_sequencer_state_within_svr_sequencers_max() {
         let mut cfg = RcServerConfig {
             initial_state: RcServerState::HwConfigured,
@@ -354,7 +354,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CFG-008
+    //fusa:test REQ-CFG-008
     fn validate_rejects_rcp_config_tables_while_hw_unconfigured() {
         let mut cfg = RcServerConfig::default();
         // initial_state defaults to HwUnconfigured, where RcpConfig-category
@@ -365,7 +365,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CFG-008
+    //fusa:test REQ-CFG-008
     fn validate_accepts_rcp_config_tables_once_hw_configured() {
         let mut cfg = RcServerConfig {
             initial_state: RcServerState::HwConfigured,
@@ -377,7 +377,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CFG-008
+    //fusa:test REQ-CFG-008
     fn validate_accepts_hw_config_tables_while_hw_unconfigured() {
         // HwConfig-category tables (hw_pin_mapping) are reachable from the
         // very first state onward, unlike RcpConfig-category tables.

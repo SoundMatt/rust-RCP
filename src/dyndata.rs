@@ -1,8 +1,8 @@
-// fusa:req REQ-DYN-001
-// fusa:req REQ-DYN-002
-// fusa:req REQ-DYN-003
-// fusa:req REQ-DYN-004
-// fusa:req REQ-DYN-005
+//fusa:req REQ-DYN-001
+//fusa:req REQ-DYN-002
+//fusa:req REQ-DYN-003
+//fusa:req REQ-DYN-004
+//fusa:req REQ-DYN-005
 
 //! Dynamic data store — runtime key/value parameters accessible to controllers.
 //!
@@ -15,7 +15,7 @@ use std::sync::RwLock;
 // ── DynStore ──────────────────────────────────────────────────────────────────
 
 /// Thread-safe dynamic parameter store.
-// fusa:req REQ-DYN-001
+//fusa:req REQ-DYN-001
 pub struct DynStore {
     data: RwLock<HashMap<String, Vec<u8>>>,
 }
@@ -28,25 +28,25 @@ impl DynStore {
     }
 
     /// Insert or replace a parameter.
-    // fusa:req REQ-DYN-002
+    //fusa:req REQ-DYN-002
     pub fn set(&self, key: impl Into<String>, value: Vec<u8>) {
         self.data.write().unwrap().insert(key.into(), value);
     }
 
     /// Retrieve a parameter value, or `None` if not present.
-    // fusa:req REQ-DYN-003
+    //fusa:req REQ-DYN-003
     pub fn get(&self, key: &str) -> Option<Vec<u8>> {
         self.data.read().unwrap().get(key).cloned()
     }
 
     /// Delete a parameter. Returns `true` if it existed.
-    // fusa:req REQ-DYN-004
+    //fusa:req REQ-DYN-004
     pub fn delete(&self, key: &str) -> bool {
         self.data.write().unwrap().remove(key).is_some()
     }
 
     /// All parameter keys currently present.
-    // fusa:req REQ-DYN-005
+    //fusa:req REQ-DYN-005
     pub fn keys(&self) -> Vec<String> {
         self.data.read().unwrap().keys().cloned().collect()
     }
@@ -75,14 +75,14 @@ mod tests {
     use super::*;
 
     #[test]
-    // fusa:test REQ-DYN-001
+    //fusa:test REQ-DYN-001
     fn new_store_is_empty() {
         assert!(DynStore::new().is_empty());
     }
 
     #[test]
-    // fusa:test REQ-DYN-002
-    // fusa:test REQ-DYN-003
+    //fusa:test REQ-DYN-002
+    //fusa:test REQ-DYN-003
     fn set_and_get() {
         let s = DynStore::new();
         s.set("key", b"value".to_vec());
@@ -90,13 +90,13 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DYN-003
+    //fusa:test REQ-DYN-003
     fn get_absent_returns_none() {
         assert!(DynStore::new().get("missing").is_none());
     }
 
     #[test]
-    // fusa:test REQ-DYN-004
+    //fusa:test REQ-DYN-004
     fn delete_removes_key() {
         let s = DynStore::new();
         s.set("k", vec![1]);
@@ -106,7 +106,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DYN-005
+    //fusa:test REQ-DYN-005
     fn keys_lists_all() {
         let s = DynStore::new();
         s.set("a", vec![]);
@@ -117,7 +117,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DYN-002
+    //fusa:test REQ-DYN-002
     fn overwrite_replaces_value() {
         let s = DynStore::new();
         s.set("k", b"v1".to_vec());

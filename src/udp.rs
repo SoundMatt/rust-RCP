@@ -1,17 +1,17 @@
-// fusa:req REQ-UDP-001
-// fusa:req REQ-UDP-002
-// fusa:req REQ-UDP-003
-// fusa:req REQ-UDP-004
-// fusa:req REQ-UDP-005
-// fusa:req REQ-UDP-006
-// fusa:req REQ-UDP-007
-// fusa:req REQ-UDP-008
-// fusa:req REQ-UDP-009
-// fusa:req REQ-UDP-010
-// fusa:req REQ-UDP-011
-// fusa:req REQ-UDP-012
-// fusa:req REQ-UDP-013
-// fusa:req REQ-UDP-014
+//fusa:req REQ-UDP-001
+//fusa:req REQ-UDP-002
+//fusa:req REQ-UDP-003
+//fusa:req REQ-UDP-004
+//fusa:req REQ-UDP-005
+//fusa:req REQ-UDP-006
+//fusa:req REQ-UDP-007
+//fusa:req REQ-UDP-008
+//fusa:req REQ-UDP-009
+//fusa:req REQ-UDP-010
+//fusa:req REQ-UDP-011
+//fusa:req REQ-UDP-012
+//fusa:req REQ-UDP-013
+//fusa:req REQ-UDP-014
 
 //! UDP unicast transport for the TC18 AVTPDU/ACF wire format.
 //!
@@ -108,7 +108,7 @@ use crate::RcpError;
 /// Abstract UDP socket for testability. Unchanged in shape from this
 /// module's pre-Milestone-9 version — only the bytes carried over it
 /// changed.
-// fusa:req REQ-UDP-001
+//fusa:req REQ-UDP-001
 pub trait UdpSocket: Send + Sync {
     fn send_to(&self, buf: &[u8], addr: SocketAddr) -> Result<usize, RcpError>;
     fn recv_from(&self, timeout: Option<Duration>) -> Result<(Vec<u8>, SocketAddr), RcpError>;
@@ -123,7 +123,7 @@ pub trait UdpSocket: Send + Sync {
 /// doc comment, "Real OS-socket transport and IEEE 1722-2016 Annex J
 /// encapsulation", for this constant's provenance (public secondary
 /// sources, not the paywalled primary standard).
-// fusa:req REQ-UDP-012
+//fusa:req REQ-UDP-012
 pub const ANNEX_J_CONTROL_PORT: u16 = 17221;
 
 /// Standard destination UDP port for IEEE 1722-2016 Annex J "Continuous"
@@ -139,7 +139,7 @@ pub const ANNEX_J_CONTINUOUS_PORT: u16 = 17220;
 /// crate's existing big-endian wire convention (e.g.
 /// [`crate::avtp::encode_ntscf_frame`]'s `stream_id` field,
 /// [`crate::acf`]'s `message_timestamp`).
-// fusa:req REQ-UDP-012
+//fusa:req REQ-UDP-012
 pub fn encode_annex_j_udp_payload(seq: u32, avtpdu: &[u8]) -> Vec<u8> {
     let mut buf = Vec::with_capacity(4 + avtpdu.len());
     buf.extend_from_slice(&seq.to_be_bytes());
@@ -151,7 +151,7 @@ pub fn encode_annex_j_udp_payload(seq: u32, avtpdu: &[u8]) -> Vec<u8> {
 /// into its 4-byte encapsulation sequence number and the AVTPDU bytes that
 /// follow it. `Err(RcpError::ShortFrame)` for fewer than 4 bytes — never
 /// panics on truncated or empty input.
-// fusa:req REQ-UDP-012
+//fusa:req REQ-UDP-012
 pub fn decode_annex_j_udp_payload(buf: &[u8]) -> Result<(u32, &[u8]), RcpError> {
     if buf.len() < 4 {
         return Err(RcpError::ShortFrame);
@@ -179,8 +179,8 @@ pub fn decode_annex_j_udp_payload(buf: &[u8]) -> Result<(u32, &[u8]), RcpError> 
 /// increasing counter, starting at 0 on construction; it is not exposed to
 /// callers (see this module's own doc comment for why no receiver-side
 /// semantics are attached to it).
-// fusa:req REQ-UDP-013
-// fusa:req REQ-UDP-014
+//fusa:req REQ-UDP-013
+//fusa:req REQ-UDP-014
 pub struct StdUdpSocket {
     socket: std::net::UdpSocket,
     send_seq: AtomicU32,
@@ -188,7 +188,7 @@ pub struct StdUdpSocket {
 
 impl StdUdpSocket {
     /// Bind a real UDP socket to `local_addr`.
-    // fusa:req REQ-UDP-013
+    //fusa:req REQ-UDP-013
     pub fn bind(local_addr: SocketAddr) -> Result<Self, RcpError> {
         let socket = std::net::UdpSocket::bind(local_addr)
             .map_err(|e| RcpError::Other(format!("udp: bind {local_addr}: {e}")))?;
@@ -203,7 +203,7 @@ impl StdUdpSocket {
     /// control-plane traffic. [`Self::bind`] remains available directly
     /// for an explicit port (testing, or a deployment that cannot use the
     /// standard port).
-    // fusa:req REQ-UDP-013
+    //fusa:req REQ-UDP-013
     pub fn new_default_port(bind_ip: std::net::IpAddr) -> Result<Self, RcpError> {
         Self::bind(SocketAddr::new(bind_ip, ANNEX_J_CONTROL_PORT))
     }
@@ -223,7 +223,7 @@ impl UdpSocket for StdUdpSocket {
     /// including the prepended encapsulation sequence number — matching
     /// this trait's existing mock-implementation convention of echoing
     /// `buf.len()` back rather than any wire-framing overhead.
-    // fusa:req REQ-UDP-013
+    //fusa:req REQ-UDP-013
     fn send_to(&self, buf: &[u8], addr: SocketAddr) -> Result<usize, RcpError> {
         let seq = self.send_seq.fetch_add(1, Ordering::Relaxed);
         let framed = encode_annex_j_udp_payload(seq, buf);
@@ -238,7 +238,7 @@ impl UdpSocket for StdUdpSocket {
     /// indefinitely. A real OS-level timeout is mapped to
     /// `Err(RcpError::Timeout)`, matching every other timeout path in this
     /// crate.
-    // fusa:req REQ-UDP-014
+    //fusa:req REQ-UDP-014
     fn recv_from(&self, timeout: Option<Duration>) -> Result<(Vec<u8>, SocketAddr), RcpError> {
         self.socket
             .set_read_timeout(timeout)
@@ -269,7 +269,7 @@ impl UdpSocket for StdUdpSocket {
 /// matching this crate's existing discipline of taking such values as
 /// explicit parameters (e.g. `crate::discovery`'s `now: Instant`) rather
 /// than hiding a counter/clock behind an method that looks pure.
-// fusa:req REQ-UDP-002
+//fusa:req REQ-UDP-002
 pub struct UdpTransport {
     local_stream: StreamId,
     socket: Arc<dyn UdpSocket>,
@@ -299,9 +299,9 @@ impl UdpTransport {
     ///
     /// Returns `Err(RcpError::Timeout)` immediately for a zero `timeout`,
     /// matching this module's pre-Milestone-9 behavior.
-    // fusa:req REQ-UDP-003
-    // fusa:req REQ-UDP-004
-    // fusa:req REQ-WIRE-006
+    //fusa:req REQ-UDP-003
+    //fusa:req REQ-UDP-004
+    //fusa:req REQ-WIRE-006
     pub fn send_acf_abb(
         &self,
         msg: &AcfAbbMessage,
@@ -322,9 +322,9 @@ impl UdpTransport {
     }
 
     /// Same as [`Self::send_acf_abb`], for an ACF_GBB request/response pair.
-    // fusa:req REQ-UDP-003
-    // fusa:req REQ-UDP-004
-    // fusa:req REQ-WIRE-006
+    //fusa:req REQ-UDP-003
+    //fusa:req REQ-UDP-004
+    //fusa:req REQ-WIRE-006
     pub fn send_acf_gbb(
         &self,
         msg: &AcfGbbMessage,
@@ -345,7 +345,7 @@ impl UdpTransport {
     }
 
     /// No-op, matching this module's pre-Milestone-9 behavior.
-    // fusa:req REQ-UDP-005
+    //fusa:req REQ-UDP-005
     pub fn close(&self) -> Result<(), RcpError> {
         Ok(())
     }
@@ -358,7 +358,7 @@ impl UdpTransport {
 /// `DeviceEndpoint` case — unlike [`crate::ep0::RequestRoute`], which stops
 /// at the routing decision itself and never performs the lookup.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-UDP-006
+//fusa:req REQ-UDP-006
 pub enum ResolvedEndpoint {
     /// `byte_bus_id` was the reserved EP0 address.
     Ep0,
@@ -375,8 +375,8 @@ pub enum ResolvedEndpoint {
 /// Returns `Err(RcpError::EpNotFound)` if `byte_bus_id` is not the reserved
 /// EP0 address and no endpoint is registered under `(stream_id,
 /// byte_bus_id)`. Never panics for any input.
-// fusa:req REQ-UDP-006
-// fusa:req REQ-UDP-007
+//fusa:req REQ-UDP-006
+//fusa:req REQ-UDP-007
 pub fn resolve_endpoint(
     endpoints: &EndpointTable,
     stream_id: StreamId,
@@ -504,7 +504,7 @@ impl UdpRcServer {
     /// Starts with no discovery-stream claim held by anyone, matching
     /// [`crate::discovery::try_claim_discovery_stream`]'s own "`current` is
     /// `None`" unclaimed starting condition.
-    // fusa:req REQ-UDP-008
+    //fusa:req REQ-UDP-008
     pub fn new(local_stream: StreamId, socket: Arc<dyn UdpSocket>, server: Arc<RcServer>) -> Self {
         UdpRcServer {
             local_stream,
@@ -570,10 +570,10 @@ impl UdpRcServer {
     /// every response into the one outgoing frame in the same order. See
     /// [`crate::mock::RcServer::handle_ntscf_frame`]'s own doc comment for
     /// the same multi-request handling.
-    // fusa:req REQ-UDP-008
-    // fusa:req REQ-UDP-009
-    // fusa:req REQ-UDP-010
-    // fusa:req REQ-UDP-011
+    //fusa:req REQ-UDP-008
+    //fusa:req REQ-UDP-009
+    //fusa:req REQ-UDP-010
+    //fusa:req REQ-UDP-011
     pub fn serve_one(
         &self,
         recv_timeout: Option<Duration>,
@@ -608,10 +608,10 @@ impl UdpRcServer {
     /// The decoded-request half of [`Self::serve_one`] — see this type's own
     /// doc comment, "Discovery integration", for the three-case recognition
     /// order this implements.
-    // fusa:req REQ-UDP-008
-    // fusa:req REQ-UDP-009
-    // fusa:req REQ-UDP-010
-    // fusa:req REQ-UDP-011
+    //fusa:req REQ-UDP-008
+    //fusa:req REQ-UDP-009
+    //fusa:req REQ-UDP-010
+    //fusa:req REQ-UDP-011
     fn dispatch_request(
         &self,
         requester_stream: StreamId,
@@ -676,7 +676,7 @@ mod tests {
     // ── Annex J encapsulation (pure byte manipulation, no socket) ─────────
 
     #[test]
-    // fusa:test REQ-UDP-012
+    //fusa:test REQ-UDP-012
     fn annex_j_encode_decode_round_trips() {
         let avtpdu = vec![0xDE, 0xAD, 0xBE, 0xEF, 0x01];
         let encoded = encode_annex_j_udp_payload(7, &avtpdu);
@@ -689,7 +689,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UDP-012
+    //fusa:test REQ-UDP-012
     fn annex_j_encode_handles_empty_avtpdu() {
         let encoded = encode_annex_j_udp_payload(0xFFFF_FFFF, &[]);
         assert_eq!(encoded, vec![0xFF, 0xFF, 0xFF, 0xFF]);
@@ -699,7 +699,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UDP-012
+    //fusa:test REQ-UDP-012
     fn annex_j_decode_rejects_short_buffers() {
         for len in 0..4 {
             let buf = vec![0u8; len];
@@ -718,8 +718,8 @@ mod tests {
     // ── StdUdpSocket (real loopback sockets — no privileges required) ─────
 
     #[test]
-    // fusa:test REQ-UDP-013
-    // fusa:test REQ-UDP-014
+    //fusa:test REQ-UDP-013
+    //fusa:test REQ-UDP-014
     fn std_udp_socket_round_trips_over_real_loopback_socket() {
         let a = StdUdpSocket::bind("127.0.0.1:0".parse().unwrap()).unwrap();
         let b = StdUdpSocket::bind("127.0.0.1:0".parse().unwrap()).unwrap();
@@ -733,8 +733,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UDP-013
-    // fusa:test REQ-UDP-014
+    //fusa:test REQ-UDP-013
+    //fusa:test REQ-UDP-014
     fn std_udp_socket_and_udp_rc_server_serve_a_real_discovery_request_end_to_end() {
         // The same composition `src/bin/rcp.rs`'s `serve` command builds
         // (StdUdpSocket + UdpRcServer), but with both a real client and a
@@ -779,7 +779,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UDP-013
+    //fusa:test REQ-UDP-013
     fn std_udp_socket_send_seq_is_monotonically_increasing_on_the_wire() {
         // Inspect the real encapsulated bytes with a plain std socket
         // (bypassing StdUdpSocket's own recv_from, which strips the
@@ -879,10 +879,10 @@ mod tests {
     // ── send_acf_abb ───────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-UDP-001
-    // fusa:test REQ-UDP-002
-    // fusa:test REQ-UDP-003
-    // fusa:test REQ-WIRE-006
+    //fusa:test REQ-UDP-001
+    //fusa:test REQ-UDP-002
+    //fusa:test REQ-UDP-003
+    //fusa:test REQ-WIRE-006
     fn send_acf_abb_round_trips_over_socket() {
         let addr: SocketAddr = "127.0.0.1:9000".parse().unwrap();
         let socket = Arc::new(EchoUdp { mismatch: false });
@@ -893,7 +893,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UDP-004
+    //fusa:test REQ-UDP-004
     fn send_acf_abb_rejects_echo_back_mismatch() {
         let addr: SocketAddr = "127.0.0.1:9000".parse().unwrap();
         let socket = Arc::new(EchoUdp { mismatch: true });
@@ -903,7 +903,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UDP-003
+    //fusa:test REQ-UDP-003
     fn send_acf_abb_rejects_zero_timeout() {
         let addr: SocketAddr = "127.0.0.1:9000".parse().unwrap();
         let socket = Arc::new(EchoUdp { mismatch: false });
@@ -915,7 +915,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UDP-002
+    //fusa:test REQ-UDP-002
     fn local_stream_getter_matches_constructor() {
         let addr: SocketAddr = "127.0.0.1:9000".parse().unwrap();
         let socket = Arc::new(EchoUdp { mismatch: false });
@@ -925,7 +925,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UDP-005
+    //fusa:test REQ-UDP-005
     fn close_is_noop() {
         let addr: SocketAddr = "127.0.0.1:9000".parse().unwrap();
         let socket = Arc::new(EchoUdp { mismatch: false });
@@ -937,7 +937,7 @@ mod tests {
     // ── resolve_endpoint ───────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-UDP-006
+    //fusa:test REQ-UDP-006
     fn resolve_endpoint_routes_ep0() {
         let endpoints = EndpointTable::new();
         let resolved = resolve_endpoint(&endpoints, local_stream(), ep0::EP0_BYTE_BUS_ID).unwrap();
@@ -945,8 +945,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UDP-006
-    // fusa:test REQ-UDP-007
+    //fusa:test REQ-UDP-006
+    //fusa:test REQ-UDP-007
     fn resolve_endpoint_routes_registered_device_endpoint() {
         let mut endpoints = EndpointTable::new();
         let sid = local_stream();
@@ -956,7 +956,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UDP-007
+    //fusa:test REQ-UDP-007
     fn resolve_endpoint_rejects_unregistered_device_endpoint() {
         let endpoints = EndpointTable::new();
         let err = resolve_endpoint(&endpoints, local_stream(), 7).unwrap_err();
@@ -964,7 +964,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UDP-007
+    //fusa:test REQ-UDP-007
     fn resolve_endpoint_does_not_leak_across_streams() {
         let mut endpoints = EndpointTable::new();
         let sid_a = local_stream();
@@ -1061,7 +1061,7 @@ mod tests {
         // ── construction / accessors ────────────────────────────────────
 
         #[test]
-        // fusa:test REQ-UDP-008
+        //fusa:test REQ-UDP-008
         fn new_server_holds_no_discovery_claim() {
             let socket = QueuedUdpSocket::with_inbound(Vec::new());
             let rc = RcServer::new(GeneralRegisters::default());
@@ -1073,7 +1073,7 @@ mod tests {
         // ── register-map-driven dispatch ─────────────────────────────────
 
         #[test]
-        // fusa:test REQ-UDP-008
+        //fusa:test REQ-UDP-008
         fn serve_one_dispatches_ep0_read_through_rc_server() {
             let general = GeneralRegisters {
                 svr_vendor_id: 0x1234,
@@ -1102,7 +1102,7 @@ mod tests {
         }
 
         #[test]
-        // fusa:test REQ-UDP-008
+        //fusa:test REQ-UDP-008
         fn serve_one_dispatches_device_endpoint_write_through_rc_server() {
             let rc = RcServer::new(GeneralRegisters::default());
             let sid = client_stream(2);
@@ -1124,7 +1124,7 @@ mod tests {
         }
 
         #[test]
-        // fusa:test REQ-UDP-008
+        //fusa:test REQ-UDP-008
         fn serve_one_dispatches_multiple_requests_concatenated_in_one_frame() {
             // TC18 §12.9.1.1: an RC Server must support multiple requests
             // concatenated in a single frame (rust-RCP-W03).
@@ -1164,7 +1164,7 @@ mod tests {
         }
 
         #[test]
-        // fusa:test REQ-UDP-008
+        //fusa:test REQ-UDP-008
         fn serve_one_answers_unregistered_endpoint_with_a_wire_error_response() {
             // rust-RCP-W04: EpNotFound has a TC18 Table 27 wire code, so it
             // is answered with a real err=1 response frame, not just
@@ -1187,7 +1187,7 @@ mod tests {
         // ── discovery integration: broadcast read ────────────────────────
 
         #[test]
-        // fusa:test REQ-UDP-009
+        //fusa:test REQ-UDP-009
         fn serve_one_answers_broadcast_discovery_request_in_any_lifecycle_state() {
             use crate::lifecycle::RcServerState;
 
@@ -1233,7 +1233,7 @@ mod tests {
         }
 
         #[test]
-        // fusa:test REQ-UDP-009
+        //fusa:test REQ-UDP-009
         fn serve_one_answers_a_direct_non_broadcast_discovery_request_too() {
             let rc = RcServer::new(GeneralRegisters::default());
             let request = discovery::build_discovery_request(0x22);
@@ -1252,7 +1252,7 @@ mod tests {
         // ── discovery integration: configure / claim ─────────────────────
 
         #[test]
-        // fusa:test REQ-UDP-010
+        //fusa:test REQ-UDP-010
         fn serve_one_grants_a_discovery_configure_claim_to_the_first_requester() {
             let rc = RcServer::new(GeneralRegisters::default());
             let mut request = discovery::build_discovery_request(0);
@@ -1270,7 +1270,7 @@ mod tests {
         }
 
         #[test]
-        // fusa:test REQ-UDP-010
+        //fusa:test REQ-UDP-010
         fn serve_one_rejects_a_different_live_claimant() {
             let rc = RcServer::new(GeneralRegisters::default());
             let now = Instant::now();
@@ -1311,7 +1311,7 @@ mod tests {
         // ── broadcast sentinel misuse ─────────────────────────────────────
 
         #[test]
-        // fusa:test REQ-UDP-011
+        //fusa:test REQ-UDP-011
         fn serve_one_rejects_a_non_discovery_request_under_the_broadcast_sentinel() {
             let rc = RcServer::new(GeneralRegisters::default());
             let request = abb(7, false, Vec::new());

@@ -1,9 +1,9 @@
-// fusa:req REQ-CYB-001
-// fusa:req REQ-CYB-002
-// fusa:req REQ-CYB-003
-// fusa:req REQ-CYB-004
-// fusa:req REQ-CYB-005
-// fusa:req REQ-CYB-006
+//fusa:req REQ-CYB-001
+//fusa:req REQ-CYB-002
+//fusa:req REQ-CYB-003
+//fusa:req REQ-CYB-004
+//fusa:req REQ-CYB-005
+//fusa:req REQ-CYB-006
 
 //! ISO 21434 cybersecurity artifacts: TARA (Threat Analysis and Risk Assessment)
 //! data types and validation helpers.
@@ -15,7 +15,7 @@ use std::fmt;
 // ── Risk classification ───────────────────────────────────────────────────────
 
 /// SFOP attack feasibility rating dimensions.
-// fusa:req REQ-CYB-001
+//fusa:req REQ-CYB-001
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Feasibility {
     Low,
@@ -36,7 +36,7 @@ impl fmt::Display for Feasibility {
 }
 
 /// Impact levels per ISO 21434 §15.
-// fusa:req REQ-CYB-002
+//fusa:req REQ-CYB-002
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Impact {
     Negligible,
@@ -59,7 +59,7 @@ impl fmt::Display for Impact {
 // ── Risk level ────────────────────────────────────────────────────────────────
 
 /// Combined risk level = Feasibility × Impact.
-// fusa:req REQ-CYB-003
+//fusa:req REQ-CYB-003
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RiskLevel {
     Low,
@@ -69,7 +69,7 @@ pub enum RiskLevel {
 }
 
 /// Compute risk level from feasibility and impact per ISO 21434 Table 14.
-// fusa:req REQ-CYB-004
+//fusa:req REQ-CYB-004
 pub fn risk_level(f: Feasibility, i: Impact) -> RiskLevel {
     match (f, i) {
         (_, Impact::Negligible) => RiskLevel::Low,
@@ -85,7 +85,7 @@ pub fn risk_level(f: Feasibility, i: Impact) -> RiskLevel {
 // ── Threat entry ──────────────────────────────────────────────────────────────
 
 /// A single threat in the TARA.
-// fusa:req REQ-CYB-005
+//fusa:req REQ-CYB-005
 #[derive(Debug, Clone)]
 pub struct Threat {
     pub id: String,
@@ -101,7 +101,7 @@ impl Threat {
 }
 
 /// Filter threats that meet or exceed the minimum risk level.
-// fusa:req REQ-CYB-006
+//fusa:req REQ-CYB-006
 pub fn filter_by_risk(threats: &[Threat], min: RiskLevel) -> Vec<&Threat> {
     let rank = |r: RiskLevel| r as u8;
     threats
@@ -118,8 +118,8 @@ mod tests {
     use super::*;
 
     #[test]
-    // fusa:test REQ-CYB-003
-    // fusa:test REQ-CYB-004
+    //fusa:test REQ-CYB-003
+    //fusa:test REQ-CYB-004
     fn negligible_impact_always_low_risk() {
         for f in [
             Feasibility::Low,
@@ -132,7 +132,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CYB-004
+    //fusa:test REQ-CYB-004
     fn critical_feasibility_severe_impact_is_critical() {
         assert_eq!(
             risk_level(Feasibility::Critical, Impact::Severe),
@@ -141,7 +141,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CYB-004
+    //fusa:test REQ-CYB-004
     fn low_feasibility_is_always_low_risk() {
         for i in [
             Impact::Negligible,
@@ -154,7 +154,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CYB-005
+    //fusa:test REQ-CYB-005
     fn threat_risk_level() {
         let t = Threat {
             id: "T-001".into(),
@@ -166,7 +166,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CYB-006
+    //fusa:test REQ-CYB-006
     fn filter_by_risk_high() {
         let threats = vec![
             Threat {
@@ -188,8 +188,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CYB-001
-    // fusa:test REQ-CYB-002
+    //fusa:test REQ-CYB-001
+    //fusa:test REQ-CYB-002
     fn display_variants() {
         assert_eq!(format!("{}", Feasibility::Critical), "critical");
         assert_eq!(format!("{}", Impact::Severe), "severe");

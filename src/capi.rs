@@ -1,7 +1,7 @@
-// fusa:req REQ-CAPI-001
-// fusa:req REQ-CAPI-002
-// fusa:req REQ-CAPI-003
-// fusa:req REQ-CAPI-004
+//fusa:req REQ-CAPI-001
+//fusa:req REQ-CAPI-002
+//fusa:req REQ-CAPI-003
+//fusa:req REQ-CAPI-004
 
 //! C API bridge — exposes a C-compatible FFI surface for embedding this
 //! crate's OPEN Alliance TC18 Remote Control Protocol Specification
@@ -85,7 +85,7 @@ use crate::RcpError;
 
 /// C-compatible mirror of [`StreamId`]: a sender MAC address plus a
 /// locally-assigned unique-id suffix.
-// fusa:req REQ-CAPI-001
+//fusa:req REQ-CAPI-001
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CStreamId {
@@ -94,7 +94,7 @@ pub struct CStreamId {
 }
 
 impl From<StreamId> for CStreamId {
-    // fusa:req REQ-CAPI-003
+    //fusa:req REQ-CAPI-003
     fn from(id: StreamId) -> Self {
         CStreamId {
             sender_mac: id.sender_mac,
@@ -104,7 +104,7 @@ impl From<StreamId> for CStreamId {
 }
 
 impl From<CStreamId> for StreamId {
-    // fusa:req REQ-CAPI-003
+    //fusa:req REQ-CAPI-003
     fn from(id: CStreamId) -> Self {
         StreamId::new(id.sender_mac, id.unique_id)
     }
@@ -116,7 +116,7 @@ impl From<CStreamId> for StreamId {
 /// module's doc comment for why `evt`/`read_size_segment` are
 /// flattened rather than nested, and why field-width validation is not
 /// repeated here.
-// fusa:req REQ-CAPI-002
+//fusa:req REQ-CAPI-002
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CByteMessageInfo {
@@ -138,7 +138,7 @@ pub struct CByteMessageInfo {
 }
 
 impl From<ByteMessageInfo> for CByteMessageInfo {
-    // fusa:req REQ-CAPI-003
+    //fusa:req REQ-CAPI-003
     fn from(info: ByteMessageInfo) -> Self {
         CByteMessageInfo {
             acf_msg_type: info.acf_msg_type,
@@ -161,7 +161,7 @@ impl From<ByteMessageInfo> for CByteMessageInfo {
 }
 
 impl From<CByteMessageInfo> for ByteMessageInfo {
-    // fusa:req REQ-CAPI-003
+    //fusa:req REQ-CAPI-003
     fn from(c: CByteMessageInfo) -> Self {
         ByteMessageInfo {
             acf_msg_type: c.acf_msg_type,
@@ -190,8 +190,8 @@ impl From<CByteMessageInfo> for ByteMessageInfo {
 /// C-compatible ACF_ABB request header: a [`CStreamId`] plus the request's
 /// [`CByteMessageInfo`]. See this module's doc comment for why `payload`
 /// bytes are not part of this type.
-// fusa:req REQ-CAPI-001
-// fusa:req REQ-CAPI-002
+//fusa:req REQ-CAPI-001
+//fusa:req REQ-CAPI-002
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CAbbRequest {
@@ -223,8 +223,8 @@ impl CAbbRequest {
 /// [`CAbbRequest`] (see this module's doc comment for why they are still
 /// kept as two distinct types), for a response's [`CStreamId`]/
 /// [`CByteMessageInfo`].
-// fusa:req REQ-CAPI-001
-// fusa:req REQ-CAPI-002
+//fusa:req REQ-CAPI-001
+//fusa:req REQ-CAPI-002
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CAbbResponse {
@@ -257,7 +257,7 @@ impl CAbbResponse {
 /// C-compatible error code, rebuilt against every current
 /// [`crate::RcpError`] variant. See this module's doc comment for the
 /// full provenance/mapping note.
-// fusa:req REQ-CAPI-004
+//fusa:req REQ-CAPI-004
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CError {
@@ -310,7 +310,7 @@ pub enum CError {
 }
 
 impl From<&RcpError> for CError {
-    // fusa:req REQ-CAPI-004
+    //fusa:req REQ-CAPI-004
     fn from(e: &RcpError) -> Self {
         match e {
             RcpError::Closed => CError::Closed,
@@ -381,14 +381,14 @@ mod tests {
     // ── repr(C) sanity ───────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-CAPI-001
+    //fusa:test REQ-CAPI-001
     fn c_stream_id_is_repr_c() {
         // 6-byte MAC + u16 unique_id: at least 8 bytes on every platform.
         assert!(std::mem::size_of::<CStreamId>() >= 8);
     }
 
     #[test]
-    // fusa:test REQ-CAPI-002
+    //fusa:test REQ-CAPI-002
     fn c_byte_message_info_is_repr_c() {
         // 2x u16 + 9 bool/u8-sized fields: at least 13 bytes on every
         // platform (padding may add more, never less).
@@ -398,7 +398,7 @@ mod tests {
     // ── CStreamId <-> StreamId ───────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-CAPI-003
+    //fusa:test REQ-CAPI-003
     fn stream_id_round_trip() {
         let sid = stream_id();
         let c: CStreamId = sid.into();
@@ -409,7 +409,7 @@ mod tests {
     // ── CByteMessageInfo <-> ByteMessageInfo ─────────────────────────────────
 
     #[test]
-    // fusa:test REQ-CAPI-003
+    //fusa:test REQ-CAPI-003
     fn byte_message_info_round_trip() {
         let bmi = info(7, true);
         let c: CByteMessageInfo = bmi.into();
@@ -426,9 +426,9 @@ mod tests {
     // ── CAbbRequest / CAbbResponse ───────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-CAPI-001
-    // fusa:test REQ-CAPI-002
-    // fusa:test REQ-CAPI-003
+    //fusa:test REQ-CAPI-001
+    //fusa:test REQ-CAPI-002
+    //fusa:test REQ-CAPI-003
     fn abb_request_round_trip() {
         let sid = stream_id();
         let bmi = info(7, true);
@@ -438,9 +438,9 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CAPI-001
-    // fusa:test REQ-CAPI-002
-    // fusa:test REQ-CAPI-003
+    //fusa:test REQ-CAPI-001
+    //fusa:test REQ-CAPI-002
+    //fusa:test REQ-CAPI-003
     fn abb_response_round_trip() {
         let sid = stream_id();
         let bmi = info(7, false);
@@ -450,7 +450,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CAPI-003
+    //fusa:test REQ-CAPI-003
     fn request_and_response_headers_are_distinct_types_same_layout() {
         // Same field layout by construction (see this module's doc
         // comment) — this test exists so a future divergence in either
@@ -465,7 +465,7 @@ mod tests {
     // ── CError mapping ───────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-CAPI-004
+    //fusa:test REQ-CAPI-004
     fn error_code_mapping_covers_tc18_codes() {
         assert_eq!(
             CError::from(&RcpError::UnsupportedCmd),
@@ -520,7 +520,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CAPI-004
+    //fusa:test REQ-CAPI-004
     fn error_code_mapping_covers_relay_and_general_sentinels() {
         assert_eq!(CError::from(&RcpError::Closed), CError::Closed);
         assert_eq!(CError::from(&RcpError::NotConnected), CError::NotConnected);
@@ -537,7 +537,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CAPI-004
+    //fusa:test REQ-CAPI-004
     fn error_code_mapping_collapses_legacy_and_other_to_other() {
         assert_eq!(CError::from(&RcpError::NotFound), CError::Other);
         assert_eq!(CError::from(&RcpError::AlreadyExists), CError::Other);

@@ -1,13 +1,13 @@
-// fusa:req REQ-UART-001
-// fusa:req REQ-UART-002
-// fusa:req REQ-UART-003
-// fusa:req REQ-UART-004
-// fusa:req REQ-UART-005
-// fusa:req REQ-UART-006
-// fusa:req REQ-UART-007
-// fusa:req REQ-UART-008
-// fusa:req REQ-UART-009
-// fusa:req REQ-UART-010
+//fusa:req REQ-UART-001
+//fusa:req REQ-UART-002
+//fusa:req REQ-UART-003
+//fusa:req REQ-UART-004
+//fusa:req REQ-UART-005
+//fusa:req REQ-UART-006
+//fusa:req REQ-UART-007
+//fusa:req REQ-UART-008
+//fusa:req REQ-UART-009
+//fusa:req REQ-UART-010
 
 //! The UART endpoint type (`ep_type 0x05`) — `ROADMAP.md` Milestone 4
 //! ("Basic Endpoint Types"), fourth checklist bullet: "independent TX/RX
@@ -182,7 +182,7 @@ use crate::RcpError;
 /// stream. Every possible byte slice, including an empty one, has a valid
 /// encoding, so [`UartTxQueue::decode`] is infallible.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-// fusa:req REQ-UART-001
+//fusa:req REQ-UART-001
 pub struct UartTxQueue {
     /// The raw bytes queued for transmission.
     pub bytes: Vec<u8>,
@@ -191,7 +191,7 @@ pub struct UartTxQueue {
 impl UartTxQueue {
     /// Encode this queue's bytes to their raw wire representation:
     /// `bytes`, unmodified and unframed.
-    // fusa:req REQ-UART-001
+    //fusa:req REQ-UART-001
     pub fn encode(&self) -> Vec<u8> {
         self.bytes.clone()
     }
@@ -200,7 +200,7 @@ impl UartTxQueue {
     ///
     /// Every possible byte slice, including an empty one, is a valid TX
     /// queue payload, so this never fails and never panics for any input.
-    // fusa:req REQ-UART-001
+    //fusa:req REQ-UART-001
     pub fn decode(b: &[u8]) -> Self {
         Self { bytes: b.to_vec() }
     }
@@ -212,7 +212,7 @@ impl UartTxQueue {
 /// See [`UartTxQueue`]'s doc comment — this is the same unstructured,
 /// variable-length byte-stream modeling for the opposite queue/direction.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-// fusa:req REQ-UART-002
+//fusa:req REQ-UART-002
 pub struct UartRxQueue {
     /// The raw bytes collected from reception.
     pub bytes: Vec<u8>,
@@ -221,7 +221,7 @@ pub struct UartRxQueue {
 impl UartRxQueue {
     /// Encode this queue's bytes to their raw wire representation:
     /// `bytes`, unmodified and unframed.
-    // fusa:req REQ-UART-002
+    //fusa:req REQ-UART-002
     pub fn encode(&self) -> Vec<u8> {
         self.bytes.clone()
     }
@@ -230,7 +230,7 @@ impl UartRxQueue {
     ///
     /// Every possible byte slice, including an empty one, is a valid RX
     /// queue payload, so this never fails and never panics for any input.
-    // fusa:req REQ-UART-002
+    //fusa:req REQ-UART-002
     pub fn decode(b: &[u8]) -> Self {
         Self { bytes: b.to_vec() }
     }
@@ -244,7 +244,7 @@ impl UartRxQueue {
 /// "Provenance note: two queues, one shared config block" for why the
 /// checklist names no concrete TX-side field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-UART-003
+//fusa:req REQ-UART-003
 pub struct UartTxQueueConfig;
 
 /// The RX queue's own config content: the `read_size`/`uart_timeout`
@@ -256,7 +256,7 @@ pub struct UartTxQueueConfig;
 /// [`crate::acf::ReadSizeOrSegment`] and for `uart_timeout`'s own
 /// unconfirmed width/units.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-UART-003
+//fusa:req REQ-UART-003
 pub struct UartRxQueueConfig {
     /// The read-size completion threshold, reusing the same wire field
     /// [`crate::acf::ByteMessageInfo::read_size_segment`] already
@@ -279,7 +279,7 @@ pub struct UartRxQueueConfig {
 /// [`crate::spi::SpiFunctionalConfig`], and
 /// [`crate::i2c::I2cFunctionalConfig`] each used.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-UART-004
+//fusa:req REQ-UART-004
 pub struct UartFunctionalConfig {
     /// The TX queue's own config content.
     pub tx: UartTxQueueConfig,
@@ -295,7 +295,7 @@ impl UartFunctionalConfig {
     /// This module does not itself call that function — it only shows how a
     /// caller would obtain the matching tag, per this module's doc comment
     /// "Relationship to `crate::regmap`".
-    // fusa:req REQ-UART-004
+    //fusa:req REQ-UART-004
     pub fn layer_tag(&self) -> crate::regmap::PerEpTypeFunctionalConfig {
         crate::regmap::PerEpTypeFunctionalConfig::new(crate::regmap::EndpointType::Uart)
     }
@@ -311,9 +311,9 @@ impl UartFunctionalConfig {
 /// exists as an explicit third outcome rather than either of the other two
 /// being silently preferred.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-UART-005
-// fusa:req REQ-UART-006
-// fusa:req REQ-UART-007
+//fusa:req REQ-UART-005
+//fusa:req REQ-UART-006
+//fusa:req REQ-UART-007
 pub enum UartReadCompletionReason {
     /// Only the `read_size` byte-count threshold was met.
     ReadSizeReached,
@@ -334,10 +334,10 @@ pub enum UartReadCompletionReason {
 /// "Provenance note: the `read_size`/`uart_timeout` race" for why a
 /// zero-valued threshold is not treated as "disabled." Never panics for any
 /// input.
-// fusa:req REQ-UART-005
-// fusa:req REQ-UART-006
-// fusa:req REQ-UART-007
-// fusa:req REQ-UART-008
+//fusa:req REQ-UART-005
+//fusa:req REQ-UART-006
+//fusa:req REQ-UART-007
+//fusa:req REQ-UART-008
 pub fn resolve_uart_read_completion(
     rx: &UartRxQueueConfig,
     bytes_collected: u16,
@@ -364,8 +364,8 @@ pub fn resolve_uart_read_completion(
 /// `RcpError::UnsupportedCmd`" for why this crate reads the checklist's
 /// `UNKNOWN_CMD` wording onto this already-defined variant. Never panics for
 /// any input.
-// fusa:req REQ-UART-009
-// fusa:req REQ-UART-010
+//fusa:req REQ-UART-009
+//fusa:req REQ-UART-010
 pub fn validate_uart_read_request(payload: &[u8]) -> Result<(), RcpError> {
     if payload.is_empty() {
         Ok(())
@@ -381,7 +381,7 @@ mod tests {
     // ── UartTxQueue / UartRxQueue: round-trip / never-panic ─────────────────
 
     #[test]
-    // fusa:test REQ-UART-001
+    //fusa:test REQ-UART-001
     fn uart_tx_queue_round_trips_through_encode_decode() {
         for bytes in [vec![], vec![0x00], vec![0xAA; 3], (0u8..=255).collect()] {
             let queue = UartTxQueue {
@@ -392,7 +392,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UART-001
+    //fusa:test REQ-UART-001
     fn uart_tx_queue_decode_never_panics_for_any_sampled_input() {
         for len in [0usize, 1, 2, 7, 64] {
             let buf = vec![0x5Au8; len];
@@ -401,7 +401,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UART-002
+    //fusa:test REQ-UART-002
     fn uart_rx_queue_round_trips_through_encode_decode() {
         for bytes in [vec![], vec![0xFF], vec![0x01, 0x02, 0x03]] {
             let queue = UartRxQueue {
@@ -412,7 +412,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UART-002
+    //fusa:test REQ-UART-002
     fn uart_rx_queue_decode_never_panics_for_any_sampled_input() {
         for len in [0usize, 1, 5, 32] {
             let buf = vec![0xA5u8; len];
@@ -423,7 +423,7 @@ mod tests {
     // ── UartFunctionalConfig / layer_tag ─────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-UART-003
+    //fusa:test REQ-UART-003
     fn uart_tx_and_rx_queue_configs_default_independently() {
         let config = UartFunctionalConfig::default();
         assert_eq!(config.tx, UartTxQueueConfig);
@@ -433,7 +433,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UART-004
+    //fusa:test REQ-UART-004
     fn uart_functional_config_layer_tag_matches_ep_type_uart() {
         let functional = UartFunctionalConfig::default();
         let generic = crate::regmap::PerEpConfigBlock::new(crate::regmap::EndpointType::Uart);
@@ -449,7 +449,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UART-004
+    //fusa:test REQ-UART-004
     fn uart_functional_config_layer_tag_rejects_mismatched_ep_type() {
         let functional = UartFunctionalConfig::default();
         let generic = crate::regmap::PerEpConfigBlock::new(crate::regmap::EndpointType::I2c);
@@ -469,7 +469,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UART-005
+    //fusa:test REQ-UART-005
     fn resolve_uart_read_completion_reports_read_size_reached_only() {
         let rx = rx_config(10, 1000);
         assert_eq!(
@@ -483,7 +483,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UART-006
+    //fusa:test REQ-UART-006
     fn resolve_uart_read_completion_reports_timed_out_only() {
         let rx = rx_config(10, 1000);
         assert_eq!(
@@ -497,7 +497,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UART-007
+    //fusa:test REQ-UART-007
     fn resolve_uart_read_completion_reports_both_on_simultaneous_thresholds() {
         let rx = rx_config(10, 1000);
         assert_eq!(
@@ -507,7 +507,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UART-007
+    //fusa:test REQ-UART-007
     fn resolve_uart_read_completion_zeroed_config_resolves_both_immediately() {
         // See this module's doc comment: zero is not treated as a
         // "disabled" sentinel for either threshold.
@@ -519,7 +519,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UART-008
+    //fusa:test REQ-UART-008
     fn resolve_uart_read_completion_returns_none_before_either_threshold() {
         let rx = rx_config(10, 1000);
         assert_eq!(resolve_uart_read_completion(&rx, 9, 999), None);
@@ -529,7 +529,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UART-008
+    //fusa:test REQ-UART-008
     fn resolve_uart_read_completion_never_panics_for_any_sampled_input() {
         let configs = [
             rx_config(0, 0),
@@ -552,13 +552,13 @@ mod tests {
     // ── validate_uart_read_request: payload-less-read-only rule ─────────────
 
     #[test]
-    // fusa:test REQ-UART-009
+    //fusa:test REQ-UART-009
     fn validate_uart_read_request_accepts_empty_payload() {
         assert_eq!(validate_uart_read_request(&[]), Ok(()));
     }
 
     #[test]
-    // fusa:test REQ-UART-010
+    //fusa:test REQ-UART-010
     fn validate_uart_read_request_rejects_any_non_empty_payload() {
         for payload in [vec![0x00], vec![0x01, 0x02], vec![0xFF; 16]] {
             assert_eq!(
@@ -569,7 +569,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-UART-010
+    //fusa:test REQ-UART-010
     fn validate_uart_read_request_never_panics_for_any_sampled_input() {
         for len in [0usize, 1, 2, 8, 64] {
             let buf = vec![0x5Au8; len];

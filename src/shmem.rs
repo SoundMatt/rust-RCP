@@ -1,8 +1,8 @@
-// fusa:req REQ-SHM-001
-// fusa:req REQ-SHM-002
-// fusa:req REQ-SHM-003
-// fusa:req REQ-SHM-004
-// fusa:req REQ-SHM-005
+//fusa:req REQ-SHM-001
+//fusa:req REQ-SHM-002
+//fusa:req REQ-SHM-003
+//fusa:req REQ-SHM-004
+//fusa:req REQ-SHM-005
 
 //! Shared-memory transport bridge (intra-host IPC).
 //!
@@ -32,7 +32,7 @@ use crate::RcpError;
 // ── ShmChannel trait ──────────────────────────────────────────────────────────
 
 /// Abstract shared-memory channel for testability.
-// fusa:req REQ-SHM-001
+//fusa:req REQ-SHM-001
 pub trait ShmChannel: Send + Sync {
     fn write(&self, data: &[u8]) -> Result<(), RcpError>;
     fn read(&self, timeout: Option<Duration>) -> Result<Vec<u8>, RcpError>;
@@ -41,7 +41,7 @@ pub trait ShmChannel: Send + Sync {
 // ── In-process ring buffer implementation ─────────────────────────────────────
 
 /// Simple in-process FIFO channel (for tests and integration).
-// fusa:req REQ-SHM-002
+//fusa:req REQ-SHM-002
 pub struct InProcChannel {
     buf: std::sync::Mutex<std::collections::VecDeque<Vec<u8>>>,
     cvar: std::sync::Condvar,
@@ -106,7 +106,7 @@ impl ShmChannel for InProcChannel {
 /// ([`crate::avtp::StreamId`]) rather than the legacy `Zone`.
 ///
 /// The caller must wire `tx` (write) and `rx` (read) channels to the peer process.
-// fusa:req REQ-SHM-003
+//fusa:req REQ-SHM-003
 pub struct ShmBridge {
     local_stream: StreamId,
     tx: Arc<dyn ShmChannel>,
@@ -131,7 +131,7 @@ impl ShmBridge {
     /// ACF_ABB response, verifying it echoes the request's `byte_bus_id` —
     /// the same framing `crate::tlstransport::TlsBridge::send_acf_abb`
     /// uses, over an [`ShmChannel`] pair instead of a TLS stream.
-    // fusa:req REQ-SHM-004
+    //fusa:req REQ-SHM-004
     pub fn send_acf_abb(
         &self,
         msg: &AcfAbbMessage,
@@ -152,7 +152,7 @@ impl ShmBridge {
     }
 
     /// Same as [`Self::send_acf_abb`], for an ACF_GBB request/response pair.
-    // fusa:req REQ-SHM-004
+    //fusa:req REQ-SHM-004
     pub fn send_acf_gbb(
         &self,
         msg: &AcfGbbMessage,
@@ -173,7 +173,7 @@ impl ShmBridge {
     }
 
     /// No-op, matching this module's pre-Milestone-9 behavior.
-    // fusa:req REQ-SHM-005
+    //fusa:req REQ-SHM-005
     pub fn close(&self) -> Result<(), RcpError> {
         Ok(())
     }
@@ -223,8 +223,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SHM-003
-    // fusa:test REQ-SHM-004
+    //fusa:test REQ-SHM-003
+    //fusa:test REQ-SHM-004
     fn shm_bridge_send_acf_abb_ok() {
         let tx = InProcChannel::new() as Arc<dyn ShmChannel>;
         let rx = InProcChannel::new() as Arc<dyn ShmChannel>;
@@ -236,7 +236,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SHM-004
+    //fusa:test REQ-SHM-004
     fn shm_bridge_rejects_echo_back_mismatch() {
         let tx = InProcChannel::new() as Arc<dyn ShmChannel>;
         let rx = InProcChannel::new() as Arc<dyn ShmChannel>;
@@ -247,7 +247,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SHM-004
+    //fusa:test REQ-SHM-004
     fn zero_timeout_rejected() {
         let b = make_bridge();
         let err = b
@@ -257,8 +257,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SHM-001
-    // fusa:test REQ-SHM-002
+    //fusa:test REQ-SHM-001
+    //fusa:test REQ-SHM-002
     fn in_proc_channel_fifo() {
         let ch = InProcChannel::new();
         ch.write(b"first").unwrap();
@@ -268,7 +268,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SHM-002
+    //fusa:test REQ-SHM-002
     fn in_proc_channel_timeout() {
         let ch = InProcChannel::new();
         let err = ch.read(Some(Duration::from_millis(10))).unwrap_err();
@@ -276,7 +276,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SHM-005
+    //fusa:test REQ-SHM-005
     fn close_is_noop() {
         let b = make_bridge();
         assert!(b.close().is_ok());

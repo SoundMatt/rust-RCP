@@ -1,9 +1,9 @@
-// fusa:req REQ-LIN-001
-// fusa:req REQ-LIN-002
-// fusa:req REQ-LIN-003
-// fusa:req REQ-LIN-004
-// fusa:req REQ-LIN-005
-// fusa:req REQ-LIN-006
+//fusa:req REQ-LIN-001
+//fusa:req REQ-LIN-002
+//fusa:req REQ-LIN-003
+//fusa:req REQ-LIN-004
+//fusa:req REQ-LIN-005
+//fusa:req REQ-LIN-006
 
 //! The LIN commander endpoint type (`ep_type 0x06`) — `ROADMAP.md`
 //! Milestone 7 ("Remaining Endpoint Types"), opening checklist bullet: raw
@@ -82,6 +82,32 @@
 //! stub module behind purely to hold one constant — the same resolution
 //! `can.rs`'s own `CAN_FD_MAX_PAYLOAD` used when `canbr.rs` was deleted.
 //!
+//! ## TC18 reconciliation note (§13.7.10)
+//!
+//! TC18 §13.7.10.3 (TC18.txt line 5304) states only that "the Byte Msg
+//! Payload is the payload to be used on the Lin bus", and Figure 38 shows
+//! that payload as one undifferentiated "Lin payload" field followed by
+//! padding — it defines no PID sub-field, no checksum sub-field, and no
+//! per-frame length ceiling of its own. This module's split of the leading
+//! byte into [`LinFrameTransfer::pid`] is therefore a crate-local modeling
+//! convenience that changes no wire byte: `pid` followed by `data` is the
+//! same byte sequence, in the same order, that TC18 calls the Lin payload.
+//! The [`LIN_MAX_DATA`] ceiling is likewise this crate's own (real LIN 2.x)
+//! physical fact, not a TC18 clause.
+//!
+//! Three normative §13.7.10.1 behaviors are **not** implemented here and are
+//! recorded as explicit not-implemented requirement entries rather than
+//! silently omitted: matching each received LIN message against the pending
+//! read request's `byte_msg_payload` under the conditions given by
+//! `evt[2:0]` and replying when `op = 0` (TC18.txt lines 5276-5277); issuing
+//! a trigger once a transmission has been finalized and the configured
+//! trailing time has expired (line 5278); and the cyclic-transmission
+//! pattern built from a repeated trigger request on the endpoint's own
+//! trigger (line 5279). All three are RC-Server run-time endpoint behaviors,
+//! outside this module's codec-only scope. TC18 Table 52's own
+//! functional-config register layout (§13.7.10.2, lines 5287-5298) is
+//! likewise unimplemented — see [`LinFunctionalConfig`].
+//!
 //! ## Relationship to [`crate::regmap`]
 //!
 //! As with every Milestone 4 endpoint-type module, LIN's real
@@ -138,7 +164,7 @@ use crate::RcpError;
 /// comment "Validation against `linbr.rs` (historical — see below for its
 /// outcome)"); stated directly as this module's own constant since
 /// Milestone 9's `linbr` REPLACE cutover deleted that module.
-// fusa:req REQ-LIN-001
+//fusa:req REQ-LIN-001
 pub const LIN_MAX_DATA: usize = 8;
 
 // ── LinFrameTransfer ─────────────────────────────────────────────────────────
@@ -151,7 +177,7 @@ pub const LIN_MAX_DATA: usize = 8;
 /// and for why neither field is parsed or validated beyond the
 /// [`LIN_MAX_DATA`] data-length ceiling.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-// fusa:req REQ-LIN-002
+//fusa:req REQ-LIN-002
 pub struct LinFrameTransfer {
     /// The client-computed PID byte, carried unparsed and unvalidated —
     /// this module performs no parity check or PID derivation of its own.
@@ -165,7 +191,13 @@ pub struct LinFrameTransfer {
 impl LinFrameTransfer {
     /// Encode this transfer to its raw wire representation: the PID byte
     /// followed by `data`, unmodified and unframed.
-    // fusa:req REQ-LIN-002
+    ///
+    /// This is the `byte_msg_payload` TC18 §13.7.10.3 (TC18.txt line 5304)
+    /// calls "the payload to be used on the Lin bus": the bytes are emitted
+    /// verbatim, in supplied order, with nothing inserted, removed, or
+    /// reordered — see this module's doc comment "TC18 reconciliation note".
+    //fusa:req REQ-LIN-002
+    //fusa:req REQ-LIN-007
     pub fn encode(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(1 + self.data.len());
         buf.push(self.pid);
@@ -182,8 +214,8 @@ impl LinFrameTransfer {
     /// when the remaining data would exceed [`LIN_MAX_DATA`] bytes, the same
     /// error variant the legacy `linbr::LinBridge::send` already used for
     /// the same physical ceiling. Never panics for any input.
-    // fusa:req REQ-LIN-003
-    // fusa:req REQ-LIN-004
+    //fusa:req REQ-LIN-003
+    //fusa:req REQ-LIN-004
     pub fn decode(b: &[u8]) -> Result<Self, RcpError> {
         let (pid, data) = b.split_first().ok_or(RcpError::ShortFrame)?;
         if data.len() > LIN_MAX_DATA {
@@ -203,7 +235,7 @@ impl LinFrameTransfer {
 /// a LIN response frame is identified by the request's own PID rather than
 /// carrying a second one of its own.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-// fusa:req REQ-LIN-005
+//fusa:req REQ-LIN-005
 pub struct LinFrameTransferResult {
     /// The data bytes read back off the bus, carried unparsed. Never longer
     /// than [`LIN_MAX_DATA`] bytes.
@@ -213,7 +245,7 @@ pub struct LinFrameTransferResult {
 impl LinFrameTransferResult {
     /// Encode this transfer result to its raw wire representation: `data`,
     /// unmodified and unframed.
-    // fusa:req REQ-LIN-005
+    //fusa:req REQ-LIN-005
     pub fn encode(&self) -> Vec<u8> {
         self.data.clone()
     }
@@ -223,7 +255,7 @@ impl LinFrameTransferResult {
     /// Returns `Err(RcpError::PayloadTooLarge)` for input longer than
     /// [`LIN_MAX_DATA`] bytes; an empty slice is a valid (zero-length) LIN
     /// response and decodes successfully. Never panics for any input.
-    // fusa:req REQ-LIN-005
+    //fusa:req REQ-LIN-005
     pub fn decode(b: &[u8]) -> Result<Self, RcpError> {
         if b.len() > LIN_MAX_DATA {
             return Err(RcpError::PayloadTooLarge);
@@ -240,7 +272,7 @@ impl LinFrameTransferResult {
 /// "Relationship to `crate::regmap`" for why the checklist text names no
 /// LIN-specific configuration content to model here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-LIN-006
+//fusa:req REQ-LIN-006
 pub struct LinFunctionalConfig;
 
 impl LinFunctionalConfig {
@@ -251,7 +283,7 @@ impl LinFunctionalConfig {
     /// This module does not itself call that function — it only shows how a
     /// caller would obtain the matching tag, per this module's doc comment
     /// "Relationship to `crate::regmap`".
-    // fusa:req REQ-LIN-006
+    //fusa:req REQ-LIN-006
     pub fn layer_tag(&self) -> crate::regmap::PerEpTypeFunctionalConfig {
         crate::regmap::PerEpTypeFunctionalConfig::new(crate::regmap::EndpointType::Lin)
     }
@@ -264,7 +296,7 @@ mod tests {
     // ── LIN_MAX_DATA ─────────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-LIN-001
+    //fusa:test REQ-LIN-001
     fn lin_max_data_is_eight() {
         assert_eq!(LIN_MAX_DATA, 8);
     }
@@ -272,7 +304,7 @@ mod tests {
     // ── LinFrameTransfer: round-trip / never-panic ──────────────────────────
 
     #[test]
-    // fusa:test REQ-LIN-002
+    //fusa:test REQ-LIN-002
     fn lin_frame_transfer_round_trips_through_encode_decode() {
         for (pid, data) in [
             (0x00u8, vec![]),
@@ -291,13 +323,46 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIN-003
+    //fusa:test REQ-LIN-007
+    fn lin_byte_msg_payload_is_carried_verbatim_onto_the_bus() {
+        // TC18 §13.7.10.3 (TC18.txt line 5304): "The Byte Msg Payload is the
+        // payload to be used on the Lin bus." Figure 38's own on-wire example
+        // (line 5305) carries three payload bytes with no PID/checksum
+        // sub-structure and no length/format byte of its own, so the encoded
+        // form must be byte-for-byte identical to the supplied payload.
+        //
+        // Literal payload: LIN 2.x diagnostic master-request frame identifier
+        // 0x3C followed by three data bytes.
+        const PAYLOAD: [u8; 4] = [0x3C, 0x01, 0x02, 0x03];
+
+        let transfer = LinFrameTransfer {
+            pid: PAYLOAD[0],
+            data: PAYLOAD[1..].to_vec(),
+        };
+        assert_eq!(transfer.encode(), PAYLOAD.to_vec());
+
+        let decoded = LinFrameTransfer::decode(&PAYLOAD).unwrap();
+        assert_eq!(decoded.pid, 0x3C);
+        assert_eq!(decoded.data, vec![0x01, 0x02, 0x03]);
+
+        // Nothing is appended (no checksum byte is synthesised) even at the
+        // full LIN 2.x data ceiling: 1 payload-leading byte + 8 data bytes.
+        let full = LinFrameTransfer {
+            pid: 0x3C,
+            data: vec![0xA5; LIN_MAX_DATA],
+        };
+        assert_eq!(full.encode().len(), 9);
+        assert_eq!(&full.encode()[1..], &[0xA5u8; LIN_MAX_DATA][..]);
+    }
+
+    #[test]
+    //fusa:test REQ-LIN-003
     fn lin_frame_transfer_decode_rejects_empty_input() {
         assert_eq!(LinFrameTransfer::decode(&[]), Err(RcpError::ShortFrame));
     }
 
     #[test]
-    // fusa:test REQ-LIN-004
+    //fusa:test REQ-LIN-004
     fn lin_frame_transfer_decode_rejects_data_longer_than_lin_max_data() {
         let mut buf = vec![0x00u8]; // pid
         buf.extend(vec![0xAAu8; LIN_MAX_DATA + 1]);
@@ -308,7 +373,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIN-004
+    //fusa:test REQ-LIN-004
     fn lin_frame_transfer_decode_accepts_data_at_exactly_lin_max_data() {
         let mut buf = vec![0x00u8]; // pid
         buf.extend(vec![0xAAu8; LIN_MAX_DATA]);
@@ -317,7 +382,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIN-002
+    //fusa:test REQ-LIN-002
     fn lin_frame_transfer_decode_never_panics_for_any_sampled_input() {
         for len in [0usize, 1, 2, 9, 64] {
             let buf = vec![0x5Au8; len];
@@ -328,7 +393,7 @@ mod tests {
     // ── LinFrameTransferResult: round-trip / never-panic ────────────────────
 
     #[test]
-    // fusa:test REQ-LIN-005
+    //fusa:test REQ-LIN-005
     fn lin_frame_transfer_result_round_trips_through_encode_decode() {
         for data in [vec![], vec![0xFF], vec![0x01, 0x02, 0x03]] {
             let result = LinFrameTransferResult { data: data.clone() };
@@ -342,7 +407,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIN-005
+    //fusa:test REQ-LIN-005
     fn lin_frame_transfer_result_decode_rejects_longer_than_lin_max_data() {
         let buf = vec![0xAAu8; LIN_MAX_DATA + 1];
         assert_eq!(
@@ -352,7 +417,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIN-005
+    //fusa:test REQ-LIN-005
     fn lin_frame_transfer_result_decode_accepts_exactly_lin_max_data() {
         let buf = vec![0xAAu8; LIN_MAX_DATA];
         assert_eq!(
@@ -362,7 +427,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIN-005
+    //fusa:test REQ-LIN-005
     fn lin_frame_transfer_result_decode_never_panics_for_any_sampled_input() {
         for len in [0usize, 1, 5, 32] {
             let buf = vec![0xA5u8; len];
@@ -373,7 +438,7 @@ mod tests {
     // ── LinFunctionalConfig / layer_tag ─────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-LIN-006
+    //fusa:test REQ-LIN-006
     fn lin_functional_config_layer_tag_matches_ep_type_lin() {
         let functional = LinFunctionalConfig;
         let generic = crate::regmap::PerEpConfigBlock::new(crate::regmap::EndpointType::Lin);
@@ -389,7 +454,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LIN-006
+    //fusa:test REQ-LIN-006
     fn lin_functional_config_layer_tag_rejects_mismatched_ep_type() {
         let functional = LinFunctionalConfig;
         let generic = crate::regmap::PerEpConfigBlock::new(crate::regmap::EndpointType::Spi);

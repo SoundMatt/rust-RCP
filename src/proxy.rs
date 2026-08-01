@@ -1,9 +1,9 @@
-// fusa:req REQ-PROXY-001
-// fusa:req REQ-PROXY-002
-// fusa:req REQ-PROXY-003
-// fusa:req REQ-PROXY-004
-// fusa:req REQ-PROXY-005
-// fusa:req REQ-PROXY-006
+//fusa:req REQ-PROXY-001
+//fusa:req REQ-PROXY-002
+//fusa:req REQ-PROXY-003
+//fusa:req REQ-PROXY-004
+//fusa:req REQ-PROXY-005
+//fusa:req REQ-PROXY-006
 
 //! Transparent proxy endpoint — delegates to an interchangeable inner
 //! endpoint, allowing hot-swap without changing the call site.
@@ -26,7 +26,7 @@ use crate::RcpError;
 // ── ProxyEndpoint ─────────────────────────────────────────────────────────────
 
 /// A proxy that forwards all calls to a replaceable inner endpoint.
-// fusa:req REQ-PROXY-001
+//fusa:req REQ-PROXY-001
 pub struct ProxyEndpoint {
     ep_type: EndpointType,
     inner: RwLock<Option<Arc<dyn Endpoint>>>,
@@ -34,7 +34,7 @@ pub struct ProxyEndpoint {
 
 impl ProxyEndpoint {
     /// Create a proxy backed by `inner`.
-    // fusa:req REQ-PROXY-002
+    //fusa:req REQ-PROXY-002
     pub fn new(inner: Arc<dyn Endpoint>) -> Self {
         let ep_type = inner.ep_type();
         ProxyEndpoint {
@@ -44,13 +44,13 @@ impl ProxyEndpoint {
     }
 
     /// Replace the inner endpoint atomically.
-    // fusa:req REQ-PROXY-005
+    //fusa:req REQ-PROXY-005
     pub fn swap(&self, new_inner: Arc<dyn Endpoint>) {
         *self.inner.write().unwrap() = Some(new_inner);
     }
 
     /// Detach the inner endpoint; subsequent calls return `Err(RcpError::NotConnected)`.
-    // fusa:req REQ-PROXY-006
+    //fusa:req REQ-PROXY-006
     pub fn detach(&self) {
         *self.inner.write().unwrap() = None;
     }
@@ -61,7 +61,7 @@ impl Endpoint for ProxyEndpoint {
         self.ep_type
     }
 
-    // fusa:req REQ-PROXY-003
+    //fusa:req REQ-PROXY-003
     fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
         let guard = self.inner.read().unwrap();
         match guard.as_ref() {
@@ -70,7 +70,7 @@ impl Endpoint for ProxyEndpoint {
         }
     }
 
-    // fusa:req REQ-PROXY-004
+    //fusa:req REQ-PROXY-004
     fn write(&self, payload: &[u8]) -> Result<(), RcpError> {
         let guard = self.inner.read().unwrap();
         match guard.as_ref() {
@@ -93,8 +93,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PROXY-001
-    // fusa:test REQ-PROXY-003
+    //fusa:test REQ-PROXY-001
+    //fusa:test REQ-PROXY-003
     fn forwards_calls_to_inner() {
         let proxy = ProxyEndpoint::new(ok_ep(EndpointType::Gpio));
         proxy.write(b"x").unwrap();
@@ -102,14 +102,14 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PROXY-002
+    //fusa:test REQ-PROXY-002
     fn ep_type_matches_original_inner() {
         let proxy = ProxyEndpoint::new(ok_ep(EndpointType::Adc));
         assert_eq!(proxy.ep_type(), EndpointType::Adc);
     }
 
     #[test]
-    // fusa:test REQ-PROXY-005
+    //fusa:test REQ-PROXY-005
     fn swap_replaces_inner() {
         let proxy = ProxyEndpoint::new(ok_ep(EndpointType::Gpio));
         // Detach-and-reattach a fresh endpoint to observe the swap taking
@@ -121,7 +121,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PROXY-006
+    //fusa:test REQ-PROXY-006
     fn detach_returns_not_connected() {
         let proxy = ProxyEndpoint::new(ok_ep(EndpointType::Gpio));
         proxy.detach();
@@ -130,14 +130,14 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PROXY-004
+    //fusa:test REQ-PROXY-004
     fn read_forwarded() {
         let proxy = ProxyEndpoint::new(ok_ep(EndpointType::Gpio));
         proxy.read(4).unwrap();
     }
 
     #[test]
-    // fusa:test REQ-PROXY-006
+    //fusa:test REQ-PROXY-006
     fn read_detached_returns_not_connected() {
         let proxy = ProxyEndpoint::new(ok_ep(EndpointType::Gpio));
         proxy.detach();

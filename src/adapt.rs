@@ -1,14 +1,14 @@
-// fusa:req REQ-ADAPT-001
-// fusa:req REQ-ADAPT-002
-// fusa:req REQ-ADAPT-003
-// fusa:req REQ-ADAPT-004
-// fusa:req REQ-ADAPT-005
-// fusa:req REQ-ADAPT-006
-// fusa:req REQ-ADAPT-007
-// fusa:req REQ-ADAPT-008
-// fusa:req REQ-ADAPT-009
-// fusa:req REQ-ADAPT-010
-// fusa:req REQ-ADAPT-011
+//fusa:req REQ-ADAPT-001
+//fusa:req REQ-ADAPT-002
+//fusa:req REQ-ADAPT-003
+//fusa:req REQ-ADAPT-004
+//fusa:req REQ-ADAPT-005
+//fusa:req REQ-ADAPT-006
+//fusa:req REQ-ADAPT-007
+//fusa:req REQ-ADAPT-008
+//fusa:req REQ-ADAPT-009
+//fusa:req REQ-ADAPT-010
+//fusa:req REQ-ADAPT-011
 
 //! Adapter layer — converts between RCP and external protocol representations.
 //!
@@ -118,7 +118,7 @@ use crate::RcpError;
 
 /// Converts between an external message format `M` and endpoint payload
 /// bytes.
-// fusa:req REQ-ADAPT-001
+//fusa:req REQ-ADAPT-001
 pub trait Adapter<M>: Send + Sync {
     /// Convert an external message to endpoint write-payload bytes.
     fn to_write_payload(&self, msg: M) -> Result<Vec<u8>, RcpError>;
@@ -130,7 +130,7 @@ pub trait Adapter<M>: Send + Sync {
 
 /// Endpoint wrapper that adapts an external message type `M` to/from
 /// endpoint payload bytes.
-// fusa:req REQ-ADAPT-002
+//fusa:req REQ-ADAPT-002
 pub struct AdaptEndpoint<M> {
     inner: Arc<dyn Endpoint>,
     adapter: Arc<dyn Adapter<M>>,
@@ -145,7 +145,7 @@ impl<M: Send + Sync + 'static> AdaptEndpoint<M> {
     /// to `read_size` bytes and adapt the response — see this module's doc
     /// comment for why this is a write-then-read round trip rather than a
     /// single `send`-shaped call.
-    // fusa:req REQ-ADAPT-003
+    //fusa:req REQ-ADAPT-003
     pub fn send_msg(&self, msg: M, read_size: u16) -> Result<M, RcpError> {
         let payload = self.adapter.to_write_payload(msg)?;
         self.inner.write(&payload)?;
@@ -157,7 +157,7 @@ impl<M: Send + Sync + 'static> AdaptEndpoint<M> {
 // ── Passthrough adapter ───────────────────────────────────────────────────────
 
 /// Identity adapter for `Vec<u8>` → `Vec<u8>` testing.
-// fusa:req REQ-ADAPT-004
+//fusa:req REQ-ADAPT-004
 pub struct PassthroughAdapter;
 
 impl Adapter<Vec<u8>> for PassthroughAdapter {
@@ -185,7 +185,7 @@ const ENDPOINT_ID_SEP: char = '.';
 /// 16 lowercase hex digits, zero-padded so [`parse_endpoint_id`] never has
 /// to guess where it ends; `byte_bus_id` follows in plain decimal, needing
 /// no padding since [`ENDPOINT_ID_SEP`] already marks where it starts.
-// fusa:req REQ-ADAPT-011
+//fusa:req REQ-ADAPT-011
 pub fn format_endpoint_id(stream_id: StreamId, byte_bus_id: u16) -> String {
     format!(
         "{:016x}{}{}",
@@ -202,7 +202,7 @@ pub fn format_endpoint_id(stream_id: StreamId, byte_bus_id: u16) -> String {
 /// [`ENDPOINT_ID_SEP`]-separated pair of a 16-hex-digit `stream_id` and a
 /// decimal `byte_bus_id` in `0..=u16::MAX`. Never panics on malformed
 /// input.
-// fusa:req REQ-ADAPT-011
+//fusa:req REQ-ADAPT-011
 pub fn parse_endpoint_id(id: &str) -> Result<(StreamId, u16), RcpError> {
     let (sid_hex, bus_dec) = id
         .split_once(ENDPOINT_ID_SEP)
@@ -239,7 +239,7 @@ pub fn parse_endpoint_id(id: &str) -> Result<(StreamId, u16), RcpError> {
 /// analog for (`evt`, `hs`, `cs`, `transaction_num`, `ms`, `pad`, `mtv`) is
 /// left at its zero default; [`crate::mock::RcServer::handle_abb`]'s
 /// dispatch logic does not consult any of them.
-// fusa:req REQ-ADAPT-007
+//fusa:req REQ-ADAPT-007
 pub fn from_message(msg: &Message) -> Result<(StreamId, AcfAbbMessage), RcpError> {
     let (stream_id, byte_bus_id) = parse_endpoint_id(&msg.id)?;
     let op = match msg.meta.get("rcp.op").map(String::as_str) {
@@ -279,7 +279,7 @@ pub fn from_message(msg: &Message) -> Result<(StreamId, AcfAbbMessage), RcpError
 /// (`"write"`/`"read"`), mirroring [`from_message`]'s own request-side key,
 /// so a caller can confirm which operation the RC Server actually
 /// performed.
-// fusa:req REQ-ADAPT-006
+//fusa:req REQ-ADAPT-006
 pub fn to_message(stream_id: StreamId, resp: &AcfAbbMessage) -> Message {
     let mut meta = std::collections::BTreeMap::new();
     meta.insert(
@@ -305,7 +305,7 @@ pub fn to_message(stream_id: StreamId, resp: &AcfAbbMessage) -> Message {
 /// share one addressed-response conversion (see this module's provenance
 /// note on why the retired `Status`/`Response` split collapsed to one
 /// shape).
-// fusa:req REQ-ADAPT-008
+//fusa:req REQ-ADAPT-008
 pub fn response_to_message(stream_id: StreamId, resp: &AcfAbbMessage) -> Message {
     to_message(stream_id, resp)
 }
@@ -446,7 +446,7 @@ impl crate::relay::Caller for RcpAdapter {
     /// path — flagged per Guiding Principle 5 rather than asserted as a
     /// closed question, since that absence has not been exhaustively
     /// confirmed against the rest of the spec.
-    // fusa:req REQ-ADAPT-010
+    //fusa:req REQ-ADAPT-010
     async fn call(&self, ctx: Context, req: Message) -> Result<Message, crate::relay::Error> {
         if self.closed.load(Ordering::SeqCst) {
             return Err(crate::relay::Error::Closed);
@@ -500,8 +500,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADAPT-001
-    // fusa:test REQ-ADAPT-004
+    //fusa:test REQ-ADAPT-001
+    //fusa:test REQ-ADAPT-004
     fn passthrough_adapter_identity() {
         let ep = AdaptEndpoint::new(ok_endpoint(), Arc::new(PassthroughAdapter));
         let out = ep.send_msg(b"hi".to_vec(), 8).unwrap();
@@ -509,7 +509,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADAPT-002
+    //fusa:test REQ-ADAPT-002
     fn ep_type_forwarded() {
         let inner = ok_endpoint();
         let ep = AdaptEndpoint::new(Arc::clone(&inner), Arc::new(PassthroughAdapter));
@@ -517,7 +517,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADAPT-003
+    //fusa:test REQ-ADAPT-003
     fn adapter_error_propagated() {
         struct FailAdapter;
         impl Adapter<Vec<u8>> for FailAdapter {
@@ -534,7 +534,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADAPT-005
+    //fusa:test REQ-ADAPT-005
     fn passthrough_preserves_payload() {
         let ep = AdaptEndpoint::new(ok_endpoint(), Arc::new(PassthroughAdapter));
         let out = ep.send_msg(b"data".to_vec(), 8).unwrap();
@@ -544,7 +544,7 @@ mod tests {
     // ── endpoint-id encoding ───────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-ADAPT-011
+    //fusa:test REQ-ADAPT-011
     fn endpoint_id_roundtrips() {
         let sid = stream(0x1234);
         let encoded = format_endpoint_id(sid, 0x07FF);
@@ -554,7 +554,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADAPT-011
+    //fusa:test REQ-ADAPT-011
     fn parse_endpoint_id_rejects_malformed_input() {
         assert_eq!(
             parse_endpoint_id("not-an-address").unwrap_err(),
@@ -573,7 +573,7 @@ mod tests {
     // ── to_message / from_message / response_to_message (§15.7.5) ────────────
 
     #[test]
-    // fusa:test REQ-ADAPT-006
+    //fusa:test REQ-ADAPT-006
     fn to_message_maps_address_op_and_payload() {
         let sid = stream(7);
         let resp = AcfAbbMessage {
@@ -592,7 +592,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADAPT-007
+    //fusa:test REQ-ADAPT-007
     fn from_message_defaults_op_from_payload_emptiness() {
         let write_msg = Message::new(Protocol::Rcp, format_endpoint_id(stream(1), 3), vec![0xAA]);
         let (_, write_req) = from_message(&write_msg).unwrap();
@@ -604,7 +604,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADAPT-007
+    //fusa:test REQ-ADAPT-007
     fn from_message_honors_explicit_op_and_read_size_meta() {
         let mut msg = Message::new(Protocol::Rcp, format_endpoint_id(stream(1), 3), vec![]);
         msg.meta.insert("rcp.op".to_string(), "read".to_string());
@@ -618,7 +618,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADAPT-007
+    //fusa:test REQ-ADAPT-007
     fn from_message_rejects_unknown_op_value() {
         let mut msg = Message::new(Protocol::Rcp, format_endpoint_id(stream(1), 3), vec![]);
         msg.meta
@@ -627,14 +627,14 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADAPT-007
+    //fusa:test REQ-ADAPT-007
     fn from_message_rejects_malformed_id() {
         let msg = Message::new(Protocol::Rcp, "not-an-address", vec![]);
         assert_eq!(from_message(&msg).unwrap_err(), RcpError::InvalidParameter);
     }
 
     #[test]
-    // fusa:test REQ-ADAPT-008
+    //fusa:test REQ-ADAPT-008
     fn response_to_message_matches_to_message() {
         let sid = stream(2);
         let resp = AcfAbbMessage {
@@ -655,9 +655,9 @@ mod tests {
     // ── adapt() (§10.3) ────────────────────────────────────────────────────
 
     #[tokio::test]
-    // fusa:test REQ-ADAPT-009
-    // fusa:test REQ-ADAPT-010
-    // fusa:test REQ-RELAY-008
+    //fusa:test REQ-ADAPT-009
+    //fusa:test REQ-ADAPT-010
+    //fusa:test REQ-RELAY-008
     async fn adapt_call_write_then_read_round_trips_payload() {
         let sid = stream(11);
         let server = server_with_endpoint(sid, 4, vec![0u8; 8]);
@@ -679,7 +679,7 @@ mod tests {
     }
 
     #[tokio::test]
-    // fusa:test REQ-ADAPT-009
+    //fusa:test REQ-ADAPT-009
     async fn adapt_send_discards_response() {
         let sid = stream(12);
         let server = server_with_endpoint(sid, 4, vec![0u8; 8]);
@@ -691,7 +691,7 @@ mod tests {
     }
 
     #[tokio::test]
-    // fusa:test REQ-ADAPT-009
+    //fusa:test REQ-ADAPT-009
     async fn adapt_send_invalid_address_is_not_connected() {
         let sid = stream(13);
         let server = server_with_endpoint(sid, 4, vec![0u8; 8]);
@@ -704,7 +704,7 @@ mod tests {
     }
 
     #[tokio::test]
-    // fusa:test REQ-ADAPT-009
+    //fusa:test REQ-ADAPT-009
     async fn adapt_call_unknown_endpoint_is_not_connected() {
         let sid = stream(14);
         let server = server_with_endpoint(sid, 4, vec![0u8; 8]);
@@ -716,7 +716,7 @@ mod tests {
     }
 
     #[tokio::test]
-    // fusa:test REQ-ADAPT-009
+    //fusa:test REQ-ADAPT-009
     async fn adapt_call_already_expired_context_is_timeout() {
         let sid = stream(15);
         let server = server_with_endpoint(sid, 4, vec![0u8; 8]);
@@ -729,7 +729,7 @@ mod tests {
     }
 
     #[tokio::test]
-    // fusa:test REQ-ADAPT-009
+    //fusa:test REQ-ADAPT-009
     async fn adapt_subscribe_returns_immediately_closed_channel() {
         let sid = stream(16);
         let server = server_with_endpoint(sid, 4, vec![0u8; 8]);
@@ -741,7 +741,7 @@ mod tests {
     }
 
     #[tokio::test]
-    // fusa:test REQ-ADAPT-009
+    //fusa:test REQ-ADAPT-009
     async fn adapt_close_then_call_is_closed() {
         let sid = stream(17);
         let server = server_with_endpoint(sid, 4, vec![0u8; 8]);
@@ -754,8 +754,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ADAPT-009
-    // fusa:test REQ-RELAY-007
+    //fusa:test REQ-ADAPT-009
+    //fusa:test REQ-RELAY-007
     fn adapt_protocol_is_rcp() {
         let sid = stream(18);
         let server = server_with_endpoint(sid, 4, vec![0u8; 8]);

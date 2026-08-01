@@ -1,10 +1,10 @@
-// fusa:req REQ-AUTHZ-001
-// fusa:req REQ-AUTHZ-002
-// fusa:req REQ-AUTHZ-003
-// fusa:req REQ-AUTHZ-004
-// fusa:req REQ-AUTHZ-005
-// fusa:req REQ-AUTHZ-006
-// fusa:req REQ-AUTHZ-007
+//fusa:req REQ-AUTHZ-001
+//fusa:req REQ-AUTHZ-002
+//fusa:req REQ-AUTHZ-003
+//fusa:req REQ-AUTHZ-004
+//fusa:req REQ-AUTHZ-005
+//fusa:req REQ-AUTHZ-006
+//fusa:req REQ-AUTHZ-007
 
 //! Authorization policy enforcement over an [`Endpoint`].
 //!
@@ -38,7 +38,7 @@ use crate::RcpError;
 
 /// Authorization policy for an endpoint: an allowlist of
 /// `(ep_type, is_write)` pairs. Empty = deny all.
-// fusa:req REQ-AUTHZ-001
+//fusa:req REQ-AUTHZ-001
 #[derive(Clone, Debug, Default)]
 pub struct Policy {
     pub allowed: HashSet<(u8, bool)>,
@@ -50,7 +50,7 @@ const ALL_EP_TYPE_BYTES: std::ops::RangeInclusive<u8> = 0x01..=0x0D;
 
 impl Policy {
     /// Allow every recognized endpoint type, for both reads and writes.
-    // fusa:req REQ-AUTHZ-002
+    //fusa:req REQ-AUTHZ-002
     pub fn allow_all() -> Self {
         let mut set = HashSet::new();
         for b in ALL_EP_TYPE_BYTES {
@@ -61,7 +61,7 @@ impl Policy {
     }
 
     /// Deny everything (closed policy).
-    // fusa:req REQ-AUTHZ-003
+    //fusa:req REQ-AUTHZ-003
     pub fn deny_all() -> Self {
         Policy::default()
     }
@@ -74,7 +74,7 @@ impl Policy {
 // ── AuthzEndpoint ──────────────────────────────────────────────────────────────
 
 /// Policy-enforcing endpoint wrapper.
-// fusa:req REQ-AUTHZ-004
+//fusa:req REQ-AUTHZ-004
 pub struct AuthzEndpoint {
     inner: Arc<dyn Endpoint>,
     policy: RwLock<Policy>,
@@ -89,7 +89,7 @@ impl AuthzEndpoint {
     }
 
     /// Replace the active policy atomically.
-    // fusa:req REQ-AUTHZ-006
+    //fusa:req REQ-AUTHZ-006
     pub fn set_policy(&self, policy: Policy) {
         *self.policy.write().unwrap() = policy;
     }
@@ -105,7 +105,7 @@ impl Endpoint for AuthzEndpoint {
         self.inner.ep_type()
     }
 
-    // fusa:req REQ-AUTHZ-005
+    //fusa:req REQ-AUTHZ-005
     fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
         let ep_type = self.inner.ep_type();
         if !self.policy.read().unwrap().is_allowed(ep_type, false) {
@@ -114,8 +114,8 @@ impl Endpoint for AuthzEndpoint {
         self.inner.read(read_size)
     }
 
-    // fusa:req REQ-AUTHZ-005
-    // fusa:req REQ-AUTHZ-007
+    //fusa:req REQ-AUTHZ-005
+    //fusa:req REQ-AUTHZ-007
     fn write(&self, payload: &[u8]) -> Result<(), RcpError> {
         let ep_type = self.inner.ep_type();
         if !self.policy.read().unwrap().is_allowed(ep_type, true) {
@@ -138,9 +138,9 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-AUTHZ-002
-    // fusa:test REQ-AUTHZ-004
-    // fusa:test REQ-AUTHZ-005
+    //fusa:test REQ-AUTHZ-002
+    //fusa:test REQ-AUTHZ-004
+    //fusa:test REQ-AUTHZ-005
     fn allow_all_permits_any_call() {
         let a = AuthzEndpoint::new(inner(EndpointType::Gpio), Policy::allow_all());
         a.write(b"x").unwrap();
@@ -148,8 +148,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-AUTHZ-003
-    // fusa:test REQ-AUTHZ-005
+    //fusa:test REQ-AUTHZ-003
+    //fusa:test REQ-AUTHZ-005
     fn deny_all_blocks_every_call() {
         let a = AuthzEndpoint::new(inner(EndpointType::Gpio), Policy::deny_all());
         let err = a.read(4).unwrap_err();
@@ -158,8 +158,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-AUTHZ-001
-    // fusa:test REQ-AUTHZ-005
+    //fusa:test REQ-AUTHZ-001
+    //fusa:test REQ-AUTHZ-005
     fn partial_allowlist_enforced_by_request_type() {
         let mut set = HashSet::new();
         set.insert((EndpointType::Gpio.to_u8(), false)); // reads only
@@ -172,7 +172,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-AUTHZ-001
+    //fusa:test REQ-AUTHZ-001
     fn partial_allowlist_enforced_by_ep_type() {
         let mut set = HashSet::new();
         set.insert((EndpointType::Adc.to_u8(), false));
@@ -184,7 +184,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-AUTHZ-006
+    //fusa:test REQ-AUTHZ-006
     fn set_policy_takes_effect_immediately() {
         let a = AuthzEndpoint::new(inner(EndpointType::Gpio), Policy::deny_all());
         a.write(b"x").unwrap_err();
@@ -193,7 +193,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-AUTHZ-007
+    //fusa:test REQ-AUTHZ-007
     fn ep_type_forwarded() {
         let a = AuthzEndpoint::new(inner(EndpointType::Gpio), Policy::allow_all());
         assert_eq!(a.ep_type(), EndpointType::Gpio);

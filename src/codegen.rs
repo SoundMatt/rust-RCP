@@ -1,7 +1,7 @@
-// fusa:req REQ-CG-001
-// fusa:req REQ-CG-002
-// fusa:req REQ-CG-003
-// fusa:req REQ-CG-004
+//fusa:req REQ-CG-001
+//fusa:req REQ-CG-002
+//fusa:req REQ-CG-003
+//fusa:req REQ-CG-004
 
 //! Stub-code generator — emits Rust type definitions from a JSON schema.
 //!
@@ -12,7 +12,7 @@ use std::collections::HashMap;
 // ── Schema types ──────────────────────────────────────────────────────────────
 
 /// Simple field types supported by the code generator.
-// fusa:req REQ-CG-001
+//fusa:req REQ-CG-001
 #[derive(Debug, Clone, PartialEq)]
 pub enum FieldType {
     U8,
@@ -39,7 +39,7 @@ impl FieldType {
 }
 
 /// A named field in a generated struct.
-// fusa:req REQ-CG-002
+//fusa:req REQ-CG-002
 #[derive(Debug, Clone)]
 pub struct Field {
     pub name: String,
@@ -48,7 +48,7 @@ pub struct Field {
 }
 
 /// A schema for a generated struct.
-// fusa:req REQ-CG-002
+//fusa:req REQ-CG-002
 #[derive(Debug, Clone)]
 pub struct StructSchema {
     pub name: String,
@@ -58,7 +58,7 @@ pub struct StructSchema {
 // ── Code generator ────────────────────────────────────────────────────────────
 
 /// Generates Rust struct definitions from a list of schemas.
-// fusa:req REQ-CG-003
+//fusa:req REQ-CG-003
 pub fn generate_structs(schemas: &[StructSchema]) -> String {
     let mut out = String::new();
     for schema in schemas {
@@ -82,7 +82,7 @@ pub fn generate_structs(schemas: &[StructSchema]) -> String {
 /// Parse a simple JSON-like schema definition map into [`StructSchema`] list.
 ///
 /// Accepts: `{"StructName": {"field": "type", "opt_field?": "type"}}`
-// fusa:req REQ-CG-004
+//fusa:req REQ-CG-004
 pub fn parse_schema(map: &HashMap<String, HashMap<String, String>>) -> Vec<StructSchema> {
     let mut schemas = Vec::new();
     let mut names: Vec<&String> = map.keys().collect();
@@ -133,7 +133,7 @@ mod tests {
     use std::collections::HashMap;
 
     #[test]
-    // fusa:test REQ-CG-001
+    //fusa:test REQ-CG-001
     fn field_type_rust_names() {
         assert_eq!(FieldType::U8.rust_type(), "u8");
         assert_eq!(FieldType::Bool.rust_type(), "bool");
@@ -141,7 +141,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CG-003
+    //fusa:test REQ-CG-003
     fn generate_empty_struct() {
         let schema = StructSchema {
             name: "Empty".into(),
@@ -152,8 +152,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CG-002
-    // fusa:test REQ-CG-003
+    //fusa:test REQ-CG-002
+    //fusa:test REQ-CG-003
     fn generate_struct_with_optional_field() {
         let schema = StructSchema {
             name: "Cmd".into(),
@@ -176,7 +176,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CG-004
+    //fusa:test REQ-CG-004
     fn parse_schema_roundtrip() {
         let mut map = HashMap::new();
         let mut fields = HashMap::new();

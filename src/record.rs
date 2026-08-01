@@ -1,8 +1,8 @@
-// fusa:req REQ-REC-001
-// fusa:req REQ-REC-002
-// fusa:req REQ-REC-003
-// fusa:req REQ-REC-004
-// fusa:req REQ-REC-005
+//fusa:req REQ-REC-001
+//fusa:req REQ-REC-002
+//fusa:req REQ-REC-003
+//fusa:req REQ-REC-004
+//fusa:req REQ-REC-005
 
 //! Call recorder for replay, audit trails, and regression testing, wrapping
 //! an [`Endpoint`].
@@ -29,7 +29,7 @@ use crate::RcpError;
 // ── Record entry ──────────────────────────────────────────────────────────────
 
 /// A single recorded interaction.
-// fusa:req REQ-REC-001
+//fusa:req REQ-REC-001
 #[derive(Clone, Debug)]
 pub enum Entry {
     Read {
@@ -65,7 +65,7 @@ impl Entry {
 // ── RecordEndpoint ─────────────────────────────────────────────────────────────
 
 /// Endpoint wrapper that records every read/write call and its result.
-// fusa:req REQ-REC-002
+//fusa:req REQ-REC-002
 pub struct RecordEndpoint {
     inner: Arc<dyn Endpoint>,
     log: Mutex<Vec<Entry>>,
@@ -80,13 +80,13 @@ impl RecordEndpoint {
     }
 
     /// All recorded entries in chronological order.
-    // fusa:req REQ-REC-003
+    //fusa:req REQ-REC-003
     pub fn entries(&self) -> Vec<Entry> {
         self.log.lock().unwrap().clone()
     }
 
     /// Clear the recorded log.
-    // fusa:req REQ-REC-004
+    //fusa:req REQ-REC-004
     pub fn clear(&self) {
         self.log.lock().unwrap().clear();
     }
@@ -97,7 +97,7 @@ impl Endpoint for RecordEndpoint {
         self.inner.ep_type()
     }
 
-    // fusa:req REQ-REC-005
+    //fusa:req REQ-REC-005
     fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
         let result = self.inner.read(read_size);
         self.log.lock().unwrap().push(Entry::Read {
@@ -108,7 +108,7 @@ impl Endpoint for RecordEndpoint {
         result
     }
 
-    // fusa:req REQ-REC-005
+    //fusa:req REQ-REC-005
     fn write(&self, payload: &[u8]) -> Result<(), RcpError> {
         let result = self.inner.write(payload);
         self.log.lock().unwrap().push(Entry::Write {
@@ -135,8 +135,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-REC-002
-    // fusa:test REQ-REC-005
+    //fusa:test REQ-REC-002
+    //fusa:test REQ-REC-005
     fn records_successful_writes() {
         let r = rec();
         for i in 1u8..=3 {
@@ -151,7 +151,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-REC-005
+    //fusa:test REQ-REC-005
     fn records_errors() {
         struct AlwaysFail;
         impl Endpoint for AlwaysFail {
@@ -173,7 +173,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-REC-004
+    //fusa:test REQ-REC-004
     fn clear_empties_log() {
         let r = rec();
         r.write(b"x").unwrap();
@@ -182,7 +182,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-REC-001
+    //fusa:test REQ-REC-001
     fn entry_timestamp_is_recent() {
         let r = rec();
         r.write(b"x").unwrap();
@@ -192,7 +192,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-REC-003
+    //fusa:test REQ-REC-003
     fn entries_in_order() {
         let r = rec();
         for i in 1u8..=5 {

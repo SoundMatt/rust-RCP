@@ -1,24 +1,24 @@
-// fusa:req REQ-DISC-001
-// fusa:req REQ-DISC-002
-// fusa:req REQ-DISC-003
-// fusa:req REQ-DISC-004
-// fusa:req REQ-DISC-005
-// fusa:req REQ-DISC-006
-// fusa:req REQ-DISC-007
-// fusa:req REQ-DISC-008
-// fusa:req REQ-DISC-009
-// fusa:req REQ-DISC-010
-// fusa:req REQ-DISC-011
-// fusa:req REQ-DISC-012
-// fusa:req REQ-DISC-013
-// fusa:req REQ-DISC-014
-// fusa:req REQ-DISC-015
-// fusa:req REQ-DISC-016
-// fusa:req REQ-DISC-017
-// fusa:req REQ-DISC-018
-// fusa:req REQ-DISC-019
-// fusa:req REQ-DISC-020
-// fusa:req REQ-DISC-021
+//fusa:req REQ-DISC-001
+//fusa:req REQ-DISC-002
+//fusa:req REQ-DISC-003
+//fusa:req REQ-DISC-004
+//fusa:req REQ-DISC-005
+//fusa:req REQ-DISC-006
+//fusa:req REQ-DISC-007
+//fusa:req REQ-DISC-008
+//fusa:req REQ-DISC-009
+//fusa:req REQ-DISC-010
+//fusa:req REQ-DISC-011
+//fusa:req REQ-DISC-012
+//fusa:req REQ-DISC-013
+//fusa:req REQ-DISC-014
+//fusa:req REQ-DISC-015
+//fusa:req REQ-DISC-016
+//fusa:req REQ-DISC-017
+//fusa:req REQ-DISC-018
+//fusa:req REQ-DISC-019
+//fusa:req REQ-DISC-020
+//fusa:req REQ-DISC-021
 
 //! Discovery request/response, discovery-stream claiming, multi-client
 //! coexistence, and the client-side discovery cache — TC18 register-map
@@ -338,7 +338,7 @@ pub const DISCOVERY_BROADCAST_STREAM_ID: StreamId = StreamId {
 /// Is `stream_id` this module's sentinel broadcast discovery address?
 ///
 /// Never panics for any input.
-// fusa:req REQ-DISC-001
+//fusa:req REQ-DISC-001
 pub fn is_discovery_broadcast_stream_id(stream_id: StreamId) -> bool {
     stream_id == DISCOVERY_BROADCAST_STREAM_ID
 }
@@ -377,7 +377,25 @@ fn decode_register_address(payload: &[u8]) -> Option<u16> {
 /// transaction-id allocation, which remains a caller/later-milestone
 /// concern. The result always satisfies [`is_discovery_request`]. Never
 /// panics for any input.
-// fusa:req REQ-DISC-002
+///
+/// The header fields this builds match TC18 §12.6.1 Table 16 "Discovery
+/// request" (TC18.txt lines 2370-2381): `acf_msg_type` = `ACF_ABB`,
+/// `byte_bus_id` = `00000000000b`, `evt` = `0000b`, and a read-direction
+/// `op` — §12.6.1's own opening sentence (TC18.txt line 2365) is "A
+/// discovery request is a read request", and TC18 encodes a read as
+/// `op = 0` (the request-header tables' "if op = 0 this is read_size, else
+/// segment_num", TC18.txt line 1169, and §12.9's "op=0 (read request)",
+/// TC18.txt line 3207). Table 16's own `op` row reads "1b (read request)",
+/// which contradicts both and is treated here as a specification typo.
+///
+/// One Table 16 row this deliberately does **not** match:
+/// `byte_msg_payload` is specified as "none", whereas this builder emits
+/// the [`DISCOVERY_REGISTER_ADDRESS_LEN`]-byte register-address prefix this
+/// module's Provenance note describes. See requirement `REQ-DISC-027` in
+/// `.fusa-reqs.json`, which records that divergence rather than papering
+/// over it.
+//fusa:req REQ-DISC-002
+//fusa:req REQ-DISC-025
 pub fn build_discovery_request(transaction_num: u8) -> AcfAbbMessage {
     AcfAbbMessage {
         info: ByteMessageInfo {
@@ -400,8 +418,8 @@ pub fn build_discovery_request(transaction_num: u8) -> AcfAbbMessage {
 /// bytes beyond the register-address prefix, if any, are ignored — this
 /// function does not itself decide whether extra payload content is
 /// otherwise meaningful or malformed. Never panics for any input.
-// fusa:req REQ-DISC-002
-// fusa:req REQ-DISC-003
+//fusa:req REQ-DISC-002
+//fusa:req REQ-DISC-003
 pub fn is_discovery_request(msg: &AcfAbbMessage) -> bool {
     route_byte_bus_id(msg.info.byte_bus_id) == RequestRoute::Ep0
         && access_kind(&msg.info) == Ep0AccessKind::Read
@@ -440,7 +458,7 @@ pub fn is_discovery_request(msg: &AcfAbbMessage) -> bool {
 ///
 /// Trailing payload bytes beyond the register-address prefix, if any, are
 /// ignored, mirroring [`is_discovery_request`]. Never panics for any input.
-// fusa:req REQ-DISC-021
+//fusa:req REQ-DISC-021
 pub fn is_discovery_configure_request(msg: &AcfAbbMessage) -> bool {
     route_byte_bus_id(msg.info.byte_bus_id) == RequestRoute::Ep0
         && access_kind(&msg.info) == Ep0AccessKind::Write
@@ -466,7 +484,24 @@ pub fn is_discovery_configure_request(msg: &AcfAbbMessage) -> bool {
 /// caller-supplied value, exactly as [`crate::ep0::check_ep0_access`]
 /// performs no register I/O either — see that module's own doc comment for
 /// why. Never panics for any input.
-// fusa:req REQ-DISC-004
+///
+/// The header fields this builds match TC18 §12.6.2 Table 17 "Discovery
+/// response" (TC18.txt lines 2414-2428): `acf_msg_type` = `ACF_ABB`,
+/// `byte_bus_id` = `00000000000b` (here by echo-back of the request's own
+/// EP0 `byte_bus_id`), `evt` = `0000b`, a read-direction `op` (see
+/// [`build_discovery_request`] for why a read is `op = 0` despite Table
+/// 17's "1b (read request)" row), and a `byte_msg_payload` that "contains
+/// RC Server's register map content starting from address 0x00000".
+///
+/// Two Table 17 rows this deliberately does **not** implement: the
+/// response length is *not* clamped to the discovery request's `read_size`
+/// (`acf_msg_length ≤ read_size of discovery request`, TC18.txt line
+/// 2422), and this function builds no `stream_id` at all, so Table 17's
+/// `stream_id = localMAC + unique_id 0x0000` row is a transport-level
+/// concern here. See requirements `REQ-DISC-029`/`REQ-DISC-030` in
+/// `.fusa-reqs.json`, which record both gaps.
+//fusa:req REQ-DISC-004
+//fusa:req REQ-DISC-026
 pub fn build_discovery_response(
     request: &ByteMessageInfo,
     state: RcServerState,
@@ -520,7 +555,7 @@ impl DiscoveryClaim {
     /// an `now` that is (incorrectly) earlier than [`Self::claimed_at`]
     /// reads as zero elapsed time rather than panicking or wrapping. Never
     /// panics for any input.
-    // fusa:req REQ-DISC-006
+    //fusa:req REQ-DISC-006
     pub fn has_lapsed(&self, now: Instant, timeout: Duration) -> bool {
         now.saturating_duration_since(self.claimed_at) >= timeout
     }
@@ -547,28 +582,28 @@ impl DiscoveryClaim {
 ///   an exclusive claim.
 ///
 /// Never panics for any input.
-// fusa:req REQ-DISC-007
-// fusa:req REQ-DISC-008
-// fusa:req REQ-DISC-009
+//fusa:req REQ-DISC-007
+//fusa:req REQ-DISC-008
+//fusa:req REQ-DISC-009
 pub fn try_claim_discovery_stream(
     current: Option<DiscoveryClaim>,
     claimant: StreamId,
     now: Instant,
     timeout: Duration,
 ) -> Result<DiscoveryClaim, RcpError> {
-    // fusa:req REQ-DISC-009
+    //fusa:req REQ-DISC-009
     if is_discovery_broadcast_stream_id(claimant) {
         return Err(RcpError::InvalidParameter);
     }
 
-    // fusa:req REQ-DISC-007
+    //fusa:req REQ-DISC-007
     if claim_permits(current, claimant, now, timeout) {
         Ok(DiscoveryClaim {
             claimant,
             claimed_at: now,
         })
     } else {
-        // fusa:req REQ-DISC-008
+        //fusa:req REQ-DISC-008
         Err(RcpError::RequestRejected)
     }
 }
@@ -605,7 +640,7 @@ fn claim_permits(
 /// rationale, including why this is a caller-supplied value rather than one
 /// [`check_discovery_access`] derives from a decoded message itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-DISC-011
+//fusa:req REQ-DISC-011
 pub enum DiscoveryAccessKind {
     /// Reading discovery info — the broadcast discovery request/response
     /// mechanism ([`build_discovery_request`]/[`build_discovery_response`]).
@@ -637,9 +672,9 @@ pub enum DiscoveryAccessKind {
 /// Performs no register I/O and does not mutate `current` — like
 /// [`try_claim_discovery_stream`], this function only ever answers a
 /// question about caller-supplied state. Never panics for any input.
-// fusa:req REQ-DISC-012
-// fusa:req REQ-DISC-013
-// fusa:req REQ-DISC-014
+//fusa:req REQ-DISC-012
+//fusa:req REQ-DISC-013
+//fusa:req REQ-DISC-014
 pub fn check_discovery_access(
     current: Option<DiscoveryClaim>,
     requester: StreamId,
@@ -650,16 +685,16 @@ pub fn check_discovery_access(
     match kind {
         DiscoveryAccessKind::Read => Ok(()),
         DiscoveryAccessKind::Configure => {
-            // fusa:req REQ-DISC-014
+            //fusa:req REQ-DISC-014
             if is_discovery_broadcast_stream_id(requester) {
                 return Err(RcpError::InvalidParameter);
             }
 
-            // fusa:req REQ-DISC-012
+            //fusa:req REQ-DISC-012
             if claim_permits(current, requester, now, timeout) {
                 Ok(())
             } else {
-                // fusa:req REQ-DISC-013
+                //fusa:req REQ-DISC-013
                 Err(RcpError::UnauthorizedAccess)
             }
         }
@@ -740,7 +775,7 @@ impl DiscoveryCacheEntry {
     /// as zero elapsed time rather than panicking or wrapping. `max_age` is
     /// entirely caller-supplied — see this module's Provenance note for why
     /// no default is provided here. Never panics for any input.
-    // fusa:req REQ-DISC-018
+    //fusa:req REQ-DISC-018
     pub fn is_stale(&self, now: Instant, max_age: Duration) -> bool {
         now.saturating_duration_since(self.cached_at) >= max_age
     }
@@ -754,7 +789,7 @@ impl DiscoveryCacheEntry {
     /// [`StreamId`] — a real re-discovery is warranted, not merely a cache
     /// refresh — see this module's "Client-side discovery cache" section.
     /// Never panics for any input.
-    // fusa:req REQ-DISC-019
+    //fusa:req REQ-DISC-019
     pub fn matches(&self, general: &GeneralRegisters) -> bool {
         self.svr_oa_tc18_magic_nr == general.svr_oa_tc18_magic_nr
             && self.svr_version == general.svr_version
@@ -794,8 +829,8 @@ impl DiscoveryCache {
     /// [`try_claim_discovery_stream`]'s own rejection of it as a claimant.
     /// An existing entry for `stream_id`, if any, is overwritten rather than
     /// preserved. Never panics for any input.
-    // fusa:req REQ-DISC-016
-    // fusa:req REQ-DISC-017
+    //fusa:req REQ-DISC-016
+    //fusa:req REQ-DISC-017
     pub fn remember(
         &mut self,
         stream_id: StreamId,
@@ -830,8 +865,8 @@ impl DiscoveryCache {
     /// [`build_discovery_request`]'s broadcast exchange for `stream_id` when
     /// this returns `true`, and falls back to real discovery otherwise
     /// (unknown, or known but stale). Never panics for any input.
-    // fusa:req REQ-DISC-016
-    // fusa:req REQ-DISC-018
+    //fusa:req REQ-DISC-016
+    //fusa:req REQ-DISC-018
     pub fn is_known(&self, stream_id: StreamId, now: Instant, max_age: Duration) -> bool {
         self.entries
             .get(&stream_id)
@@ -846,7 +881,7 @@ impl DiscoveryCache {
     /// Provenance note for why claim state and cache state are deliberately
     /// kept independent; a caller that wants that coupling calls this
     /// explicitly. Never panics for any input.
-    // fusa:req REQ-DISC-019
+    //fusa:req REQ-DISC-019
     pub fn invalidate(&mut self, stream_id: StreamId) -> bool {
         self.entries.remove(&stream_id).is_some()
     }
@@ -889,7 +924,7 @@ mod tests {
     // ── Broadcast addressing ─────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-DISC-001
+    //fusa:test REQ-DISC-001
     fn is_discovery_broadcast_stream_id_true_only_for_the_sentinel() {
         assert!(is_discovery_broadcast_stream_id(
             DISCOVERY_BROADCAST_STREAM_ID
@@ -914,7 +949,7 @@ mod tests {
     // ── Discovery request ─────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-DISC-002
+    //fusa:test REQ-DISC-002
     fn build_discovery_request_is_recognized_by_is_discovery_request() {
         for transaction_num in [0u8, 1, 0x42, 0xFF] {
             let request = build_discovery_request(transaction_num);
@@ -926,7 +961,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-002
+    //fusa:test REQ-DISC-002
     fn build_discovery_request_round_trips_through_acf_abb_encode_decode() {
         let request = build_discovery_request(0x11);
         let frame = crate::acf::encode_acf_abb(&request).unwrap();
@@ -951,7 +986,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-003
+    //fusa:test REQ-DISC-003
     fn is_discovery_request_rejects_non_ep0_byte_bus_id() {
         let mut request = build_discovery_request(0);
         request.info.byte_bus_id = 1;
@@ -959,7 +994,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-003
+    //fusa:test REQ-DISC-003
     fn is_discovery_request_rejects_write_direction() {
         let mut request = build_discovery_request(0);
         request.info.op = true;
@@ -967,7 +1002,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-003
+    //fusa:test REQ-DISC-003
     fn is_discovery_request_rejects_mismatched_register_address() {
         let mut request = build_discovery_request(0);
         request.payload = 7u16.to_be_bytes().to_vec();
@@ -975,7 +1010,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-003
+    //fusa:test REQ-DISC-003
     fn is_discovery_request_rejects_short_payload() {
         let mut request = build_discovery_request(0);
         request.payload = vec![0x00];
@@ -986,17 +1021,83 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-003
+    //fusa:test REQ-DISC-003
     fn is_discovery_request_ignores_trailing_payload_bytes() {
         let mut request = build_discovery_request(0);
         request.payload.extend_from_slice(&[0xAA, 0xBB, 0xCC]);
         assert!(is_discovery_request(&request));
     }
 
+    // ── TC18 §12.6.1 Table 16 / §12.6.2 Table 17 field conformance ──────────
+
+    /// TC18 §12.6.1 Table 16 "Discovery request" (TC18.txt lines
+    /// 2370-2381), asserted against the *encoded* frame rather than the
+    /// in-memory struct, so the bit positions are exercised too. Expected
+    /// values are written out as literals taken from Table 16:
+    ///
+    /// | Table 16 field | Required value |
+    /// |----------------|----------------|
+    /// | `acf_msg_type` | `ACF_ABB` (`0x0E`) |
+    /// | `Byte_bus_id`  | `00000000000b` |
+    /// | `evt`          | `0000b` |
+    /// | `op`           | read request |
+    ///
+    /// `op` is asserted as `0`: §12.6.1's opening sentence (TC18.txt line
+    /// 2365) says "A discovery request is a read request", and TC18 encodes
+    /// a read as `op = 0` ("if op = 0 this is read_size, else segment_num",
+    /// TC18.txt line 1169; "op=0 (read request)", TC18.txt line 3207).
+    /// Table 16's own "1b (read request)" row contradicts both.
+    #[test]
+    //fusa:test REQ-DISC-025
+    fn tc18_table_16_discovery_request_header_fields_match_the_required_values() {
+        let frame = crate::acf::encode_acf_abb(&build_discovery_request(0x42)).unwrap();
+
+        // octet 0 bits 7:1 — acf_msg_type; ACF_ABB is 0x0E.
+        assert_eq!(frame[0] >> 1, 0x0E);
+        // byte_bus_id, 11 bits: octet 2 bits 2:0 (high 3) || octet 3 (low 8).
+        assert_eq!(frame[2] & 0x07, 0x00);
+        assert_eq!(frame[3], 0x00);
+        // octet 4 bits 7:4 — evt (ack || sub_opcode) = 0000b.
+        assert_eq!(frame[4] & 0xF0, 0x00);
+        // octet 6 bit 7 — op = 0 (read request).
+        assert_eq!(frame[6] & 0x80, 0x00);
+        // octet 5 — transaction_num, passed through unchanged.
+        assert_eq!(frame[5], 0x42);
+    }
+
+    /// TC18 §12.6.2 Table 17 "Discovery response" (TC18.txt lines
+    /// 2414-2428), asserted against the encoded frame with literal expected
+    /// values taken from Table 17: `acf_msg_type` = `ACF_ABB` (`0x0E`),
+    /// `Byte_bus_id` = `00000000000b`, `evt` = `0000b`, `op` = read (see
+    /// the Table 16 test above for the op-bit polarity), and
+    /// `byte_msg_payload` = "RC Server's register map content starting from
+    /// address 0x00000".
+    #[test]
+    //fusa:test REQ-DISC-026
+    fn tc18_table_17_discovery_response_header_fields_match_the_required_values() {
+        let general = sample_general_registers();
+        let request = build_discovery_request(0x42);
+        let response =
+            build_discovery_response(&request.info, RcServerState::HwUnconfigured, &general)
+                .unwrap();
+        let frame = crate::acf::encode_acf_abb(&response).unwrap();
+
+        assert_eq!(frame[0] >> 1, 0x0E); // acf_msg_type = ACF_ABB
+        assert_eq!(frame[2] & 0x07, 0x00); // byte_bus_id[10:8] = 000b
+        assert_eq!(frame[3], 0x00); // byte_bus_id[7:0] = 0x00
+        assert_eq!(frame[4] & 0xF0, 0x00); // evt = 0000b
+        assert_eq!(frame[6] & 0x80, 0x00); // op = 0 (read)
+
+        // byte_msg_payload: the register map starting at address 0x0000,
+        // immediately after the 8-octet byte_message_info header.
+        let encoded_general = general.encode();
+        assert_eq!(&frame[8..8 + encoded_general.len()], &encoded_general[..]);
+    }
+
     // ── is_discovery_configure_request ──────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-DISC-021
+    //fusa:test REQ-DISC-021
     fn is_discovery_configure_request_recognizes_the_write_direction_shape() {
         let mut request = build_discovery_request(0);
         request.info.op = true;
@@ -1007,7 +1108,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-021
+    //fusa:test REQ-DISC-021
     fn is_discovery_configure_request_and_is_discovery_request_are_mutually_exclusive() {
         for op in [false, true] {
             let mut request = build_discovery_request(0);
@@ -1020,7 +1121,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-021
+    //fusa:test REQ-DISC-021
     fn is_discovery_configure_request_rejects_non_matching_shapes() {
         let mut request = build_discovery_request(0);
         request.info.op = true;
@@ -1043,7 +1144,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-021
+    //fusa:test REQ-DISC-021
     fn is_discovery_configure_request_ignores_trailing_payload_bytes() {
         let mut request = build_discovery_request(0);
         request.info.op = true;
@@ -1054,7 +1155,7 @@ mod tests {
     // ── Discovery response: answerable in any lifecycle state ─────────────
 
     #[test]
-    // fusa:test REQ-DISC-004
+    //fusa:test REQ-DISC-004
     fn discovery_response_succeeds_in_every_lifecycle_state() {
         let general = sample_general_registers();
         let request = build_discovery_request(0x55).info;
@@ -1068,7 +1169,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-004
+    //fusa:test REQ-DISC-004
     fn discovery_response_echoes_request_byte_bus_id_per_echo_back_rule() {
         let general = sample_general_registers();
         let request = ByteMessageInfo {
@@ -1086,7 +1187,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-004
+    //fusa:test REQ-DISC-004
     fn discovery_response_round_trips_through_acf_abb_encode_decode() {
         let general = sample_general_registers();
         let request = build_discovery_request(0x22).info;
@@ -1122,7 +1223,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-007
+    //fusa:test REQ-DISC-007
     fn first_claimant_wins_an_unclaimed_stream() {
         let now = Instant::now();
         let claim = try_claim_discovery_stream(None, client_a(), now, DISCOVERY_TIME_OUT)
@@ -1132,7 +1233,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-008
+    //fusa:test REQ-DISC-008
     fn second_different_claimant_is_rejected_while_claim_is_live() {
         let claimed_at = Instant::now();
         let claim =
@@ -1145,7 +1246,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-007
+    //fusa:test REQ-DISC-007
     fn same_claimant_may_refresh_its_own_live_claim() {
         let claimed_at = Instant::now();
         let claim =
@@ -1159,8 +1260,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-006
-    // fusa:test REQ-DISC-007
+    //fusa:test REQ-DISC-006
+    //fusa:test REQ-DISC-007
     fn lapsed_claim_reopens_to_a_new_claimant() {
         let claimed_at = Instant::now();
         let claim =
@@ -1178,7 +1279,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-006
+    //fusa:test REQ-DISC-006
     fn has_lapsed_boundary_is_inclusive_of_the_exact_timeout() {
         let claimed_at = Instant::now();
         let claim = DiscoveryClaim {
@@ -1192,7 +1293,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-006
+    //fusa:test REQ-DISC-006
     fn has_lapsed_never_panics_when_now_precedes_claimed_at() {
         let claimed_at = Instant::now();
         let claim = DiscoveryClaim {
@@ -1206,7 +1307,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-009
+    //fusa:test REQ-DISC-009
     fn broadcast_sentinel_is_never_an_eligible_claimant() {
         let now = Instant::now();
         let err = try_claim_discovery_stream(
@@ -1236,8 +1337,8 @@ mod tests {
     // ── Multi-client coexistence: read/configure access-kind distinction ───
 
     #[test]
-    // fusa:test REQ-DISC-011
-    // fusa:test REQ-DISC-012
+    //fusa:test REQ-DISC-011
+    //fusa:test REQ-DISC-012
     fn read_access_always_succeeds_and_never_consults_claim_state() {
         let now = Instant::now();
         // Unclaimed.
@@ -1278,7 +1379,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-012
+    //fusa:test REQ-DISC-012
     fn configure_succeeds_on_an_unclaimed_stream() {
         let now = Instant::now();
         assert_eq!(
@@ -1294,7 +1395,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-012
+    //fusa:test REQ-DISC-012
     fn configure_succeeds_for_the_live_claimant() {
         let claimed_at = Instant::now();
         let claim =
@@ -1313,7 +1414,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-013
+    //fusa:test REQ-DISC-013
     fn configure_rejects_a_different_live_claimant() {
         let claimed_at = Instant::now();
         let claim =
@@ -1332,7 +1433,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-012
+    //fusa:test REQ-DISC-012
     fn configure_succeeds_for_any_requester_once_the_claim_has_lapsed() {
         let claimed_at = Instant::now();
         let claim =
@@ -1351,7 +1452,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-014
+    //fusa:test REQ-DISC-014
     fn configure_rejects_the_broadcast_sentinel_regardless_of_claim_state() {
         let now = Instant::now();
         // Unclaimed.
@@ -1392,8 +1493,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-012
-    // fusa:test REQ-DISC-013
+    //fusa:test REQ-DISC-012
+    //fusa:test REQ-DISC-013
     fn check_discovery_access_configure_agrees_with_try_claim_discovery_stream_grant_decision() {
         // check_discovery_access's Configure gate and
         // try_claim_discovery_stream's grant decision share the same
@@ -1445,7 +1546,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-016
+    //fusa:test REQ-DISC-016
     fn discovery_cache_remember_then_lookup_round_trips_the_cache_worthy_subset() {
         let mut cache = DiscoveryCache::new();
         assert!(cache.is_empty());
@@ -1469,7 +1570,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-016
+    //fusa:test REQ-DISC-016
     fn discovery_cache_remember_overwrites_an_existing_entry_for_the_same_stream_id() {
         let mut cache = DiscoveryCache::new();
         let first = Instant::now();
@@ -1492,7 +1593,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-017
+    //fusa:test REQ-DISC-017
     fn discovery_cache_remember_rejects_the_broadcast_sentinel_as_stream_id() {
         let mut cache = DiscoveryCache::new();
         let err = cache
@@ -1507,7 +1608,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-018
+    //fusa:test REQ-DISC-018
     fn discovery_cache_is_known_reflects_staleness_under_max_age() {
         let mut cache = DiscoveryCache::new();
         let cached_at = Instant::now();
@@ -1528,7 +1629,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-018
+    //fusa:test REQ-DISC-018
     fn discovery_cache_entry_is_stale_boundary_is_inclusive_and_never_panics_on_out_of_order_now() {
         let cached_at = Instant::now();
         let general = sample_general_registers();
@@ -1546,7 +1647,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-019
+    //fusa:test REQ-DISC-019
     fn discovery_cache_entry_matches_detects_an_identity_change() {
         let general = sample_general_registers();
         let entry = DiscoveryCacheEntry::from_general_registers(&general, Instant::now());
@@ -1558,7 +1659,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-019
+    //fusa:test REQ-DISC-019
     fn discovery_cache_invalidate_removes_the_entry_and_is_idempotent() {
         let mut cache = DiscoveryCache::new();
         cache
@@ -1573,7 +1674,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-016
+    //fusa:test REQ-DISC-016
     fn discovery_cache_holds_independent_entries_across_multiple_stream_ids() {
         let mut cache = DiscoveryCache::new();
         let now = Instant::now();
@@ -1602,7 +1703,7 @@ mod tests {
     // ── Never panics ────────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-DISC-010
+    //fusa:test REQ-DISC-010
     fn try_claim_discovery_stream_never_panics_across_sampled_inputs() {
         let mut state: u32 = 0xC1A1_0DEC;
         let mut next = || {
@@ -1633,7 +1734,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-015
+    //fusa:test REQ-DISC-015
     fn check_discovery_access_never_panics_across_sampled_inputs() {
         let mut state: u32 = 0xACCE_5501;
         let mut next = || {
@@ -1668,7 +1769,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-005
+    //fusa:test REQ-DISC-005
     fn is_discovery_request_never_panics_on_arbitrary_payloads() {
         let mut state: u32 = 0xD15C_0BE1;
         let mut next = || {
@@ -1697,7 +1798,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-005
+    //fusa:test REQ-DISC-005
     fn build_discovery_response_never_panics_for_any_state() {
         let general = sample_general_registers();
         for state in ALL_STATES {
@@ -1707,7 +1808,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-005
+    //fusa:test REQ-DISC-005
     fn is_discovery_broadcast_stream_id_never_panics_across_sampled_values() {
         let mut state: u32 = 0xB0AD_CA57;
         let mut next = || {
@@ -1731,7 +1832,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DISC-020
+    //fusa:test REQ-DISC-020
     fn discovery_cache_operations_never_panic_across_sampled_inputs() {
         let mut state: u32 = 0xCAC4_E5EE;
         let mut next = || {

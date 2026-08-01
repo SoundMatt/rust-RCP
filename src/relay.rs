@@ -1,11 +1,11 @@
-// fusa:req REQ-RELAY-001
-// fusa:req REQ-RELAY-002
-// fusa:req REQ-RELAY-003
-// fusa:req REQ-RELAY-004
-// fusa:req REQ-RELAY-005
-// fusa:req REQ-RELAY-006
-// fusa:req REQ-RELAY-007
-// fusa:req REQ-RELAY-008
+//fusa:req REQ-RELAY-001
+//fusa:req REQ-RELAY-002
+//fusa:req REQ-RELAY-003
+//fusa:req REQ-RELAY-004
+//fusa:req REQ-RELAY-005
+//fusa:req REQ-RELAY-006
+//fusa:req REQ-RELAY-007
+//fusa:req REQ-RELAY-008
 
 //! RELAY protocol types, bundled locally until a published `relay-rs` crate
 //! exists to depend on directly.
@@ -26,7 +26,7 @@ use tokio::sync::mpsc;
 // ── Protocol ──────────────────────────────────────────────────────────────────
 
 /// Protocol identifier per RELAY spec §3. Serialises as its integer value.
-// fusa:req REQ-RELAY-001
+//fusa:req REQ-RELAY-001
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Protocol {
@@ -105,7 +105,7 @@ impl std::fmt::Display for Version {
 // ── Message ───────────────────────────────────────────────────────────────────
 
 /// Universal message envelope per RELAY spec §4.
-// fusa:req REQ-RELAY-002
+//fusa:req REQ-RELAY-002
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message {
     pub protocol: Protocol,
@@ -143,7 +143,7 @@ impl Message {
 // ── Back-pressure policy ──────────────────────────────────────────────────────
 
 /// Back-pressure policy for subscriber channels per RELAY spec §14.
-// fusa:req REQ-RELAY-003
+//fusa:req REQ-RELAY-003
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum BackPressurePolicy {
     /// Drop the arriving message when the channel is full (default).
@@ -158,7 +158,7 @@ pub enum BackPressurePolicy {
 // ── SubscriberOptions ─────────────────────────────────────────────────────────
 
 /// Subscriber channel configuration per RELAY spec §18.3.
-// fusa:req REQ-RELAY-004
+//fusa:req REQ-RELAY-004
 #[derive(Clone, Debug, Default)]
 pub struct SubscriberOptions {
     /// Buffer depth; 0 means use the default (64).
@@ -182,7 +182,7 @@ impl SubscriberOptions {
 // ── Error ─────────────────────────────────────────────────────────────────────
 
 /// The four mandatory RELAY error sentinels per §5.1.
-// fusa:req REQ-RELAY-005
+//fusa:req REQ-RELAY-005
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum Error {
     #[error("relay: closed")]
@@ -198,7 +198,7 @@ pub enum Error {
 // ── Context ───────────────────────────────────────────────────────────────────
 
 /// Lightweight context carrying an optional deadline per RELAY spec §18.3.
-// fusa:req REQ-RELAY-006
+//fusa:req REQ-RELAY-006
 #[derive(Clone, Debug)]
 pub struct Context {
     pub deadline: Option<Instant>,
@@ -232,7 +232,7 @@ impl Default for Context {
 // ── Node and Caller traits ────────────────────────────────────────────────────
 
 /// Protocol-agnostic pub/sub interface per RELAY spec §10.1.
-// fusa:req REQ-RELAY-007
+//fusa:req REQ-RELAY-007
 #[async_trait]
 pub trait Node: Send + Sync {
     fn protocol(&self) -> Protocol;
@@ -245,7 +245,7 @@ pub trait Node: Send + Sync {
 }
 
 /// Extends [`Node`] with request/response semantics per RELAY spec §10.2.
-// fusa:req REQ-RELAY-008
+//fusa:req REQ-RELAY-008
 #[async_trait]
 pub trait Caller: Node {
     async fn call(&self, ctx: Context, req: Message) -> Result<Message, Error>;
@@ -259,14 +259,14 @@ mod tests {
     use super::*;
 
     #[test]
-    // fusa:test REQ-RELAY-001
+    //fusa:test REQ-RELAY-001
     fn protocol_display() {
         assert_eq!(Protocol::Rcp.to_string(), "RCP");
         assert_eq!(Protocol::Can.to_string(), "CAN");
     }
 
     #[test]
-    // fusa:test REQ-RELAY-001
+    //fusa:test REQ-RELAY-001
     fn protocol_serde_roundtrip() {
         let p = Protocol::Rcp;
         let json = serde_json::to_string(&p).unwrap();
@@ -276,14 +276,14 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RELAY-001
+    //fusa:test REQ-RELAY-001
     fn protocol_deserialize_unknown_rejected() {
         let err = serde_json::from_str::<Protocol>("99");
         assert!(err.is_err());
     }
 
     #[test]
-    // fusa:test REQ-RELAY-002
+    //fusa:test REQ-RELAY-002
     fn message_new_defaults() {
         let m = Message::new(Protocol::Rcp, "stream-0001", vec![1, 2, 3]);
         assert_eq!(m.id, "stream-0001");
@@ -293,7 +293,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RELAY-002
+    //fusa:test REQ-RELAY-002
     fn message_serde_base64_payload() {
         let m = Message::new(Protocol::Rcp, "stream-0002", vec![0xDE, 0xAD]);
         let json = serde_json::to_value(&m).unwrap();
@@ -302,14 +302,14 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RELAY-006
+    //fusa:test REQ-RELAY-006
     fn context_background_not_done() {
         let ctx = Context::background();
         assert!(!ctx.done());
     }
 
     #[test]
-    // fusa:test REQ-RELAY-006
+    //fusa:test REQ-RELAY-006
     fn context_expired() {
         let ctx = Context::with_timeout(Duration::from_nanos(1));
         std::thread::sleep(Duration::from_millis(1));
@@ -317,7 +317,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RELAY-004
+    //fusa:test REQ-RELAY-004
     fn subscriber_options_chan_depth() {
         let opts = SubscriberOptions::default();
         assert_eq!(opts.chan_depth(64), 64);
@@ -329,7 +329,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RELAY-003
+    //fusa:test REQ-RELAY-003
     fn back_pressure_default_is_drop_newest() {
         assert_eq!(
             BackPressurePolicy::default(),
@@ -338,7 +338,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RELAY-005
+    //fusa:test REQ-RELAY-005
     fn error_sentinels_are_distinct() {
         let sentinels = [
             Error::Closed,

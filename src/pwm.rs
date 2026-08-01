@@ -1,12 +1,12 @@
-// fusa:req REQ-PWM-001
-// fusa:req REQ-PWM-002
-// fusa:req REQ-PWM-003
-// fusa:req REQ-PWM-004
-// fusa:req REQ-PWM-005
-// fusa:req REQ-PWM-006
-// fusa:req REQ-PWM-007
-// fusa:req REQ-PWM-008
-// fusa:req REQ-PWM-009
+//fusa:req REQ-PWM-001
+//fusa:req REQ-PWM-002
+//fusa:req REQ-PWM-003
+//fusa:req REQ-PWM-004
+//fusa:req REQ-PWM-005
+//fusa:req REQ-PWM-006
+//fusa:req REQ-PWM-007
+//fusa:req REQ-PWM-008
+//fusa:req REQ-PWM-009
 
 //! The PWM_OUT / PWM_IN endpoint types (`ep_type 0x07`/`0x08`) —
 //! `ROADMAP.md` Milestone 4 ("Basic Endpoint Types"), fifth checklist
@@ -155,7 +155,7 @@ use crate::regmap::{EndpointType, PerEpTypeFunctionalConfig};
 /// for why both fields are unconfirmed-width/units `u32` values rather than
 /// a specific bit width or physical unit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-PWM-001
+//fusa:req REQ-PWM-001
 pub struct PwmDurationPair {
     /// The full PWM cycle length.
     pub period: u32,
@@ -173,7 +173,7 @@ pub struct PwmDurationPair {
 /// two endpoint types" for why it holds [`PwmDurationPair`] as a field
 /// rather than PWM_OUT/PWM_IN sharing one functional-config type outright.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-PWM-002
+//fusa:req REQ-PWM-002
 pub struct PwmOutFunctionalConfig {
     /// The period+active-duration pair this endpoint drives onto the wire.
     pub target: PwmDurationPair,
@@ -187,7 +187,7 @@ impl PwmOutFunctionalConfig {
     /// This module does not itself call that function — it only shows how a
     /// caller would obtain the matching tag, per
     /// [`crate::uart::UartFunctionalConfig::layer_tag`]'s own precedent.
-    // fusa:req REQ-PWM-003
+    //fusa:req REQ-PWM-003
     pub fn layer_tag(&self) -> PerEpTypeFunctionalConfig {
         PerEpTypeFunctionalConfig::new(EndpointType::PwmOut)
     }
@@ -204,7 +204,7 @@ impl PwmOutFunctionalConfig {
 /// not a stored last-measured [`PwmDurationPair`] — and for why a zero
 /// threshold is not treated as "disabled."
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-PWM-004
+//fusa:req REQ-PWM-004
 pub struct PwmInFunctionalConfig {
     /// How much time may elapse since the last observed signal edge before
     /// a read resolves to [`PwmInReadResolution::NoSignal`] instead of a
@@ -216,7 +216,7 @@ impl PwmInFunctionalConfig {
     /// The [`crate::regmap::PerEpTypeFunctionalConfig`] generic-layer tag
     /// that matches this PWM_IN functional config, for use with
     /// [`crate::regmap::check_functional_config_matches_ep_type`].
-    // fusa:req REQ-PWM-005
+    //fusa:req REQ-PWM-005
     pub fn layer_tag(&self) -> PerEpTypeFunctionalConfig {
         PerEpTypeFunctionalConfig::new(EndpointType::PwmIn)
     }
@@ -232,8 +232,8 @@ impl PwmInFunctionalConfig {
 /// hanging, and stale data" for why this is a resolved measurement outcome
 /// rather than a [`crate::RcpError`] variant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-PWM-006
-// fusa:req REQ-PWM-007
+//fusa:req REQ-PWM-006
+//fusa:req REQ-PWM-007
 pub enum PwmInReadResolution {
     /// A signal edge was observed within the configured timeout; the inner
     /// value is the measured period+active-duration pair.
@@ -259,9 +259,10 @@ pub enum PwmInReadResolution {
 /// `Some(PwmInReadResolution::NoSignal)`, regardless of `last_measured` — a
 /// stale measurement is never returned past the timeout. Never panics for
 /// any input.
-// fusa:req REQ-PWM-006
-// fusa:req REQ-PWM-007
-// fusa:req REQ-PWM-008
+//fusa:req REQ-PWM-006
+//fusa:req REQ-PWM-007
+//fusa:req REQ-PWM-008
+//fusa:req REQ-PWMI-003
 pub fn resolve_pwm_in_read(
     config: &PwmInFunctionalConfig,
     last_measured: Option<PwmDurationPair>,
@@ -282,7 +283,7 @@ mod tests {
     // ── PwmDurationPair ───────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-PWM-001
+    //fusa:test REQ-PWM-001
     fn pwm_duration_pair_default_is_zeroed() {
         let pair = PwmDurationPair::default();
         assert_eq!(pair.period, 0);
@@ -290,7 +291,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PWM-001
+    //fusa:test REQ-PWM-001
     fn pwm_duration_pair_fields_are_independently_settable() {
         let pair = PwmDurationPair {
             period: 1000,
@@ -303,14 +304,14 @@ mod tests {
     // ── PwmOutFunctionalConfig / layer_tag ───────────────────────────────
 
     #[test]
-    // fusa:test REQ-PWM-002
+    //fusa:test REQ-PWM-002
     fn pwm_out_functional_config_default_target_is_zeroed_pair() {
         let config = PwmOutFunctionalConfig::default();
         assert_eq!(config.target, PwmDurationPair::default());
     }
 
     #[test]
-    // fusa:test REQ-PWM-003
+    //fusa:test REQ-PWM-003
     fn pwm_out_functional_config_layer_tag_matches_ep_type_pwm_out() {
         let functional = PwmOutFunctionalConfig::default();
         let generic = crate::regmap::PerEpConfigBlock::new(EndpointType::PwmOut);
@@ -326,7 +327,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PWM-003
+    //fusa:test REQ-PWM-003
     fn pwm_out_functional_config_layer_tag_rejects_mismatched_ep_type() {
         let functional = PwmOutFunctionalConfig::default();
         // In particular, PWM_OUT's tag must not silently match PWM_IN's
@@ -342,14 +343,14 @@ mod tests {
     // ── PwmInFunctionalConfig / layer_tag ────────────────────────────────
 
     #[test]
-    // fusa:test REQ-PWM-004
+    //fusa:test REQ-PWM-004
     fn pwm_in_functional_config_default_timeout_is_zero() {
         let config = PwmInFunctionalConfig::default();
         assert_eq!(config.no_signal_timeout, 0);
     }
 
     #[test]
-    // fusa:test REQ-PWM-005
+    //fusa:test REQ-PWM-005
     fn pwm_in_functional_config_layer_tag_matches_ep_type_pwm_in() {
         let functional = PwmInFunctionalConfig::default();
         let generic = crate::regmap::PerEpConfigBlock::new(EndpointType::PwmIn);
@@ -365,7 +366,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PWM-005
+    //fusa:test REQ-PWM-005
     fn pwm_in_functional_config_layer_tag_rejects_mismatched_ep_type() {
         let functional = PwmInFunctionalConfig::default();
         let generic = crate::regmap::PerEpConfigBlock::new(EndpointType::PwmOut);
@@ -378,7 +379,7 @@ mod tests {
     // ── resolve_pwm_in_read: PWM_IN_NO_SIGNAL vs. measured vs. in-progress ──
 
     #[test]
-    // fusa:test REQ-PWM-006
+    //fusa:test REQ-PWM-006
     fn resolve_pwm_in_read_reports_measured_within_timeout() {
         let config = PwmInFunctionalConfig {
             no_signal_timeout: 1000,
@@ -398,7 +399,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PWM-007
+    //fusa:test REQ-PWM-007
     fn resolve_pwm_in_read_reports_no_signal_once_timed_out() {
         let config = PwmInFunctionalConfig {
             no_signal_timeout: 1000,
@@ -414,7 +415,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PWM-007
+    //fusa:test REQ-PWM-007
     fn resolve_pwm_in_read_never_returns_stale_measurement_past_timeout() {
         // A prior measurement exists, but the timeout has since elapsed —
         // the checklist's "instead of ... returning stale data" case.
@@ -436,7 +437,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PWM-007
+    //fusa:test REQ-PWM-007
     fn resolve_pwm_in_read_zeroed_config_resolves_no_signal_immediately() {
         // See this module's doc comment: zero is not treated as a
         // "disabled" sentinel for the timeout, mirroring
@@ -450,7 +451,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PWM-008
+    //fusa:test REQ-PWM-008
     fn resolve_pwm_in_read_returns_none_while_awaiting_first_edge_before_timeout() {
         // Genuinely in progress: no measurement yet, timeout not yet
         // elapsed — this is the "not a hang" case, resolved by returning
@@ -463,7 +464,40 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PWM-009
+    //fusa:test REQ-PWMI-003
+    fn resolve_pwm_in_read_invalidates_measurement_once_max_period_is_exceeded() {
+        // TC18 §13.7.6.2 Table 45, pwmi_err_on_max_period = 0b (TC18.txt
+        // line 4721): "if MAX PERIOD is exceeded, invalidate measurement and
+        // wait for new active phase of signal". pwmi_max_period (Table 45,
+        // relative address 0x000A, TC18.txt line 4735) is a 16-bit register,
+        // so 0xFFFF is the largest MAX PERIOD a conforming RC Server can be
+        // configured with.
+        let config = PwmInFunctionalConfig {
+            no_signal_timeout: 0xFFFF,
+        };
+        // TC18 §13.7.6.3 (TC18.txt line 4758): both measured values are
+        // 16-bit, so a valid measurement fits 0x0000..=0xFFFF.
+        let measured = PwmDurationPair {
+            period: 0x8000,
+            active_duration: 0x4000,
+        };
+        // One PWM_CLK cycle below MAX PERIOD the measurement is still valid.
+        assert_eq!(
+            resolve_pwm_in_read(&config, Some(measured), 0xFFFE),
+            Some(PwmInReadResolution::Measured(measured))
+        );
+        // At and beyond MAX PERIOD the measurement is invalid and must never
+        // be re-reported.
+        for elapsed in [0xFFFFu32, 0x1_0000] {
+            assert_eq!(
+                resolve_pwm_in_read(&config, Some(measured), elapsed),
+                Some(PwmInReadResolution::NoSignal)
+            );
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-PWM-009
     fn resolve_pwm_in_read_never_panics_for_any_sampled_input() {
         let configs = [
             PwmInFunctionalConfig {

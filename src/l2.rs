@@ -1,11 +1,11 @@
-// fusa:req REQ-L2-001
-// fusa:req REQ-L2-002
-// fusa:req REQ-L2-003
-// fusa:req REQ-L2-004
-// fusa:req REQ-L2-005
-// fusa:req REQ-L2-006
-// fusa:req REQ-L2-007
-// fusa:req REQ-L2-008
+//fusa:req REQ-L2-001
+//fusa:req REQ-L2-002
+//fusa:req REQ-L2-003
+//fusa:req REQ-L2-004
+//fusa:req REQ-L2-005
+//fusa:req REQ-L2-006
+//fusa:req REQ-L2-007
+//fusa:req REQ-L2-008
 
 //! Layer-2 (raw Ethernet) transport for the TC18 AVTPDU/ACF wire format.
 //!
@@ -101,7 +101,7 @@ use crate::RcpError;
 /// AVTPDU is marked by an EtherType value of 0x22F0." Sent in place of,
 /// never alongside, [`crate::udp::encode_annex_j_udp_payload`]'s 4-byte
 /// encapsulation sequence number — see this module's own doc comment.
-// fusa:req REQ-L2-001
+//fusa:req REQ-L2-001
 pub const ETHERTYPE_AVTP: u16 = 0x22F0;
 
 /// Ethernet II header length: 6-byte destination MAC + 6-byte source MAC +
@@ -111,8 +111,8 @@ const ETHERNET_HEADER_LEN: usize = 14;
 /// Encode a raw Ethernet II frame carrying `avtpdu`: `dest_mac` +
 /// `src_mac` + [`ETHERTYPE_AVTP`] (big-endian) + `avtpdu` directly, with
 /// no encapsulation sequence number — see this module's own doc comment.
-// fusa:req REQ-L2-001
-// fusa:req REQ-L2-002
+//fusa:req REQ-L2-001
+//fusa:req REQ-L2-002
 pub fn encode_ethernet_frame(dest_mac: [u8; 6], src_mac: [u8; 6], avtpdu: &[u8]) -> Vec<u8> {
     let mut frame = Vec::with_capacity(ETHERNET_HEADER_LEN + avtpdu.len());
     frame.extend_from_slice(&dest_mac);
@@ -133,8 +133,8 @@ pub type DecodedEthernetFrame<'a> = ([u8; 6], [u8; 6], &'a [u8]);
 /// Other(_))` if the EtherType field is not [`ETHERTYPE_AVTP`] — such a
 /// frame is real Ethernet traffic this transport is simply not addressed
 /// to decode (e.g. ARP, IPv4/IPv6), not a malformed AVTPDU.
-// fusa:req REQ-L2-001
-// fusa:req REQ-L2-002
+//fusa:req REQ-L2-001
+//fusa:req REQ-L2-002
 pub fn decode_ethernet_frame(frame: &[u8]) -> Result<DecodedEthernetFrame<'_>, RcpError> {
     if frame.len() < ETHERNET_HEADER_LEN {
         return Err(RcpError::ShortFrame);
@@ -170,7 +170,7 @@ pub fn decode_ethernet_frame(frame: &[u8]) -> Result<DecodedEthernetFrame<'_>, R
 /// ambiguity entirely by special-casing `Duration::ZERO` themselves before
 /// ever reaching this method, the same discipline
 /// [`crate::udp::UdpTransport::send_acf_abb`] uses.
-// fusa:req REQ-L2-003
+//fusa:req REQ-L2-003
 pub trait L2Socket: Send + Sync {
     /// Send `frame` (a full Ethernet frame — see [`encode_ethernet_frame`])
     /// out this socket's bound interface.
@@ -193,7 +193,7 @@ pub trait L2Socket: Send + Sync {
 /// address, used to build every outgoing frame's Ethernet header — see
 /// [`RawEthernetSocket::bind`] for how a real caller obtains its
 /// interface's own MAC without supplying one itself).
-// fusa:req REQ-L2-004
+//fusa:req REQ-L2-004
 pub struct L2Transport {
     local_stream: StreamId,
     socket: Arc<dyn L2Socket>,
@@ -244,8 +244,8 @@ impl L2Transport {
     /// Returns `Err(RcpError::Timeout)` immediately for a zero `timeout`,
     /// matching [`crate::udp::UdpTransport::send_acf_abb`]'s own
     /// discipline.
-    // fusa:req REQ-L2-005
-    // fusa:req REQ-L2-006
+    //fusa:req REQ-L2-005
+    //fusa:req REQ-L2-006
     pub fn send_acf_abb(
         &self,
         msg: &AcfAbbMessage,
@@ -269,8 +269,8 @@ impl L2Transport {
 
     /// Same as [`Self::send_acf_abb`], for an ACF_GBB request/response
     /// pair.
-    // fusa:req REQ-L2-005
-    // fusa:req REQ-L2-006
+    //fusa:req REQ-L2-005
+    //fusa:req REQ-L2-006
     pub fn send_acf_gbb(
         &self,
         msg: &AcfGbbMessage,
@@ -321,8 +321,8 @@ mod raw_socket {
     /// doc comment ("Why `nix`, not raw `libc` `unsafe` syscalls" and
     /// "Runtime requirement") for the design rationale and privilege
     /// requirement.
-    // fusa:req REQ-L2-007
-    // fusa:req REQ-L2-008
+    //fusa:req REQ-L2-007
+    //fusa:req REQ-L2-008
     #[derive(Debug)]
     pub struct RawEthernetSocket {
         fd: OwnedFd,
@@ -341,7 +341,7 @@ mod raw_socket {
         /// the interface itself via `getifaddrs`, never supplied by the
         /// caller — mirroring how [`crate::udp::StdUdpSocket::bind`] never
         /// asks a caller for its own local IP address.
-        // fusa:req REQ-L2-007
+        //fusa:req REQ-L2-007
         pub fn bind(interface_name: &str) -> Result<Self, RcpError> {
             let addrs =
                 getifaddrs().map_err(|e| RcpError::Other(format!("l2: getifaddrs: {e}")))?;
@@ -419,7 +419,7 @@ mod raw_socket {
         /// that argument's interface index matters for a raw send, so
         /// this reuses [`Self::bind_addr`], which already carries the
         /// correct one.
-        // fusa:req REQ-L2-007
+        //fusa:req REQ-L2-007
         fn send(&self, frame: &[u8]) -> Result<usize, RcpError> {
             sendto(
                 self.fd.as_raw_fd(),
@@ -430,7 +430,7 @@ mod raw_socket {
             .map_err(|e| RcpError::Other(format!("l2: sendto: {e}")))
         }
 
-        // fusa:req REQ-L2-007
+        //fusa:req REQ-L2-007
         fn recv(&self, timeout: Option<Duration>) -> Result<Vec<u8>, RcpError> {
             self.set_recv_timeout(timeout)?;
             let mut buf = [0u8; 65535];
@@ -457,7 +457,7 @@ mod raw_socket {
     /// platforms". [`Self::bind`] always fails explicitly; this type
     /// exists at all only so `crate::l2::RawEthernetSocket` resolves on
     /// every target.
-    // fusa:req REQ-L2-008
+    //fusa:req REQ-L2-008
     #[derive(Debug)]
     pub struct RawEthernetSocket {
         _unconstructible: (),
@@ -467,7 +467,7 @@ mod raw_socket {
         /// Always returns `Err(RcpError::Other(_))` — `AF_PACKET` raw
         /// sockets are a Linux-specific facility this crate has no
         /// implementation of on this target.
-        // fusa:req REQ-L2-008
+        //fusa:req REQ-L2-008
         pub fn bind(_interface_name: &str) -> Result<Self, RcpError> {
             Err(RcpError::Other(
                 "l2::RawEthernetSocket is only implemented on target_os = \"linux\" \
@@ -513,8 +513,8 @@ mod tests {
     // ── Ethernet II framing (pure byte manipulation, no socket) ───────────
 
     #[test]
-    // fusa:test REQ-L2-001
-    // fusa:test REQ-L2-002
+    //fusa:test REQ-L2-001
+    //fusa:test REQ-L2-002
     fn ethernet_frame_encode_decode_round_trips() {
         let dest = [0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF];
         let src = [0x02, 0x11, 0x22, 0x33, 0x44, 0x55];
@@ -534,7 +534,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-L2-002
+    //fusa:test REQ-L2-002
     fn ethernet_frame_encode_handles_empty_avtpdu() {
         let frame = encode_ethernet_frame([0; 6], [0; 6], &[]);
         assert_eq!(frame.len(), 14);
@@ -543,7 +543,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-L2-002
+    //fusa:test REQ-L2-002
     fn ethernet_frame_decode_rejects_short_frames() {
         for len in 0..14 {
             let buf = vec![0u8; len];
@@ -553,7 +553,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-L2-002
+    //fusa:test REQ-L2-002
     fn ethernet_frame_decode_rejects_wrong_ethertype() {
         let mut frame = encode_ethernet_frame([0; 6], [0; 6], &[0xAA]);
         // Corrupt the EtherType field to something real but not AVTP
@@ -646,9 +646,9 @@ mod tests {
     const SRC_MAC: [u8; 6] = [0x02, 0x11, 0x22, 0x33, 0x44, 0x55];
 
     #[test]
-    // fusa:test REQ-L2-004
-    // fusa:test REQ-L2-005
-    // fusa:test REQ-L2-006
+    //fusa:test REQ-L2-004
+    //fusa:test REQ-L2-005
+    //fusa:test REQ-L2-006
     fn l2_send_acf_abb_round_trips_over_socket() {
         let socket = Arc::new(EchoL2 { mismatch: false });
         let transport = L2Transport::new(local_stream(), socket, DEST_MAC, SRC_MAC);
@@ -658,7 +658,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-L2-006
+    //fusa:test REQ-L2-006
     fn l2_send_acf_abb_rejects_echo_back_mismatch() {
         let socket = Arc::new(EchoL2 { mismatch: true });
         let transport = L2Transport::new(local_stream(), socket, DEST_MAC, SRC_MAC);
@@ -667,7 +667,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-L2-005
+    //fusa:test REQ-L2-005
     fn l2_send_acf_abb_rejects_zero_timeout() {
         let socket = Arc::new(EchoL2 { mismatch: false });
         let transport = L2Transport::new(local_stream(), socket, DEST_MAC, SRC_MAC);
@@ -678,7 +678,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-L2-004
+    //fusa:test REQ-L2-004
     fn l2_transport_getters_match_constructor() {
         let socket = Arc::new(EchoL2 { mismatch: false });
         let sid = local_stream();
@@ -690,8 +690,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-L2-004
-    // fusa:test REQ-L2-005
+    //fusa:test REQ-L2-004
+    //fusa:test REQ-L2-005
     fn l2_send_acf_gbb_round_trips_over_socket() {
         struct EchoGbb;
         impl L2Socket for EchoGbb {
@@ -730,8 +730,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-L2-003
-    // fusa:test REQ-L2-004
+    //fusa:test REQ-L2-003
+    //fusa:test REQ-L2-004
     fn l2_transport_send_records_the_real_ethernet_frame() {
         let socket = QueuedL2::with_inbound(Vec::new());
         let transport = L2Transport::new(local_stream(), socket.clone(), DEST_MAC, SRC_MAC);
@@ -750,7 +750,7 @@ mod tests {
 
     #[cfg(not(target_os = "linux"))]
     #[test]
-    // fusa:test REQ-L2-008
+    //fusa:test REQ-L2-008
     fn raw_ethernet_socket_bind_fails_explicitly_off_linux() {
         let err = RawEthernetSocket::bind("eth0").unwrap_err();
         assert!(matches!(err, RcpError::Other(_)));
@@ -764,7 +764,7 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     #[ignore = "requires root/CAP_NET_RAW and a pre-existing veth0/veth1 pair; see ci.yml's l2-veth job"]
-    // fusa:test REQ-L2-007
+    //fusa:test REQ-L2-007
     fn real_raw_ethernet_socket_round_trips_a_frame_over_a_veth_pair() {
         let tx = RawEthernetSocket::bind("veth0").expect("bind veth0 (needs sudo/CAP_NET_RAW)");
         let rx = RawEthernetSocket::bind("veth1").expect("bind veth1 (needs sudo/CAP_NET_RAW)");

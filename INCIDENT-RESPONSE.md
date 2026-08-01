@@ -39,7 +39,7 @@ This plan covers security incidents affecting the rust-RCP library or any deploy
 ### 3. Analysis and Fix
 
 1. Root cause analysis — trace to specific `REQ-*` requirement.
-2. Write a failing test reproducing the vulnerability (`// fusa:test REQ-XXX`).
+2. Write a failing test reproducing the vulnerability (`//fusa:test REQ-XXX`).
 3. Implement the fix; add the requirement annotation.
 4. Update `.fusa-problems.json` with problem record.
 5. Re-run `rsfusa check` to verify coverage.

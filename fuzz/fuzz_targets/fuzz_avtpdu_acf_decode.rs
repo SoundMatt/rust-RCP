@@ -9,27 +9,27 @@ use libfuzzer_sys::fuzz_target;
 // only failure mode under test is a panic inside the crate's own decode
 // logic, never an assertion in this harness.
 fuzz_target!(|data: &[u8]| {
-    // fusa:req REQ-NTSCF-005
-    // fusa:req REQ-NTSCF-006
+    //fusa:req REQ-NTSCF-005
+    //fusa:req REQ-NTSCF-006
     let _ = rcp::avtp::decode_ntscf_header(data);
 
-    // fusa:req REQ-TSCF-005
-    // fusa:req REQ-TSCF-006
+    //fusa:req REQ-TSCF-005
+    //fusa:req REQ-TSCF-006
     let _ = rcp::avtp::decode_tscf_header(data);
 
-    // fusa:req REQ-HVSEL-005
+    //fusa:req REQ-HVSEL-005
     // select_header_variant is exercised under both TimeSyncCapability
     // outcomes, since the rule branches on it before decoding the body.
     let _ = rcp::avtp::select_header_variant(data, rcp::avtp::TimeSyncCapability::Capable);
     let _ = rcp::avtp::select_header_variant(data, rcp::avtp::TimeSyncCapability::Incapable);
 
-    // fusa:req REQ-BMI-004
+    //fusa:req REQ-BMI-004
     let _ = rcp::acf::decode_byte_message_info(data);
 
-    // fusa:req REQ-ABB-005
+    //fusa:req REQ-ABB-005
     let _ = rcp::acf::decode_acf_abb(data);
 
-    // fusa:req REQ-GBB-005
+    //fusa:req REQ-GBB-005
     let _ = rcp::acf::decode_acf_gbb(data);
 
     // Belt-and-suspenders: parse_stream_id/StreamId::from_u64 take a plain

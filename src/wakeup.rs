@@ -1,11 +1,11 @@
-// fusa:req REQ-WAKE-001
-// fusa:req REQ-WAKE-002
-// fusa:req REQ-WAKE-003
-// fusa:req REQ-WAKE-004
-// fusa:req REQ-WAKE-005
-// fusa:req REQ-WAKE-006
-// fusa:req REQ-WAKE-007
-// fusa:req REQ-WAKE-008
+//fusa:req REQ-WAKE-001
+//fusa:req REQ-WAKE-002
+//fusa:req REQ-WAKE-003
+//fusa:req REQ-WAKE-004
+//fusa:req REQ-WAKE-005
+//fusa:req REQ-WAKE-006
+//fusa:req REQ-WAKE-007
+//fusa:req REQ-WAKE-008
 
 //! The Wakeup control endpoint type (`ep_type 0x01`) — `ROADMAP.md`
 //! Milestone 7 ("Remaining Endpoint Types"), fifth checklist bullet: a
@@ -198,17 +198,17 @@ use crate::RcpError;
 /// [`SleepCmdRequest::encode`]/[`SleepCmdRequest::decode`] carry exactly
 /// one byte and no surrounding frame.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-WAKE-001
+//fusa:req REQ-WAKE-001
 pub struct SleepCmdRequest;
 
 impl SleepCmdRequest {
     /// The fixed `SleepCMD` wire discriminant this checklist bullet names.
-    // fusa:req REQ-WAKE-001
+    //fusa:req REQ-WAKE-001
     pub const DISCRIMINANT: u8 = 0xA5;
 
     /// Encode this request to its one-byte wire representation:
     /// [`SleepCmdRequest::DISCRIMINANT`], always.
-    // fusa:req REQ-WAKE-001
+    //fusa:req REQ-WAKE-001
     pub fn encode(self) -> [u8; 1] {
         [Self::DISCRIMINANT]
     }
@@ -220,7 +220,7 @@ impl SleepCmdRequest {
     /// is not [`SleepCmdRequest::DISCRIMINANT`] — matching
     /// [`crate::mdio::MdioAddressingMode::from_u8`]'s own short-vs-invalid
     /// split. Never panics for any input.
-    // fusa:req REQ-WAKE-002
+    //fusa:req REQ-WAKE-002
     pub fn decode(b: &[u8]) -> Result<Self, RcpError> {
         match b.first() {
             None => Err(RcpError::ShortFrame),
@@ -244,12 +244,12 @@ pub const WAKE_SOURCE_PIN_MASK_LEN: usize = 4;
 /// comment for why that mapping is [`crate::regmap::HwPinMappingEntry`]'s
 /// job, not this type's.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-WAKE-003
+//fusa:req REQ-WAKE-003
 pub struct WakeSourcePinMask(pub u32);
 
 impl WakeSourcePinMask {
     /// Encode this bitmask to its 4-byte big-endian wire representation.
-    // fusa:req REQ-WAKE-003
+    //fusa:req REQ-WAKE-003
     pub fn encode(self) -> [u8; WAKE_SOURCE_PIN_MASK_LEN] {
         self.0.to_be_bytes()
     }
@@ -261,7 +261,7 @@ impl WakeSourcePinMask {
     /// [`WAKE_SOURCE_PIN_MASK_LEN`] instead. Trailing bytes beyond the
     /// first four are ignored, matching [`crate::gpio::GpioBitmask::decode`]'s
     /// own handling of a longer-than-required slice.
-    // fusa:req REQ-WAKE-003
+    //fusa:req REQ-WAKE-003
     pub fn decode(b: &[u8]) -> Result<Self, RcpError> {
         if b.len() < WAKE_SOURCE_PIN_MASK_LEN {
             return Err(RcpError::ShortFrame);
@@ -280,7 +280,7 @@ impl WakeSourcePinMask {
 /// why this module does not transcribe GPIO's edge-triggered model onto a
 /// mechanism this crate has no confirmed basis for reading the same way.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-WAKE-004
+//fusa:req REQ-WAKE-004
 pub struct WakeupTriggerConfig {
     /// Per-pin bitmask: this pin is armed to be monitored as a wake source.
     pub wake_enable: WakeSourcePinMask,
@@ -289,7 +289,7 @@ pub struct WakeupTriggerConfig {
 impl WakeupTriggerConfig {
     /// Encode this config to its 4-byte big-endian wire representation:
     /// [`WakeupTriggerConfig::wake_enable`], unmodified.
-    // fusa:req REQ-WAKE-004
+    //fusa:req REQ-WAKE-004
     pub fn encode(self) -> [u8; WAKE_SOURCE_PIN_MASK_LEN] {
         self.wake_enable.encode()
     }
@@ -300,7 +300,7 @@ impl WakeupTriggerConfig {
     /// returns `Err(RcpError::ShortFrame)` for input shorter than
     /// [`WAKE_SOURCE_PIN_MASK_LEN`] instead, delegating to
     /// [`WakeSourcePinMask::decode`].
-    // fusa:req REQ-WAKE-004
+    //fusa:req REQ-WAKE-004
     pub fn decode(b: &[u8]) -> Result<Self, RcpError> {
         Ok(Self {
             wake_enable: WakeSourcePinMask::decode(b)?,
@@ -311,7 +311,7 @@ impl WakeupTriggerConfig {
 /// Which wake-source pins actually fired, as reported by
 /// [`evaluate_wake_source_signals`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-WAKE-005
+//fusa:req REQ-WAKE-005
 pub struct WakeSourceSignals {
     /// Per-pin bitmask: this pin was armed and observed asserted.
     pub fired: WakeSourcePinMask,
@@ -320,7 +320,7 @@ pub struct WakeSourceSignals {
 impl WakeSourceSignals {
     /// True if any pin fired at all — `fired`'s underlying bitmask is
     /// nonzero. Never panics for any input.
-    // fusa:req REQ-WAKE-005
+    //fusa:req REQ-WAKE-005
     pub fn any_fired(self) -> bool {
         self.fired.0 != 0
     }
@@ -333,7 +333,7 @@ impl WakeSourceSignals {
 /// across a previous/current pair — see this module's doc comment
 /// "Provenance note: wake-source pin count, width, and push-vs-poll" for
 /// why. Never panics for any input.
-// fusa:req REQ-WAKE-005
+//fusa:req REQ-WAKE-005
 pub fn evaluate_wake_source_signals(
     config: &WakeupTriggerConfig,
     observed: WakeSourcePinMask,
@@ -352,7 +352,7 @@ pub fn evaluate_wake_source_signals(
 /// this is a dedicated type rather than content added directly to
 /// [`crate::regmap::PerEpTypeFunctionalConfig`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-WAKE-006
+//fusa:req REQ-WAKE-006
 pub struct WakeupFunctionalConfig {
     /// This endpoint's per-pin wake-source trigger arming.
     pub trigger: WakeupTriggerConfig,
@@ -366,7 +366,7 @@ impl WakeupFunctionalConfig {
     /// This module does not itself call that function — it only shows how a
     /// caller would obtain the matching tag, per this module's doc comment
     /// "Relationship to `crate::regmap`".
-    // fusa:req REQ-WAKE-006
+    //fusa:req REQ-WAKE-006
     pub fn layer_tag(&self) -> crate::regmap::PerEpTypeFunctionalConfig {
         crate::regmap::PerEpTypeFunctionalConfig::new(crate::regmap::EndpointType::Wakeup)
     }
@@ -386,7 +386,14 @@ impl WakeupFunctionalConfig {
 /// no target mode of its own. Returns whatever
 /// [`crate::powerstate::try_enter_power_mode`] returns; never panics for
 /// any input.
-// fusa:req REQ-WAKE-007
+///
+/// Because [`crate::powerstate::try_enter_power_mode`] admits the move only
+/// when both [`crate::powerstate::PowerModeGateInput`] flags hold, a
+/// `SleepCMD` reaches sleep mode only "as soon as all EPs are idle and the
+/// responder queues are empty (all responses sent)" — TC18 §13.7.2.3's
+/// third sleep-sequence step.
+//fusa:req REQ-WAKE-007
+//fusa:req REQ-WAKE-009
 pub fn request_sleep_via_sleep_cmd(
     _cmd: SleepCmdRequest,
     from: crate::powerstate::PowerMode,
@@ -406,7 +413,7 @@ pub fn request_sleep_via_sleep_cmd(
 /// [`crate::powerstate::send_wakeup_request`], which itself only succeeds
 /// from [`crate::powerstate::WakeUpHandshakeState::Idle`]. Never panics for
 /// any input.
-// fusa:req REQ-WAKE-008
+//fusa:req REQ-WAKE-008
 pub fn wake_source_signals_trigger_handshake(
     state: crate::powerstate::WakeUpHandshakeState,
     signals: WakeSourceSignals,
@@ -425,27 +432,27 @@ mod tests {
     // ── SleepCmdRequest: encode/decode round-trip, never panic ─────────────
 
     #[test]
-    // fusa:test REQ-WAKE-001
+    //fusa:test REQ-WAKE-001
     fn sleep_cmd_request_encodes_to_the_fixed_0xa5_discriminant() {
         assert_eq!(SleepCmdRequest.encode(), [0xA5u8]);
         assert_eq!(SleepCmdRequest::DISCRIMINANT, 0xA5);
     }
 
     #[test]
-    // fusa:test REQ-WAKE-001
+    //fusa:test REQ-WAKE-001
     fn sleep_cmd_request_round_trips_through_encode_decode() {
         let req = SleepCmdRequest;
         assert_eq!(SleepCmdRequest::decode(&req.encode()), Ok(req));
     }
 
     #[test]
-    // fusa:test REQ-WAKE-002
+    //fusa:test REQ-WAKE-002
     fn sleep_cmd_request_decode_rejects_empty_input() {
         assert_eq!(SleepCmdRequest::decode(&[]), Err(RcpError::ShortFrame));
     }
 
     #[test]
-    // fusa:test REQ-WAKE-002
+    //fusa:test REQ-WAKE-002
     fn sleep_cmd_request_decode_rejects_any_non_0xa5_first_byte() {
         for raw in [0x00u8, 0x01, 0x5A, 0xA4, 0xA6, 0xFF] {
             assert_eq!(
@@ -456,7 +463,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WAKE-002
+    //fusa:test REQ-WAKE-002
     fn sleep_cmd_request_decode_never_panics_for_any_sampled_input() {
         for buf in [
             vec![],
@@ -472,7 +479,7 @@ mod tests {
     // ── WakeSourcePinMask: round-trip / never-panic ─────────────────────────
 
     #[test]
-    // fusa:test REQ-WAKE-003
+    //fusa:test REQ-WAKE-003
     fn wake_source_pin_mask_round_trips_through_encode_decode() {
         for raw in [0u32, 1, 0x0000_0001, 0x8000_0000, 0xFFFF_FFFF, 0x1234_5678] {
             let mask = WakeSourcePinMask(raw);
@@ -481,7 +488,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WAKE-003
+    //fusa:test REQ-WAKE-003
     fn wake_source_pin_mask_decode_rejects_short_input() {
         for len in 0..WAKE_SOURCE_PIN_MASK_LEN {
             let buf = vec![0xAAu8; len];
@@ -490,14 +497,14 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WAKE-003
+    //fusa:test REQ-WAKE-003
     fn wake_source_pin_mask_decode_ignores_trailing_bytes() {
         let buf = [0x00, 0x00, 0x00, 0x2A, 0xFF, 0xFF];
         assert_eq!(WakeSourcePinMask::decode(&buf), Ok(WakeSourcePinMask(0x2A)));
     }
 
     #[test]
-    // fusa:test REQ-WAKE-003
+    //fusa:test REQ-WAKE-003
     fn wake_source_pin_mask_decode_never_panics_for_any_sampled_input() {
         for len in [0usize, 1, 2, 3, 4, 5, 9, 64] {
             let buf = vec![0x5Au8; len];
@@ -508,7 +515,7 @@ mod tests {
     // ── WakeupTriggerConfig: round-trip / never-panic ───────────────────────
 
     #[test]
-    // fusa:test REQ-WAKE-004
+    //fusa:test REQ-WAKE-004
     fn wakeup_trigger_config_round_trips_through_encode_decode() {
         let cfg = WakeupTriggerConfig {
             wake_enable: WakeSourcePinMask(0x0000_0007),
@@ -517,7 +524,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WAKE-004
+    //fusa:test REQ-WAKE-004
     fn wakeup_trigger_config_decode_rejects_short_input() {
         for len in 0..WAKE_SOURCE_PIN_MASK_LEN {
             let buf = vec![0x00u8; len];
@@ -526,7 +533,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WAKE-004
+    //fusa:test REQ-WAKE-004
     fn wakeup_trigger_config_default_arms_no_pins() {
         assert_eq!(
             WakeupTriggerConfig::default().wake_enable,
@@ -537,7 +544,7 @@ mod tests {
     // ── evaluate_wake_source_signals ─────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-WAKE-005
+    //fusa:test REQ-WAKE-005
     fn evaluate_wake_source_signals_reports_only_armed_and_observed_pins() {
         let config = WakeupTriggerConfig {
             wake_enable: WakeSourcePinMask(0b1010),
@@ -548,7 +555,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WAKE-005
+    //fusa:test REQ-WAKE-005
     fn evaluate_wake_source_signals_masks_out_disarmed_pins() {
         let config = WakeupTriggerConfig {
             wake_enable: WakeSourcePinMask(0b0000),
@@ -559,7 +566,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WAKE-005
+    //fusa:test REQ-WAKE-005
     fn evaluate_wake_source_signals_no_signal_when_nothing_observed() {
         let config = WakeupTriggerConfig {
             wake_enable: WakeSourcePinMask(0xFFFF_FFFF),
@@ -570,7 +577,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WAKE-005
+    //fusa:test REQ-WAKE-005
     fn evaluate_wake_source_signals_never_panics_for_any_sampled_input() {
         for armed in [0u32, 0x5555_5555, 0xFFFF_FFFF] {
             for observed in [0u32, 0xAAAA_AAAA, 0xFFFF_FFFF] {
@@ -585,7 +592,7 @@ mod tests {
     // ── WakeupFunctionalConfig / layer_tag ──────────────────────────────────
 
     #[test]
-    // fusa:test REQ-WAKE-006
+    //fusa:test REQ-WAKE-006
     fn wakeup_functional_config_default_arms_no_pins_and_layer_tag_matches_ep_type_wakeup() {
         let functional = WakeupFunctionalConfig::default();
         assert_eq!(functional.trigger, WakeupTriggerConfig::default());
@@ -603,7 +610,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WAKE-006
+    //fusa:test REQ-WAKE-006
     fn wakeup_functional_config_layer_tag_rejects_mismatched_ep_type() {
         let functional = WakeupFunctionalConfig {
             trigger: WakeupTriggerConfig {
@@ -620,7 +627,7 @@ mod tests {
     // ── request_sleep_via_sleep_cmd ──────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-WAKE-007
+    //fusa:test REQ-WAKE-007
     fn request_sleep_via_sleep_cmd_succeeds_for_a_defined_gated_transition() {
         let gate = PowerModeGateInput {
             all_endpoints_idle: true,
@@ -643,7 +650,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WAKE-007
+    //fusa:test REQ-WAKE-007
     fn request_sleep_via_sleep_cmd_rejects_an_undefined_transition() {
         let gate = PowerModeGateInput {
             all_endpoints_idle: true,
@@ -672,7 +679,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WAKE-007
+    //fusa:test REQ-WAKE-007
     fn request_sleep_via_sleep_cmd_rejects_when_not_gated() {
         let gate = PowerModeGateInput::default();
         assert_eq!(
@@ -686,10 +693,44 @@ mod tests {
         );
     }
 
+    /// TC18 §13.7.2.3 (TC18.txt lines 4151-4158): based on the sleep
+    /// request the RC Server brings the implementation to sleep mode only
+    /// "as soon as all EPs are idle and the responder queues are empty (all
+    /// responses sent)". Both conjuncts are required; neither alone admits
+    /// the move.
+    #[test]
+    //fusa:test REQ-WAKE-009
+    fn sleep_cmd_reaches_sleep_only_when_all_eps_idle_and_responder_queues_empty() {
+        // TC18 §13.7.2.3's two conditions, enumerated exhaustively.
+        let cases = [
+            (false, false, false),
+            (false, true, false),
+            (true, false, false),
+            (true, true, true),
+        ];
+        for (all_endpoints_idle, no_pending_response, admitted) in cases {
+            let gate = PowerModeGateInput {
+                all_endpoints_idle,
+                no_pending_response,
+            };
+            let result = request_sleep_via_sleep_cmd(
+                SleepCmdRequest,
+                PowerMode::Normal,
+                PowerMode::Sleep,
+                gate,
+            );
+            if admitted {
+                assert_eq!(result, Ok(PowerMode::Sleep));
+            } else {
+                assert_eq!(result, Err(RcpError::RequestRejected));
+            }
+        }
+    }
+
     // ── wake_source_signals_trigger_handshake ───────────────────────────
 
     #[test]
-    // fusa:test REQ-WAKE-008
+    //fusa:test REQ-WAKE-008
     fn wake_source_signals_trigger_handshake_advances_idle_to_request_sent_when_fired() {
         let signals = WakeSourceSignals {
             fired: WakeSourcePinMask(1),
@@ -701,7 +742,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WAKE-008
+    //fusa:test REQ-WAKE-008
     fn wake_source_signals_trigger_handshake_rejects_when_nothing_fired() {
         let signals = WakeSourceSignals::default();
         assert_eq!(
@@ -711,7 +752,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WAKE-008
+    //fusa:test REQ-WAKE-008
     fn wake_source_signals_trigger_handshake_rejects_when_handshake_not_idle() {
         let signals = WakeSourceSignals {
             fired: WakeSourcePinMask(1),
@@ -728,7 +769,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WAKE-008
+    //fusa:test REQ-WAKE-008
     fn wake_source_signals_trigger_handshake_never_panics_for_any_sampled_input() {
         for state in [
             WakeUpHandshakeState::Idle,

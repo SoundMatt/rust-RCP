@@ -1,10 +1,10 @@
-// fusa:req REQ-RL-001
-// fusa:req REQ-RL-002
-// fusa:req REQ-RL-003
-// fusa:req REQ-RL-004
-// fusa:req REQ-RL-005
-// fusa:req REQ-RL-006
-// fusa:req REQ-RL-008
+//fusa:req REQ-RL-001
+//fusa:req REQ-RL-002
+//fusa:req REQ-RL-003
+//fusa:req REQ-RL-004
+//fusa:req REQ-RL-005
+//fusa:req REQ-RL-006
+//fusa:req REQ-RL-008
 
 //! Token-bucket rate limiter endpoint decorator.
 //!
@@ -38,7 +38,7 @@ use crate::RcpError;
 // ── Config ────────────────────────────────────────────────────────────────────
 
 /// Token-bucket configuration.
-// fusa:req REQ-RL-001
+//fusa:req REQ-RL-001
 #[derive(Clone, Debug)]
 pub struct Config {
     /// Sustained request rate (calls per second).
@@ -48,7 +48,7 @@ pub struct Config {
 }
 
 /// Returns the default rate-limiter config: 100 calls/s, 20-call burst.
-// fusa:req REQ-RL-002
+//fusa:req REQ-RL-002
 pub fn default_config() -> Config {
     Config {
         rate: 100.0,
@@ -95,7 +95,7 @@ impl Bucket {
 // ── RateLimitEndpoint ────────────────────────────────────────────────────────
 
 /// Rate-limiting wrapper around an inner [`Endpoint`].
-// fusa:req REQ-RL-003
+//fusa:req REQ-RL-003
 pub struct RateLimitEndpoint {
     inner: Arc<dyn Endpoint>,
     bucket: Mutex<Bucket>,
@@ -103,7 +103,7 @@ pub struct RateLimitEndpoint {
 
 impl RateLimitEndpoint {
     /// Create a new `RateLimitEndpoint` with the given configuration.
-    // fusa:req REQ-RL-004
+    //fusa:req REQ-RL-004
     pub fn new(inner: Arc<dyn Endpoint>, cfg: Config) -> Self {
         RateLimitEndpoint {
             inner,
@@ -132,15 +132,15 @@ impl Endpoint for RateLimitEndpoint {
         self.inner.ep_type()
     }
 
-    // fusa:req REQ-RL-005
-    // fusa:req REQ-RL-006
+    //fusa:req REQ-RL-005
+    //fusa:req REQ-RL-006
     fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
         self.consume()?;
         self.inner.read(read_size)
     }
 
-    // fusa:req REQ-RL-005
-    // fusa:req REQ-RL-006
+    //fusa:req REQ-RL-005
+    //fusa:req REQ-RL-006
     fn write(&self, payload: &[u8]) -> Result<(), RcpError> {
         self.consume()?;
         self.inner.write(payload)
@@ -168,7 +168,7 @@ mod tests {
     // ── Default config ────────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-RL-002
+    //fusa:test REQ-RL-002
     fn default_config_values() {
         let cfg = default_config();
         assert_eq!(cfg.rate, 100.0);
@@ -178,8 +178,8 @@ mod tests {
     // ── Burst allowed ─────────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-RL-001
-    // fusa:test REQ-RL-005
+    //fusa:test REQ-RL-001
+    //fusa:test REQ-RL-005
     fn burst_capacity_is_honoured() {
         let rl = rl(1.0, 5.0); // 1 call/s, burst=5
         for _ in 0..5 {
@@ -193,7 +193,7 @@ mod tests {
     // ── Empty bucket returns Busy ─────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-RL-006
+    //fusa:test REQ-RL-006
     fn bucket_exhaustion_returns_busy() {
         let rl = rl(0.0, 0.0); // zero tokens — always Busy
         let err = rl.write(b"x").unwrap_err();
@@ -201,7 +201,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RL-006
+    //fusa:test REQ-RL-006
     fn burst_exhaustion_across_multiple_calls_returns_busy() {
         let rl = rl(0.0, 3.0); // 3 burst, no refill
         for _ in 0..3 {
@@ -214,7 +214,7 @@ mod tests {
     // ── Read and write both obey bucket ───────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-RL-005
+    //fusa:test REQ-RL-005
     fn read_obeys_bucket() {
         let rl = rl(0.0, 0.0);
         let err = rl.read(1).unwrap_err();
@@ -222,7 +222,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RL-005
+    //fusa:test REQ-RL-005
     fn write_obeys_bucket() {
         let rl = rl(0.0, 0.0);
         let err = rl.write(b"x").unwrap_err();
@@ -232,7 +232,7 @@ mod tests {
     // ── ep_type forwarded ────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-RL-003
+    //fusa:test REQ-RL-003
     fn ep_type_matches_inner() {
         let inner = MockEndpoint::new(EndpointType::Adc, vec![]) as Arc<dyn Endpoint>;
         let rl = RateLimitEndpoint::new_default(inner);
@@ -242,7 +242,7 @@ mod tests {
     // ── Token replenishment ───────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-RL-004
+    //fusa:test REQ-RL-004
     fn tokens_replenish_over_time() {
         let rl = rl(1000.0, 1.0); // very fast replenishment, burst=1
         rl.write(b"x").unwrap(); // consume the one token
@@ -254,7 +254,7 @@ mod tests {
     // ── Busy is a relay timeout sentinel ─────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-RL-008
+    //fusa:test REQ-RL-008
     fn busy_is_relay_timeout_sentinel() {
         let err = RcpError::Busy;
         assert!(
