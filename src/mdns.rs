@@ -1,7 +1,7 @@
-// fusa:req REQ-MDNS-001
-// fusa:req REQ-MDNS-002
-// fusa:req REQ-MDNS-003
-// fusa:req REQ-MDNS-004
+//fusa:req REQ-MDNS-001
+//fusa:req REQ-MDNS-002
+//fusa:req REQ-MDNS-003
+//fusa:req REQ-MDNS-004
 
 //! mDNS/DNS-SD service discovery — an optional pre-discovery rendezvous
 //! helper.
@@ -37,7 +37,7 @@ use crate::avtp::StreamId;
 // ── ServiceRecord ─────────────────────────────────────────────────────────────
 
 /// A discovered mDNS service record.
-// fusa:req REQ-MDNS-001
+//fusa:req REQ-MDNS-001
 #[derive(Debug, Clone)]
 pub struct ServiceRecord {
     pub host: String,
@@ -50,7 +50,7 @@ pub struct ServiceRecord {
 
 /// In-process mDNS registry for testing. Production implementations
 /// integrate with OS mDNS APIs via the same interface.
-// fusa:req REQ-MDNS-002
+//fusa:req REQ-MDNS-002
 pub struct MdnsRegistry {
     records: RwLock<HashMap<String, ServiceRecord>>,
 }
@@ -63,7 +63,7 @@ impl MdnsRegistry {
     }
 
     /// Announce a service (called by a server on startup).
-    // fusa:req REQ-MDNS-003
+    //fusa:req REQ-MDNS-003
     pub fn announce(&self, name: impl Into<String>, record: ServiceRecord) {
         self.records.write().unwrap().insert(name.into(), record);
     }
@@ -74,7 +74,7 @@ impl MdnsRegistry {
     }
 
     /// Resolve a service name to its record.
-    // fusa:req REQ-MDNS-004
+    //fusa:req REQ-MDNS-004
     pub fn resolve(&self, name: &str) -> Option<ServiceRecord> {
         self.records.read().unwrap().get(name).cloned()
     }
@@ -112,8 +112,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-MDNS-003
-    // fusa:test REQ-MDNS-004
+    //fusa:test REQ-MDNS-003
+    //fusa:test REQ-MDNS-004
     fn announce_and_resolve() {
         let r = MdnsRegistry::new();
         r.announce("fl-svr._rcp._tcp.local.", record(1));
@@ -122,13 +122,13 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-MDNS-004
+    //fusa:test REQ-MDNS-004
     fn resolve_unknown_returns_none() {
         assert!(MdnsRegistry::new().resolve("unknown").is_none());
     }
 
     #[test]
-    // fusa:test REQ-MDNS-002
+    //fusa:test REQ-MDNS-002
     fn withdraw_removes_record() {
         let r = MdnsRegistry::new();
         r.announce("svc", record(2));
@@ -137,7 +137,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-MDNS-001
+    //fusa:test REQ-MDNS-001
     fn service_record_fields() {
         let rec = ServiceRecord {
             host: "h".into(),

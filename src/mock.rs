@@ -1,13 +1,13 @@
-// fusa:req REQ-MOCKSRV-001
-// fusa:req REQ-MOCKSRV-002
-// fusa:req REQ-MOCKSRV-003
-// fusa:req REQ-MOCKSRV-004
-// fusa:req REQ-MOCKSRV-005
-// fusa:req REQ-MOCKSRV-006
-// fusa:req REQ-MOCKSRV-007
-// fusa:req REQ-MOCKSRV-008
-// fusa:req REQ-MOCKSRV-009
-// fusa:req REQ-MOCKSRV-010
+//fusa:req REQ-MOCKSRV-001
+//fusa:req REQ-MOCKSRV-002
+//fusa:req REQ-MOCKSRV-003
+//fusa:req REQ-MOCKSRV-004
+//fusa:req REQ-MOCKSRV-005
+//fusa:req REQ-MOCKSRV-006
+//fusa:req REQ-MOCKSRV-007
+//fusa:req REQ-MOCKSRV-008
+//fusa:req REQ-MOCKSRV-009
+//fusa:req REQ-MOCKSRV-010
 
 //! In-process test double for this crate's OPEN Alliance TC18 Remote
 //! Control Protocol Specification v0.5.1_RC RC Server model.
@@ -153,14 +153,14 @@ impl Endpoint for MockEndpoint {
         self.ep_type
     }
 
-    // fusa:req REQ-MOCKSRV-010
+    //fusa:req REQ-MOCKSRV-010
     fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
         let buf = self.buf.lock().unwrap();
         let n = (read_size as usize).min(buf.len());
         Ok(buf[..n].to_vec())
     }
 
-    // fusa:req REQ-MOCKSRV-009
+    //fusa:req REQ-MOCKSRV-009
     fn write(&self, payload: &[u8]) -> Result<(), RcpError> {
         *self.buf.lock().unwrap() = payload.to_vec();
         Ok(())
@@ -207,7 +207,7 @@ impl RcServer {
     /// Construct a fresh RC Server, starting at [`RcServerState::INITIAL`]
     /// with no root client and no registered endpoints, holding `general`
     /// as its initial [`GeneralRegisters`] snapshot.
-    // fusa:req REQ-MOCKSRV-001
+    //fusa:req REQ-MOCKSRV-001
     pub fn new(general: GeneralRegisters) -> Arc<Self> {
         Arc::new(Self {
             state: Mutex::new(RcServerState::INITIAL),
@@ -221,7 +221,7 @@ impl RcServer {
     }
 
     /// This server's current lifecycle state.
-    // fusa:req REQ-MOCKSRV-002
+    //fusa:req REQ-MOCKSRV-002
     pub fn state(&self) -> RcServerState {
         *self.state.lock().unwrap()
     }
@@ -235,7 +235,7 @@ impl RcServer {
     /// delegating to [`RcServerState::try_transition`]. On success, this
     /// server's stored state is updated to `target`; on failure, it is left
     /// unchanged.
-    // fusa:req REQ-MOCKSRV-002
+    //fusa:req REQ-MOCKSRV-002
     pub fn try_transition(
         &self,
         target: RcServerState,
@@ -261,7 +261,7 @@ impl RcServer {
     /// `Err(RcpError::InvalidSize)` for an oversized `byte_bus_id`, or
     /// `Err(RcpError::EpError)` for an already-registered pair — without
     /// allocating an endpoint id or storing `endpoint` in either case.
-    // fusa:req REQ-MOCKSRV-003
+    //fusa:req REQ-MOCKSRV-003
     pub fn register_endpoint(
         &self,
         stream_id: StreamId,
@@ -316,10 +316,10 @@ impl RcServer {
     /// since `build_response_info` always sets the field it echoes — this
     /// call exists so a future change to either function is caught by this
     /// module's own tests rather than by a caller).
-    // fusa:req REQ-MOCKSRV-004
-    // fusa:req REQ-MOCKSRV-005
-    // fusa:req REQ-MOCKSRV-006
-    // fusa:req REQ-MOCKSRV-007
+    //fusa:req REQ-MOCKSRV-004
+    //fusa:req REQ-MOCKSRV-005
+    //fusa:req REQ-MOCKSRV-006
+    //fusa:req REQ-MOCKSRV-007
     pub fn handle_abb(
         &self,
         stream_id: StreamId,
@@ -414,7 +414,7 @@ impl RcServer {
     /// The response frame's `sequence_num` is this server's own
     /// free-running counter (see [`Self`]'s doc comment), unrelated to the
     /// request frame's.
-    // fusa:req REQ-MOCKSRV-008
+    //fusa:req REQ-MOCKSRV-008
     pub fn handle_ntscf_frame(
         &self,
         stream_id: StreamId,
@@ -467,14 +467,14 @@ mod rc_server_tests {
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-MOCKSRV-001
+    //fusa:test REQ-MOCKSRV-001
     fn new_server_starts_hw_unconfigured_with_no_root_client() {
         let srv = RcServer::new(GeneralRegisters::default());
         assert_eq!(srv.state(), RcServerState::HwUnconfigured);
     }
 
     #[test]
-    // fusa:test REQ-MOCKSRV-002
+    //fusa:test REQ-MOCKSRV-002
     fn try_transition_updates_state_on_success_and_leaves_it_on_failure() {
         let srv = RcServer::new(GeneralRegisters::default());
         srv.try_transition(RcServerState::HwConfigured, || true)
@@ -491,7 +491,7 @@ mod rc_server_tests {
     // ── Endpoint registration ─────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-MOCKSRV-003
+    //fusa:test REQ-MOCKSRV-003
     fn register_endpoint_assigns_unique_ids_and_rejects_duplicate_pair() {
         let srv = RcServer::new(GeneralRegisters::default());
         let sid = stream(1);
@@ -509,8 +509,8 @@ mod rc_server_tests {
     // ── EP0 dispatch ──────────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-MOCKSRV-004
-    // fusa:test REQ-MOCKSRV-005
+    //fusa:test REQ-MOCKSRV-004
+    //fusa:test REQ-MOCKSRV-005
     fn ep0_read_returns_general_registers_snapshot() {
         let regs = GeneralRegisters {
             svr_vendor_id: 0x1234,
@@ -525,8 +525,8 @@ mod rc_server_tests {
     }
 
     #[test]
-    // fusa:test REQ-MOCKSRV-004
-    // fusa:test REQ-MOCKSRV-005
+    //fusa:test REQ-MOCKSRV-004
+    //fusa:test REQ-MOCKSRV-005
     fn ep0_write_succeeds_for_the_root_client() {
         // RegisterCategory::General now has LockPolicy::W
         // (crate::lifecycle::lock_policy), writable whenever reachable, and
@@ -551,7 +551,7 @@ mod rc_server_tests {
     }
 
     #[test]
-    // fusa:test REQ-MOCKSRV-004
+    //fusa:test REQ-MOCKSRV-004
     fn ep0_write_from_non_root_client_is_rejected() {
         let srv = RcServer::new(GeneralRegisters::default());
         let root = stream(1);
@@ -573,7 +573,7 @@ mod rc_server_tests {
     }
 
     #[test]
-    // fusa:test REQ-MOCKSRV-004
+    //fusa:test REQ-MOCKSRV-004
     fn ep0_read_is_reachable_in_every_lifecycle_state() {
         let srv = RcServer::new(GeneralRegisters::default());
         let sid = stream(1);
@@ -594,7 +594,7 @@ mod rc_server_tests {
     // ── Device endpoint dispatch ──────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-MOCKSRV-006
+    //fusa:test REQ-MOCKSRV-006
     fn device_endpoint_write_then_read_round_trips_through_dispatch() {
         let srv = RcServer::new(GeneralRegisters::default());
         let sid = stream(1);
@@ -611,7 +611,7 @@ mod rc_server_tests {
     }
 
     #[test]
-    // fusa:test REQ-MOCKSRV-006
+    //fusa:test REQ-MOCKSRV-006
     fn unregistered_device_endpoint_returns_ep_not_found() {
         let srv = RcServer::new(GeneralRegisters::default());
         let sid = stream(1);
@@ -621,7 +621,7 @@ mod rc_server_tests {
     }
 
     #[test]
-    // fusa:test REQ-MOCKSRV-006
+    //fusa:test REQ-MOCKSRV-006
     fn endpoint_registered_under_one_stream_is_not_visible_from_another() {
         let srv = RcServer::new(GeneralRegisters::default());
         let sid_a = stream(1);
@@ -638,7 +638,7 @@ mod rc_server_tests {
     // ── Echo-back ─────────────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-MOCKSRV-007
+    //fusa:test REQ-MOCKSRV-007
     fn response_echoes_request_byte_bus_id() {
         let srv = RcServer::new(GeneralRegisters::default());
         let sid = stream(1);
@@ -654,7 +654,7 @@ mod rc_server_tests {
     // ── Whole on-wire round trip ──────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-MOCKSRV-008
+    //fusa:test REQ-MOCKSRV-008
     fn handle_ntscf_frame_round_trips_a_whole_on_wire_request() {
         let srv = RcServer::new(GeneralRegisters::default());
         let sid = stream(1);
@@ -674,7 +674,7 @@ mod rc_server_tests {
     }
 
     #[test]
-    // fusa:test REQ-MOCKSRV-008
+    //fusa:test REQ-MOCKSRV-008
     fn handle_ntscf_frame_dispatches_multiple_requests_concatenated_in_one_frame() {
         // TC18 §12.9.1.1: an RC Server must support multiple requests
         // concatenated in a single frame (rust-RCP-W03).
@@ -708,7 +708,7 @@ mod rc_server_tests {
     }
 
     #[test]
-    // fusa:test REQ-MOCKSRV-008
+    //fusa:test REQ-MOCKSRV-008
     fn handle_ntscf_frame_answers_a_dispatch_failure_with_a_wire_error_response_not_a_local_err() {
         // TC18 §12.9.6 "Handling errors" / rust-RCP-W04: a dispatch failure
         // that has a Table 27 wire code must be answered on the wire with
@@ -729,7 +729,7 @@ mod rc_server_tests {
     }
 
     #[test]
-    // fusa:test REQ-MOCKSRV-008
+    //fusa:test REQ-MOCKSRV-008
     fn handle_ntscf_frame_never_panics_on_garbage_input() {
         let srv = RcServer::new(GeneralRegisters::default());
         let sid = stream(1);
@@ -741,7 +741,7 @@ mod rc_server_tests {
     // ── MockEndpoint ──────────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-MOCKSRV-009
+    //fusa:test REQ-MOCKSRV-009
     fn mock_endpoint_read_returns_last_written_bytes() {
         let ep = MockEndpoint::new(EndpointType::Gpio, Vec::new());
         ep.write(&[1, 2, 3]).unwrap();
@@ -749,7 +749,7 @@ mod rc_server_tests {
     }
 
     #[test]
-    // fusa:test REQ-MOCKSRV-010
+    //fusa:test REQ-MOCKSRV-010
     fn mock_endpoint_read_size_exceeding_buffer_does_not_panic() {
         let ep = MockEndpoint::new(EndpointType::Gpio, vec![1, 2]);
         let out = ep.read(255).unwrap();
@@ -757,7 +757,7 @@ mod rc_server_tests {
     }
 
     #[test]
-    // fusa:test REQ-MOCKSRV-010
+    //fusa:test REQ-MOCKSRV-010
     fn mock_endpoint_read_on_empty_buffer_does_not_panic() {
         let ep = MockEndpoint::new(EndpointType::Gpio, Vec::new());
         assert_eq!(ep.read(10).unwrap(), Vec::<u8>::new());

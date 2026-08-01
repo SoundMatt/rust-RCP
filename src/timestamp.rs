@@ -1,9 +1,9 @@
-// fusa:req REQ-TS-001
-// fusa:req REQ-TS-002
-// fusa:req REQ-TS-003
-// fusa:req REQ-TS-004
-// fusa:req REQ-TS-005
-// fusa:req REQ-TS-006
+//fusa:req REQ-TS-001
+//fusa:req REQ-TS-002
+//fusa:req REQ-TS-003
+//fusa:req REQ-TS-004
+//fusa:req REQ-TS-005
+//fusa:req REQ-TS-006
 
 //! Timestamp semantics — TC18 wire format core (`ROADMAP.md` Milestone 1,
 //! "Timestamp Semantics" subsection).
@@ -99,7 +99,7 @@
 ///
 /// Returned by [`AvtpTimestamp::semantics`] and [`MessageTimestamp::semantics`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-// fusa:req REQ-TS-004
+//fusa:req REQ-TS-004
 pub enum TimestampMeaning {
     /// The raw value falls in this module's untimed fallback region (exact
     /// all-zero — see the module's provenance note) and must be treated as
@@ -119,13 +119,23 @@ pub enum TimestampMeaning {
 /// A distinct type from [`MessageTimestamp`] by design — see the module doc
 /// comment's "Distinct widths, distinct rollover periods" section.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
-// fusa:req REQ-TS-001
+//fusa:req REQ-TS-001
 pub struct AvtpTimestamp(pub u32);
 
 impl AvtpTimestamp {
     /// This type's rollover period, in raw ticks: the field's full 32-bit
-    /// width. See the module's provenance note for what this does and does
-    /// not claim about real-world tick units.
+    /// width.
+    ///
+    /// TC18 §11.4.1 (TC18.txt lines 1952-1953) confirms both the tick unit
+    /// and the period: "avtp_timestamp = (AS_sec × 10^9 + AS_ns) mod 2^32
+    /// where AS_sec is the gPTP seconds field and AS_ns is the gPTP
+    /// nanoseconds field (thus rolls over every 4 seconds)" — i.e. the
+    /// ticks are nanoseconds and the modulus is the field's full 2^32
+    /// width, which at 1 ns/tick is 4.294967296 s. See the module's
+    /// provenance note (now partly reconciled by that clause) and
+    /// `REQ-TIME-004` for the gPTP-derivation half of the same clause,
+    /// which this crate does not implement.
+    //fusa:req REQ-TS-007
     pub const ROLLOVER_PERIOD: u64 = 1u64 << 32;
 
     /// Wrap a raw `u32` value (e.g. from
@@ -142,7 +152,7 @@ impl AvtpTimestamp {
 
     /// This value's fallback-rule interpretation. See
     /// [`TimestampMeaning`] and the module's provenance note.
-    // fusa:req REQ-TS-004
+    //fusa:req REQ-TS-004
     pub fn semantics(self) -> TimestampMeaning {
         if self.0 == 0 {
             TimestampMeaning::Untimed
@@ -152,7 +162,7 @@ impl AvtpTimestamp {
     }
 
     /// Shorthand for `self.semantics() == TimestampMeaning::Untimed`.
-    // fusa:req REQ-TS-004
+    //fusa:req REQ-TS-004
     pub fn is_untimed(self) -> bool {
         self.semantics() == TimestampMeaning::Untimed
     }
@@ -171,14 +181,14 @@ impl AvtpTimestamp {
     /// beyond the sign this arithmetic happens to produce for them (see
     /// the "exactly half a period apart" test below for the boundary this
     /// module resolves to).
-    // fusa:req REQ-TS-002
+    //fusa:req REQ-TS-002
     pub fn wrapping_delta(self, earlier: Self) -> i64 {
         i64::from(self.0.wrapping_sub(earlier.0) as i32)
     }
 
     /// `true` if `self` is logically after `other`, per
     /// [`Self::wrapping_delta`] — i.e. `self.wrapping_delta(other) > 0`.
-    // fusa:req REQ-TS-002
+    //fusa:req REQ-TS-002
     pub fn is_after(self, other: Self) -> bool {
         self.wrapping_delta(other) > 0
     }
@@ -204,14 +214,20 @@ impl From<AvtpTimestamp> for u32 {
 /// A distinct type from [`AvtpTimestamp`] by design — see the module doc
 /// comment's "Distinct widths, distinct rollover periods" section.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
-// fusa:req REQ-TS-001
+//fusa:req REQ-TS-001
 pub struct MessageTimestamp(pub u64);
 
 impl MessageTimestamp {
     /// This type's rollover period, in raw ticks: the field's full 64-bit
     /// width — 2^32 times longer than [`AvtpTimestamp::ROLLOVER_PERIOD`].
-    /// See the module's provenance note for what this does and does not
-    /// claim about real-world tick units.
+    ///
+    /// TC18 §11.4.1 (TC18.txt lines 1954-1955) confirms both the tick unit
+    /// and the period: "message_timestamp = (AS_sec × 10^9 + AS_ns) mod
+    /// 2^64 where AS_sec is the gPTP seconds field and AS_ns is the gPTP
+    /// nanoseconds field (thus rolls over every 584,9 years)" — i.e. the
+    /// ticks are nanoseconds and the modulus is the field's full 2^64
+    /// width, which at 1 ns/tick is ~584.9 years of 365 days.
+    //fusa:req REQ-TS-007
     pub const ROLLOVER_PERIOD: u128 = 1u128 << 64;
 
     /// Wrap a raw `u64` value (e.g. from
@@ -228,7 +244,7 @@ impl MessageTimestamp {
 
     /// This value's fallback-rule interpretation. See
     /// [`TimestampMeaning`] and the module's provenance note.
-    // fusa:req REQ-TS-004
+    //fusa:req REQ-TS-004
     pub fn semantics(self) -> TimestampMeaning {
         if self.0 == 0 {
             TimestampMeaning::Untimed
@@ -238,7 +254,7 @@ impl MessageTimestamp {
     }
 
     /// Shorthand for `self.semantics() == TimestampMeaning::Untimed`.
-    // fusa:req REQ-TS-004
+    //fusa:req REQ-TS-004
     pub fn is_untimed(self) -> bool {
         self.semantics() == TimestampMeaning::Untimed
     }
@@ -252,14 +268,14 @@ impl MessageTimestamp {
     /// rollover period of one another — see
     /// [`AvtpTimestamp::wrapping_delta`]'s doc comment for the boundary
     /// case this module resolves to.
-    // fusa:req REQ-TS-003
+    //fusa:req REQ-TS-003
     pub fn wrapping_delta(self, earlier: Self) -> i64 {
         self.0.wrapping_sub(earlier.0) as i64
     }
 
     /// `true` if `self` is logically after `other`, per
     /// [`Self::wrapping_delta`] — i.e. `self.wrapping_delta(other) > 0`.
-    // fusa:req REQ-TS-003
+    //fusa:req REQ-TS-003
     pub fn is_after(self, other: Self) -> bool {
         self.wrapping_delta(other) > 0
     }
@@ -291,7 +307,7 @@ mod tests {
     // ═══════════════════════════════════════════════════════════════════
 
     #[test]
-    // fusa:test REQ-TS-001
+    //fusa:test REQ-TS-001
     fn avtp_timestamp_and_message_timestamp_are_distinct_types() {
         // This is primarily a compile-time property (there is no shared
         // trait or cross-type comparison between the two), but the two
@@ -306,7 +322,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TS-001
+    //fusa:test REQ-TS-001
     fn rollover_periods_are_distinct() {
         assert_eq!(AvtpTimestamp::ROLLOVER_PERIOD, 1u64 << 32);
         assert_eq!(MessageTimestamp::ROLLOVER_PERIOD, 1u128 << 64);
@@ -321,7 +337,7 @@ mod tests {
     // ═══════════════════════════════════════════════════════════════════
 
     #[test]
-    // fusa:test REQ-TS-004
+    //fusa:test REQ-TS-004
     fn avtp_timestamp_zero_is_untimed() {
         assert_eq!(AvtpTimestamp::new(0).semantics(), TimestampMeaning::Untimed);
         assert!(AvtpTimestamp::new(0).is_untimed());
@@ -329,7 +345,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TS-004
+    //fusa:test REQ-TS-004
     fn avtp_timestamp_nonzero_is_timed() {
         for raw in [1u32, 2, 0x1234_5678, u32::MAX] {
             let ts = AvtpTimestamp::new(raw);
@@ -343,7 +359,7 @@ mod tests {
     // ═══════════════════════════════════════════════════════════════════
 
     #[test]
-    // fusa:test REQ-TS-004
+    //fusa:test REQ-TS-004
     fn message_timestamp_zero_is_untimed() {
         assert_eq!(
             MessageTimestamp::new(0).semantics(),
@@ -354,7 +370,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TS-004
+    //fusa:test REQ-TS-004
     fn message_timestamp_nonzero_is_timed() {
         for raw in [1u64, 2, 0x0123_4567_89AB_CDEF, u64::MAX] {
             let ts = MessageTimestamp::new(raw);
@@ -368,7 +384,7 @@ mod tests {
     // ═══════════════════════════════════════════════════════════════════
 
     #[test]
-    // fusa:test REQ-TS-002
+    //fusa:test REQ-TS-002
     fn avtp_timestamp_delta_without_wraparound() {
         let earlier = AvtpTimestamp::new(100);
         let later = AvtpTimestamp::new(140);
@@ -379,7 +395,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TS-002
+    //fusa:test REQ-TS-002
     fn avtp_timestamp_delta_across_rollover_boundary() {
         // 0 is one tick after u32::MAX, wrapping — not "4294967295 ticks
         // behind" if the rollover is accounted for.
@@ -396,7 +412,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TS-002
+    //fusa:test REQ-TS-002
     fn avtp_timestamp_delta_of_self_is_zero() {
         let ts = AvtpTimestamp::new(0xDEAD_BEEF);
         assert_eq!(ts.wrapping_delta(ts), 0);
@@ -404,7 +420,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TS-002
+    //fusa:test REQ-TS-002
     fn avtp_timestamp_exactly_half_period_apart_resolves_to_not_after() {
         // Exactly half a rollover period apart has no unambiguous
         // ordering; this module's arithmetic (bit-pattern reinterpreted as
@@ -424,7 +440,7 @@ mod tests {
     // ═══════════════════════════════════════════════════════════════════
 
     #[test]
-    // fusa:test REQ-TS-003
+    //fusa:test REQ-TS-003
     fn message_timestamp_delta_without_wraparound() {
         let earlier = MessageTimestamp::new(1_000);
         let later = MessageTimestamp::new(1_500);
@@ -435,7 +451,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TS-003
+    //fusa:test REQ-TS-003
     fn message_timestamp_delta_across_rollover_boundary() {
         let just_wrapped = MessageTimestamp::new(0);
         let just_before_wrap = MessageTimestamp::new(u64::MAX);
@@ -450,7 +466,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TS-003
+    //fusa:test REQ-TS-003
     fn message_timestamp_delta_of_self_is_zero() {
         let ts = MessageTimestamp::new(0xDEAD_BEEF_0000_0001);
         assert_eq!(ts.wrapping_delta(ts), 0);
@@ -458,7 +474,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TS-003
+    //fusa:test REQ-TS-003
     fn message_timestamp_exactly_half_period_apart_resolves_to_not_after() {
         let a = MessageTimestamp::new(0);
         let b = MessageTimestamp::new(1u64 << 63);
@@ -473,7 +489,7 @@ mod tests {
     // ═══════════════════════════════════════════════════════════════════
 
     #[test]
-    // fusa:test REQ-TS-005
+    //fusa:test REQ-TS-005
     fn avtp_timestamp_round_trips_through_u32() {
         for raw in [0u32, 1, 0x1234_5678, u32::MAX] {
             assert_eq!(AvtpTimestamp::new(raw).to_u32(), raw);
@@ -482,7 +498,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TS-005
+    //fusa:test REQ-TS-005
     fn message_timestamp_round_trips_through_u64() {
         for raw in [0u64, 1, 0x0123_4567_89AB_CDEF, u64::MAX] {
             assert_eq!(MessageTimestamp::new(raw).to_u64(), raw);
@@ -491,7 +507,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TS-005
+    //fusa:test REQ-TS-005
     fn avtp_timestamp_interoperates_with_tscf_header_field() {
         let hdr = TscfHeader {
             sequence_num: 1,
@@ -505,7 +521,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TS-005
+    //fusa:test REQ-TS-005
     fn message_timestamp_interoperates_with_acf_gbb_message_field() {
         let msg = AcfGbbMessage {
             info: ByteMessageInfo::default(),
@@ -518,7 +534,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TS-005
+    //fusa:test REQ-TS-005
     fn zero_message_timestamp_on_acf_gbb_message_is_untimed() {
         // The fallback rule applies identically to a message_timestamp
         // sourced from a real AcfGbbMessage, not just a bare u64.
@@ -535,7 +551,7 @@ mod tests {
     // ═══════════════════════════════════════════════════════════════════
 
     #[test]
-    // fusa:test REQ-TS-006
+    //fusa:test REQ-TS-006
     fn avtp_timestamp_operations_never_panic_across_arbitrary_input() {
         let mut state: u32 = 0x2468_ACE0;
         let mut next = || {
@@ -561,7 +577,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TS-006
+    //fusa:test REQ-TS-006
     fn message_timestamp_operations_never_panic_across_arbitrary_input() {
         let mut state: u64 = 0x1234_5678_9ABC_DEF0;
         let mut next = || {
@@ -584,5 +600,51 @@ mod tests {
                 let _ = ta.is_after(tb);
             }
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  TC18 §11.4.1 rollover periods
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    //fusa:test REQ-TS-007
+    fn rollover_periods_match_tc18_11_4_1_nanosecond_derivation() {
+        // TC18 §11.4.1 (TC18.txt lines 1952-1955) states both moduli and
+        // both resulting real-world periods, with the tick unit fixed at
+        // nanoseconds by the `AS_sec × 10^9 + AS_ns` construction:
+        //
+        //   avtp_timestamp    = (...) mod 2^32  -> "rolls over every 4 seconds"
+        //   message_timestamp = (...) mod 2^64  -> "rolls over every 584,9 years"
+        //
+        // The moduli below are written out as literal powers of two read
+        // from that clause, not from this crate's own constants.
+        const TC18_AVTP_MODULUS: u64 = 4_294_967_296; // 2^32
+        const TC18_MESSAGE_MODULUS: u128 = 18_446_744_073_709_551_616; // 2^64
+        const NANOS_PER_SECOND: u128 = 1_000_000_000;
+        const SECONDS_PER_365_DAY_YEAR: u128 = 365 * 24 * 60 * 60;
+
+        assert_eq!(AvtpTimestamp::ROLLOVER_PERIOD, TC18_AVTP_MODULUS);
+        assert_eq!(MessageTimestamp::ROLLOVER_PERIOD, TC18_MESSAGE_MODULUS);
+
+        // 2^32 ns = 4.294967296 s, i.e. TC18's "every 4 seconds" (whole
+        // seconds: 4, and strictly less than 5).
+        let avtp_seconds = u128::from(AvtpTimestamp::ROLLOVER_PERIOD) / NANOS_PER_SECOND;
+        assert_eq!(avtp_seconds, 4, "TC18 §11.4.1: rolls over every 4 seconds");
+
+        // 2^64 ns = 18 446 744 073.709551616 s = 584.94... 365-day years,
+        // i.e. TC18's "584,9 years" to one decimal place.
+        let message_tenths_of_a_year = (MessageTimestamp::ROLLOVER_PERIOD * 10)
+            / (NANOS_PER_SECOND * SECONDS_PER_365_DAY_YEAR);
+        assert_eq!(
+            message_tenths_of_a_year, 5849,
+            "TC18 §11.4.1: rolls over every 584,9 years"
+        );
+
+        // The two periods differ by exactly the 2^32 factor the two field
+        // widths imply.
+        assert_eq!(
+            MessageTimestamp::ROLLOVER_PERIOD / u128::from(AvtpTimestamp::ROLLOVER_PERIOD),
+            u128::from(TC18_AVTP_MODULUS)
+        );
     }
 }

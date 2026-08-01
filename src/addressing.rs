@@ -1,7 +1,7 @@
-// fusa:req REQ-EPLK-001
-// fusa:req REQ-EPLK-002
-// fusa:req REQ-EPLK-003
-// fusa:req REQ-EPLK-004
+//fusa:req REQ-EPLK-001
+//fusa:req REQ-EPLK-002
+//fusa:req REQ-EPLK-003
+//fusa:req REQ-EPLK-004
 
 //! `(stream_id, byte_bus_id)` → endpoint lookup — TC18 wire format core
 //! (`ROADMAP.md` Milestone 1, "Addressing" subsection).
@@ -73,7 +73,7 @@ use std::collections::HashMap;
 /// something hashable/comparable to resolve a `(stream_id, byte_bus_id)`
 /// pair to — it does not need to know what an endpoint actually is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-// fusa:req REQ-EPLK-001
+//fusa:req REQ-EPLK-001
 pub struct EndpointId(pub u32);
 
 /// A stream-scoped `(stream_id, byte_bus_id)` → [`EndpointId`] lookup table.
@@ -81,7 +81,7 @@ pub struct EndpointId(pub u32);
 /// See the module doc comment for why `byte_bus_id`'s uniqueness is
 /// enforced per-[`StreamId`] rather than across the whole table.
 #[derive(Debug, Clone, Default)]
-// fusa:req REQ-EPLK-001
+//fusa:req REQ-EPLK-001
 pub struct EndpointTable {
     streams: HashMap<StreamId, HashMap<u16, EndpointId>>,
 }
@@ -102,7 +102,7 @@ impl EndpointTable {
     /// silently overwritten. The same `byte_bus_id` may be registered
     /// independently under any number of *different* `stream_id`s, since
     /// uniqueness here is stream-relative, not global.
-    // fusa:req REQ-EPLK-002
+    //fusa:req REQ-EPLK-002
     pub fn register(
         &mut self,
         stream_id: StreamId,
@@ -125,8 +125,8 @@ impl EndpointTable {
     ///
     /// A `byte_bus_id` registered under one `stream_id` is never visible
     /// under any other `stream_id` — both must match exactly.
-    // fusa:req REQ-EPLK-003
-    // fusa:req REQ-EPLK-004
+    //fusa:req REQ-EPLK-003
+    //fusa:req REQ-EPLK-004
     pub fn lookup(&self, stream_id: StreamId, byte_bus_id: u16) -> Option<EndpointId> {
         self.streams.get(&stream_id)?.get(&byte_bus_id).copied()
     }
@@ -146,9 +146,9 @@ mod tests {
     // ── Round-trip ─────────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-EPLK-001
-    // fusa:test REQ-EPLK-002
-    // fusa:test REQ-EPLK-003
+    //fusa:test REQ-EPLK-001
+    //fusa:test REQ-EPLK-002
+    //fusa:test REQ-EPLK-003
     fn register_then_lookup_resolves_the_same_endpoint() {
         let mut table = EndpointTable::new();
         let sid = stream(1);
@@ -157,7 +157,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-EPLK-002
+    //fusa:test REQ-EPLK-002
     fn register_accepts_byte_bus_id_at_11bit_max() {
         let mut table = EndpointTable::new();
         let sid = stream(1);
@@ -173,8 +173,8 @@ mod tests {
     // ── Stream-relative (not global) uniqueness ─────────────────────────────
 
     #[test]
-    // fusa:test REQ-EPLK-002
-    // fusa:test REQ-EPLK-003
+    //fusa:test REQ-EPLK-002
+    //fusa:test REQ-EPLK-003
     fn same_byte_bus_id_under_two_streams_resolves_independently() {
         let mut table = EndpointTable::new();
         let sid_a = stream(1);
@@ -190,7 +190,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-EPLK-003
+    //fusa:test REQ-EPLK-003
     fn lookup_does_not_leak_across_streams() {
         let mut table = EndpointTable::new();
         let sid_a = stream(1);
@@ -202,7 +202,7 @@ mod tests {
     // ── Explicit ambiguity flagging ──────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-EPLK-002
+    //fusa:test REQ-EPLK-002
     fn register_rejects_duplicate_pair_without_overwriting() {
         let mut table = EndpointTable::new();
         let sid = stream(1);
@@ -214,7 +214,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-EPLK-002
+    //fusa:test REQ-EPLK-002
     fn register_rejects_oversized_byte_bus_id() {
         let mut table = EndpointTable::new();
         let sid = stream(1);
@@ -226,7 +226,7 @@ mod tests {
     // ── Fuzz-style: arbitrary lookups never panic ───────────────────────────
 
     #[test]
-    // fusa:test REQ-EPLK-004
+    //fusa:test REQ-EPLK-004
     fn lookup_never_panics_on_empty_or_populated_table() {
         let empty = EndpointTable::new();
         let sweep: &[(StreamId, u16)] = &[

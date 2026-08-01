@@ -1,9 +1,9 @@
-// fusa:req REQ-CONF-001
-// fusa:req REQ-CONF-002
-// fusa:req REQ-CONF-003
-// fusa:req REQ-CONF-004
-// fusa:req REQ-CONF-005
-// fusa:req REQ-CONF-006
+//fusa:req REQ-CONF-001
+//fusa:req REQ-CONF-002
+//fusa:req REQ-CONF-003
+//fusa:req REQ-CONF-004
+//fusa:req REQ-CONF-005
+//fusa:req REQ-CONF-006
 
 //! Conformance test vectors — `ROADMAP.md` Milestone 10's last checklist
 //! item, "Conformance test vectors / interop verification against at least
@@ -529,7 +529,7 @@ mod tests {
     // ── Self-referential golden vectors ───────────────────────────────────
 
     #[test]
-    // fusa:test REQ-CONF-001
+    //fusa:test REQ-CONF-001
     fn ntscf_header_matches_golden_bytes_both_directions() {
         let hdr = golden::ntscf_header_fields();
         let encoded = avtp::encode_ntscf_header(&hdr).unwrap();
@@ -546,7 +546,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CONF-002
+    //fusa:test REQ-CONF-002
     fn tscf_header_matches_golden_bytes_both_directions() {
         let hdr = golden::tscf_header_fields();
         // Sanity: this vector's avtp_timestamp must stay non-degenerate —
@@ -568,7 +568,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CONF-003
+    //fusa:test REQ-CONF-003
     fn acf_abb_matches_golden_bytes_both_directions() {
         let msg = golden::acf_abb_fields();
         let encoded = acf::encode_acf_abb(&msg).unwrap();
@@ -585,7 +585,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CONF-004
+    //fusa:test REQ-CONF-004
     fn acf_gbb_matches_golden_bytes_both_directions() {
         let msg = golden::acf_gbb_fields();
         // Sanity: this vector's message_timestamp must stay non-zero — see
@@ -605,7 +605,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CONF-005
+    //fusa:test REQ-CONF-005
     fn ntscf_acf_abb_frame_matches_golden_bytes_both_directions() {
         let sid = StreamId::new(golden::SENDER_MAC_1, golden::UNIQUE_ID_1);
         let abb_bytes = acf::encode_acf_abb(&golden::acf_abb_fields()).unwrap();
@@ -627,7 +627,7 @@ mod tests {
     // ── go-RCP interop cross-check ──────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-CONF-006
+    //fusa:test REQ-CONF-006
     fn go_rcp_bytes_diverge_from_this_crates_own_encoding() {
         // Per this module's doc comment: rust-RCP and go-RCP, both
         // independently interpreting the same (confidential) TC18 spec
@@ -658,7 +658,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CONF-006
+    //fusa:test REQ-CONF-006
     fn stream_id_bytes_agree_with_go_rcp_crosscheck() {
         // The one part of the cross-check that *does* agree: both
         // implementations place the 6-byte sender MAC in the high-order
@@ -688,7 +688,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CONF-006
+    //fusa:test REQ-CONF-006
     fn go_rcp_crosscheck_message_kind_discriminants_differ_from_this_crates_own() {
         // A narrower, explicit check on the "Message-kind discriminant"
         // divergence documented above, independent of the byte-array-wide

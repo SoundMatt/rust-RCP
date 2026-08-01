@@ -1,19 +1,19 @@
-// fusa:req REQ-GPIO-001
-// fusa:req REQ-GPIO-002
-// fusa:req REQ-GPIO-003
-// fusa:req REQ-GPIO-004
-// fusa:req REQ-GPIO-005
-// fusa:req REQ-GPIO-006
-// fusa:req REQ-GPIO-007
-// fusa:req REQ-GPIO-008
-// fusa:req REQ-GPIO-009
-// fusa:req REQ-GPIO-010
-// fusa:req REQ-GPIO-011
-// fusa:req REQ-GPIO-012
-// fusa:req REQ-GPIO-013
-// fusa:req REQ-GPIO-014
-// fusa:req REQ-GPIO-015
-// fusa:req REQ-GPIO-016
+//fusa:req REQ-GPIO-001
+//fusa:req REQ-GPIO-002
+//fusa:req REQ-GPIO-003
+//fusa:req REQ-GPIO-004
+//fusa:req REQ-GPIO-005
+//fusa:req REQ-GPIO-006
+//fusa:req REQ-GPIO-007
+//fusa:req REQ-GPIO-008
+//fusa:req REQ-GPIO-009
+//fusa:req REQ-GPIO-010
+//fusa:req REQ-GPIO-011
+//fusa:req REQ-GPIO-012
+//fusa:req REQ-GPIO-013
+//fusa:req REQ-GPIO-014
+//fusa:req REQ-GPIO-015
+//fusa:req REQ-GPIO-016
 
 //! The GPIO endpoint type (`ep_type 0x02`) — `ROADMAP.md` Milestone 4
 //! ("Basic Endpoint Types"), first checklist bullet: "4-byte bitmask
@@ -177,18 +177,29 @@ use crate::RcpError;
 // ── GpioBitmask ────────────────────────────────────────────────────────────
 
 /// Length, in bytes, of the GPIO 4-byte read/write bitmask.
+///
+/// Four bytes is exactly 32 bit positions, matching TC18 §13.7.4.1's "Each
+/// GPIO endpoint can handle up to 32 IOs".
+//fusa:req REQ-GPIO-017
 pub const GPIO_BITMASK_LEN: usize = 4;
 
 /// The GPIO endpoint's 4-byte read/write bitmask: one bit per pin.
 ///
 /// See this module's doc comment for the checklist wording this models.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-GPIO-001
+//fusa:req REQ-GPIO-001
 pub struct GpioBitmask(pub u32);
 
 impl GpioBitmask {
     /// Encode this bitmask to its 4-byte big-endian wire representation.
-    // fusa:req REQ-GPIO-001
+    ///
+    /// Big-endian places IO0 in the last byte's least-significant bit and
+    /// IO31 in the first byte's most-significant bit, so IO `n` is bit `n`
+    /// of the `byte_msg_payload` exactly as TC18 §13.7.4.1's Figure 24 lays
+    /// the payload out (msb on the left, IO23..IO0 in the low positions for
+    /// that figure's own 24-pin example endpoint).
+    //fusa:req REQ-GPIO-001
+    //fusa:req REQ-GPIO-018
     pub fn encode(self) -> [u8; GPIO_BITMASK_LEN] {
         self.0.to_be_bytes()
     }
@@ -200,7 +211,7 @@ impl GpioBitmask {
     /// [`GPIO_BITMASK_LEN`] instead. Trailing bytes beyond the first four
     /// are ignored, matching [`crate::acf::decode_byte_message_info`]'s own
     /// handling of a longer-than-required slice.
-    // fusa:req REQ-GPIO-002
+    //fusa:req REQ-GPIO-002
     pub fn decode(b: &[u8]) -> Result<Self, RcpError> {
         if b.len() < GPIO_BITMASK_LEN {
             return Err(RcpError::ShortFrame);
@@ -217,15 +228,32 @@ impl GpioBitmask {
 /// selection via `evt.sub_opcode`", "Provenance note: the spec-reserved
 /// write-semantics code", and "Provenance note: `AddSaturating` and
 /// `Reconfigure`" for the working interpretations this type embodies.
+/// These eight `evt[2:0]` codes are the endpoint's *complete* write
+/// surface: TC18 §13.7.4.1 states plainly that "Generating a pulse for a
+/// defined time is NOT a function of the GPIO endpoint" — it must instead be
+/// managed by the Client via two commands, a compound, or a trigger
+/// operation — so no duration-carrying ninth operation exists here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-// fusa:req REQ-GPIO-003
+//fusa:req REQ-GPIO-003
+//fusa:req REQ-GPIO-020
 pub enum GpioWriteSemantics {
     /// Overwrite the current value with the operand.
     Replace = 0,
     /// Bitwise OR the operand into the current value.
     Or = 1,
     /// Bitwise AND the operand into the current value.
+    ///
+    /// TC18 §13.7.4.1's prose words the value-changing operations as
+    /// "(NAND, OR, XOR)", but TC18 §13.5's Table 30 — the normative
+    /// per-endpoint `evt[2:0]` table — defines code `010b` as the
+    /// *byte_msg_payload bitwise AND current interface status*, with the
+    /// worked example "with a byte_msg_payload of 0xFFFF FFFE the first IO
+    /// pin will be reset, while other IO pins remain unchanged". This crate
+    /// follows Table 30's AND; §13.7.4.1's "NAND" wording contradicts it and
+    /// is recorded as a TC18-internal inconsistency, not implemented as
+    /// written.
+    //fusa:req REQ-GPIO-021
     And = 2,
     /// Bitwise XOR the operand into the current value.
     Xor = 3,
@@ -251,7 +279,7 @@ pub enum GpioWriteSemantics {
 
 impl GpioWriteSemantics {
     /// Encode this write semantics as its `evt.sub_opcode` value (`0..=7`).
-    // fusa:req REQ-GPIO-003
+    //fusa:req REQ-GPIO-003
     pub fn to_sub_opcode(self) -> u8 {
         self as u8
     }
@@ -262,7 +290,7 @@ impl GpioWriteSemantics {
     /// 3-bit `sub_opcode` field's range
     /// (`> `[`crate::acf::EVT_SUB_OPCODE_MAX`]``). Never panics for any
     /// input.
-    // fusa:req REQ-GPIO-004
+    //fusa:req REQ-GPIO-004
     pub fn from_sub_opcode(raw: u8) -> Result<Self, RcpError> {
         match raw {
             0 => Ok(Self::Replace),
@@ -281,7 +309,7 @@ impl GpioWriteSemantics {
     /// the seven write-semantics `ROADMAP.md`'s checklist text actually
     /// names. See this module's doc comment "Provenance note: the
     /// spec-reserved write-semantics code".
-    // fusa:req REQ-GPIO-009
+    //fusa:req REQ-GPIO-009
     pub fn is_named(self) -> bool {
         !matches!(self, Self::Reserved4)
     }
@@ -297,12 +325,17 @@ impl GpioWriteSemantics {
 /// including at the
 /// [`GpioWriteSemantics::AddSaturating`]/[`GpioWriteSemantics::SubtractSaturating`]
 /// `u32` saturation boundaries.
-// fusa:req REQ-GPIO-005
-// fusa:req REQ-GPIO-006
-// fusa:req REQ-GPIO-007
-// fusa:req REQ-GPIO-008
-// fusa:req REQ-GPIO-009
-// fusa:req REQ-GPIO-010
+///
+/// [`GpioWriteSemantics::Or`] with an all-zero operand is the identity, so
+/// TC18 §13.7.4.3's "A request with data '0x0000 0000' and evt[2:0] = 0x001
+/// (OR) results in 'no change'" holds for every current value.
+//fusa:req REQ-GPIO-005
+//fusa:req REQ-GPIO-006
+//fusa:req REQ-GPIO-007
+//fusa:req REQ-GPIO-008
+//fusa:req REQ-GPIO-009
+//fusa:req REQ-GPIO-010
+//fusa:req REQ-GPIO-019
 pub fn apply_gpio_write(
     semantics: GpioWriteSemantics,
     current: GpioBitmask,
@@ -334,7 +367,7 @@ pub const GPIO_TRIGGER_CONFIG_LEN: usize = 3 * GPIO_BITMASK_LEN;
 /// See this module's doc comment "Provenance note: per-pin trigger
 /// modeling".
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-GPIO-011
+//fusa:req REQ-GPIO-011
 pub struct GpioTriggerConfig {
     /// Per-pin bitmask: change (either-edge) trigger enabled.
     pub change_enable: GpioBitmask,
@@ -348,7 +381,7 @@ impl GpioTriggerConfig {
     /// Encode this config to its 12-byte big-endian wire representation:
     /// `change_enable` then `rising_enable` then `falling_enable`, each
     /// 4 bytes.
-    // fusa:req REQ-GPIO-011
+    //fusa:req REQ-GPIO-011
     pub fn encode(self) -> [u8; GPIO_TRIGGER_CONFIG_LEN] {
         let mut buf = [0u8; GPIO_TRIGGER_CONFIG_LEN];
         buf[0..4].copy_from_slice(&self.change_enable.encode());
@@ -362,7 +395,7 @@ impl GpioTriggerConfig {
     /// Never panics on short, truncated, or arbitrary input — always
     /// returns `Err(RcpError::ShortFrame)` for input shorter than
     /// [`GPIO_TRIGGER_CONFIG_LEN`] instead.
-    // fusa:req REQ-GPIO-012
+    //fusa:req REQ-GPIO-012
     pub fn decode(b: &[u8]) -> Result<Self, RcpError> {
         if b.len() < GPIO_TRIGGER_CONFIG_LEN {
             return Err(RcpError::ShortFrame);
@@ -378,7 +411,7 @@ impl GpioTriggerConfig {
 /// Which pins actually fired a trigger between one [`GpioBitmask`] sample
 /// and the next, as reported by [`evaluate_gpio_triggers`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-GPIO-013
+//fusa:req REQ-GPIO-013
 pub struct GpioTriggerSignals {
     /// Per-pin bitmask: this pin changed and had `change_enable` armed.
     pub changed: GpioBitmask,
@@ -397,9 +430,9 @@ pub struct GpioTriggerSignals {
 /// differs between `previous`/`current` *and* has `change_enable` armed for
 /// that pin in `config` — likewise for `rising`/`falling`, each additionally
 /// gated on the transition direction. Never panics for any input.
-// fusa:req REQ-GPIO-013
-// fusa:req REQ-GPIO-014
-// fusa:req REQ-GPIO-015
+//fusa:req REQ-GPIO-013
+//fusa:req REQ-GPIO-014
+//fusa:req REQ-GPIO-015
 pub fn evaluate_gpio_triggers(
     config: &GpioTriggerConfig,
     previous: GpioBitmask,
@@ -427,7 +460,7 @@ pub fn evaluate_gpio_triggers(
 /// this is a dedicated type rather than content added directly to
 /// [`crate::regmap::PerEpTypeFunctionalConfig`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-GPIO-016
+//fusa:req REQ-GPIO-016
 pub struct GpioFunctionalConfig {
     /// This endpoint's per-pin trigger arming.
     pub trigger: GpioTriggerConfig,
@@ -441,7 +474,7 @@ impl GpioFunctionalConfig {
     /// This module does not itself call that function — it only shows how a
     /// caller would obtain the matching tag, per this module's doc comment
     /// "Relationship to `crate::regmap`".
-    // fusa:req REQ-GPIO-016
+    //fusa:req REQ-GPIO-016
     pub fn layer_tag(&self) -> crate::regmap::PerEpTypeFunctionalConfig {
         crate::regmap::PerEpTypeFunctionalConfig::new(crate::regmap::EndpointType::Gpio)
     }
@@ -454,7 +487,7 @@ mod tests {
     // ── GpioBitmask: round-trip / never-panic ───────────────────────────────
 
     #[test]
-    // fusa:test REQ-GPIO-001
+    //fusa:test REQ-GPIO-001
     fn gpio_bitmask_round_trips_through_encode_decode() {
         for raw in [0u32, 1, 0xFFFF_FFFF, 0x8000_0001, 0x0102_0304] {
             let mask = GpioBitmask(raw);
@@ -464,14 +497,14 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-001
+    //fusa:test REQ-GPIO-001
     fn gpio_bitmask_encode_is_big_endian() {
         let mask = GpioBitmask(0x0102_0304);
         assert_eq!(mask.encode(), [0x01, 0x02, 0x03, 0x04]);
     }
 
     #[test]
-    // fusa:test REQ-GPIO-002
+    //fusa:test REQ-GPIO-002
     fn gpio_bitmask_decode_rejects_short_input() {
         for len in 0..GPIO_BITMASK_LEN {
             let short = vec![0xAAu8; len];
@@ -480,7 +513,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-002
+    //fusa:test REQ-GPIO-002
     fn gpio_bitmask_decode_ignores_trailing_bytes() {
         let b = [0x00, 0x00, 0x00, 0x2A, 0xFF, 0xFF];
         assert_eq!(GpioBitmask::decode(&b).unwrap(), GpioBitmask(42));
@@ -500,7 +533,7 @@ mod tests {
     ];
 
     #[test]
-    // fusa:test REQ-GPIO-003
+    //fusa:test REQ-GPIO-003
     fn gpio_write_semantics_sub_opcode_round_trips_for_all_eight_values() {
         for semantics in ALL_WRITE_SEMANTICS {
             let raw = semantics.to_sub_opcode();
@@ -510,7 +543,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-003
+    //fusa:test REQ-GPIO-003
     fn gpio_write_semantics_sub_opcode_values_are_the_full_0_to_7_range() {
         let mut raws: Vec<u8> = ALL_WRITE_SEMANTICS
             .iter()
@@ -521,7 +554,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-004
+    //fusa:test REQ-GPIO-004
     fn gpio_write_semantics_from_sub_opcode_rejects_out_of_range() {
         for raw in [8u8, 9, 0x7F, 0xFF] {
             assert_eq!(
@@ -532,7 +565,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-009
+    //fusa:test REQ-GPIO-009
     fn gpio_write_semantics_is_named_true_only_for_the_seven_named_variants() {
         for semantics in ALL_WRITE_SEMANTICS {
             assert_eq!(
@@ -545,7 +578,7 @@ mod tests {
     // ── apply_gpio_write: per-semantics correctness ─────────────────────────
 
     #[test]
-    // fusa:test REQ-GPIO-005
+    //fusa:test REQ-GPIO-005
     fn apply_gpio_write_replace_overwrites_current() {
         let result = apply_gpio_write(
             GpioWriteSemantics::Replace,
@@ -556,7 +589,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-005
+    //fusa:test REQ-GPIO-005
     fn apply_gpio_write_or_and_xor_match_bitwise_ops() {
         let current = GpioBitmask(0b1010);
         let operand = GpioBitmask(0b0110);
@@ -575,7 +608,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-006
+    //fusa:test REQ-GPIO-006
     fn apply_gpio_write_add_saturating_clamps_at_u32_max() {
         let result = apply_gpio_write(
             GpioWriteSemantics::AddSaturating,
@@ -586,7 +619,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-006
+    //fusa:test REQ-GPIO-006
     fn apply_gpio_write_add_saturating_exact_u32_max_boundary() {
         let result = apply_gpio_write(
             GpioWriteSemantics::AddSaturating,
@@ -597,7 +630,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-006
+    //fusa:test REQ-GPIO-006
     fn apply_gpio_write_add_saturating_ordinary_case() {
         let result = apply_gpio_write(
             GpioWriteSemantics::AddSaturating,
@@ -608,7 +641,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-007
+    //fusa:test REQ-GPIO-007
     fn apply_gpio_write_subtract_saturating_clamps_at_zero() {
         let result = apply_gpio_write(
             GpioWriteSemantics::SubtractSaturating,
@@ -619,7 +652,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-007
+    //fusa:test REQ-GPIO-007
     fn apply_gpio_write_subtract_saturating_exact_zero_boundary() {
         let result = apply_gpio_write(
             GpioWriteSemantics::SubtractSaturating,
@@ -630,7 +663,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-007
+    //fusa:test REQ-GPIO-007
     fn apply_gpio_write_subtract_saturating_ordinary_case() {
         let result = apply_gpio_write(
             GpioWriteSemantics::SubtractSaturating,
@@ -641,7 +674,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-008
+    //fusa:test REQ-GPIO-008
     fn apply_gpio_write_reconfigure_matches_replace_at_the_bitmask_level() {
         let current = GpioBitmask(0xFFFF_FFFF);
         let operand = GpioBitmask(0x1234);
@@ -652,7 +685,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-009
+    //fusa:test REQ-GPIO-009
     fn apply_gpio_write_refuses_the_spec_reserved_semantics() {
         let result = apply_gpio_write(
             GpioWriteSemantics::Reserved4,
@@ -663,7 +696,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-010
+    //fusa:test REQ-GPIO-010
     fn apply_gpio_write_never_panics_for_any_sampled_input() {
         let samples = [0u32, 1, 2, 0x7FFF_FFFF, 0x8000_0000, 0xFFFF_FFFE, u32::MAX];
         for semantics in ALL_WRITE_SEMANTICS {
@@ -678,7 +711,7 @@ mod tests {
     // ── GpioTriggerConfig: round-trip / never-panic ─────────────────────────
 
     #[test]
-    // fusa:test REQ-GPIO-011
+    //fusa:test REQ-GPIO-011
     fn gpio_trigger_config_round_trips_through_encode_decode() {
         let config = GpioTriggerConfig {
             change_enable: GpioBitmask(0x1111_1111),
@@ -690,7 +723,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-011
+    //fusa:test REQ-GPIO-011
     fn gpio_trigger_config_encode_field_order_is_change_rising_falling() {
         let config = GpioTriggerConfig {
             change_enable: GpioBitmask(0x0000_0001),
@@ -704,7 +737,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-012
+    //fusa:test REQ-GPIO-012
     fn gpio_trigger_config_decode_rejects_short_input() {
         for len in 0..GPIO_TRIGGER_CONFIG_LEN {
             let short = vec![0xAAu8; len];
@@ -715,7 +748,7 @@ mod tests {
     // ── evaluate_gpio_triggers: edge detection + arming ─────────────────────
 
     #[test]
-    // fusa:test REQ-GPIO-013
+    //fusa:test REQ-GPIO-013
     fn evaluate_gpio_triggers_detects_rising_edge_on_armed_pin() {
         let config = GpioTriggerConfig {
             change_enable: GpioBitmask(0xFFFF_FFFF),
@@ -729,7 +762,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-013
+    //fusa:test REQ-GPIO-013
     fn evaluate_gpio_triggers_detects_falling_edge_on_armed_pin() {
         let config = GpioTriggerConfig {
             change_enable: GpioBitmask(0xFFFF_FFFF),
@@ -743,7 +776,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-013
+    //fusa:test REQ-GPIO-013
     fn evaluate_gpio_triggers_no_signal_when_value_unchanged() {
         let config = GpioTriggerConfig {
             change_enable: GpioBitmask(0xFFFF_FFFF),
@@ -755,7 +788,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-014
+    //fusa:test REQ-GPIO-014
     fn evaluate_gpio_triggers_masks_out_disarmed_pins() {
         // Pin 0 rises but only pin 1's rising trigger is armed.
         let config = GpioTriggerConfig {
@@ -768,7 +801,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-014
+    //fusa:test REQ-GPIO-014
     fn evaluate_gpio_triggers_per_pin_independence() {
         // Pin 0 rises (armed), pin 1 falls (not armed for falling).
         let config = GpioTriggerConfig {
@@ -783,7 +816,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GPIO-015
+    //fusa:test REQ-GPIO-015
     fn evaluate_gpio_triggers_never_panics_for_any_sampled_input() {
         let samples = [0u32, 1, 0x5555_5555, 0xAAAA_AAAA, 0x8000_0000, u32::MAX];
         let config = GpioTriggerConfig {
@@ -802,7 +835,7 @@ mod tests {
     // ── GpioFunctionalConfig / crate::regmap composition ────────────────────
 
     #[test]
-    // fusa:test REQ-GPIO-016
+    //fusa:test REQ-GPIO-016
     fn gpio_functional_config_layer_tag_matches_ep_type_gpio() {
         let functional = GpioFunctionalConfig::default();
         let generic = crate::regmap::PerEpConfigBlock::new(crate::regmap::EndpointType::Gpio);
@@ -817,8 +850,145 @@ mod tests {
         );
     }
 
+    // ── TC18 §13.7.4 spec-literal conformance checks ────────────────────────
+
+    /// TC18 §13.7.4.1 (TC18.txt line 4381): "Each GPIO endpoint can handle
+    /// up to 32 IOs." The 4-byte bitmask is exactly 32 bit positions wide,
+    /// so IO0..IO31 are all representable and there is no IO32.
     #[test]
-    // fusa:test REQ-GPIO-016
+    //fusa:test REQ-GPIO-017
+    fn gpio_bitmask_spans_exactly_the_32_ios_tc18_admits() {
+        // 4 bytes x 8 bits = the 32 IO positions TC18 §13.7.4.1 names.
+        assert_eq!(GPIO_BITMASK_LEN, 4);
+        assert_eq!(GPIO_BITMASK_LEN * 8, 32);
+        // IO31 — the highest IO a 32-IO endpoint has — is representable and
+        // round-trips.
+        let io31 = GpioBitmask(1u32 << 31);
+        assert_eq!(io31.encode(), [0x80, 0x00, 0x00, 0x00]);
+        assert_eq!(GpioBitmask::decode(&io31.encode()), Ok(io31));
+        // All 32 IOs asserted at once is the all-ones 4-byte payload.
+        assert_eq!(GpioBitmask(u32::MAX).encode(), [0xFF, 0xFF, 0xFF, 0xFF]);
+        // A fifth payload byte would be outside the endpoint's 32-IO reach:
+        // decode reads exactly four.
+        assert_eq!(
+            GpioBitmask::decode(&[0x80, 0x00, 0x00, 0x00, 0xFF]),
+            Ok(io31)
+        );
+    }
+
+    /// TC18 §13.7.4.1 / Figure 24 (TC18.txt lines 4389-4398): "Each GPIO pin
+    /// can be assigned to a bit position of the byte_msg_payload", laid out
+    /// msb-first with IO23..IO0 in the low bit positions for that figure's
+    /// own 24-pin example endpoint. IO `n` is therefore bit `n`, and the
+    /// 4-byte payload is big-endian.
+    #[test]
+    //fusa:test REQ-GPIO-018
+    fn gpio_bitmask_maps_io_n_to_bit_n_per_tc18_figure_24() {
+        // IO0 is the least-significant bit: last payload byte, bit 0.
+        assert_eq!(GpioBitmask(1u32).encode(), [0x00, 0x00, 0x00, 0x01]);
+        // IO7 completes the last payload byte.
+        assert_eq!(GpioBitmask(1u32 << 7).encode(), [0x00, 0x00, 0x00, 0x80]);
+        // IO8 opens the next byte up.
+        assert_eq!(GpioBitmask(1u32 << 8).encode(), [0x00, 0x00, 0x01, 0x00]);
+        // IO23 — the highest IO drawn in Figure 24's 24-pin example.
+        assert_eq!(GpioBitmask(1u32 << 23).encode(), [0x00, 0x80, 0x00, 0x00]);
+        // Figure 24's whole 24-pin example EP: IO0..IO23 asserted, the
+        // "don't care" positions above IO23 clear.
+        assert_eq!(GpioBitmask(0x00FF_FFFF).encode(), [0x00, 0xFF, 0xFF, 0xFF]);
+        // IO31 tops out the 32-IO range.
+        assert_eq!(GpioBitmask(1u32 << 31).encode(), [0x80, 0x00, 0x00, 0x00]);
+    }
+
+    /// TC18 §13.7.4.3 (TC18.txt line 4480): "A request with data
+    /// '0x0000 0000' and evt[2:0] = 0x001 (OR) results in 'no change'."
+    #[test]
+    //fusa:test REQ-GPIO-019
+    fn gpio_or_with_all_zero_payload_is_no_change_per_tc18_13_7_4_3() {
+        // evt[2:0] = 0x001 is the OR semantics.
+        assert_eq!(
+            GpioWriteSemantics::from_sub_opcode(0x001),
+            Ok(GpioWriteSemantics::Or)
+        );
+        // The literal 0x0000_0000 payload leaves every current interface
+        // state untouched, bit for bit.
+        for current in [0x0000_0000u32, 0x0000_0002, 0x5555_5555, 0xFFFF_FFFF] {
+            assert_eq!(
+                apply_gpio_write(
+                    GpioWriteSemantics::Or,
+                    GpioBitmask(current),
+                    GpioBitmask(0x0000_0000)
+                ),
+                Ok(GpioBitmask(current))
+            );
+        }
+    }
+
+    /// TC18 §13.7.4.1 (TC18.txt lines 4403-4404): "Generating a pulse for a
+    /// defined time is NOT a function of the GPIO endpoint. This either
+    /// needs to be managed by the Client ... by a compound or a trigger
+    /// operation." The endpoint's whole write surface is therefore exactly
+    /// TC18 §13.5 Table 30's eight `evt[2:0]` value-level codes, with no
+    /// ninth, duration-carrying operation.
+    #[test]
+    //fusa:test REQ-GPIO-020
+    fn gpio_write_surface_is_tc18_eight_codes_with_no_pulse_operation() {
+        // TC18 §13.5 Table 30's GPIO/PWM_OUT rows, code by code.
+        let table_30: [(u8, GpioWriteSemantics); 8] = [
+            (0b000, GpioWriteSemantics::Replace),
+            (0b001, GpioWriteSemantics::Or),
+            (0b010, GpioWriteSemantics::And),
+            (0b011, GpioWriteSemantics::Xor),
+            (0b100, GpioWriteSemantics::Reserved4),
+            (0b101, GpioWriteSemantics::AddSaturating),
+            (0b110, GpioWriteSemantics::SubtractSaturating),
+            (0b111, GpioWriteSemantics::Reconfigure),
+        ];
+        for (code, semantics) in table_30 {
+            assert_eq!(GpioWriteSemantics::from_sub_opcode(code), Ok(semantics));
+        }
+        // Those eight are the complete set — nothing outside `evt[2:0]`'s
+        // 3-bit range decodes, so there is no pulse-shaped ninth operation.
+        assert_eq!(table_30.len(), ALL_WRITE_SEMANTICS.len());
+        for raw in 8u8..=0x1F {
+            assert_eq!(
+                GpioWriteSemantics::from_sub_opcode(raw),
+                Err(RcpError::InvalidParameter)
+            );
+        }
+    }
+
+    /// TC18 §13.7.4.1 (TC18.txt line 4402) words the value-changing
+    /// operations as "(NAND, OR, XOR)", but TC18 §13.5 Table 30 (TC18.txt
+    /// lines 3699-3702) defines `evt[2:0] = 010b` as the byte_msg_payload
+    /// *bitwise AND* the current interface status, with the worked example
+    /// "with a byte_msg_payload of 0xFFFF FFFE the first IO pin will be
+    /// reset, while other IO pins remain unchanged". This crate follows
+    /// Table 30's AND.
+    #[test]
+    //fusa:test REQ-GPIO-021
+    fn gpio_evt_010b_is_bitwise_and_per_tc18_table_30_worked_example() {
+        assert_eq!(
+            GpioWriteSemantics::from_sub_opcode(0b010),
+            Ok(GpioWriteSemantics::And)
+        );
+        // Table 30's own worked example: every IO currently set, payload
+        // 0xFFFF_FFFE -> IO0 reset, IO1..IO31 unchanged.
+        let current = GpioBitmask(0xFFFF_FFFF);
+        let payload = GpioBitmask(0xFFFF_FFFE);
+        assert_eq!(
+            apply_gpio_write(GpioWriteSemantics::And, current, payload),
+            Ok(GpioBitmask(0xFFFF_FFFE))
+        );
+        // A NAND, as §13.7.4.1's prose would have it, would instead have
+        // produced the complement — 0x0000_0001.
+        assert_ne!(
+            apply_gpio_write(GpioWriteSemantics::And, current, payload),
+            Ok(GpioBitmask(0x0000_0001))
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-GPIO-016
     fn gpio_functional_config_layer_tag_rejects_mismatched_ep_type() {
         let functional = GpioFunctionalConfig::default();
         let generic = crate::regmap::PerEpConfigBlock::new(crate::regmap::EndpointType::Spi);

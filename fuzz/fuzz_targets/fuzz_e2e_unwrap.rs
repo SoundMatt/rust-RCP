@@ -10,6 +10,6 @@ use libfuzzer_sys::fuzz_target;
 // an arbitrary caller-supplied byte slice, matching this harness's own
 // `data: &[u8]` shape.
 fuzz_target!(|data: &[u8]| {
-    // fusa:req REQ-CRC-002
+    //fusa:req REQ-CRC-002
     let _ = rcp::e2e::crc32_tc18(data);
 });

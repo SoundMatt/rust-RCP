@@ -1,9 +1,9 @@
-// fusa:req REQ-DL-001
-// fusa:req REQ-DL-002
-// fusa:req REQ-DL-003
-// fusa:req REQ-DL-004
-// fusa:req REQ-DL-005
-// fusa:req REQ-DL-006
+//fusa:req REQ-DL-001
+//fusa:req REQ-DL-002
+//fusa:req REQ-DL-003
+//fusa:req REQ-DL-004
+//fusa:req REQ-DL-005
+//fusa:req REQ-DL-006
 
 //! Deadline monitor — enforces a maximum call latency on an [`Endpoint`].
 //!
@@ -43,7 +43,7 @@ use crate::RcpError;
 
 /// Wraps an inner [`Endpoint`] with a configured deadline, honored by
 /// [`Self::read_with_deadline`]/[`Self::write_with_deadline`].
-// fusa:req REQ-DL-001
+//fusa:req REQ-DL-001
 pub struct DeadlineEndpoint {
     inner: Arc<dyn Endpoint>,
     deadline: Duration,
@@ -54,7 +54,7 @@ impl DeadlineEndpoint {
     ///
     /// # Panics
     /// Panics if `deadline` is zero (use the `Timeout` sentinel instead).
-    // fusa:req REQ-DL-002
+    //fusa:req REQ-DL-002
     pub fn new(inner: Arc<dyn Endpoint>, deadline: Duration) -> Self {
         assert!(!deadline.is_zero(), "deadline must be non-zero");
         DeadlineEndpoint { inner, deadline }
@@ -80,9 +80,9 @@ impl DeadlineEndpoint {
     /// Read from the inner endpoint, enforcing this deadline against
     /// `timeout` — see this module's doc comment for what "enforcing"
     /// means on this crate's synchronous `Endpoint` model.
-    // fusa:req REQ-DL-003
-    // fusa:req REQ-DL-004
-    // fusa:req REQ-DL-005
+    //fusa:req REQ-DL-003
+    //fusa:req REQ-DL-004
+    //fusa:req REQ-DL-005
     pub fn read_with_deadline(
         &self,
         read_size: u16,
@@ -93,9 +93,9 @@ impl DeadlineEndpoint {
     }
 
     /// Same as [`Self::read_with_deadline`], for a write.
-    // fusa:req REQ-DL-003
-    // fusa:req REQ-DL-004
-    // fusa:req REQ-DL-005
+    //fusa:req REQ-DL-003
+    //fusa:req REQ-DL-004
+    //fusa:req REQ-DL-005
     pub fn write_with_deadline(
         &self,
         payload: &[u8],
@@ -111,12 +111,12 @@ impl Endpoint for DeadlineEndpoint {
         self.inner.ep_type()
     }
 
-    // fusa:req REQ-DL-006
+    //fusa:req REQ-DL-006
     fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
         self.inner.read(read_size)
     }
 
-    // fusa:req REQ-DL-006
+    //fusa:req REQ-DL-006
     fn write(&self, payload: &[u8]) -> Result<(), RcpError> {
         self.inner.write(payload)
     }
@@ -135,8 +135,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DL-001
-    // fusa:test REQ-DL-003
+    //fusa:test REQ-DL-001
+    //fusa:test REQ-DL-003
     fn passes_calls_to_inner() {
         let dl = DeadlineEndpoint::new(quick_endpoint(), Duration::from_secs(1));
         dl.write_with_deadline(b"hi", None).unwrap();
@@ -144,7 +144,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DL-002
+    //fusa:test REQ-DL-002
     fn deadline_getter() {
         let d = Duration::from_millis(500);
         let dl = DeadlineEndpoint::new(quick_endpoint(), d);
@@ -152,7 +152,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DL-004
+    //fusa:test REQ-DL-004
     fn zero_timeout_returns_timeout_error() {
         let dl = DeadlineEndpoint::new(quick_endpoint(), Duration::from_secs(1));
         let err = dl
@@ -165,7 +165,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DL-005
+    //fusa:test REQ-DL-005
     fn shorter_caller_timeout_wins() {
         let dl = DeadlineEndpoint::new(quick_endpoint(), Duration::from_secs(10));
         // If caller timeout is shorter, that is the effective timeout.
@@ -174,7 +174,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-DL-006
+    //fusa:test REQ-DL-006
     fn plain_endpoint_impl_ignores_deadline() {
         let dl = DeadlineEndpoint::new(quick_endpoint(), Duration::from_secs(1));
         let as_endpoint: &dyn Endpoint = &dl;

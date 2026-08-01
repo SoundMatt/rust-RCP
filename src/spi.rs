@@ -1,15 +1,15 @@
-// fusa:req REQ-SPI-001
-// fusa:req REQ-SPI-002
-// fusa:req REQ-SPI-003
-// fusa:req REQ-SPI-004
-// fusa:req REQ-SPI-005
-// fusa:req REQ-SPI-006
-// fusa:req REQ-SPI-007
-// fusa:req REQ-SPI-008
-// fusa:req REQ-SPI-009
-// fusa:req REQ-SPI-010
-// fusa:req REQ-SPI-011
-// fusa:req REQ-SPI-012
+//fusa:req REQ-SPI-001
+//fusa:req REQ-SPI-002
+//fusa:req REQ-SPI-003
+//fusa:req REQ-SPI-004
+//fusa:req REQ-SPI-005
+//fusa:req REQ-SPI-006
+//fusa:req REQ-SPI-007
+//fusa:req REQ-SPI-008
+//fusa:req REQ-SPI-009
+//fusa:req REQ-SPI-010
+//fusa:req REQ-SPI-011
+//fusa:req REQ-SPI-012
 
 //! The SPI endpoint type (`ep_type 0x03`) — `ROADMAP.md` Milestone 4
 //! ("Basic Endpoint Types"), second checklist bullet: "up to 6
@@ -155,7 +155,7 @@ pub const SPI_CHANNEL_COUNT: usize = 6;
 /// "spare" values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-// fusa:req REQ-SPI-001
+//fusa:req REQ-SPI-001
 pub enum SpiChannelSelect {
     /// Pre-configured channel 0.
     Channel0 = 0,
@@ -188,7 +188,7 @@ pub enum SpiChannelSelect {
 impl SpiChannelSelect {
     /// Encode this channel selection as its `evt.sub_opcode` value
     /// (`0..=7`).
-    // fusa:req REQ-SPI-001
+    //fusa:req REQ-SPI-001
     pub fn to_sub_opcode(self) -> u8 {
         self as u8
     }
@@ -200,7 +200,7 @@ impl SpiChannelSelect {
     /// (`> `[`crate::acf::EVT_SUB_OPCODE_MAX`]``), matching
     /// [`crate::gpio::GpioWriteSemantics::from_sub_opcode`]'s own range
     /// check. Never panics for any input.
-    // fusa:req REQ-SPI-002
+    //fusa:req REQ-SPI-002
     pub fn from_sub_opcode(raw: u8) -> Result<Self, RcpError> {
         match raw {
             0 => Ok(Self::Channel0),
@@ -220,7 +220,7 @@ impl SpiChannelSelect {
     /// names. False for [`SpiChannelSelect::Reserved6`] (spec-reserved,
     /// rejected) and [`SpiChannelSelect::Reconfigure7`] (endpoint
     /// reconfiguration, not a channel selection).
-    // fusa:req REQ-SPI-003
+    //fusa:req REQ-SPI-003
     pub fn is_named(self) -> bool {
         !matches!(self, Self::Reserved6 | Self::Reconfigure7)
     }
@@ -234,7 +234,7 @@ impl SpiChannelSelect {
 /// neither resolves to a real channel index — rather than guessing a
 /// channel for them; see this module's doc comment "Provenance note:
 /// channel selection via `evt.sub_opcode`". Never panics for any input.
-// fusa:req REQ-SPI-004
+//fusa:req REQ-SPI-004
 pub fn resolve_spi_channel_index(select: SpiChannelSelect) -> Result<usize, RcpError> {
     match select {
         SpiChannelSelect::Channel0 => Ok(0),
@@ -257,7 +257,7 @@ pub fn resolve_spi_channel_index(select: SpiChannelSelect) -> Result<usize, RcpE
 /// why the actual per-channel fields (clock rate, polarity/phase, bit
 /// order, and so on) are left unmodeled here rather than guessed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-SPI-005
+//fusa:req REQ-SPI-005
 pub struct SpiChannelConfigSlot;
 
 /// SPI's own per-EP-type functional-config content: up to
@@ -268,7 +268,7 @@ pub struct SpiChannelConfigSlot;
 /// this is a dedicated type rather than content added directly to
 /// [`crate::regmap::PerEpTypeFunctionalConfig`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-SPI-005
+//fusa:req REQ-SPI-005
 pub struct SpiFunctionalConfig {
     /// This endpoint's up-to-6 pre-configured channel slots, indexed by
     /// [`resolve_spi_channel_index`].
@@ -283,7 +283,7 @@ impl SpiFunctionalConfig {
     /// This module does not itself call that function — it only shows how a
     /// caller would obtain the matching tag, per this module's doc comment
     /// "Relationship to `crate::regmap`".
-    // fusa:req REQ-SPI-007
+    //fusa:req REQ-SPI-007
     pub fn layer_tag(&self) -> crate::regmap::PerEpTypeFunctionalConfig {
         crate::regmap::PerEpTypeFunctionalConfig::new(crate::regmap::EndpointType::Spi)
     }
@@ -295,7 +295,7 @@ impl SpiFunctionalConfig {
 /// Returns `Err(RcpError::UnsupportedCmd)` for the two spare
 /// [`SpiChannelSelect`] values, via [`resolve_spi_channel_index`]. Never
 /// panics for any input.
-// fusa:req REQ-SPI-006
+//fusa:req REQ-SPI-006
 pub fn select_spi_channel_config(
     select: SpiChannelSelect,
     config: &SpiFunctionalConfig,
@@ -317,7 +317,7 @@ pub fn select_spi_channel_config(
 /// any length has no invalid encoding, so [`SpiByteTransfer::decode`] is
 /// infallible.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-// fusa:req REQ-SPI-008
+//fusa:req REQ-SPI-008
 pub struct SpiByteTransfer {
     /// The raw bytes sent from controller to peripheral.
     pub pico: Vec<u8>,
@@ -326,7 +326,7 @@ pub struct SpiByteTransfer {
 impl SpiByteTransfer {
     /// Encode this transfer to its raw wire representation: `pico`'s bytes,
     /// unmodified and unframed.
-    // fusa:req REQ-SPI-008
+    //fusa:req REQ-SPI-008
     pub fn encode(&self) -> Vec<u8> {
         self.pico.clone()
     }
@@ -335,7 +335,7 @@ impl SpiByteTransfer {
     ///
     /// Every possible byte slice, including an empty one, is a valid PICO
     /// transfer, so this never fails and never panics for any input.
-    // fusa:req REQ-SPI-008
+    //fusa:req REQ-SPI-008
     pub fn decode(b: &[u8]) -> Self {
         Self { pico: b.to_vec() }
     }
@@ -348,7 +348,7 @@ impl SpiByteTransfer {
 /// variable-length byte-stream modeling for the opposite transfer
 /// direction.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-// fusa:req REQ-SPI-009
+//fusa:req REQ-SPI-009
 pub struct SpiByteTransferResult {
     /// The raw bytes returned from peripheral to controller.
     pub poci: Vec<u8>,
@@ -357,7 +357,7 @@ pub struct SpiByteTransferResult {
 impl SpiByteTransferResult {
     /// Encode this transfer result to its raw wire representation: `poci`'s
     /// bytes, unmodified and unframed.
-    // fusa:req REQ-SPI-009
+    //fusa:req REQ-SPI-009
     pub fn encode(&self) -> Vec<u8> {
         self.poci.clone()
     }
@@ -366,7 +366,7 @@ impl SpiByteTransferResult {
     ///
     /// Every possible byte slice, including an empty one, is a valid POCI
     /// transfer result, so this never fails and never panics for any input.
-    // fusa:req REQ-SPI-009
+    //fusa:req REQ-SPI-009
     pub fn decode(b: &[u8]) -> Self {
         Self { poci: b.to_vec() }
     }
@@ -388,12 +388,12 @@ pub const SPI_COMPOUND_WAIT_STATUS_LEN: usize = 4;
 /// truncation" — this crate does not otherwise interpret this status's
 /// byte layout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-SPI-010
+//fusa:req REQ-SPI-010
 pub struct SpiStatus(pub [u8; SPI_STATUS_LEN]);
 
 impl SpiStatus {
     /// Encode this status to its 20-byte wire representation.
-    // fusa:req REQ-SPI-010
+    //fusa:req REQ-SPI-010
     pub fn encode(self) -> [u8; SPI_STATUS_LEN] {
         self.0
     }
@@ -405,7 +405,7 @@ impl SpiStatus {
     /// [`SPI_STATUS_LEN`] instead. Trailing bytes beyond the first 20 are
     /// ignored, matching [`crate::gpio::GpioBitmask::decode`]'s own handling
     /// of a longer-than-required slice.
-    // fusa:req REQ-SPI-010
+    //fusa:req REQ-SPI-010
     pub fn decode(b: &[u8]) -> Result<Self, RcpError> {
         if b.len() < SPI_STATUS_LEN {
             return Err(RcpError::ShortFrame);
@@ -419,12 +419,12 @@ impl SpiStatus {
 /// The 4-byte SPI status shape produced by truncating an [`SpiStatus`] for
 /// compound-wait, per [`truncate_spi_status_for_compound_wait`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-SPI-011
+//fusa:req REQ-SPI-011
 pub struct SpiCompoundWaitStatus(pub [u8; SPI_COMPOUND_WAIT_STATUS_LEN]);
 
 impl SpiCompoundWaitStatus {
     /// Encode this truncated status to its 4-byte wire representation.
-    // fusa:req REQ-SPI-011
+    //fusa:req REQ-SPI-011
     pub fn encode(self) -> [u8; SPI_COMPOUND_WAIT_STATUS_LEN] {
         self.0
     }
@@ -434,7 +434,7 @@ impl SpiCompoundWaitStatus {
     /// Never panics on short, truncated, or arbitrary input — always
     /// returns `Err(RcpError::ShortFrame)` for input shorter than
     /// [`SPI_COMPOUND_WAIT_STATUS_LEN`] instead.
-    // fusa:req REQ-SPI-011
+    //fusa:req REQ-SPI-011
     pub fn decode(b: &[u8]) -> Result<Self, RcpError> {
         if b.len() < SPI_COMPOUND_WAIT_STATUS_LEN {
             return Err(RcpError::ShortFrame);
@@ -454,7 +454,7 @@ impl SpiCompoundWaitStatus {
 /// for why this function is standalone plumbing not wired into any
 /// compound-wait execution path (`ROADMAP.md` Milestone 5, not yet built).
 /// Never panics for any input.
-// fusa:req REQ-SPI-012
+//fusa:req REQ-SPI-012
 pub fn truncate_spi_status_for_compound_wait(status: SpiStatus) -> SpiCompoundWaitStatus {
     let mut buf = [0u8; SPI_COMPOUND_WAIT_STATUS_LEN];
     buf.copy_from_slice(&status.0[0..SPI_COMPOUND_WAIT_STATUS_LEN]);
@@ -479,7 +479,7 @@ mod tests {
     ];
 
     #[test]
-    // fusa:test REQ-SPI-001
+    //fusa:test REQ-SPI-001
     fn spi_channel_select_sub_opcode_round_trips_for_all_eight_values() {
         for select in ALL_CHANNEL_SELECTS {
             let raw = select.to_sub_opcode();
@@ -489,7 +489,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SPI-001
+    //fusa:test REQ-SPI-001
     fn spi_channel_select_sub_opcode_values_are_the_full_0_to_7_range() {
         let mut raws: Vec<u8> = ALL_CHANNEL_SELECTS
             .iter()
@@ -500,7 +500,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SPI-002
+    //fusa:test REQ-SPI-002
     fn spi_channel_select_from_sub_opcode_rejects_out_of_range() {
         for raw in [8u8, 9, 0x7F, 0xFF] {
             assert_eq!(
@@ -511,7 +511,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SPI-003
+    //fusa:test REQ-SPI-003
     fn spi_channel_select_is_named_true_only_for_the_six_named_channels() {
         for select in ALL_CHANNEL_SELECTS {
             let expected = !matches!(
@@ -523,7 +523,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SPI-001
+    //fusa:test REQ-SPI-001
     fn spi_channel_select_reserved6_and_reconfigure7_are_distinct_values() {
         // Issue #100: the reserved and reconfigure high codes must no longer
         // be interchangeable "spare" values — they are distinct `sub_opcode`
@@ -536,7 +536,7 @@ mod tests {
     // ── resolve_spi_channel_index ────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-SPI-004
+    //fusa:test REQ-SPI-004
     fn resolve_spi_channel_index_maps_named_channels_to_0_through_5() {
         let expected = [
             (SpiChannelSelect::Channel0, 0usize),
@@ -552,7 +552,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SPI-004
+    //fusa:test REQ-SPI-004
     fn resolve_spi_channel_index_refuses_reserved_and_reconfigure() {
         for select in [SpiChannelSelect::Reserved6, SpiChannelSelect::Reconfigure7] {
             assert_eq!(
@@ -565,7 +565,7 @@ mod tests {
     // ── SpiFunctionalConfig / select_spi_channel_config ─────────────────────
 
     #[test]
-    // fusa:test REQ-SPI-005
+    //fusa:test REQ-SPI-005
     fn spi_functional_config_has_exactly_six_channel_slots() {
         let config = SpiFunctionalConfig::default();
         assert_eq!(config.channels.len(), SPI_CHANNEL_COUNT);
@@ -573,7 +573,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SPI-006
+    //fusa:test REQ-SPI-006
     fn select_spi_channel_config_resolves_named_channels() {
         let config = SpiFunctionalConfig::default();
         for select in [
@@ -592,7 +592,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SPI-006
+    //fusa:test REQ-SPI-006
     fn select_spi_channel_config_refuses_reserved_and_reconfigure_selections() {
         let config = SpiFunctionalConfig::default();
         for select in [SpiChannelSelect::Reserved6, SpiChannelSelect::Reconfigure7] {
@@ -604,7 +604,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SPI-007
+    //fusa:test REQ-SPI-007
     fn spi_functional_config_layer_tag_matches_ep_type_spi() {
         let functional = SpiFunctionalConfig::default();
         let generic = crate::regmap::PerEpConfigBlock::new(crate::regmap::EndpointType::Spi);
@@ -620,7 +620,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SPI-007
+    //fusa:test REQ-SPI-007
     fn spi_functional_config_layer_tag_rejects_mismatched_ep_type() {
         let functional = SpiFunctionalConfig::default();
         let generic = crate::regmap::PerEpConfigBlock::new(crate::regmap::EndpointType::Gpio);
@@ -633,7 +633,7 @@ mod tests {
     // ── SpiByteTransfer / SpiByteTransferResult: round-trip / never-panic ──
 
     #[test]
-    // fusa:test REQ-SPI-008
+    //fusa:test REQ-SPI-008
     fn spi_byte_transfer_round_trips_through_encode_decode() {
         for bytes in [vec![], vec![0x00], vec![0xAA; 3], (0u8..=255).collect()] {
             let transfer = SpiByteTransfer {
@@ -644,7 +644,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SPI-008
+    //fusa:test REQ-SPI-008
     fn spi_byte_transfer_decode_never_panics_for_any_sampled_input() {
         for len in [0usize, 1, 2, 7, 64] {
             let buf = vec![0x5Au8; len];
@@ -653,7 +653,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SPI-009
+    //fusa:test REQ-SPI-009
     fn spi_byte_transfer_result_round_trips_through_encode_decode() {
         for bytes in [vec![], vec![0xFF], vec![0x01, 0x02, 0x03]] {
             let result = SpiByteTransferResult {
@@ -664,7 +664,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SPI-009
+    //fusa:test REQ-SPI-009
     fn spi_byte_transfer_result_decode_never_panics_for_any_sampled_input() {
         for len in [0usize, 1, 5, 32] {
             let buf = vec![0xA5u8; len];
@@ -683,14 +683,14 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SPI-010
+    //fusa:test REQ-SPI-010
     fn spi_status_round_trips_through_encode_decode() {
         let status = sample_status();
         assert_eq!(SpiStatus::decode(&status.encode()).unwrap(), status);
     }
 
     #[test]
-    // fusa:test REQ-SPI-010
+    //fusa:test REQ-SPI-010
     fn spi_status_decode_rejects_short_input() {
         for len in 0..SPI_STATUS_LEN {
             let short = vec![0xAAu8; len];
@@ -699,7 +699,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SPI-010
+    //fusa:test REQ-SPI-010
     fn spi_status_decode_ignores_trailing_bytes() {
         let mut b = sample_status().encode().to_vec();
         b.extend_from_slice(&[0xFF, 0xFF]);
@@ -707,7 +707,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SPI-011
+    //fusa:test REQ-SPI-011
     fn spi_compound_wait_status_round_trips_through_encode_decode() {
         let status = SpiCompoundWaitStatus([0x00, 0x01, 0x02, 0x03]);
         assert_eq!(
@@ -717,7 +717,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SPI-011
+    //fusa:test REQ-SPI-011
     fn spi_compound_wait_status_decode_rejects_short_input() {
         for len in 0..SPI_COMPOUND_WAIT_STATUS_LEN {
             let short = vec![0xAAu8; len];
@@ -731,7 +731,7 @@ mod tests {
     // ── truncate_spi_status_for_compound_wait ───────────────────────────────
 
     #[test]
-    // fusa:test REQ-SPI-012
+    //fusa:test REQ-SPI-012
     fn truncate_spi_status_for_compound_wait_keeps_the_leading_four_bytes() {
         let status = sample_status();
         let truncated = truncate_spi_status_for_compound_wait(status);
@@ -740,7 +740,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SPI-012
+    //fusa:test REQ-SPI-012
     fn truncate_spi_status_for_compound_wait_never_panics_for_any_sampled_input() {
         let samples = [
             [0u8; SPI_STATUS_LEN],

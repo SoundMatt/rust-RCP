@@ -1,46 +1,46 @@
-// fusa:req REQ-CMP-001
-// fusa:req REQ-CMP-002
-// fusa:req REQ-CMP-003
-// fusa:req REQ-CMP-004
-// fusa:req REQ-CMP-005
-// fusa:req REQ-CMP-006
-// fusa:req REQ-CMP-007
-// fusa:req REQ-TRIG-001
-// fusa:req REQ-TRIG-002
-// fusa:req REQ-TRIG-003
-// fusa:req REQ-TRIG-004
-// fusa:req REQ-TRIG-005
-// fusa:req REQ-CHAIN-001
-// fusa:req REQ-CHAIN-002
-// fusa:req REQ-CHAIN-003
-// fusa:req REQ-TIME-001
-// fusa:req REQ-TIME-002
-// fusa:req REQ-TIME-003
-// fusa:req REQ-CANCEL-001
-// fusa:req REQ-CANCEL-002
-// fusa:req REQ-CANCEL-003
-// fusa:req REQ-CANCEL-004
-// fusa:req REQ-SEQ-001
-// fusa:req REQ-SEQ-002
-// fusa:req REQ-SEQ-003
-// fusa:req REQ-SEQ-004
-// fusa:req REQ-PRIO-001
-// fusa:req REQ-PRIO-002
-// fusa:req REQ-PRIO-003
-// fusa:req REQ-PRIO-004
-// fusa:req REQ-RLC-001
-// fusa:req REQ-RLC-002
-// fusa:req REQ-RLC-003
-// fusa:req REQ-RLC-004
-// fusa:req REQ-RLC-005
-// fusa:req REQ-RLC-006
-// fusa:req REQ-BUNDLE-001
-// fusa:req REQ-BUNDLE-002
-// fusa:req REQ-SAFETY-001
-// fusa:req REQ-SAFETY-002
-// fusa:req REQ-SAFETY-003
-// fusa:req REQ-SAFETY-004
-// fusa:req REQ-SAFETY-005
+//fusa:req REQ-CMP-001
+//fusa:req REQ-CMP-002
+//fusa:req REQ-CMP-003
+//fusa:req REQ-CMP-004
+//fusa:req REQ-CMP-005
+//fusa:req REQ-CMP-006
+//fusa:req REQ-CMP-007
+//fusa:req REQ-TRIG-001
+//fusa:req REQ-TRIG-002
+//fusa:req REQ-TRIG-003
+//fusa:req REQ-TRIG-004
+//fusa:req REQ-TRIG-005
+//fusa:req REQ-CHAIN-001
+//fusa:req REQ-CHAIN-002
+//fusa:req REQ-CHAIN-003
+//fusa:req REQ-TIME-001
+//fusa:req REQ-TIME-002
+//fusa:req REQ-TIME-003
+//fusa:req REQ-CANCEL-001
+//fusa:req REQ-CANCEL-002
+//fusa:req REQ-CANCEL-003
+//fusa:req REQ-CANCEL-004
+//fusa:req REQ-SEQ-001
+//fusa:req REQ-SEQ-002
+//fusa:req REQ-SEQ-003
+//fusa:req REQ-SEQ-004
+//fusa:req REQ-PRIO-001
+//fusa:req REQ-PRIO-002
+//fusa:req REQ-PRIO-003
+//fusa:req REQ-PRIO-004
+//fusa:req REQ-RLC-001
+//fusa:req REQ-RLC-002
+//fusa:req REQ-RLC-003
+//fusa:req REQ-RLC-004
+//fusa:req REQ-RLC-005
+//fusa:req REQ-RLC-006
+//fusa:req REQ-BUNDLE-001
+//fusa:req REQ-BUNDLE-002
+//fusa:req REQ-SAFETY-001
+//fusa:req REQ-SAFETY-002
+//fusa:req REQ-SAFETY-003
+//fusa:req REQ-SAFETY-004
+//fusa:req REQ-SAFETY-005
 
 //! Conditional-request taxonomy: compound / compound-wait (`0x0F`/`0x0B`),
 //! triggered (`0x0E`), chained (`0x01`), timed (`0x0A`), the
@@ -1315,12 +1315,13 @@ use crate::RcpError;
 /// less confidence than the other eight.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-// fusa:req REQ-CMP-001
-// fusa:req REQ-TRIG-001
-// fusa:req REQ-CHAIN-001
-// fusa:req REQ-TIME-001
-// fusa:req REQ-CANCEL-001
-// fusa:req REQ-PRIO-001
+//fusa:req REQ-CMP-001
+//fusa:req REQ-TRIG-001
+//fusa:req REQ-CHAIN-001
+//fusa:req REQ-TIME-001
+//fusa:req REQ-CANCEL-001
+//fusa:req REQ-PRIO-001
+//fusa:req REQ-CMP-009
 pub enum RequestKind {
     /// The crate-local placeholder discriminant byte assigned to
     /// [`RequestKind::Standard`] — see this module's doc comment
@@ -1376,13 +1377,14 @@ pub enum RequestKind {
 
 impl RequestKind {
     /// Encode this request kind as its discriminant byte.
-    // fusa:req REQ-CMP-001
-    // fusa:req REQ-TRIG-001
-    // fusa:req REQ-CHAIN-001
-    // fusa:req REQ-TIME-001
-    // fusa:req REQ-CANCEL-001
-    // fusa:req REQ-PRIO-001
-    // fusa:req REQ-SAFETY-001
+    //fusa:req REQ-CMP-001
+    //fusa:req REQ-TRIG-001
+    //fusa:req REQ-CHAIN-001
+    //fusa:req REQ-TIME-001
+    //fusa:req REQ-CANCEL-001
+    //fusa:req REQ-PRIO-001
+    //fusa:req REQ-SAFETY-001
+    //fusa:req REQ-CMP-009
     pub fn to_u8(self) -> u8 {
         self as u8
     }
@@ -1391,13 +1393,15 @@ impl RequestKind {
     ///
     /// Returns `Err(RcpError::InvalidParameter)` for any value other than
     /// the named discriminants. Never panics for any input.
-    // fusa:req REQ-CMP-002
-    // fusa:req REQ-TRIG-001
-    // fusa:req REQ-CHAIN-001
-    // fusa:req REQ-TIME-001
-    // fusa:req REQ-CANCEL-001
-    // fusa:req REQ-PRIO-001
-    // fusa:req REQ-SAFETY-001
+    //fusa:req REQ-CMP-002
+    //fusa:req REQ-TRIG-001
+    //fusa:req REQ-CHAIN-001
+    //fusa:req REQ-TIME-001
+    //fusa:req REQ-CANCEL-001
+    //fusa:req REQ-PRIO-001
+    //fusa:req REQ-SAFETY-001
+    //fusa:req REQ-CMP-009
+    //fusa:req REQ-ERRH-001
     pub fn from_u8(raw: u8) -> Result<Self, RcpError> {
         match raw {
             0x00 => Ok(Self::Standard),
@@ -1423,7 +1427,7 @@ impl RequestKind {
     /// [`check_watchdog_overflow_purge`]/
     /// [`purge_normal_priority_on_watchdog_overflow`] to exempt these three
     /// from the watchdog-overflow purge. Never panics for any input.
-    // fusa:req REQ-SAFETY-002
+    //fusa:req REQ-SAFETY-002
     pub fn is_safety_tagged(self) -> bool {
         matches!(
             self,
@@ -1456,7 +1460,7 @@ impl RequestKind {
     /// discriminants, which — unlike `0x00` — have no such ambiguity: a
     /// standard request's `message_timestamp` is not expected to collide with
     /// one of them. Never panics for any input.
-    // fusa:req REQ-CMP-008
+    //fusa:req REQ-CMP-008
     pub fn from_gbb_message_timestamp(message_timestamp: u64) -> Option<Self> {
         let raw = (message_timestamp >> 56) as u8;
         if raw == 0x00 {
@@ -1478,7 +1482,7 @@ impl RequestKind {
     /// discriminant"), so this function refuses to inject its `0x00`
     /// placeholder discriminant into a real `message_timestamp` value as
     /// though it meant something on the wire. Never panics for any input.
-    // fusa:req REQ-CMP-008
+    //fusa:req REQ-CMP-008
     pub fn to_gbb_message_timestamp(self, message_timestamp: u64) -> Result<u64, RcpError> {
         if self == Self::Standard {
             return Err(RcpError::InvalidParameter);
@@ -1497,14 +1501,15 @@ impl RequestKind {
 /// and the not-yet-built sequencer-state machine" for why this crate does
 /// not yet read this value from an actual register.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-CMP-003
+//fusa:req REQ-CMP-003
+//fusa:req REQ-SEQ-005
 pub struct SequencerState(pub u8);
 
 /// A compound/compound-wait request's sequencer gate: which sequencer it
 /// names, and the persistent state that sequencer must hold for this
 /// request to execute.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-CMP-003
+//fusa:req REQ-CMP-003
 pub struct CompoundGateConfig {
     /// The sequencer number this request is gated on, mirroring
     /// [`crate::regmap::RequestStreamConfigEntry::rx_safestate_sequencer`]'s
@@ -1522,7 +1527,7 @@ pub struct CompoundGateConfig {
 /// less than `svr_sequencers_max` (`0` meaning no sequencers exist at all
 /// — every `sequencer_num` is then out of bounds). Never panics for any
 /// input.
-// fusa:req REQ-CMP-004
+//fusa:req REQ-CMP-004
 pub fn check_sequencer_num_in_bounds(
     sequencer_num: u8,
     svr_sequencers_max: u8,
@@ -1538,7 +1543,7 @@ pub fn check_sequencer_num_in_bounds(
 /// `current_state` equals `gate.start_state`.
 ///
 /// Never panics for any input.
-// fusa:req REQ-CMP-005
+//fusa:req REQ-CMP-005
 pub fn is_gate_satisfied(current_state: SequencerState, gate: &CompoundGateConfig) -> bool {
     current_state == gate.start_state
 }
@@ -1551,8 +1556,9 @@ pub fn is_gate_satisfied(current_state: SequencerState, gate: &CompoundGateConfi
 /// sequencer number, or `Err(RcpError::RequestRejected)` if the sequencer
 /// is known but not currently in the request's start state. Never panics
 /// for any input.
-// fusa:req REQ-CMP-004
-// fusa:req REQ-CMP-005
+//fusa:req REQ-CMP-004
+//fusa:req REQ-CMP-005
+//fusa:req REQ-ERRH-001
 pub fn check_compound_gate(
     current_state: SequencerState,
     gate: &CompoundGateConfig,
@@ -1575,7 +1581,7 @@ pub fn check_compound_gate(
 /// `cmp_exec_delay`/`cmpw_exec_delay` width and units" for why both are
 /// plain `u32` placeholders.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-CMP-006
+//fusa:req REQ-CMP-006
 pub struct CompoundExecDelays {
     /// The `0x0F` compound request kind's execution-delay timer.
     pub cmp_exec_delay: u32,
@@ -1613,9 +1619,9 @@ pub struct CompoundExecDelays {
 /// (see this module's doc comment for why), so this is a safe
 /// additive-plumbing-stage widening, not a breaking change to any
 /// consumer.
-// fusa:req REQ-CMP-006
-// fusa:req REQ-PRIO-002
-// fusa:req REQ-SAFETY-003
+//fusa:req REQ-CMP-006
+//fusa:req REQ-PRIO-002
+//fusa:req REQ-SAFETY-003
 pub fn resolve_compound_exec_delay(kind: RequestKind, delays: &CompoundExecDelays) -> Option<u32> {
     match kind {
         RequestKind::Compound | RequestKind::SafetyCompound => Some(delays.cmp_exec_delay),
@@ -1648,7 +1654,7 @@ pub fn resolve_compound_exec_delay(kind: RequestKind, delays: &CompoundExecDelay
 /// `next_state` is caller-supplied — see this module's doc comment for why
 /// no advancement convention (increment-by-one or otherwise) is guessed
 /// here.
-// fusa:req REQ-CMP-007
+//fusa:req REQ-CMP-007
 pub fn advance_sequencer_if_still_in_start_state(
     observed_state: SequencerState,
     gate: &CompoundGateConfig,
@@ -1677,7 +1683,7 @@ pub fn advance_sequencer_if_still_in_start_state(
 /// [`advance_sequencer_if_still_in_start_state`]) this type composes rather
 /// than replaces.
 #[derive(Debug, Clone, PartialEq, Eq)]
-// fusa:req REQ-SEQ-001
+//fusa:req REQ-SEQ-001
 pub struct SequencerBank {
     states: Vec<SequencerState>,
 }
@@ -1693,7 +1699,8 @@ impl SequencerBank {
     /// exist" reading, so every [`Self::read`]/advance call against it
     /// returns `Err(RcpError::SequencerNotKnown)`. Never panics for any
     /// input.
-    // fusa:req REQ-SEQ-001
+    //fusa:req REQ-SEQ-001
+    //fusa:req REQ-SEQ-005
     pub fn new(svr_sequencers_max: u8) -> Self {
         let power_on_state = SequencerState(SequencerStateEntry::power_on_default().seq_state);
         Self {
@@ -1703,7 +1710,7 @@ impl SequencerBank {
 
     /// This bank's live sequencer-count bound — the `svr_sequencers_max`
     /// value it was constructed with via [`Self::new`].
-    // fusa:req REQ-SEQ-001
+    //fusa:req REQ-SEQ-001
     pub fn svr_sequencers_max(&self) -> u8 {
         // `Self::new` takes `svr_sequencers_max` as a `u8`, so `states.len()`
         // never exceeds `u8::MAX` and this cast never truncates.
@@ -1716,7 +1723,7 @@ impl SequencerBank {
     /// or beyond this bank's bound, reusing
     /// [`check_sequencer_num_in_bounds`]'s existing bound check rather than
     /// re-deriving it. Never panics for any input.
-    // fusa:req REQ-SEQ-002
+    //fusa:req REQ-SEQ-002
     pub fn read(&self, sequencer_num: u8) -> Result<SequencerState, RcpError> {
         check_sequencer_num_in_bounds(sequencer_num, self.svr_sequencers_max())?;
         Ok(self.states[sequencer_num as usize])
@@ -1735,7 +1742,7 @@ impl SequencerBank {
     /// (this bank is left unchanged) if some other request raced ahead and
     /// moved the sequencer out of that state first. Never panics for any
     /// input.
-    // fusa:req REQ-SEQ-003
+    //fusa:req REQ-SEQ-003
     pub fn advance_if_still_in_start_state(
         &mut self,
         gate: &CompoundGateConfig,
@@ -1761,7 +1768,7 @@ impl SequencerBank {
     /// `gate.sequencer_num`, or `Err(RcpError::RequestRejected)` if the
     /// sequencer is known but not currently in `gate.start_state`. Never
     /// panics for any input.
-    // fusa:req REQ-SEQ-004
+    //fusa:req REQ-SEQ-004
     pub fn check_compound_gate(&self, gate: &CompoundGateConfig) -> Result<(), RcpError> {
         let current_state = self.read(gate.sequencer_num)?;
         check_compound_gate(current_state, gate, self.svr_sequencers_max())
@@ -1778,7 +1785,7 @@ impl SequencerBank {
     /// regardless of what the sequencer currently holds. Returns
     /// `Err(RcpError::SequencerNotKnown)` for an out-of-bounds
     /// `sequencer_num`. Never panics for any input.
-    // fusa:req REQ-SAFEMEAS-004
+    //fusa:req REQ-SAFEMEAS-004
     pub fn force_state(
         &mut self,
         sequencer_num: u8,
@@ -1798,7 +1805,7 @@ impl SequencerBank {
 /// See this module's doc comment "Provenance note: exec-delay timer width
 /// and units" for why this is a plain `u32` placeholder.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-TRIG-002
+//fusa:req REQ-TRIG-002
 pub struct TriggerExecDelay(pub u32);
 
 /// Select the execution-delay timer that applies to `kind`, if any.
@@ -1809,9 +1816,9 @@ pub struct TriggerExecDelay(pub u32);
 /// per-kind-timer-selection shape, including [`RequestKind::Standard`] (a
 /// ninth and final variant, added alongside [`ExecutionPriorityTier`]).
 /// Never panics for any input.
-// fusa:req REQ-TRIG-002
-// fusa:req REQ-PRIO-002
-// fusa:req REQ-SAFETY-003
+//fusa:req REQ-TRIG-002
+//fusa:req REQ-PRIO-002
+//fusa:req REQ-SAFETY-003
 pub fn resolve_trigger_exec_delay(kind: RequestKind, delay: TriggerExecDelay) -> Option<u32> {
     match kind {
         RequestKind::Triggered | RequestKind::SafetyTriggered => Some(delay.0),
@@ -1838,7 +1845,7 @@ pub fn resolve_trigger_exec_delay(kind: RequestKind, delay: TriggerExecDelay) ->
 /// sentinel" for the reasoning behind modeling this as an explicit enum,
 /// and for why a directly-constructed `Finite(0xFFFF)` does not round-trip.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-TRIG-003
+//fusa:req REQ-TRIG-003
 pub enum TriggerRepeatCount {
     /// A finite number of trigger occurrences this request repeats for.
     Finite(u16),
@@ -1849,7 +1856,7 @@ pub enum TriggerRepeatCount {
 
 /// The raw wire value `ROADMAP.md`'s checklist bullet names as the
 /// infinite-repeat sentinel for a Triggered request's occurrence count.
-// fusa:req REQ-TRIG-003
+//fusa:req REQ-TRIG-003
 pub const TRIGGER_REPEAT_COUNT_INFINITE_SENTINEL: u16 = 0xFFFF;
 
 impl TriggerRepeatCount {
@@ -1857,7 +1864,7 @@ impl TriggerRepeatCount {
     /// [`TriggerRepeatCount`]: [`Self::Infinite`] for
     /// [`TRIGGER_REPEAT_COUNT_INFINITE_SENTINEL`], [`Self::Finite`]
     /// otherwise. Never panics for any input.
-    // fusa:req REQ-TRIG-003
+    //fusa:req REQ-TRIG-003
     pub fn from_u16(raw: u16) -> Self {
         if raw == TRIGGER_REPEAT_COUNT_INFINITE_SENTINEL {
             Self::Infinite
@@ -1872,7 +1879,7 @@ impl TriggerRepeatCount {
     /// sentinel" for why `Self::Finite(0xFFFF)` — not reachable via
     /// [`Self::from_u16`] — encodes to the same sentinel value as
     /// [`Self::Infinite`] rather than round-tripping to itself.
-    // fusa:req REQ-TRIG-003
+    //fusa:req REQ-TRIG-003
     pub fn to_u16(self) -> u16 {
         match self {
             Self::Finite(n) => n,
@@ -1885,7 +1892,7 @@ impl TriggerRepeatCount {
 /// always `false` for [`TriggerRepeatCount::Infinite`] (it never exhausts on
 /// its own), and `true` once `occurrences_so_far` has reached or passed the
 /// finite configured target. Never panics for any input.
-// fusa:req REQ-TRIG-004
+//fusa:req REQ-TRIG-004
 pub fn is_trigger_repeat_exhausted(
     occurrences_so_far: u16,
     repeat_count: TriggerRepeatCount,
@@ -1908,7 +1915,7 @@ pub fn is_trigger_repeat_exhausted(
 /// See this module's doc comment "Provenance note: busy/idle independence
 /// as a caller-supplied parameter" for why `endpoint_busy` is taken (and
 /// deliberately ignored) rather than omitted outright.
-// fusa:req REQ-TRIG-005
+//fusa:req REQ-TRIG-005
 pub fn should_count_trigger_occurrence(endpoint_busy: bool) -> bool {
     let _ = endpoint_busy;
     true
@@ -1936,7 +1943,8 @@ pub fn should_count_trigger_occurrence(endpoint_busy: bool) -> bool {
 /// and "Provenance note: `CHAIN_ABORTED`/`CHAIN_ERROR` as new variants, and
 /// the distinction between them" for why this function only ever
 /// constructs [`RcpError::ChainAborted`], never [`RcpError::ChainError`].
-// fusa:req REQ-CHAIN-002
+//fusa:req REQ-CHAIN-002
+//fusa:req REQ-ERRH-001
 pub fn check_chain_continuation(cs: bool, predecessor_errored: bool) -> Result<(), RcpError> {
     if cs && predecessor_errored {
         Err(RcpError::ChainAborted)
@@ -1959,7 +1967,7 @@ pub fn check_chain_continuation(cs: bool, predecessor_errored: bool) -> Result<(
 /// duplicating its shape or introducing a new unconfirmed-width
 /// placeholder.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-TIME-002
+//fusa:req REQ-TIME-002
 pub struct TimedExecutionTime(pub AvtpTimestamp);
 
 /// Whether a Timed request is ready to execute: `true` once `current` — a
@@ -1978,7 +1986,7 @@ pub struct TimedExecutionTime(pub AvtpTimestamp);
 /// reads that case as always ready — mirroring the same fallback rule
 /// rather than treating an untimed `exec_time` as an unreachable instant
 /// far in the past or future. Never panics for any input.
-// fusa:req REQ-TIME-003
+//fusa:req REQ-TIME-003
 pub fn is_timed_request_ready(current: AvtpTimestamp, exec_time: TimedExecutionTime) -> bool {
     if exec_time.0.is_untimed() {
         return true;
@@ -2000,7 +2008,8 @@ pub fn is_timed_request_ready(current: AvtpTimestamp, exec_time: TimedExecutionT
 /// `RequestCanceled` as this item's outcome signal" for why this
 /// constructs [`RcpError::RequestCanceled`] rather than
 /// [`RcpError::RequestRejected`] or a new variant of its own.
-// fusa:req REQ-CANCEL-002
+//fusa:req REQ-CANCEL-002
+//fusa:req REQ-ERRH-001
 pub fn check_clear_all_cancellation() -> Result<(), RcpError> {
     Err(RcpError::RequestCanceled)
 }
@@ -2018,7 +2027,7 @@ pub fn check_clear_all_cancellation() -> Result<(), RcpError> {
 /// predicate as a caller-supplied parameter" for why `is_safestate_related`
 /// is taken as a plain caller-supplied `bool` rather than read from this
 /// crate's not-yet-built `rx_safety_measure`/safe-state machinery.
-// fusa:req REQ-CANCEL-003
+//fusa:req REQ-CANCEL-003
 pub fn check_clear_non_safestate_cancellation(is_safestate_related: bool) -> Result<(), RcpError> {
     if is_safestate_related {
         Ok(())
@@ -2035,7 +2044,7 @@ pub fn check_clear_non_safestate_cancellation(is_safestate_related: bool) -> Res
 /// `u8` matching [`crate::acf::ByteMessageInfo::transaction_num`]'s own
 /// width.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-CANCEL-004
+//fusa:req REQ-CANCEL-004
 pub struct ClearTransactionNum(pub u8);
 
 /// The clear-single (`0x07`, optional) cancellation rule this checklist
@@ -2048,7 +2057,7 @@ pub struct ClearTransactionNum(pub u8);
 /// `Err(RcpError::RequestCanceled)` when `candidate_transaction_num` equals
 /// `target.0`, and `Ok(())` (do not cancel) otherwise. Never panics for any
 /// input.
-// fusa:req REQ-CANCEL-004
+//fusa:req REQ-CANCEL-004
 pub fn check_clear_single_cancellation(
     candidate_transaction_num: u8,
     target: ClearTransactionNum,
@@ -2079,7 +2088,7 @@ pub fn check_clear_single_cancellation(
 /// later-declared, lower-priority tier; [`select_next_pending_request`]
 /// relies on that ordering directly rather than re-deriving a rank number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-// fusa:req REQ-PRIO-003
+//fusa:req REQ-PRIO-003
 pub enum ExecutionPriorityTier {
     /// Highest priority: the cancellation trio (clear-all,
     /// clear-non-safestate, clear-single).
@@ -2107,8 +2116,8 @@ pub enum ExecutionPriorityTier {
 /// comment "Provenance note: execution-priority tier and exec-delay-timer
 /// treatment for the three new variants" for why. Never panics for any
 /// input.
-// fusa:req REQ-PRIO-003
-// fusa:req REQ-SAFETY-003
+//fusa:req REQ-PRIO-003
+//fusa:req REQ-SAFETY-003
 pub fn execution_priority_tier(kind: RequestKind) -> ExecutionPriorityTier {
     match kind {
         RequestKind::ClearAll | RequestKind::ClearNonSafestate | RequestKind::ClearSingle => {
@@ -2133,7 +2142,7 @@ pub fn execution_priority_tier(kind: RequestKind) -> ExecutionPriorityTier {
 /// caller-supplied sequence number" for why `arrival_seq` is a plain `u64`
 /// rather than this module owning a queue data structure of its own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-PRIO-004
+//fusa:req REQ-PRIO-004
 pub struct PendingRequestKey {
     /// This pending request's kind, which [`execution_priority_tier`] maps
     /// to the tier it competes within.
@@ -2157,7 +2166,7 @@ pub struct PendingRequestKey {
 /// comment "Provenance note: what execution priority ordering does not
 /// decide" for the scope and starvation/overflow questions this function
 /// deliberately does not answer.
-// fusa:req REQ-PRIO-004
+//fusa:req REQ-PRIO-004
 pub fn select_next_pending_request(pending: &[PendingRequestKey]) -> Option<usize> {
     pending
         .iter()
@@ -2178,7 +2187,7 @@ pub fn select_next_pending_request(pending: &[PendingRequestKey]) -> Option<usiz
 /// unlike [`crate::lifecycle::RcServerState`], has no `#[repr(u8)]` and no
 /// `to_u8`/`from_u8` pair.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-RLC-001
+//fusa:req REQ-RLC-001
 pub enum RequestLifecycleState {
     /// A request has been decoded and admitted to this RC Server's pending
     /// set, but has not yet been evaluated for execution eligibility.
@@ -2205,7 +2214,7 @@ pub enum RequestLifecycleState {
 /// staying in the same state, any backward move, and skipping a state on
 /// the way up (e.g. `Pending` straight to `UnderExecution`). Never panics
 /// for any input.
-// fusa:req REQ-RLC-001
+//fusa:req REQ-RLC-001
 pub fn is_request_lifecycle_transition_defined(
     from: RequestLifecycleState,
     to: RequestLifecycleState,
@@ -2237,8 +2246,8 @@ pub fn is_request_lifecycle_transition_defined(
 /// wording to the two guarded hops below, and for why the third hop
 /// (`UnderExecution` -> `Finalized`) is unconditional for every kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-RLC-003
-// fusa:req REQ-RLC-004
+//fusa:req REQ-RLC-003
+//fusa:req REQ-RLC-004
 pub enum RequestLifecycleGuardInput {
     /// [`RequestKind::Standard`]: no gate at either hop.
     Standard,
@@ -2322,9 +2331,9 @@ pub enum RequestLifecycleGuardInput {
 /// every [`RequestLifecycleGuardInput::Standard`]/`ClearAll`/
 /// `ClearNonSafestate`/`ClearSingle` input at either guarded hop — is an
 /// unconditional pass. Never panics for any input.
-// fusa:req REQ-RLC-003
-// fusa:req REQ-RLC-004
-// fusa:req REQ-RLC-005
+//fusa:req REQ-RLC-003
+//fusa:req REQ-RLC-004
+//fusa:req REQ-RLC-005
 fn request_lifecycle_transition_guard(
     to: RequestLifecycleState,
     input: &RequestLifecycleGuardInput,
@@ -2406,7 +2415,7 @@ impl RequestLifecycleState {
     /// request's guard is type-specific, so `input` carries kind-aware
     /// data rather than a single opaque predicate — see
     /// [`RequestLifecycleGuardInput`].
-    // fusa:req REQ-RLC-002
+    //fusa:req REQ-RLC-002
     pub fn try_transition(
         self,
         target: Self,
@@ -2436,7 +2445,7 @@ impl RequestLifecycleState {
 /// that check is mandatory and unconditional, `*current` always becomes
 /// `Finalized` and `Err(RcpError::RequestCanceled)` is always returned.
 /// Never panics for any input.
-// fusa:req REQ-RLC-006
+//fusa:req REQ-RLC-006
 pub fn try_force_cancel_all(current: &mut RequestLifecycleState) -> Result<(), RcpError> {
     if *current == RequestLifecycleState::Finalized {
         return Ok(());
@@ -2456,7 +2465,7 @@ pub fn try_force_cancel_all(current: &mut RequestLifecycleState) -> Result<(), R
 /// [`check_clear_non_safestate_cancellation`]. A `current` already at
 /// [`RequestLifecycleState::Finalized`] is left unchanged. Never panics
 /// for any input.
-// fusa:req REQ-RLC-006
+//fusa:req REQ-RLC-006
 pub fn try_force_cancel_non_safestate(
     current: &mut RequestLifecycleState,
     is_safestate_related: bool,
@@ -2478,7 +2487,7 @@ pub fn try_force_cancel_non_safestate(
 /// `target`, delegating to [`check_clear_single_cancellation`]. A
 /// `current` already at [`RequestLifecycleState::Finalized`] is left
 /// unchanged. Never panics for any input.
-// fusa:req REQ-RLC-006
+//fusa:req REQ-RLC-006
 pub fn try_force_cancel_single(
     current: &mut RequestLifecycleState,
     candidate_transaction_num: u8,
@@ -2537,8 +2546,8 @@ pub const MIN_SEQUENCERS_FOR_COMPOUND_BUNDLE: u8 = 4;
 /// than read from a live [`crate::regmap::GeneralRegisters`], and
 /// "Provenance note: `InvalidParameter` as the compound-bundle gate's
 /// rejection code" for the error-code choice.
-// fusa:req REQ-BUNDLE-001
-// fusa:req REQ-BUNDLE-002
+//fusa:req REQ-BUNDLE-001
+//fusa:req REQ-BUNDLE-002
 pub fn check_compound_bundle_claim(
     has_compound_wait: bool,
     svr_sequencers_max: u8,
@@ -2569,7 +2578,7 @@ pub fn check_compound_bundle_claim(
 /// "Provenance note: `RequestCanceled` as this item's outcome signal" —
 /// only when `watchdog_overflowed` is `true` and `kind` is not
 /// safety-tagged. Never panics for any input.
-// fusa:req REQ-SAFETY-004
+//fusa:req REQ-SAFETY-004
 pub fn check_watchdog_overflow_purge(
     kind: RequestKind,
     watchdog_overflowed: bool,
@@ -2601,7 +2610,7 @@ pub fn check_watchdog_overflow_purge(
 /// watchdog-overflow purge" section for how a kept-queued safety-tagged
 /// request composes with the rest of this crate's already-built
 /// pending-request machinery.
-// fusa:req REQ-SAFETY-005
+//fusa:req REQ-SAFETY-005
 pub fn purge_normal_priority_on_watchdog_overflow(
     pending: &[PendingRequestKey],
     watchdog_overflowed: bool,
@@ -2623,7 +2632,7 @@ pub fn purge_normal_priority_on_watchdog_overflow(
 /// stream, selected by `rx_enforce_e2e`: see [`e2e_failure_scope`]/
 /// [`check_rx_enforce_e2e`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-E2EENF-001
+//fusa:req REQ-E2EENF-001
 pub enum E2eFailureScope {
     /// Drop the one bad request; the rest of the stream is unaffected.
     DropRequest,
@@ -2635,7 +2644,7 @@ pub enum E2eFailureScope {
 /// Select the [`E2eFailureScope`] `rx_enforce_e2e` names: [`Self::LatchStream`]
 /// when `rx_enforce_e2e` is `true`, [`Self::DropRequest`] otherwise. Never
 /// panics for any input.
-// fusa:req REQ-E2EENF-001
+//fusa:req REQ-E2EENF-001
 pub fn e2e_failure_scope(rx_enforce_e2e: bool) -> E2eFailureScope {
     if rx_enforce_e2e {
         E2eFailureScope::LatchStream
@@ -2665,8 +2674,8 @@ pub fn e2e_failure_scope(rx_enforce_e2e: bool) -> E2eFailureScope {
 /// comment "Provenance note: `CrcError` as a new variant, distinct from the
 /// legacy `CrcMismatch` sentinel" for the full history (`ROADMAP.md`
 /// Milestone 6, "`CRC_ERROR` error path").
-// fusa:req REQ-E2EENF-002
-// fusa:req REQ-CRC-011
+//fusa:req REQ-E2EENF-002
+//fusa:req REQ-CRC-011
 pub fn check_rx_enforce_e2e(
     coverage_buffer: &[u8],
     expected_crc: u32,
@@ -2686,7 +2695,7 @@ pub fn check_rx_enforce_e2e(
 /// The safe-state mechanism a stream uses when driven to safe state,
 /// selected by `rx_safety_measure`: see [`resolve_safe_state_mechanism`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-SAFEMEAS-001
+//fusa:req REQ-SAFEMEAS-001
 pub enum SafeStateMechanism {
     /// Force every I/O pin on the stream's endpoints to high-impedance.
     HiZAllPins,
@@ -2702,7 +2711,7 @@ pub enum SafeStateMechanism {
 /// safe state as a gate write, not a new mechanism" for why this reuses
 /// [`CompoundGateConfig`] rather than a safe-state-only type. Never panics
 /// for any input.
-// fusa:req REQ-SAFEMEAS-002
+//fusa:req REQ-SAFEMEAS-002
 pub fn safe_state_sequencer_gate(
     rx_safestate_sequencer: u8,
     rx_safe_sequencer_state: u8,
@@ -2718,7 +2727,7 @@ pub fn safe_state_sequencer_gate(
 /// [`safe_state_sequencer_gate`]'s result) when `rx_safety_measure` is
 /// `true`, [`SafeStateMechanism::HiZAllPins`] otherwise. Never panics for
 /// any input.
-// fusa:req REQ-SAFEMEAS-001
+//fusa:req REQ-SAFEMEAS-001
 pub fn resolve_safe_state_mechanism(
     rx_safety_measure: bool,
     rx_safestate_sequencer: u8,
@@ -2741,7 +2750,7 @@ pub fn resolve_safe_state_mechanism(
 ///
 /// Returns `Err(RcpError::SequencerNotKnown)` for an out-of-bounds
 /// `gate.sequencer_num`. Never panics for any input.
-// fusa:req REQ-SAFEMEAS-003
+//fusa:req REQ-SAFEMEAS-003
 pub fn enter_sequencer_driven_safe_state(
     bank: &mut SequencerBank,
     gate: &CompoundGateConfig,
@@ -2754,7 +2763,7 @@ pub fn enter_sequencer_driven_safe_state(
 /// The result of evaluating a request-storage overflow against
 /// `rx_ovrflw_safestate_enable`: see [`evaluate_request_storage_overflow`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-OVRFLW-001
+//fusa:req REQ-OVRFLW-001
 pub enum OverflowOutcome {
     /// No overflow occurred.
     NoOverflow,
@@ -2768,14 +2777,14 @@ pub enum OverflowOutcome {
 
 impl OverflowOutcome {
     /// True for either overflow variant. Never panics for any input.
-    // fusa:req REQ-OVRFLW-002
+    //fusa:req REQ-OVRFLW-002
     pub fn is_overflow(&self) -> bool {
         !matches!(self, Self::NoOverflow)
     }
 
     /// True only for [`Self::OverflowSafestate`]. Never panics for any
     /// input.
-    // fusa:req REQ-OVRFLW-002
+    //fusa:req REQ-OVRFLW-002
     pub fn drives_safestate(&self) -> bool {
         matches!(self, Self::OverflowSafestate)
     }
@@ -2790,7 +2799,7 @@ impl OverflowOutcome {
 /// [`OverflowOutcome::OverflowSafestate`] or
 /// [`OverflowOutcome::OverflowNoSafestate`], selected by
 /// `rx_ovrflw_safestate_enable`. Never panics for any input.
-// fusa:req REQ-OVRFLW-003
+//fusa:req REQ-OVRFLW-003
 pub fn evaluate_request_storage_overflow(
     storage_overflowed: bool,
     rx_ovrflw_safestate_enable: bool,
@@ -2810,7 +2819,7 @@ pub fn evaluate_request_storage_overflow(
 /// `rx_enforce_seq`/`rx_seq_safestate_enable`: see
 /// [`evaluate_rx_enforce_seq`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-SEQENF-001
+//fusa:req REQ-SEQENF-001
 pub enum SequenceEnforcementOutcome {
     /// Enforcement is disabled, or the candidate sequence number strictly
     /// exceeds the last accepted one: queue the request.
@@ -2826,14 +2835,14 @@ pub enum SequenceEnforcementOutcome {
 
 impl SequenceEnforcementOutcome {
     /// True for either rejected variant. Never panics for any input.
-    // fusa:req REQ-SEQENF-002
+    //fusa:req REQ-SEQENF-002
     pub fn is_rejected(&self) -> bool {
         !matches!(self, Self::Accepted)
     }
 
     /// True only for [`Self::RejectedSafestate`]. Never panics for any
     /// input.
-    // fusa:req REQ-SEQENF-002
+    //fusa:req REQ-SEQENF-002
     pub fn drives_safestate(&self) -> bool {
         matches!(self, Self::RejectedSafestate)
     }
@@ -2853,7 +2862,7 @@ impl SequenceEnforcementOutcome {
 /// module's doc comment "Provenance note: the enforced sequence number's
 /// own wire field and width" for why `last_accepted_seq`/`candidate_seq`
 /// are plain caller-supplied `u32` values.
-// fusa:req REQ-SEQENF-003
+//fusa:req REQ-SEQENF-003
 pub fn evaluate_rx_enforce_seq(
     last_accepted_seq: u32,
     candidate_seq: u32,
@@ -2876,7 +2885,7 @@ pub fn evaluate_rx_enforce_seq(
 /// decided a stream should enter safe state: see
 /// [`resolve_safe_state_action`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-SAFEACT-001
+//fusa:req REQ-SAFEACT-001
 pub enum SafeStateAction {
     /// No safe-state entry is called for.
     None,
@@ -2900,7 +2909,7 @@ pub enum SafeStateAction {
 /// [`SafeStateAction::ForceHiZAllPins`] or
 /// [`SafeStateAction::ForceSequencerState`], mirroring `mechanism`. Never
 /// panics for any input.
-// fusa:req REQ-SAFEACT-002
+//fusa:req REQ-SAFEACT-002
 pub fn resolve_safe_state_action(
     should_enter_safe_state: bool,
     mechanism: SafeStateMechanism,
@@ -2936,13 +2945,13 @@ mod tests {
     ];
 
     #[test]
-    // fusa:test REQ-CMP-001
-    // fusa:test REQ-TRIG-001
-    // fusa:test REQ-CHAIN-001
-    // fusa:test REQ-TIME-001
-    // fusa:test REQ-CANCEL-001
-    // fusa:test REQ-PRIO-001
-    // fusa:test REQ-SAFETY-001
+    //fusa:test REQ-CMP-001
+    //fusa:test REQ-TRIG-001
+    //fusa:test REQ-CHAIN-001
+    //fusa:test REQ-TIME-001
+    //fusa:test REQ-CANCEL-001
+    //fusa:test REQ-PRIO-001
+    //fusa:test REQ-SAFETY-001
     fn request_kind_round_trips_through_to_u8_from_u8() {
         for kind in ALL_REQUEST_KINDS {
             assert_eq!(RequestKind::from_u8(kind.to_u8()), Ok(kind));
@@ -2950,13 +2959,13 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-001
-    // fusa:test REQ-TRIG-001
-    // fusa:test REQ-CHAIN-001
-    // fusa:test REQ-TIME-001
-    // fusa:test REQ-CANCEL-001
-    // fusa:test REQ-PRIO-001
-    // fusa:test REQ-SAFETY-001
+    //fusa:test REQ-CMP-001
+    //fusa:test REQ-TRIG-001
+    //fusa:test REQ-CHAIN-001
+    //fusa:test REQ-TIME-001
+    //fusa:test REQ-CANCEL-001
+    //fusa:test REQ-PRIO-001
+    //fusa:test REQ-SAFETY-001
     fn request_kind_discriminants_match_roadmap_named_values() {
         assert_eq!(RequestKind::Compound.to_u8(), 0x0F);
         assert_eq!(RequestKind::CompoundWait.to_u8(), 0x0B);
@@ -2978,7 +2987,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SAFETY-001
+    //fusa:test REQ-SAFETY-001
     fn request_kind_safety_variants_are_exactly_0x80_or_their_base_kind() {
         assert_eq!(
             RequestKind::SafetyCompound.to_u8(),
@@ -2995,8 +3004,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-002
-    // fusa:test REQ-SAFETY-001
+    //fusa:test REQ-CMP-002
+    //fusa:test REQ-SAFETY-001
     fn request_kind_from_u8_rejects_every_other_value() {
         for raw in [
             0x02u8, 0x03, 0x04, 0x08, 0x0C, 0x10, 0x7F, 0x80, 0x8A, 0x8C, 0x8D, 0xFF,
@@ -3006,31 +3015,31 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TRIG-001
+    //fusa:test REQ-TRIG-001
     fn request_kind_from_u8_accepts_triggered_discriminant() {
         assert_eq!(RequestKind::from_u8(0x0E), Ok(RequestKind::Triggered));
     }
 
     #[test]
-    // fusa:test REQ-PRIO-001
+    //fusa:test REQ-PRIO-001
     fn request_kind_from_u8_accepts_standard_discriminant() {
         assert_eq!(RequestKind::from_u8(0x00), Ok(RequestKind::Standard));
     }
 
     #[test]
-    // fusa:test REQ-CHAIN-001
+    //fusa:test REQ-CHAIN-001
     fn request_kind_from_u8_accepts_chained_discriminant() {
         assert_eq!(RequestKind::from_u8(0x01), Ok(RequestKind::Chained));
     }
 
     #[test]
-    // fusa:test REQ-TIME-001
+    //fusa:test REQ-TIME-001
     fn request_kind_from_u8_accepts_timed_discriminant() {
         assert_eq!(RequestKind::from_u8(0x0A), Ok(RequestKind::Timed));
     }
 
     #[test]
-    // fusa:test REQ-CANCEL-001
+    //fusa:test REQ-CANCEL-001
     fn request_kind_from_u8_accepts_all_three_cancellation_discriminants() {
         assert_eq!(RequestKind::from_u8(0x05), Ok(RequestKind::ClearAll));
         assert_eq!(
@@ -3041,7 +3050,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-002
+    //fusa:test REQ-CMP-002
     fn request_kind_from_u8_never_panics_across_the_full_byte_range() {
         for raw in 0u8..=255 {
             let _ = RequestKind::from_u8(raw);
@@ -3065,7 +3074,7 @@ mod tests {
     ];
 
     #[test]
-    // fusa:test REQ-CMP-008
+    //fusa:test REQ-CMP-008
     fn request_kind_gbb_message_timestamp_round_trips_for_every_non_standard_kind() {
         for kind in ALL_NON_STANDARD_REQUEST_KINDS {
             for message_timestamp in [0u64, u64::MAX, 0x0011_2233_4455_6677] {
@@ -3076,7 +3085,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-008
+    //fusa:test REQ-CMP-008
     fn request_kind_gbb_message_timestamp_encode_preserves_low_56_bits() {
         let message_timestamp = 0x00AA_BBCC_DDEE_FF11;
         let encoded = RequestKind::Compound
@@ -3087,7 +3096,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-008
+    //fusa:test REQ-CMP-008
     fn request_kind_gbb_message_timestamp_encode_rejects_standard() {
         assert_eq!(
             RequestKind::Standard.to_gbb_message_timestamp(0),
@@ -3100,7 +3109,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-008
+    //fusa:test REQ-CMP-008
     fn request_kind_gbb_message_timestamp_decode_never_returns_standard() {
         // A leading byte of 0x00 is ambiguous between "genuinely a standard
         // request" and "a conditional request whose timestamp coincidentally
@@ -3123,7 +3132,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-008
+    //fusa:test REQ-CMP-008
     fn request_kind_gbb_message_timestamp_decode_rejects_unrecognized_leading_byte() {
         for raw in [0x02u8, 0x03, 0x04, 0x08, 0x0C, 0x10, 0x7F, 0x80, 0xFF] {
             let ts = (raw as u64) << 56;
@@ -3132,7 +3141,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-008
+    //fusa:test REQ-CMP-008
     fn request_kind_gbb_message_timestamp_decode_ignores_low_56_bits() {
         for kind in ALL_NON_STANDARD_REQUEST_KINDS {
             let leading = (kind.to_u8() as u64) << 56;
@@ -3145,7 +3154,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-008
+    //fusa:test REQ-CMP-008
     fn request_kind_gbb_message_timestamp_decode_never_panics_across_the_full_byte_range() {
         for raw in 0u8..=255 {
             let ts = (raw as u64) << 56;
@@ -3155,7 +3164,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-008
+    //fusa:test REQ-CMP-008
     fn request_kind_gbb_message_timestamp_encode_never_panics_for_any_kind_and_timestamp() {
         for kind in ALL_REQUEST_KINDS {
             for message_timestamp in [0u64, u64::MAX, 0x8000_0000_0000_0000] {
@@ -3167,13 +3176,13 @@ mod tests {
     // ── SequencerState / CompoundGateConfig ──────────────────────────────────
 
     #[test]
-    // fusa:test REQ-CMP-003
+    //fusa:test REQ-CMP-003
     fn sequencer_state_default_is_zero() {
         assert_eq!(SequencerState::default(), SequencerState(0));
     }
 
     #[test]
-    // fusa:test REQ-CMP-003
+    //fusa:test REQ-CMP-003
     fn compound_gate_config_default_is_sequencer_zero_state_zero() {
         let gate = CompoundGateConfig::default();
         assert_eq!(gate.sequencer_num, 0);
@@ -3183,7 +3192,7 @@ mod tests {
     // ── check_sequencer_num_in_bounds ────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-CMP-004
+    //fusa:test REQ-CMP-004
     fn check_sequencer_num_in_bounds_accepts_every_num_below_max() {
         for max in [1u8, 4, 255] {
             for num in 0..max {
@@ -3193,7 +3202,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-004
+    //fusa:test REQ-CMP-004
     fn check_sequencer_num_in_bounds_rejects_num_at_or_above_max() {
         for (num, max) in [(0u8, 0u8), (4, 4), (5, 4), (255, 4)] {
             assert_eq!(
@@ -3204,7 +3213,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-004
+    //fusa:test REQ-CMP-004
     fn check_sequencer_num_in_bounds_never_panics_for_any_sampled_pair() {
         for num in [0u8, 1, 127, 255] {
             for max in [0u8, 1, 127, 255] {
@@ -3223,7 +3232,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-005
+    //fusa:test REQ-CMP-005
     fn is_gate_satisfied_true_only_when_current_state_matches_start_state() {
         let gate = sample_gate();
         assert!(is_gate_satisfied(SequencerState(1), &gate));
@@ -3232,14 +3241,14 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-005
+    //fusa:test REQ-CMP-005
     fn check_compound_gate_ok_when_sequencer_known_and_state_matches() {
         let gate = sample_gate();
         assert_eq!(check_compound_gate(SequencerState(1), &gate, 4), Ok(()));
     }
 
     #[test]
-    // fusa:test REQ-CMP-004
+    //fusa:test REQ-CMP-004
     fn check_compound_gate_rejects_out_of_bounds_sequencer_before_checking_state() {
         let gate = sample_gate();
         // svr_sequencers_max of 2 puts sequencer_num 2 out of bounds, even
@@ -3251,7 +3260,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-005
+    //fusa:test REQ-CMP-005
     fn check_compound_gate_rejects_mismatched_state_for_a_known_sequencer() {
         let gate = sample_gate();
         assert_eq!(
@@ -3261,7 +3270,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-005
+    //fusa:test REQ-CMP-005
     fn check_compound_gate_never_panics_for_any_sampled_input() {
         let gate = sample_gate();
         for state in [0u8, 1, 2, 255] {
@@ -3274,7 +3283,7 @@ mod tests {
     // ── CompoundExecDelays / resolve_compound_exec_delay ─────────────────────
 
     #[test]
-    // fusa:test REQ-CMP-006
+    //fusa:test REQ-CMP-006
     fn compound_exec_delays_default_is_zero_for_both_timers() {
         let delays = CompoundExecDelays::default();
         assert_eq!(delays.cmp_exec_delay, 0);
@@ -3282,7 +3291,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-006
+    //fusa:test REQ-CMP-006
     fn resolve_compound_exec_delay_selects_the_matching_timer() {
         let delays = CompoundExecDelays {
             cmp_exec_delay: 100,
@@ -3299,7 +3308,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SAFETY-003
+    //fusa:test REQ-SAFETY-003
     fn resolve_compound_exec_delay_matches_the_safety_tagged_variants_base_kind() {
         let delays = CompoundExecDelays {
             cmp_exec_delay: 100,
@@ -3320,7 +3329,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-006
+    //fusa:test REQ-CMP-006
     fn resolve_compound_exec_delay_is_none_for_triggered() {
         let delays = CompoundExecDelays {
             cmp_exec_delay: 100,
@@ -3333,8 +3342,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-006
-    // fusa:test REQ-CHAIN-001
+    //fusa:test REQ-CMP-006
+    //fusa:test REQ-CHAIN-001
     fn resolve_compound_exec_delay_is_none_for_chained() {
         let delays = CompoundExecDelays {
             cmp_exec_delay: 100,
@@ -3347,8 +3356,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-006
-    // fusa:test REQ-TIME-001
+    //fusa:test REQ-CMP-006
+    //fusa:test REQ-TIME-001
     fn resolve_compound_exec_delay_is_none_for_timed() {
         let delays = CompoundExecDelays {
             cmp_exec_delay: 100,
@@ -3361,8 +3370,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-006
-    // fusa:test REQ-CANCEL-001
+    //fusa:test REQ-CMP-006
+    //fusa:test REQ-CANCEL-001
     fn resolve_compound_exec_delay_is_none_for_all_three_cancellation_kinds() {
         let delays = CompoundExecDelays {
             cmp_exec_delay: 100,
@@ -3378,8 +3387,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-006
-    // fusa:test REQ-PRIO-002
+    //fusa:test REQ-CMP-006
+    //fusa:test REQ-PRIO-002
     fn resolve_compound_exec_delay_is_none_for_standard() {
         let delays = CompoundExecDelays {
             cmp_exec_delay: 100,
@@ -3394,7 +3403,7 @@ mod tests {
     // ── advance_sequencer_if_still_in_start_state ────────────────────────────
 
     #[test]
-    // fusa:test REQ-CMP-007
+    //fusa:test REQ-CMP-007
     fn advance_sequencer_advances_when_still_in_start_state() {
         let gate = sample_gate();
         assert_eq!(
@@ -3404,7 +3413,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-007
+    //fusa:test REQ-CMP-007
     fn advance_sequencer_refuses_when_race_moved_it_out_of_start_state() {
         let gate = sample_gate();
         assert_eq!(
@@ -3414,7 +3423,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CMP-007
+    //fusa:test REQ-CMP-007
     fn advance_sequencer_never_panics_for_any_sampled_input() {
         let gate = sample_gate();
         for observed in [0u8, 1, 9, 255] {
@@ -3431,7 +3440,7 @@ mod tests {
     // ── SequencerBank ─────────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-SEQ-001
+    //fusa:test REQ-SEQ-001
     fn sequencer_bank_new_sizes_the_bank_to_svr_sequencers_max() {
         for max in [0u8, 1, 4, 255] {
             let bank = SequencerBank::new(max);
@@ -3440,7 +3449,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SEQ-001
+    //fusa:test REQ-SEQ-001
     fn sequencer_bank_new_initializes_every_sequencer_to_the_power_on_default_state() {
         let bank = SequencerBank::new(4);
         for sequencer_num in 0..4u8 {
@@ -3454,7 +3463,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SEQ-001
+    //fusa:test REQ-SEQ-001
     fn sequencer_bank_new_with_zero_max_yields_an_empty_bank() {
         let bank = SequencerBank::new(0);
         assert_eq!(bank.svr_sequencers_max(), 0);
@@ -3464,7 +3473,7 @@ mod tests {
     // ── SequencerBank::read ──────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-SEQ-002
+    //fusa:test REQ-SEQ-002
     fn sequencer_bank_read_rejects_sequencer_num_at_or_above_the_bound() {
         let bank = SequencerBank::new(4);
         for sequencer_num in [4u8, 5, 255] {
@@ -3473,7 +3482,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SEQ-002
+    //fusa:test REQ-SEQ-002
     fn sequencer_bank_read_never_panics_for_any_sampled_input() {
         let bank = SequencerBank::new(4);
         for sequencer_num in [0u8, 3, 4, 255] {
@@ -3488,7 +3497,7 @@ mod tests {
     // ── SequencerBank::advance_if_still_in_start_state ───────────────────────
 
     #[test]
-    // fusa:test REQ-SEQ-003
+    //fusa:test REQ-SEQ-003
     fn sequencer_bank_advance_mutates_the_store_when_still_in_start_state() {
         let mut bank = SequencerBank::new(4);
         let gate = CompoundGateConfig {
@@ -3507,7 +3516,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SEQ-003
+    //fusa:test REQ-SEQ-003
     fn sequencer_bank_advance_leaves_the_store_unchanged_when_race_lost() {
         let mut bank = SequencerBank::new(4);
         // First advance moves sequencer 2 out of start_state 1.
@@ -3529,7 +3538,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SEQ-003
+    //fusa:test REQ-SEQ-003
     fn sequencer_bank_advance_rejects_out_of_bounds_sequencer_num() {
         let mut bank = SequencerBank::new(2);
         let gate = CompoundGateConfig {
@@ -3543,7 +3552,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SEQ-003
+    //fusa:test REQ-SEQ-003
     fn sequencer_bank_advance_never_panics_for_any_sampled_input() {
         let mut bank = SequencerBank::new(4);
         for sequencer_num in [0u8, 3, 4, 255] {
@@ -3560,7 +3569,7 @@ mod tests {
     // ── SequencerBank::check_compound_gate ───────────────────────────────────
 
     #[test]
-    // fusa:test REQ-SEQ-004
+    //fusa:test REQ-SEQ-004
     fn sequencer_bank_check_compound_gate_ok_when_default_state_matches_gate() {
         let bank = SequencerBank::new(4);
         let gate = CompoundGateConfig {
@@ -3571,7 +3580,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SEQ-004
+    //fusa:test REQ-SEQ-004
     fn sequencer_bank_check_compound_gate_rejects_mismatched_state() {
         let bank = SequencerBank::new(4);
         let gate = CompoundGateConfig {
@@ -3585,7 +3594,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SEQ-004
+    //fusa:test REQ-SEQ-004
     fn sequencer_bank_check_compound_gate_rejects_out_of_bounds_sequencer() {
         let bank = SequencerBank::new(2);
         let gate = CompoundGateConfig {
@@ -3599,7 +3608,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SEQ-004
+    //fusa:test REQ-SEQ-004
     fn sequencer_bank_check_compound_gate_reflects_a_prior_advance() {
         let mut bank = SequencerBank::new(4);
         let gate = CompoundGateConfig {
@@ -3623,7 +3632,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SEQ-004
+    //fusa:test REQ-SEQ-004
     fn sequencer_bank_check_compound_gate_never_panics_for_any_sampled_input() {
         let bank = SequencerBank::new(4);
         for sequencer_num in [0u8, 3, 4, 255] {
@@ -3640,13 +3649,13 @@ mod tests {
     // ── TriggerExecDelay / resolve_trigger_exec_delay ────────────────────────
 
     #[test]
-    // fusa:test REQ-TRIG-002
+    //fusa:test REQ-TRIG-002
     fn trigger_exec_delay_default_is_zero() {
         assert_eq!(TriggerExecDelay::default(), TriggerExecDelay(0));
     }
 
     #[test]
-    // fusa:test REQ-TRIG-002
+    //fusa:test REQ-TRIG-002
     fn resolve_trigger_exec_delay_selects_the_timer_only_for_triggered() {
         let delay = TriggerExecDelay(42);
         assert_eq!(
@@ -3656,7 +3665,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SAFETY-003
+    //fusa:test REQ-SAFETY-003
     fn resolve_trigger_exec_delay_matches_the_safety_tagged_variants_base_kind() {
         let delay = TriggerExecDelay(42);
         assert_eq!(
@@ -3674,7 +3683,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TRIG-002
+    //fusa:test REQ-TRIG-002
     fn resolve_trigger_exec_delay_is_none_for_every_other_kind() {
         let delay = TriggerExecDelay(42);
         assert_eq!(
@@ -3693,8 +3702,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TRIG-002
-    // fusa:test REQ-CANCEL-001
+    //fusa:test REQ-TRIG-002
+    //fusa:test REQ-CANCEL-001
     fn resolve_trigger_exec_delay_is_none_for_all_three_cancellation_kinds() {
         let delay = TriggerExecDelay(42);
         for kind in [
@@ -3707,8 +3716,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TRIG-002
-    // fusa:test REQ-PRIO-002
+    //fusa:test REQ-TRIG-002
+    //fusa:test REQ-PRIO-002
     fn resolve_trigger_exec_delay_is_none_for_standard() {
         let delay = TriggerExecDelay(42);
         assert_eq!(
@@ -3720,7 +3729,7 @@ mod tests {
     // ── TriggerRepeatCount ────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-TRIG-003
+    //fusa:test REQ-TRIG-003
     fn trigger_repeat_count_from_u16_maps_sentinel_to_infinite() {
         assert_eq!(
             TriggerRepeatCount::from_u16(TRIGGER_REPEAT_COUNT_INFINITE_SENTINEL),
@@ -3733,7 +3742,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TRIG-003
+    //fusa:test REQ-TRIG-003
     fn trigger_repeat_count_from_u16_maps_every_other_value_to_finite() {
         for raw in [0u16, 1, 42, 0xFFFE] {
             assert_eq!(
@@ -3744,7 +3753,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TRIG-003
+    //fusa:test REQ-TRIG-003
     fn trigger_repeat_count_finite_round_trips_through_to_u16_from_u16() {
         for raw in [0u16, 1, 42, 0xFFFE] {
             let count = TriggerRepeatCount::from_u16(raw);
@@ -3753,7 +3762,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TRIG-003
+    //fusa:test REQ-TRIG-003
     fn trigger_repeat_count_infinite_round_trips_through_to_u16_from_u16() {
         let count = TriggerRepeatCount::Infinite;
         assert_eq!(count.to_u16(), TRIGGER_REPEAT_COUNT_INFINITE_SENTINEL);
@@ -3761,7 +3770,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TRIG-003
+    //fusa:test REQ-TRIG-003
     fn trigger_repeat_count_directly_constructed_finite_sentinel_collapses_to_infinite() {
         // See this module's doc comment "Provenance note: the
         // infinite-repeat sentinel" — this is the one deliberate,
@@ -3777,7 +3786,7 @@ mod tests {
     // ── is_trigger_repeat_exhausted ───────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-TRIG-004
+    //fusa:test REQ-TRIG-004
     fn is_trigger_repeat_exhausted_is_always_false_for_infinite() {
         for occurrences in [0u16, 1, 100, u16::MAX] {
             assert!(!is_trigger_repeat_exhausted(
@@ -3788,7 +3797,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TRIG-004
+    //fusa:test REQ-TRIG-004
     fn is_trigger_repeat_exhausted_true_once_occurrences_reach_finite_target() {
         let target = TriggerRepeatCount::Finite(3);
         assert!(!is_trigger_repeat_exhausted(0, target));
@@ -3798,7 +3807,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TRIG-004
+    //fusa:test REQ-TRIG-004
     fn is_trigger_repeat_exhausted_never_panics_for_any_sampled_input() {
         for occurrences in [0u16, 1, 3, u16::MAX] {
             for target in [0u16, 3, u16::MAX] {
@@ -3812,7 +3821,7 @@ mod tests {
     // ── should_count_trigger_occurrence ───────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-TRIG-005
+    //fusa:test REQ-TRIG-005
     fn should_count_trigger_occurrence_is_always_true_regardless_of_busy_state() {
         assert!(should_count_trigger_occurrence(true));
         assert!(should_count_trigger_occurrence(false));
@@ -3821,7 +3830,7 @@ mod tests {
     // ── check_chain_continuation ──────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-CHAIN-002
+    //fusa:test REQ-CHAIN-002
     fn check_chain_continuation_aborts_only_when_cs_set_and_predecessor_errored() {
         assert_eq!(
             check_chain_continuation(true, true),
@@ -3830,20 +3839,20 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CHAIN-002
+    //fusa:test REQ-CHAIN-002
     fn check_chain_continuation_continues_when_cs_not_set_even_if_predecessor_errored() {
         assert_eq!(check_chain_continuation(false, true), Ok(()));
     }
 
     #[test]
-    // fusa:test REQ-CHAIN-002
+    //fusa:test REQ-CHAIN-002
     fn check_chain_continuation_continues_when_predecessor_did_not_error_regardless_of_cs() {
         assert_eq!(check_chain_continuation(true, false), Ok(()));
         assert_eq!(check_chain_continuation(false, false), Ok(()));
     }
 
     #[test]
-    // fusa:test REQ-CHAIN-002
+    //fusa:test REQ-CHAIN-002
     fn check_chain_continuation_never_panics_for_any_sampled_input() {
         for cs in [true, false] {
             for predecessor_errored in [true, false] {
@@ -3855,7 +3864,7 @@ mod tests {
     // ── RcpError::ChainAborted / RcpError::ChainError ────────────────────────
 
     #[test]
-    // fusa:test REQ-CHAIN-003
+    //fusa:test REQ-CHAIN-003
     fn chain_aborted_and_chain_error_are_distinct_rcp_error_variants() {
         assert_ne!(RcpError::ChainAborted, RcpError::ChainError);
         assert_eq!(RcpError::ChainAborted, RcpError::ChainAborted);
@@ -3863,7 +3872,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CHAIN-003
+    //fusa:test REQ-CHAIN-003
     fn chain_aborted_and_chain_error_carry_the_roadmap_named_codes_in_their_display_text() {
         assert!(RcpError::ChainAborted.to_string().contains("CHAIN_ABORTED"));
         assert!(RcpError::ChainError.to_string().contains("CHAIN_ERROR"));
@@ -3872,7 +3881,7 @@ mod tests {
     // ── TimedExecutionTime / is_timed_request_ready ──────────────────────────
 
     #[test]
-    // fusa:test REQ-TIME-002
+    //fusa:test REQ-TIME-002
     fn timed_execution_time_default_is_untimed() {
         let exec_time = TimedExecutionTime::default();
         assert_eq!(exec_time.0, AvtpTimestamp::default());
@@ -3880,35 +3889,35 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TIME-002
+    //fusa:test REQ-TIME-002
     fn timed_execution_time_wraps_avtp_timestamp_by_value() {
         let exec_time = TimedExecutionTime(AvtpTimestamp::new(1_000));
         assert_eq!(exec_time.0.to_u32(), 1_000);
     }
 
     #[test]
-    // fusa:test REQ-TIME-003
+    //fusa:test REQ-TIME-003
     fn is_timed_request_ready_false_before_exec_time_is_reached() {
         let exec_time = TimedExecutionTime(AvtpTimestamp::new(1_000));
         assert!(!is_timed_request_ready(AvtpTimestamp::new(999), exec_time));
     }
 
     #[test]
-    // fusa:test REQ-TIME-003
+    //fusa:test REQ-TIME-003
     fn is_timed_request_ready_true_exactly_at_exec_time() {
         let exec_time = TimedExecutionTime(AvtpTimestamp::new(1_000));
         assert!(is_timed_request_ready(AvtpTimestamp::new(1_000), exec_time));
     }
 
     #[test]
-    // fusa:test REQ-TIME-003
+    //fusa:test REQ-TIME-003
     fn is_timed_request_ready_true_after_exec_time_has_passed() {
         let exec_time = TimedExecutionTime(AvtpTimestamp::new(1_000));
         assert!(is_timed_request_ready(AvtpTimestamp::new(1_001), exec_time));
     }
 
     #[test]
-    // fusa:test REQ-TIME-003
+    //fusa:test REQ-TIME-003
     fn is_timed_request_ready_true_across_a_rollover() {
         // AvtpTimestamp::is_after is wraparound-aware; a current time that
         // just wrapped past u32::MAX back to a small value must still read
@@ -3918,7 +3927,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TIME-003
+    //fusa:test REQ-TIME-003
     fn is_timed_request_ready_always_true_for_an_untimed_exec_time() {
         let exec_time = TimedExecutionTime(AvtpTimestamp::default());
         for current in [0u32, 1, 1_000, u32::MAX] {
@@ -3930,7 +3939,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TIME-003
+    //fusa:test REQ-TIME-003
     fn is_timed_request_ready_never_panics_for_any_sampled_input() {
         for current in [0u32, 1, 1_000, u32::MAX] {
             for target in [0u32, 1, 1_000, u32::MAX] {
@@ -3945,7 +3954,7 @@ mod tests {
     // ── check_clear_all_cancellation ──────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-CANCEL-002
+    //fusa:test REQ-CANCEL-002
     fn check_clear_all_cancellation_always_cancels() {
         assert_eq!(
             check_clear_all_cancellation(),
@@ -3956,13 +3965,13 @@ mod tests {
     // ── check_clear_non_safestate_cancellation ────────────────────────────────
 
     #[test]
-    // fusa:test REQ-CANCEL-003
+    //fusa:test REQ-CANCEL-003
     fn check_clear_non_safestate_cancellation_spares_safestate_related_requests() {
         assert_eq!(check_clear_non_safestate_cancellation(true), Ok(()));
     }
 
     #[test]
-    // fusa:test REQ-CANCEL-003
+    //fusa:test REQ-CANCEL-003
     fn check_clear_non_safestate_cancellation_cancels_non_safestate_related_requests() {
         assert_eq!(
             check_clear_non_safestate_cancellation(false),
@@ -3971,7 +3980,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CANCEL-003
+    //fusa:test REQ-CANCEL-003
     fn check_clear_non_safestate_cancellation_never_panics_for_any_input() {
         for is_safestate_related in [true, false] {
             let _ = check_clear_non_safestate_cancellation(is_safestate_related);
@@ -3981,13 +3990,13 @@ mod tests {
     // ── ClearTransactionNum / check_clear_single_cancellation ────────────────
 
     #[test]
-    // fusa:test REQ-CANCEL-004
+    //fusa:test REQ-CANCEL-004
     fn clear_transaction_num_default_is_zero() {
         assert_eq!(ClearTransactionNum::default(), ClearTransactionNum(0));
     }
 
     #[test]
-    // fusa:test REQ-CANCEL-004
+    //fusa:test REQ-CANCEL-004
     fn check_clear_single_cancellation_cancels_only_the_matching_transaction_num() {
         let target = ClearTransactionNum(0x42);
         assert_eq!(
@@ -3997,7 +4006,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CANCEL-004
+    //fusa:test REQ-CANCEL-004
     fn check_clear_single_cancellation_spares_every_non_matching_transaction_num() {
         let target = ClearTransactionNum(0x42);
         for candidate in [0x00u8, 0x01, 0x41, 0x43, 0xFF] {
@@ -4006,7 +4015,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CANCEL-004
+    //fusa:test REQ-CANCEL-004
     fn check_clear_single_cancellation_never_panics_for_any_sampled_input() {
         for candidate in [0x00u8, 0x42, 0xFF] {
             for target in [0x00u8, 0x42, 0xFF] {
@@ -4018,7 +4027,7 @@ mod tests {
     // ── ExecutionPriorityTier / execution_priority_tier ──────────────────────
 
     #[test]
-    // fusa:test REQ-PRIO-003
+    //fusa:test REQ-PRIO-003
     fn execution_priority_tier_orders_tiers_cancellation_highest_standard_lowest() {
         // `ROADMAP.md`'s own stated order: cancellation > triggered > timed >
         // compound > compound-wait > chained > standard. Ord's derive makes
@@ -4033,7 +4042,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PRIO-003
+    //fusa:test REQ-PRIO-003
     fn execution_priority_tier_collapses_all_three_cancellation_kinds_onto_one_tier() {
         for kind in [
             RequestKind::ClearAll,
@@ -4048,7 +4057,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PRIO-003
+    //fusa:test REQ-PRIO-003
     fn execution_priority_tier_maps_every_remaining_kind_to_its_own_named_tier() {
         assert_eq!(
             execution_priority_tier(RequestKind::Triggered),
@@ -4077,7 +4086,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SAFETY-003
+    //fusa:test REQ-SAFETY-003
     fn execution_priority_tier_maps_each_safety_tagged_variant_to_its_base_kinds_tier() {
         assert_eq!(
             execution_priority_tier(RequestKind::SafetyCompound),
@@ -4094,7 +4103,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PRIO-003
+    //fusa:test REQ-PRIO-003
     fn execution_priority_tier_never_panics_for_any_request_kind() {
         for kind in ALL_REQUEST_KINDS {
             let _ = execution_priority_tier(kind);
@@ -4104,13 +4113,13 @@ mod tests {
     // ── PendingRequestKey / select_next_pending_request ──────────────────────
 
     #[test]
-    // fusa:test REQ-PRIO-004
+    //fusa:test REQ-PRIO-004
     fn select_next_pending_request_is_none_for_an_empty_slice() {
         assert_eq!(select_next_pending_request(&[]), None);
     }
 
     #[test]
-    // fusa:test REQ-PRIO-004
+    //fusa:test REQ-PRIO-004
     fn select_next_pending_request_picks_the_single_entry() {
         let pending = [PendingRequestKey {
             kind: RequestKind::Standard,
@@ -4120,7 +4129,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PRIO-004
+    //fusa:test REQ-PRIO-004
     fn select_next_pending_request_picks_the_highest_priority_tier_regardless_of_arrival_order() {
         // A later-arriving cancellation request must still win over an
         // earlier-arriving standard request — priority tier dominates FIFO,
@@ -4143,7 +4152,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PRIO-004
+    //fusa:test REQ-PRIO-004
     fn select_next_pending_request_respects_the_full_roadmap_tier_order() {
         // One entry per tier, deliberately listed out of priority order and
         // out of arrival order, so this test cannot pass by accident of
@@ -4184,7 +4193,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PRIO-004
+    //fusa:test REQ-PRIO-004
     fn select_next_pending_request_breaks_same_tier_ties_fifo_by_earliest_arrival() {
         let pending = [
             PendingRequestKey {
@@ -4206,7 +4215,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PRIO-004
+    //fusa:test REQ-PRIO-004
     fn select_next_pending_request_prefers_cancellation_regardless_of_which_of_the_three_kinds() {
         for cancellation_kind in [
             RequestKind::ClearAll,
@@ -4228,7 +4237,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PRIO-004
+    //fusa:test REQ-PRIO-004
     fn select_next_pending_request_never_panics_for_any_sampled_input() {
         for kind in ALL_REQUEST_KINDS {
             for arrival_seq in [0u64, 1, u64::MAX] {
@@ -4248,7 +4257,7 @@ mod tests {
     ];
 
     #[test]
-    // fusa:test REQ-RLC-001
+    //fusa:test REQ-RLC-001
     fn is_request_lifecycle_transition_defined_allows_only_the_three_linear_forward_hops() {
         let defined_pairs = [
             (
@@ -4277,7 +4286,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RLC-001
+    //fusa:test REQ-RLC-001
     fn is_request_lifecycle_transition_defined_rejects_every_backward_or_identity_pair() {
         for state in ALL_LIFECYCLE_STATES {
             // Identity: staying put is never a defined transition.
@@ -4310,7 +4319,7 @@ mod tests {
     // ── RequestLifecycleState::try_transition: undefined-shape rejection ────
 
     #[test]
-    // fusa:test REQ-RLC-002
+    //fusa:test REQ-RLC-002
     fn try_transition_rejects_every_undefined_shape_regardless_of_input() {
         for from in ALL_LIFECYCLE_STATES {
             for to in ALL_LIFECYCLE_STATES {
@@ -4329,8 +4338,8 @@ mod tests {
     // ── RequestLifecycleState::try_transition: Pending -> Started guards ────
 
     #[test]
-    // fusa:test REQ-RLC-002
-    // fusa:test REQ-RLC-003
+    //fusa:test REQ-RLC-002
+    //fusa:test REQ-RLC-003
     fn try_transition_pending_to_started_passes_unconditionally_for_ungated_kinds() {
         for input in [
             RequestLifecycleGuardInput::Standard,
@@ -4356,8 +4365,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RLC-002
-    // fusa:test REQ-RLC-003
+    //fusa:test REQ-RLC-002
+    //fusa:test REQ-RLC-003
     fn try_transition_pending_to_started_gates_timed_on_is_timed_request_ready() {
         let exec_time = TimedExecutionTime(AvtpTimestamp::new(1_000));
 
@@ -4382,8 +4391,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RLC-002
-    // fusa:test REQ-RLC-003
+    //fusa:test REQ-RLC-002
+    //fusa:test REQ-RLC-003
     fn try_transition_pending_to_started_gates_compound_and_compound_wait_on_check_compound_gate() {
         let gate = CompoundGateConfig {
             sequencer_num: 0,
@@ -4438,8 +4447,8 @@ mod tests {
     //    guards ──────────────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-RLC-002
-    // fusa:test REQ-RLC-004
+    //fusa:test REQ-RLC-002
+    //fusa:test REQ-RLC-004
     fn try_transition_started_to_under_execution_passes_unconditionally_for_ungated_kinds() {
         let gate = CompoundGateConfig {
             sequencer_num: 0,
@@ -4474,8 +4483,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RLC-002
-    // fusa:test REQ-RLC-004
+    //fusa:test REQ-RLC-002
+    //fusa:test REQ-RLC-004
     fn try_transition_started_to_under_execution_gates_chained_on_check_chain_continuation() {
         let continues = RequestLifecycleGuardInput::Chained {
             cs: true,
@@ -4499,8 +4508,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RLC-002
-    // fusa:test REQ-RLC-004
+    //fusa:test REQ-RLC-002
+    //fusa:test REQ-RLC-004
     fn try_transition_started_to_under_execution_gates_triggered_on_repeat_exhaustion() {
         let not_exhausted = RequestLifecycleGuardInput::Triggered {
             endpoint_busy: true,
@@ -4542,8 +4551,8 @@ mod tests {
     //    is unconditional ───────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-RLC-002
-    // fusa:test REQ-RLC-005
+    //fusa:test REQ-RLC-002
+    //fusa:test REQ-RLC-005
     fn try_transition_under_execution_to_finalized_is_unconditional_for_every_kind() {
         let gate = CompoundGateConfig {
             sequencer_num: 0,
@@ -4588,7 +4597,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RLC-002
+    //fusa:test REQ-RLC-002
     fn try_transition_never_panics_for_any_sampled_state_pair_or_input() {
         let gate = CompoundGateConfig {
             sequencer_num: 0,
@@ -4635,7 +4644,7 @@ mod tests {
     // ── Cancellation trio: force-canceling a target request ─────────────────
 
     #[test]
-    // fusa:test REQ-RLC-006
+    //fusa:test REQ-RLC-006
     fn try_force_cancel_all_always_finalizes_and_returns_request_canceled() {
         for mut state in [
             RequestLifecycleState::Pending,
@@ -4649,7 +4658,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RLC-006
+    //fusa:test REQ-RLC-006
     fn try_force_cancel_all_is_idempotent_once_already_finalized() {
         let mut state = RequestLifecycleState::Finalized;
         assert_eq!(try_force_cancel_all(&mut state), Ok(()));
@@ -4657,7 +4666,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RLC-006
+    //fusa:test REQ-RLC-006
     fn try_force_cancel_non_safestate_leaves_safestate_related_requests_untouched() {
         let mut state = RequestLifecycleState::UnderExecution;
         assert_eq!(try_force_cancel_non_safestate(&mut state, true), Ok(()));
@@ -4665,7 +4674,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RLC-006
+    //fusa:test REQ-RLC-006
     fn try_force_cancel_non_safestate_finalizes_non_safestate_related_requests() {
         let mut state = RequestLifecycleState::UnderExecution;
         assert_eq!(
@@ -4676,7 +4685,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RLC-006
+    //fusa:test REQ-RLC-006
     fn try_force_cancel_single_finalizes_only_the_matching_transaction() {
         let target = ClearTransactionNum(7);
 
@@ -4696,7 +4705,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RLC-006
+    //fusa:test REQ-RLC-006
     fn force_cancel_functions_never_panic_for_any_sampled_input() {
         for state in ALL_LIFECYCLE_STATES {
             let mut s = state;
@@ -4717,7 +4726,7 @@ mod tests {
     // ── check_compound_bundle_claim ─────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-BUNDLE-001
+    //fusa:test REQ-BUNDLE-001
     fn check_compound_bundle_claim_accepts_all_three_prerequisites_together() {
         assert_eq!(check_compound_bundle_claim(true, 4, true), Ok(()));
         // More than the minimum sequencer count is also honest.
@@ -4726,7 +4735,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-BUNDLE-001
+    //fusa:test REQ-BUNDLE-001
     fn check_compound_bundle_claim_rejects_missing_compound_wait() {
         assert_eq!(
             check_compound_bundle_claim(false, 4, true),
@@ -4735,7 +4744,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-BUNDLE-002
+    //fusa:test REQ-BUNDLE-002
     fn check_compound_bundle_claim_rejects_too_few_sequencers() {
         assert_eq!(
             check_compound_bundle_claim(true, 3, true),
@@ -4748,7 +4757,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-BUNDLE-001
+    //fusa:test REQ-BUNDLE-001
     fn check_compound_bundle_claim_rejects_missing_clear_non_safestate() {
         assert_eq!(
             check_compound_bundle_claim(true, 4, false),
@@ -4757,7 +4766,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-BUNDLE-001
+    //fusa:test REQ-BUNDLE-001
     fn check_compound_bundle_claim_rejects_compound_message_parsing_alone() {
         // The checklist's own named failure case: none of the three real
         // prerequisites are met, only (implicitly) the ability to decode a
@@ -4770,7 +4779,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-BUNDLE-002
+    //fusa:test REQ-BUNDLE-002
     fn check_compound_bundle_claim_never_panics_for_any_sampled_input() {
         for has_compound_wait in [false, true] {
             for svr_sequencers_max in [0, 1, 3, 4, 5, u8::MAX] {
@@ -4788,7 +4797,7 @@ mod tests {
     // ── RequestKind::is_safety_tagged ─────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-SAFETY-002
+    //fusa:test REQ-SAFETY-002
     fn is_safety_tagged_is_true_only_for_the_three_safety_variants() {
         for kind in [
             RequestKind::SafetyCompound,
@@ -4815,7 +4824,7 @@ mod tests {
     // ── check_watchdog_overflow_purge ──────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-SAFETY-004
+    //fusa:test REQ-SAFETY-004
     fn check_watchdog_overflow_purge_keeps_everything_when_not_overflowed() {
         for kind in ALL_REQUEST_KINDS {
             assert_eq!(check_watchdog_overflow_purge(kind, false), Ok(()));
@@ -4823,7 +4832,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SAFETY-004
+    //fusa:test REQ-SAFETY-004
     fn check_watchdog_overflow_purge_purges_normal_priority_kinds_on_overflow() {
         for kind in [
             RequestKind::Standard,
@@ -4844,7 +4853,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SAFETY-004
+    //fusa:test REQ-SAFETY-004
     fn check_watchdog_overflow_purge_exempts_safety_tagged_kinds_on_overflow() {
         for kind in [
             RequestKind::SafetyCompound,
@@ -4856,7 +4865,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SAFETY-004
+    //fusa:test REQ-SAFETY-004
     fn check_watchdog_overflow_purge_never_panics_for_any_sampled_input() {
         for kind in ALL_REQUEST_KINDS {
             for watchdog_overflowed in [false, true] {
@@ -4868,7 +4877,7 @@ mod tests {
     // ── purge_normal_priority_on_watchdog_overflow ─────────────────────────────
 
     #[test]
-    // fusa:test REQ-SAFETY-005
+    //fusa:test REQ-SAFETY-005
     fn purge_normal_priority_on_watchdog_overflow_is_a_no_op_for_an_empty_slice() {
         assert_eq!(
             purge_normal_priority_on_watchdog_overflow(&[], true),
@@ -4881,7 +4890,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SAFETY-005
+    //fusa:test REQ-SAFETY-005
     fn purge_normal_priority_on_watchdog_overflow_keeps_everything_without_overflow() {
         let pending = [
             PendingRequestKey {
@@ -4904,7 +4913,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SAFETY-005
+    //fusa:test REQ-SAFETY-005
     fn purge_normal_priority_on_watchdog_overflow_purges_normal_keeps_safety_tagged() {
         let pending = [
             PendingRequestKey {
@@ -4939,7 +4948,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SAFETY-005
+    //fusa:test REQ-SAFETY-005
     fn purge_normal_priority_on_watchdog_overflow_all_safety_tagged_keeps_all() {
         let pending = [
             PendingRequestKey {
@@ -4962,7 +4971,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SAFETY-005
+    //fusa:test REQ-SAFETY-005
     fn purge_normal_priority_on_watchdog_overflow_all_normal_purges_all() {
         let pending = [
             PendingRequestKey {
@@ -4981,7 +4990,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SAFETY-005
+    //fusa:test REQ-SAFETY-005
     fn purge_normal_priority_on_watchdog_overflow_never_panics_for_any_sampled_input() {
         for kind in ALL_REQUEST_KINDS {
             for watchdog_overflowed in [false, true] {
@@ -4997,14 +5006,14 @@ mod tests {
     // ── Per-stream safety config: rx_enforce_e2e ─────────────────────────────
 
     #[test]
-    // fusa:test REQ-E2EENF-001
+    //fusa:test REQ-E2EENF-001
     fn e2e_failure_scope_selects_by_rx_enforce_e2e() {
         assert_eq!(e2e_failure_scope(false), E2eFailureScope::DropRequest);
         assert_eq!(e2e_failure_scope(true), E2eFailureScope::LatchStream);
     }
 
     #[test]
-    // fusa:test REQ-E2EENF-002
+    //fusa:test REQ-E2EENF-002
     fn check_rx_enforce_e2e_accepts_matching_crc() {
         let buffer = b"safe-point coverage bytes";
         let expected = crate::e2e::crc32_tc18(buffer);
@@ -5013,8 +5022,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-E2EENF-002
-    // fusa:test REQ-CRC-011
+    //fusa:test REQ-E2EENF-002
+    //fusa:test REQ-CRC-011
     fn check_rx_enforce_e2e_reports_scope_on_mismatch() {
         let buffer = b"safe-point coverage bytes";
         let wrong = crate::e2e::crc32_tc18(buffer).wrapping_add(1);
@@ -5029,7 +5038,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-E2EENF-002
+    //fusa:test REQ-E2EENF-002
     fn check_rx_enforce_e2e_never_panics_for_any_sampled_input() {
         for buffer in [&b""[..], &b"x"[..], &[0u8; 64][..]] {
             for expected in [0u32, 1, u32::MAX] {
@@ -5043,7 +5052,7 @@ mod tests {
     // ── RcpError::CrcError ────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-CRC-011
+    //fusa:test REQ-CRC-011
     fn crc_error_is_distinct_from_other_rcperror_variants() {
         // The legacy `RcpError::CrcMismatch` sentinel this variant was
         // originally kept distinct from (see this module's "Provenance
@@ -5056,7 +5065,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CRC-011
+    //fusa:test REQ-CRC-011
     fn crc_error_carries_the_roadmap_named_code_in_its_display_text() {
         assert!(RcpError::CrcError.to_string().contains("CRC_ERROR"));
     }
@@ -5065,7 +5074,7 @@ mod tests {
     //    rx_safe_sequencer_state ────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-SAFEMEAS-002
+    //fusa:test REQ-SAFEMEAS-002
     fn safe_state_sequencer_gate_carries_both_fields_through() {
         let gate = safe_state_sequencer_gate(3, 7);
         assert_eq!(gate.sequencer_num, 3);
@@ -5073,7 +5082,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SAFEMEAS-001
+    //fusa:test REQ-SAFEMEAS-001
     fn resolve_safe_state_mechanism_selects_by_rx_safety_measure() {
         assert_eq!(
             resolve_safe_state_mechanism(false, 3, 7),
@@ -5086,7 +5095,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SAFEMEAS-004
+    //fusa:test REQ-SAFEMEAS-004
     fn force_state_writes_unconditionally_even_outside_start_state() {
         let mut bank = SequencerBank::new(4);
         let gate = CompoundGateConfig {
@@ -5101,7 +5110,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SAFEMEAS-004
+    //fusa:test REQ-SAFEMEAS-004
     fn force_state_rejects_out_of_bounds_sequencer() {
         let mut bank = SequencerBank::new(2);
         assert_eq!(
@@ -5111,7 +5120,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SAFEMEAS-003
+    //fusa:test REQ-SAFEMEAS-003
     fn enter_sequencer_driven_safe_state_composes_force_state() {
         let mut bank = SequencerBank::new(4);
         let gate = safe_state_sequencer_gate(2, 5);
@@ -5120,7 +5129,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SAFEMEAS-003
+    //fusa:test REQ-SAFEMEAS-003
     fn enter_sequencer_driven_safe_state_never_panics_for_any_sampled_input() {
         for svr_sequencers_max in [0u8, 1, 4] {
             for sequencer_num in [0u8, 1, 4, u8::MAX] {
@@ -5134,8 +5143,8 @@ mod tests {
     // ── Per-stream safety config: rx_ovrflw_safestate_enable ─────────────────
 
     #[test]
-    // fusa:test REQ-OVRFLW-001
-    // fusa:test REQ-OVRFLW-003
+    //fusa:test REQ-OVRFLW-001
+    //fusa:test REQ-OVRFLW-003
     fn evaluate_request_storage_overflow_no_overflow_ignores_safestate_flag() {
         assert_eq!(
             evaluate_request_storage_overflow(false, false),
@@ -5148,7 +5157,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-OVRFLW-003
+    //fusa:test REQ-OVRFLW-003
     fn evaluate_request_storage_overflow_selects_by_safestate_flag() {
         assert_eq!(
             evaluate_request_storage_overflow(true, false),
@@ -5161,7 +5170,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-OVRFLW-002
+    //fusa:test REQ-OVRFLW-002
     fn overflow_outcome_predicates_agree_with_variant_identity() {
         assert!(!OverflowOutcome::NoOverflow.is_overflow());
         assert!(!OverflowOutcome::NoOverflow.drives_safestate());
@@ -5174,8 +5183,8 @@ mod tests {
     // ── Per-stream safety config: rx_enforce_seq / rx_seq_safestate_enable ───
 
     #[test]
-    // fusa:test REQ-SEQENF-001
-    // fusa:test REQ-SEQENF-003
+    //fusa:test REQ-SEQENF-001
+    //fusa:test REQ-SEQENF-003
     fn evaluate_rx_enforce_seq_accepts_when_disabled_regardless_of_ordering() {
         assert_eq!(
             evaluate_rx_enforce_seq(10, 5, false, false),
@@ -5188,7 +5197,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SEQENF-003
+    //fusa:test REQ-SEQENF-003
     fn evaluate_rx_enforce_seq_accepts_strictly_increasing_sequence() {
         assert_eq!(
             evaluate_rx_enforce_seq(5, 6, true, true),
@@ -5197,7 +5206,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SEQENF-003
+    //fusa:test REQ-SEQENF-003
     fn evaluate_rx_enforce_seq_rejects_equal_or_decreasing_sequence() {
         assert_eq!(
             evaluate_rx_enforce_seq(5, 5, true, false),
@@ -5214,7 +5223,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SEQENF-002
+    //fusa:test REQ-SEQENF-002
     fn sequence_enforcement_outcome_predicates_agree_with_variant_identity() {
         assert!(!SequenceEnforcementOutcome::Accepted.is_rejected());
         assert!(!SequenceEnforcementOutcome::Accepted.drives_safestate());
@@ -5225,7 +5234,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SEQENF-003
+    //fusa:test REQ-SEQENF-003
     fn evaluate_rx_enforce_seq_never_panics_for_any_sampled_input() {
         let seqs = [0u32, 1, 5, u32::MAX];
         for &last in &seqs {
@@ -5247,8 +5256,8 @@ mod tests {
     // ── Per-stream safety config: the unifying safe-state action ─────────────
 
     #[test]
-    // fusa:test REQ-SAFEACT-001
-    // fusa:test REQ-SAFEACT-002
+    //fusa:test REQ-SAFEACT-001
+    //fusa:test REQ-SAFEACT-002
     fn resolve_safe_state_action_is_none_when_not_entering_safe_state() {
         assert_eq!(
             resolve_safe_state_action(false, SafeStateMechanism::HiZAllPins),
@@ -5264,7 +5273,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SAFEACT-002
+    //fusa:test REQ-SAFEACT-002
     fn resolve_safe_state_action_mirrors_the_mechanism_when_entering() {
         assert_eq!(
             resolve_safe_state_action(true, SafeStateMechanism::HiZAllPins),
@@ -5278,7 +5287,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SAFEACT-002
+    //fusa:test REQ-SAFEACT-002
     fn resolve_safe_state_action_never_panics_for_any_sampled_input() {
         let mechanisms = [
             SafeStateMechanism::HiZAllPins,
@@ -5290,5 +5299,185 @@ mod tests {
                 let _ = resolve_safe_state_action(should_enter_safe_state, mechanism);
             }
         }
+    }
+
+    // ── TC18-literal conformance checks ──────────────────────────────────────
+
+    #[test]
+    //fusa:test REQ-CMP-009
+    fn request_kind_discriminants_match_tc18_table_5_condition_type_bytes() {
+        // TC18 §11.2.2, Table 5 "Different types of conditional requests"
+        // (TC18.txt line 1186): "The first byte in the message_timestamp
+        // field is used to indicate the type of condition." Table 5's own
+        // rows, transcribed as literals:
+        //   0x0F, 0x8F -> Compound
+        //   0x0B, 0x8B -> Compound wait
+        //   0x0E, 0x8E -> Triggered
+        //   0x01       -> Chained
+        //   0x0A       -> Timed
+        assert_eq!(RequestKind::Compound.to_u8(), 0x0F);
+        assert_eq!(RequestKind::SafetyCompound.to_u8(), 0x8F);
+        assert_eq!(RequestKind::CompoundWait.to_u8(), 0x0B);
+        assert_eq!(RequestKind::SafetyCompoundWait.to_u8(), 0x8B);
+        assert_eq!(RequestKind::Triggered.to_u8(), 0x0E);
+        assert_eq!(RequestKind::SafetyTriggered.to_u8(), 0x8E);
+        assert_eq!(RequestKind::Chained.to_u8(), 0x01);
+        assert_eq!(RequestKind::Timed.to_u8(), 0x0A);
+
+        // TC18 §11.2.3.1 Table 11 (line 1679) "request_type 0x05",
+        // §11.2.3.2 Table 12 (line 1733) "request_type 0x06", and
+        // §11.2.3.3 Table 13 (line 1792) "request_type 0x07".
+        assert_eq!(RequestKind::ClearAll.to_u8(), 0x05);
+        assert_eq!(RequestKind::ClearNonSafestate.to_u8(), 0x06);
+        assert_eq!(RequestKind::ClearSingle.to_u8(), 0x07);
+
+        // TC18 §11.2.2 (line 1186): "If the MSB of the identifier (0x8x) is
+        // set the request is treated as a safety request".
+        for (safety, base) in [
+            (RequestKind::SafetyCompound, RequestKind::Compound),
+            (RequestKind::SafetyCompoundWait, RequestKind::CompoundWait),
+            (RequestKind::SafetyTriggered, RequestKind::Triggered),
+        ] {
+            assert_eq!(safety.to_u8(), 0x80 | base.to_u8());
+            assert!(safety.is_safety_tagged());
+            assert!(!base.is_safety_tagged());
+        }
+
+        // Decode side: those same literal bytes, positioned as Table 5's
+        // "first byte in message_timestamp field" — i.e. bits 63:56 of the
+        // big-endian 8-octet ACF_GBB message_timestamp.
+        for (byte, expected) in [
+            (0x0Fu8, RequestKind::Compound),
+            (0x8F, RequestKind::SafetyCompound),
+            (0x0B, RequestKind::CompoundWait),
+            (0x8B, RequestKind::SafetyCompoundWait),
+            (0x0E, RequestKind::Triggered),
+            (0x8E, RequestKind::SafetyTriggered),
+            (0x01, RequestKind::Chained),
+            (0x0A, RequestKind::Timed),
+            (0x05, RequestKind::ClearAll),
+            (0x06, RequestKind::ClearNonSafestate),
+            (0x07, RequestKind::ClearSingle),
+        ] {
+            let message_timestamp = (byte as u64) << 56;
+            assert_eq!(
+                RequestKind::from_gbb_message_timestamp(message_timestamp),
+                Some(expected),
+                "Table 5 condition-type byte {byte:#04X}"
+            );
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-SEQ-005
+    fn sequencer_bank_and_state_stay_within_tc18_256_sequencer_and_state_ceiling() {
+        // TC18 §12.10 "Sequencers" (TC18.txt line 3463): "The number of
+        // sequencers and states per sequencer are limited to 256 by this
+        // definition. An RC Server implementation may support only a lower
+        // number of sequencers."
+        const TC18_SEQUENCER_LIMIT: usize = 256;
+        const TC18_STATES_PER_SEQUENCER_LIMIT: usize = 256;
+
+        // `SequencerState` is one octet wide, so it spans exactly TC18's
+        // 256-state ceiling and every one of those states is distinct.
+        let all_states: Vec<SequencerState> = (0..=u8::MAX).map(SequencerState).collect();
+        assert_eq!(all_states.len(), TC18_STATES_PER_SEQUENCER_LIMIT);
+        for (i, a) in all_states.iter().enumerate() {
+            for b in &all_states[i + 1..] {
+                assert_ne!(a, b);
+            }
+        }
+
+        // The widest bank this crate can build is bounded by `u8`-valued
+        // `svr_sequencers_max`, so it never exceeds TC18's 256-sequencer
+        // ceiling. TC18 §12.10 also fixes the power-on state at 1:
+        // "After power-on/reset all sequencers are in state 1."
+        let bank = SequencerBank::new(u8::MAX);
+        assert!(bank.svr_sequencers_max() as usize <= TC18_SEQUENCER_LIMIT);
+        assert_eq!(bank.svr_sequencers_max(), 255);
+        assert_eq!(bank.read(0), Ok(SequencerState(1)));
+        assert_eq!(bank.read(254), Ok(SequencerState(1)));
+        // Sequencer number 255 is beyond this crate's own `u8` bound, and so
+        // is unreachable even though TC18's ceiling would admit it.
+        assert_eq!(bank.read(255), Err(RcpError::SequencerNotKnown));
+    }
+
+    #[test]
+    //fusa:test REQ-ERRH-001
+    fn request_module_error_outcomes_carry_their_tc18_table_27_wire_codes() {
+        // TC18 §12.9.6 Table 27 "Error codes in responses" (TC18.txt line
+        // 3413), transcribed as literals: SEQUENCER_NOT_KNOWN = 2,
+        // REQUEST_CANCELED = 5, REQUEST_REJECTED = 11,
+        // INVALID_PARAMETER = 15, CHAIN_ABORTED = 16.
+
+        // TC18 §11.2.2.1 (line 1203): a compound request naming a sequencer
+        // the RC Server does not have.
+        let unknown_sequencer = CompoundGateConfig {
+            sequencer_num: 4,
+            start_state: SequencerState(1),
+        };
+        assert_eq!(
+            check_compound_gate(SequencerState(1), &unknown_sequencer, 4)
+                .unwrap_err()
+                .tc18_wire_code(),
+            Some(2)
+        );
+
+        // TC18 §11.2.2.1 (line 1203): the sequencer is known but is not in
+        // the request's cmp_start_state, so the request is not due.
+        let unmet_gate = CompoundGateConfig {
+            sequencer_num: 0,
+            start_state: SequencerState(3),
+        };
+        assert_eq!(
+            check_compound_gate(SequencerState(1), &unmet_gate, 4)
+                .unwrap_err()
+                .tc18_wire_code(),
+            Some(11)
+        );
+
+        // TC18 §11.2.3 (line 1672): "Each request that is cancelled will send
+        // an error response with the error code = REQUEST_CANCELED."
+        assert_eq!(
+            check_clear_all_cancellation().unwrap_err().tc18_wire_code(),
+            Some(5)
+        );
+        assert_eq!(
+            check_clear_non_safestate_cancellation(false)
+                .unwrap_err()
+                .tc18_wire_code(),
+            Some(5)
+        );
+        assert_eq!(
+            check_clear_single_cancellation(7, ClearTransactionNum(7))
+                .unwrap_err()
+                .tc18_wire_code(),
+            Some(5)
+        );
+        // TC18 §11.2.2.1 (line 1203) / §11.2.2.4 Table 9 (line 1586): the
+        // watchdog-overflow purge of non-safety-tagged requests is likewise a
+        // cancellation.
+        assert_eq!(
+            check_watchdog_overflow_purge(RequestKind::Compound, true)
+                .unwrap_err()
+                .tc18_wire_code(),
+            Some(5)
+        );
+
+        // TC18 §11.2.2.4 Table 9 (line 1586): cs = 1 and "error occurred in
+        // one of the preceding requests" -> CHAIN_ABORTED.
+        assert_eq!(
+            check_chain_continuation(true, true)
+                .unwrap_err()
+                .tc18_wire_code(),
+            Some(16)
+        );
+
+        // TC18 §11.2.2 Table 5 (line 1186) names no 0x02 condition type, so
+        // decoding one is a parameter out of range -> INVALID_PARAMETER.
+        assert_eq!(
+            RequestKind::from_u8(0x02).unwrap_err().tc18_wire_code(),
+            Some(15)
+        );
     }
 }

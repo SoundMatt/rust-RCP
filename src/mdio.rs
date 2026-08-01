@@ -1,9 +1,9 @@
-// fusa:req REQ-MDIO-001
-// fusa:req REQ-MDIO-002
-// fusa:req REQ-MDIO-003
-// fusa:req REQ-MDIO-004
-// fusa:req REQ-MDIO-005
-// fusa:req REQ-MDIO-006
+//fusa:req REQ-MDIO-001
+//fusa:req REQ-MDIO-002
+//fusa:req REQ-MDIO-003
+//fusa:req REQ-MDIO-004
+//fusa:req REQ-MDIO-005
+//fusa:req REQ-MDIO-006
 
 //! The MDIO endpoint type (`ep_type 0x0D`) — `ROADMAP.md` Milestone 7
 //! ("Remaining Endpoint Types"), fourth checklist bullet: IEEE 802.3
@@ -71,6 +71,47 @@
 //! skip it — and flags the discrepancy itself in this doc comment rather
 //! than silently guessing which of the two conflicting spec passages is
 //! authoritative.
+//!
+//! ## Divergence note: `mdio_mode` does **not** select Clause 22 vs Clause 45
+//!
+//! **This module's [`MdioAddressingMode`] contradicts TC18 and must not be
+//! relied on for wire conformance.** TC18 §13.7.13.3 Table 57 "Usage of ABB
+//! message for mdio requests" (TC18.txt line 5676) defines `mdio_mode` as an
+//! MMD-vs-MMS access-kind and access-width selector, not an IEEE 802.3
+//! clause selector:
+//!
+//! | `mdio_mode` | meaning (TC18 Table 57) |
+//! |-------------|-------------------------|
+//! | `01b`       | MMD, single word access |
+//! | `01b` *(as printed — see below)* | MMD, multiple byte access |
+//! | `10b`       | MMS, single word access |
+//! | `11b`       | MMS, multiple (double) word access |
+//!
+//! Table 57 as printed lists `01b` twice and never lists `00b`, so one of
+//! the two MMD rows is a spec typo whose intended code point (`00b` for one
+//! of them) this crate cannot resolve from the text alone. Either way, the
+//! `Clause22 = 0` / `Clause45 = 1` / `Spare2` / `Spare3` mapping below is
+//! **wrong** against Table 57: TC18 assigns no `mdio_mode` value to a
+//! Clause-22-vs-Clause-45 choice at all, and it leaves at most one code
+//! point unallocated rather than two. Correcting this is a behavior change
+//! deliberately not made in the requirements-completeness pass that
+//! discovered it; the accompanying requirement entry records the divergence
+//! as not-implemented, and the surrounding provenance note is retained below
+//! only as the historical record of how the wrong mapping arose (it was
+//! derived from `ROADMAP.md`'s restatement, never from TC18 itself).
+//! Table 57 also fixes the payload widths this module does not model:
+//! `mdio_address` "as per IEEE & OA SPI spec", and `mdio_payload` data
+//! fields of 16 bits for MMD, 32 bits for MMS0 and MMS1, and 16 bits for
+//! every other MMS.
+//!
+//! Two further §13.7.13 gaps are recorded as not-implemented entries: TC18
+//! Figure 42's request-payload layout (line 5664: `reserved`, `mdio_mode`,
+//! `mdio_address`, `mdio_payload`), which [`MdioTransfer`] carries opaque;
+//! and TC18 Table 56's functional-config register layout (§13.7.13.2, line
+//! 5639), whose §13.7.13.2 prose additionally states "The MDIO EP does not
+//! have any configurable parameters" — which [`MdioFunctionalConfig`]'s own
+//! `addressing_mode` field contradicts by carrying a per-EP-type
+//! configurable parameter TC18 does not define.
 //!
 //! ## Provenance note: the two unallocated `mdio_mode` slots
 //!
@@ -149,7 +190,7 @@ use crate::RcpError;
 /// than each given a specific addressing-mode meaning.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-// fusa:req REQ-MDIO-001
+//fusa:req REQ-MDIO-001
 pub enum MdioAddressingMode {
     /// IEEE 802.3 Clause 22 addressing: the simple, 5-bit PHY-address /
     /// 5-bit register-address scheme.
@@ -169,7 +210,7 @@ pub enum MdioAddressingMode {
 
 impl MdioAddressingMode {
     /// Encode this addressing mode as its `mdio_mode` 2-bit wire value.
-    // fusa:req REQ-MDIO-001
+    //fusa:req REQ-MDIO-001
     pub fn to_u8(self) -> u8 {
         self as u8
     }
@@ -180,7 +221,7 @@ impl MdioAddressingMode {
     /// `0..=3` — `mdio_mode`'s full 2-bit range — matching
     /// [`crate::i2c::I2cSpeedMode::from_u8`]'s own range-check discipline.
     /// Never panics for any input.
-    // fusa:req REQ-MDIO-002
+    //fusa:req REQ-MDIO-002
     pub fn from_u8(raw: u8) -> Result<Self, RcpError> {
         match raw {
             0 => Ok(Self::Clause22),
@@ -195,7 +236,7 @@ impl MdioAddressingMode {
     /// — the two `mdio_mode` 2-bit values this module's doc comment flags as
     /// unallocated pending errata. False for
     /// [`MdioAddressingMode::Clause22`]/[`MdioAddressingMode::Clause45`].
-    // fusa:req REQ-MDIO-003
+    //fusa:req REQ-MDIO-003
     pub fn is_unallocated_slot(self) -> bool {
         matches!(self, Self::Spare2 | Self::Spare3)
     }
@@ -220,7 +261,7 @@ impl Default for MdioAddressingMode {
 /// this stays a single-field type rather than growing a clock-divider or
 /// further mode-select fields.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-MDIO-004
+//fusa:req REQ-MDIO-004
 pub struct MdioFunctionalConfig {
     /// This endpoint's configured `mdio_mode` addressing-mode selector.
     pub addressing_mode: MdioAddressingMode,
@@ -234,7 +275,7 @@ impl MdioFunctionalConfig {
     /// This module does not itself call that function — it only shows how a
     /// caller would obtain the matching tag, per this module's doc comment
     /// "Relationship to `crate::regmap`".
-    // fusa:req REQ-MDIO-004
+    //fusa:req REQ-MDIO-004
     pub fn layer_tag(&self) -> crate::regmap::PerEpTypeFunctionalConfig {
         crate::regmap::PerEpTypeFunctionalConfig::new(crate::regmap::EndpointType::Mdio)
     }
@@ -254,7 +295,7 @@ impl MdioFunctionalConfig {
 /// empty one, has a valid encoding, so [`MdioTransfer::decode`] is
 /// infallible.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-// fusa:req REQ-MDIO-005
+//fusa:req REQ-MDIO-005
 pub struct MdioTransfer {
     /// The raw bytes sent for this MDIO register-access request, unparsed.
     pub bytes: Vec<u8>,
@@ -263,7 +304,7 @@ pub struct MdioTransfer {
 impl MdioTransfer {
     /// Encode this transfer to its raw wire representation: `bytes`,
     /// unmodified and unframed.
-    // fusa:req REQ-MDIO-005
+    //fusa:req REQ-MDIO-005
     pub fn encode(&self) -> Vec<u8> {
         self.bytes.clone()
     }
@@ -272,7 +313,7 @@ impl MdioTransfer {
     ///
     /// Every possible byte slice, including an empty one, is a valid MDIO
     /// transfer, so this never fails and never panics for any input.
-    // fusa:req REQ-MDIO-005
+    //fusa:req REQ-MDIO-005
     pub fn decode(b: &[u8]) -> Self {
         Self { bytes: b.to_vec() }
     }
@@ -286,7 +327,7 @@ impl MdioTransfer {
 /// variable-length byte-stream modeling for the opposite transfer
 /// direction.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-// fusa:req REQ-MDIO-006
+//fusa:req REQ-MDIO-006
 pub struct MdioTransferResult {
     /// The raw bytes returned by this MDIO register-access response,
     /// unparsed.
@@ -296,7 +337,7 @@ pub struct MdioTransferResult {
 impl MdioTransferResult {
     /// Encode this transfer result to its raw wire representation: `bytes`,
     /// unmodified and unframed.
-    // fusa:req REQ-MDIO-006
+    //fusa:req REQ-MDIO-006
     pub fn encode(&self) -> Vec<u8> {
         self.bytes.clone()
     }
@@ -305,7 +346,7 @@ impl MdioTransferResult {
     ///
     /// Every possible byte slice, including an empty one, is a valid MDIO
     /// transfer result, so this never fails and never panics for any input.
-    // fusa:req REQ-MDIO-006
+    //fusa:req REQ-MDIO-006
     pub fn decode(b: &[u8]) -> Self {
         Self { bytes: b.to_vec() }
     }
@@ -325,7 +366,7 @@ mod tests {
     ];
 
     #[test]
-    // fusa:test REQ-MDIO-001
+    //fusa:test REQ-MDIO-001
     fn mdio_addressing_mode_round_trips_through_to_u8_from_u8_for_all_four_values() {
         for mode in ALL_ADDRESSING_MODES {
             let raw = mode.to_u8();
@@ -334,7 +375,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-MDIO-001
+    //fusa:test REQ-MDIO-001
     fn mdio_addressing_mode_to_u8_values_are_the_full_2_bit_0_to_3_range() {
         let mut raws: Vec<u8> = ALL_ADDRESSING_MODES.iter().map(|m| m.to_u8()).collect();
         raws.sort_unstable();
@@ -342,7 +383,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-MDIO-002
+    //fusa:test REQ-MDIO-002
     fn mdio_addressing_mode_from_u8_rejects_out_of_range() {
         for raw in [4u8, 5, 0x7F, 0xFF] {
             assert_eq!(
@@ -353,7 +394,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-MDIO-003
+    //fusa:test REQ-MDIO-003
     fn mdio_addressing_mode_is_unallocated_slot_true_only_for_the_two_spare_values() {
         for mode in ALL_ADDRESSING_MODES {
             let expected = matches!(
@@ -365,7 +406,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-MDIO-003
+    //fusa:test REQ-MDIO-003
     fn mdio_addressing_mode_default_is_clause22_and_not_unallocated() {
         let mode = MdioAddressingMode::default();
         assert_eq!(mode, MdioAddressingMode::Clause22);
@@ -375,7 +416,7 @@ mod tests {
     // ── MdioFunctionalConfig / layer_tag ────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-MDIO-004
+    //fusa:test REQ-MDIO-004
     fn mdio_functional_config_default_is_clause22_and_layer_tag_matches_ep_type_mdio() {
         let functional = MdioFunctionalConfig::default();
         assert_eq!(functional.addressing_mode, MdioAddressingMode::Clause22);
@@ -393,7 +434,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-MDIO-004
+    //fusa:test REQ-MDIO-004
     fn mdio_functional_config_layer_tag_rejects_mismatched_ep_type() {
         let functional = MdioFunctionalConfig {
             addressing_mode: MdioAddressingMode::Clause45,
@@ -408,7 +449,7 @@ mod tests {
     // ── MdioTransfer / MdioTransferResult: round-trip, never panic ─────────
 
     #[test]
-    // fusa:test REQ-MDIO-005
+    //fusa:test REQ-MDIO-005
     fn mdio_transfer_round_trips_through_encode_decode_for_any_byte_slice() {
         for bytes in [
             vec![],
@@ -425,7 +466,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-MDIO-005
+    //fusa:test REQ-MDIO-005
     fn mdio_transfer_decode_never_panics_for_any_sampled_input() {
         for len in [0usize, 1, 2, 3, 9, 64] {
             let buf = vec![0x5Au8; len];
@@ -434,7 +475,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-MDIO-006
+    //fusa:test REQ-MDIO-006
     fn mdio_transfer_result_round_trips_through_encode_decode_for_any_byte_slice() {
         for bytes in [
             vec![],
@@ -451,7 +492,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-MDIO-006
+    //fusa:test REQ-MDIO-006
     fn mdio_transfer_result_decode_never_panics_for_any_sampled_input() {
         for len in [0usize, 1, 2, 3, 9, 64] {
             let buf = vec![0x5Au8; len];

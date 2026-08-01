@@ -1,10 +1,10 @@
-// fusa:req REQ-SIM-001
-// fusa:req REQ-SIM-002
-// fusa:req REQ-SIM-003
-// fusa:req REQ-SIM-004
-// fusa:req REQ-SIM-006
-// fusa:req REQ-SIM-007
-// fusa:req REQ-SIM-008
+//fusa:req REQ-SIM-001
+//fusa:req REQ-SIM-002
+//fusa:req REQ-SIM-003
+//fusa:req REQ-SIM-004
+//fusa:req REQ-SIM-006
+//fusa:req REQ-SIM-007
+//fusa:req REQ-SIM-008
 
 //! Deterministic simulation endpoint for integration and hardware-in-loop
 //! tests.
@@ -72,7 +72,7 @@ struct Inner {
 /// returns the endpoint's held buffer (mirroring
 /// [`crate::mock::MockEndpoint::read`]); a `write` with no queued response
 /// returns `Ok(())`.
-// fusa:req REQ-SIM-001
+//fusa:req REQ-SIM-001
 pub struct SimEndpoint {
     ep_type: EndpointType,
     buf: Mutex<Vec<u8>>,
@@ -95,20 +95,20 @@ impl SimEndpoint {
     }
 
     /// Pre-program the next response returned by `read`.
-    // fusa:req REQ-SIM-002
+    //fusa:req REQ-SIM-002
     pub fn queue_read_response(&self, r: Result<Vec<u8>, RcpError>) {
         self.inner.lock().unwrap().read_responses.push_back(r);
     }
 
     /// Pre-program the next response returned by `write`.
-    // fusa:req REQ-SIM-002
+    //fusa:req REQ-SIM-002
     pub fn queue_write_response(&self, r: Result<(), RcpError>) {
         self.inner.lock().unwrap().write_responses.push_back(r);
     }
 
     /// Return all calls dispatched since creation (or last
     /// [`Self::clear_calls`]).
-    // fusa:req REQ-SIM-003
+    //fusa:req REQ-SIM-003
     pub fn calls(&self) -> Vec<SimCall> {
         self.inner.lock().unwrap().calls.clone()
     }
@@ -122,7 +122,7 @@ impl SimEndpoint {
     /// `Err(RcpError::Closed)`. An inherent method (not part of
     /// [`Endpoint`], which defines no `close`) — see this module's doc
     /// comment.
-    // fusa:req REQ-SIM-008
+    //fusa:req REQ-SIM-008
     pub fn close(&self) {
         self.closed.store(true, Ordering::SeqCst);
     }
@@ -133,7 +133,7 @@ impl Endpoint for SimEndpoint {
         self.ep_type
     }
 
-    // fusa:req REQ-SIM-004
+    //fusa:req REQ-SIM-004
     fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
         if self.closed.load(Ordering::SeqCst) {
             return Err(RcpError::Closed);
@@ -149,7 +149,7 @@ impl Endpoint for SimEndpoint {
         Ok(buf[..n].to_vec())
     }
 
-    // fusa:req REQ-SIM-004
+    //fusa:req REQ-SIM-004
     fn write(&self, payload: &[u8]) -> Result<(), RcpError> {
         if self.closed.load(Ordering::SeqCst) {
             return Err(RcpError::Closed);
@@ -175,14 +175,14 @@ mod tests {
     use super::*;
 
     #[test]
-    // fusa:test REQ-SIM-001
+    //fusa:test REQ-SIM-001
     fn new_sim_endpoint_accepts_writes() {
         let sim = SimEndpoint::new(EndpointType::Gpio);
         sim.write(b"hi").unwrap();
     }
 
     #[test]
-    // fusa:test REQ-SIM-003
+    //fusa:test REQ-SIM-003
     fn records_dispatched_calls() {
         let sim = SimEndpoint::new(EndpointType::Gpio);
         for i in 1u8..=3 {
@@ -197,7 +197,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SIM-002
+    //fusa:test REQ-SIM-002
     fn queued_read_responses_delivered_in_order() {
         let sim = SimEndpoint::new(EndpointType::Gpio);
         sim.queue_read_response(Ok(vec![0xAB]));
@@ -210,7 +210,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SIM-002
+    //fusa:test REQ-SIM-002
     fn queued_write_responses_delivered_in_order() {
         let sim = SimEndpoint::new(EndpointType::Gpio);
         sim.queue_write_response(Err(RcpError::Busy));
@@ -219,7 +219,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SIM-004
+    //fusa:test REQ-SIM-004
     fn write_then_read_round_trips_through_buffer() {
         let sim = SimEndpoint::new(EndpointType::Gpio);
         sim.write(b"test").unwrap();
@@ -228,8 +228,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SIM-006
-    // fusa:test REQ-SIM-007
+    //fusa:test REQ-SIM-006
+    //fusa:test REQ-SIM-007
     fn clear_calls_empties_log() {
         let sim = SimEndpoint::new(EndpointType::Gpio);
         sim.write(b"x").unwrap();
@@ -239,7 +239,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SIM-008
+    //fusa:test REQ-SIM-008
     fn call_after_close_returns_closed() {
         let sim = SimEndpoint::new(EndpointType::Gpio);
         sim.close();

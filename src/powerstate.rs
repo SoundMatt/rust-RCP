@@ -1,14 +1,14 @@
-// fusa:req REQ-PWR-001
-// fusa:req REQ-PWR-002
-// fusa:req REQ-PWR-003
-// fusa:req REQ-PWR-004
-// fusa:req REQ-PWR-005
-// fusa:req REQ-PWR-006
-// fusa:req REQ-PWR-007
-// fusa:req REQ-PWR-008
-// fusa:req REQ-PWRSTART-001
-// fusa:req REQ-PWRSTART-002
-// fusa:req REQ-PWRSTART-003
+//fusa:req REQ-PWR-001
+//fusa:req REQ-PWR-002
+//fusa:req REQ-PWR-003
+//fusa:req REQ-PWR-004
+//fusa:req REQ-PWR-005
+//fusa:req REQ-PWR-006
+//fusa:req REQ-PWR-007
+//fusa:req REQ-PWR-008
+//fusa:req REQ-PWRSTART-001
+//fusa:req REQ-PWRSTART-002
+//fusa:req REQ-PWRSTART-003
 
 //! Power-mode model (`ROADMAP.md` Milestone 6, "Real power-mode model
 //! backing the safe-state work" bullet).
@@ -248,7 +248,7 @@ use crate::RcpError;
 /// "Provenance note: `Unpowered`'s software-model semantics" for what
 /// [`PowerMode::Unpowered`] can and cannot mean for a running process.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-PWR-001
+//fusa:req REQ-PWR-001
 pub enum PowerMode {
     /// Fully operational — every endpoint may be driven normally. TC18
     /// §12.4's "Powered" mode, in the lifecycle state the RC Server is
@@ -309,7 +309,7 @@ impl PowerMode {
 ///   the same mode.
 ///
 /// Never panics for any input.
-// fusa:req REQ-PWR-002
+//fusa:req REQ-PWR-002
 pub fn is_power_mode_transition_defined(from: PowerMode, to: PowerMode) -> bool {
     matches!(
         (from, to),
@@ -329,7 +329,7 @@ pub fn is_power_mode_transition_defined(from: PowerMode, to: PowerMode) -> bool 
 /// [`power_mode_gate_from_request_states`] for how a caller can derive both
 /// from `crate::request::RequestLifecycleState` directly.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-PWR-003
+//fusa:req REQ-PWR-003
 pub struct PowerModeGateInput {
     /// No endpoint reachable from this power domain is currently busy.
     pub all_endpoints_idle: bool,
@@ -339,7 +339,7 @@ pub struct PowerModeGateInput {
 
 /// The full gate check: both [`PowerModeGateInput`] fields must be `true`.
 /// Never panics for any input.
-// fusa:req REQ-PWR-003
+//fusa:req REQ-PWR-003
 pub fn is_power_mode_gate_satisfied(input: PowerModeGateInput) -> bool {
     input.all_endpoints_idle && input.no_pending_response
 }
@@ -354,7 +354,7 @@ pub fn is_power_mode_gate_satisfied(input: PowerModeGateInput) -> bool {
 /// module's own working interpretation of "idle" and "no pending response"
 /// as the same underlying fact about request progress. Never panics for
 /// any input.
-// fusa:req REQ-PWRSTART-003
+//fusa:req REQ-PWRSTART-003
 pub fn power_mode_gate_from_request_states(states: &[RequestLifecycleState]) -> PowerModeGateInput {
     let idle = states
         .iter()
@@ -377,7 +377,7 @@ pub fn power_mode_gate_from_request_states(states: &[RequestLifecycleState]) -> 
 /// [`crate::request::check_compound_gate`]'s own use of
 /// `RequestRejected` for "known but not currently satisfied." Never panics
 /// for any input.
-// fusa:req REQ-PWR-004
+//fusa:req REQ-PWR-004
 pub fn try_enter_power_mode(
     from: PowerMode,
     to: PowerMode,
@@ -399,7 +399,7 @@ pub fn try_enter_power_mode(
 /// as an unconditional demotion" for why no [`PowerModeGateInput`] gate
 /// applies here. Always returns [`PowerMode::Unpowered`]. Never panics for
 /// any input.
-// fusa:req REQ-PWR-005
+//fusa:req REQ-PWR-005
 pub fn shutdown_to_unpowered(_from: PowerMode) -> PowerMode {
     PowerMode::Unpowered
 }
@@ -439,7 +439,7 @@ pub enum StartupPath {
 /// (already started) or [`PowerMode::StandBy`] (whose resume is the hot
 /// start — see [`try_hot_start`]), or when the origin is valid but `gate`
 /// is not yet satisfied. Never panics for any input.
-// fusa:req REQ-PWRSTART-001
+//fusa:req REQ-PWRSTART-001
 pub fn try_cold_start(from: PowerMode, gate: PowerModeGateInput) -> Result<PowerMode, RcpError> {
     if !matches!(from, PowerMode::Unpowered | PowerMode::Sleep) {
         return Err(RcpError::RequestRejected);
@@ -468,7 +468,7 @@ pub fn try_cold_start(from: PowerMode, gate: PowerModeGateInput) -> Result<Power
 /// [`is_power_mode_gate_satisfied`]. Returns
 /// `Err(RcpError::RequestRejected)` if any of the three does not hold.
 /// Never panics for any input.
-// fusa:req REQ-PWRSTART-002
+//fusa:req REQ-PWRSTART-002
 pub fn try_hot_start(
     from: PowerMode,
     wakeup: WakeUpHandshakeState,
@@ -499,7 +499,7 @@ pub fn try_hot_start(
 /// own wire encoding" for why this stays an abstract progress marker
 /// rather than a concrete wire message type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-PWR-006
+//fusa:req REQ-PWR-006
 pub enum WakeUpHandshakeState {
     /// No WakeUp exchange in progress.
     #[default]
@@ -516,7 +516,7 @@ pub enum WakeUpHandshakeState {
 /// Returns `Err(RcpError::RequestRejected)` for any state other than
 /// `Idle` — a request cannot be (re-)sent while one is already outstanding
 /// or already acknowledged. Never panics for any input.
-// fusa:req REQ-PWR-006
+//fusa:req REQ-PWR-006
 pub fn send_wakeup_request(state: WakeUpHandshakeState) -> Result<WakeUpHandshakeState, RcpError> {
     match state {
         WakeUpHandshakeState::Idle => Ok(WakeUpHandshakeState::RequestSent),
@@ -530,7 +530,7 @@ pub fn send_wakeup_request(state: WakeUpHandshakeState) -> Result<WakeUpHandshak
 /// Returns `Err(RcpError::RequestRejected)` for any state other than
 /// `RequestSent` — an acknowledgment is only meaningful for a request that
 /// was actually sent and not yet acknowledged. Never panics for any input.
-// fusa:req REQ-PWR-006
+//fusa:req REQ-PWR-006
 pub fn acknowledge_wakeup_request(
     state: WakeUpHandshakeState,
 ) -> Result<WakeUpHandshakeState, RcpError> {
@@ -543,7 +543,7 @@ pub fn acknowledge_wakeup_request(
 /// Whether the WakeUp handshake has reached completion:
 /// [`WakeUpHandshakeState::Acknowledged`], and only that variant. Never
 /// panics for any input.
-// fusa:req REQ-PWR-007
+//fusa:req REQ-PWR-007
 pub fn is_wakeup_handshake_complete(state: WakeUpHandshakeState) -> bool {
     matches!(state, WakeUpHandshakeState::Acknowledged)
 }
@@ -590,7 +590,7 @@ mod tests {
     // ── PowerMode ─────────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-PWR-001
+    //fusa:test REQ-PWR-001
     fn power_mode_variants_are_pairwise_distinct() {
         for (i, a) in ALL_MODES.iter().enumerate() {
             for (j, b) in ALL_MODES.iter().enumerate() {
@@ -600,7 +600,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PWR-001
+    //fusa:test REQ-PWR-001
     fn as_str_gives_a_distinct_name_per_mode() {
         let names: Vec<&str> = ALL_MODES.iter().map(|m| m.as_str()).collect();
         let mut sorted = names.clone();
@@ -614,7 +614,7 @@ mod tests {
     /// TC18 §12.4 Figure 17's two "Go to ..." edges, the only ordinary
     /// (non-start-up) transitions the diagram draws. Both leave `Normal`.
     #[test]
-    // fusa:test REQ-PWR-002
+    //fusa:test REQ-PWR-002
     fn figure_17_go_to_edges_are_the_ordinary_transitions() {
         // "Go to StandBy"
         assert!(is_power_mode_transition_defined(
@@ -633,7 +633,7 @@ mod tests {
     /// powered") and are reached only via `Normal`. Releases before
     /// v5.0.0 wrongly accepted this pair in both directions.
     #[test]
-    // fusa:test REQ-PWR-002
+    //fusa:test REQ-PWR-002
     fn standby_sleep_pair_is_not_a_transition_in_either_direction() {
         assert!(!is_power_mode_transition_defined(
             PowerMode::StandBy,
@@ -649,7 +649,7 @@ mod tests {
     /// their own extra preconditions, so they are not members of the
     /// ordinary set — [`try_hot_start`] and [`try_cold_start`] own them.
     #[test]
-    // fusa:test REQ-PWR-002
+    //fusa:test REQ-PWR-002
     fn wakeup_edges_back_to_normal_are_not_ordinary_transitions() {
         assert!(!is_power_mode_transition_defined(
             PowerMode::StandBy,
@@ -662,7 +662,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PWR-002
+    //fusa:test REQ-PWR-002
     fn unpowered_is_never_an_ordinary_transition_member() {
         for &m in &ALL_MODES {
             assert!(!is_power_mode_transition_defined(m, PowerMode::Unpowered));
@@ -671,7 +671,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PWR-002
+    //fusa:test REQ-PWR-002
     fn staying_in_the_same_mode_is_not_defined() {
         for &m in &ALL_MODES {
             assert!(!is_power_mode_transition_defined(m, m));
@@ -681,7 +681,7 @@ mod tests {
     /// Exhaustive cross-product: exactly the two Figure 17 "Go to" edges,
     /// and nothing else, out of all 16 ordered pairs.
     #[test]
-    // fusa:test REQ-PWR-002
+    //fusa:test REQ-PWR-002
     fn exactly_two_ordered_pairs_are_defined() {
         let defined: Vec<(PowerMode, PowerMode)> = ALL_MODES
             .iter()
@@ -700,7 +700,7 @@ mod tests {
     // ── PowerModeGateInput / is_power_mode_gate_satisfied ────────────────
 
     #[test]
-    // fusa:test REQ-PWR-003
+    //fusa:test REQ-PWR-003
     fn gate_requires_both_flags_true() {
         assert!(is_power_mode_gate_satisfied(PowerModeGateInput {
             all_endpoints_idle: true,
@@ -720,14 +720,14 @@ mod tests {
     // ── power_mode_gate_from_request_states ──────────────────────────────
 
     #[test]
-    // fusa:test REQ-PWRSTART-003
+    //fusa:test REQ-PWRSTART-003
     fn empty_request_state_slice_is_vacuously_idle() {
         let gate = power_mode_gate_from_request_states(&[]);
         assert!(is_power_mode_gate_satisfied(gate));
     }
 
     #[test]
-    // fusa:test REQ-PWRSTART-003
+    //fusa:test REQ-PWRSTART-003
     fn all_finalized_states_are_idle() {
         let states = [
             RequestLifecycleState::Finalized,
@@ -738,7 +738,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PWRSTART-003
+    //fusa:test REQ-PWRSTART-003
     fn any_non_finalized_state_is_not_idle() {
         for state in [
             RequestLifecycleState::Pending,
@@ -756,7 +756,7 @@ mod tests {
     // ── try_enter_power_mode ──────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-PWR-004
+    //fusa:test REQ-PWR-004
     fn succeeds_when_defined_and_gated() {
         let gate = PowerModeGateInput {
             all_endpoints_idle: true,
@@ -773,7 +773,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PWR-004
+    //fusa:test REQ-PWR-004
     fn rejected_when_transition_undefined_even_if_gated() {
         let gate = PowerModeGateInput {
             all_endpoints_idle: true,
@@ -796,7 +796,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PWR-004
+    //fusa:test REQ-PWR-004
     fn rejected_when_defined_but_not_gated() {
         let gate = PowerModeGateInput {
             all_endpoints_idle: true,
@@ -811,7 +811,7 @@ mod tests {
     // ── shutdown_to_unpowered ─────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-PWR-005
+    //fusa:test REQ-PWR-005
     fn shutdown_is_unconditional_from_every_powered_mode() {
         assert_eq!(
             shutdown_to_unpowered(PowerMode::Normal),
@@ -833,7 +833,7 @@ mod tests {
     /// sleep**)". Both origins, and Figure 17 labels both arrows
     /// "Cold start". Releases before v5.0.0 accepted only `Unpowered`.
     #[test]
-    // fusa:test REQ-PWRSTART-001
+    //fusa:test REQ-PWRSTART-001
     fn cold_start_succeeds_from_both_documented_origins_when_gated() {
         let gate = PowerModeGateInput {
             all_endpoints_idle: true,
@@ -856,7 +856,7 @@ mod tests {
     /// procedure" only. Releases before v5.0.0 gated this path behind the
     /// handshake, blocking every wake-from-sleep that had not run one.
     #[test]
-    // fusa:test REQ-PWRSTART-001
+    //fusa:test REQ-PWRSTART-001
     fn cold_start_from_sleep_needs_no_wakeup_handshake() {
         let gate = PowerModeGateInput {
             all_endpoints_idle: true,
@@ -874,7 +874,7 @@ mod tests {
     /// `StandBy` is the hot-start origin, not a cold-start one, and
     /// `Normal` is already started.
     #[test]
-    // fusa:test REQ-PWRSTART-001
+    //fusa:test REQ-PWRSTART-001
     fn cold_start_rejected_from_normal_and_standby() {
         let gate = PowerModeGateInput {
             all_endpoints_idle: true,
@@ -886,7 +886,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PWRSTART-001
+    //fusa:test REQ-PWRSTART-001
     fn cold_start_rejected_when_not_gated() {
         let gate = PowerModeGateInput::default();
         for &m in &[PowerMode::Unpowered, PowerMode::Sleep] {
@@ -900,7 +900,7 @@ mod tests {
     /// single "Hot start" arrow. Releases before v5.0.0 had this origin
     /// as `Sleep`.
     #[test]
-    // fusa:test REQ-PWRSTART-002
+    //fusa:test REQ-PWRSTART-002
     fn hot_start_succeeds_from_standby_when_acknowledged_and_gated() {
         let gate = PowerModeGateInput {
             all_endpoints_idle: true,
@@ -913,7 +913,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PWRSTART-002
+    //fusa:test REQ-PWRSTART-002
     fn hot_start_rejected_from_every_non_standby_mode() {
         let gate = PowerModeGateInput {
             all_endpoints_idle: true,
@@ -931,7 +931,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PWRSTART-002
+    //fusa:test REQ-PWRSTART-002
     fn hot_start_rejected_without_a_completed_handshake() {
         let gate = PowerModeGateInput {
             all_endpoints_idle: true,
@@ -949,7 +949,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PWRSTART-002
+    //fusa:test REQ-PWRSTART-002
     fn hot_start_rejected_when_not_gated() {
         let gate = PowerModeGateInput::default();
         assert_eq!(
@@ -962,7 +962,7 @@ mod tests {
     /// together cover exactly the three non-`Normal` modes, matching
     /// Figure 17's three inbound arrows to `Normal`.
     #[test]
-    // fusa:test REQ-PWRSTART-002
+    //fusa:test REQ-PWRSTART-002
     fn cold_and_hot_start_origins_partition_the_three_inbound_edges() {
         let gate = PowerModeGateInput {
             all_endpoints_idle: true,
@@ -986,13 +986,13 @@ mod tests {
     // ── WakeUpHandshakeState progression ──────────────────────────────────
 
     #[test]
-    // fusa:test REQ-PWR-006
+    //fusa:test REQ-PWR-006
     fn default_wakeup_state_is_idle() {
         assert_eq!(WakeUpHandshakeState::default(), WakeUpHandshakeState::Idle);
     }
 
     #[test]
-    // fusa:test REQ-PWR-006
+    //fusa:test REQ-PWR-006
     fn handshake_advances_in_order() {
         let sent = send_wakeup_request(WakeUpHandshakeState::Idle).unwrap();
         assert_eq!(sent, WakeUpHandshakeState::RequestSent);
@@ -1001,7 +1001,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PWR-006
+    //fusa:test REQ-PWR-006
     fn cannot_send_a_request_out_of_idle() {
         assert_eq!(
             send_wakeup_request(WakeUpHandshakeState::RequestSent),
@@ -1014,7 +1014,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-PWR-006
+    //fusa:test REQ-PWR-006
     fn cannot_acknowledge_out_of_request_sent() {
         assert_eq!(
             acknowledge_wakeup_request(WakeUpHandshakeState::Idle),
@@ -1029,7 +1029,7 @@ mod tests {
     // ── is_wakeup_handshake_complete ──────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-PWR-007
+    //fusa:test REQ-PWR-007
     fn only_acknowledged_is_complete() {
         assert!(!is_wakeup_handshake_complete(WakeUpHandshakeState::Idle));
         assert!(!is_wakeup_handshake_complete(
@@ -1043,7 +1043,7 @@ mod tests {
     // ── Never-panics sweep ──────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-PWR-008
+    //fusa:test REQ-PWR-008
     fn never_panics_for_any_sampled_input() {
         for &from in &ALL_MODES {
             for &to in &ALL_MODES {

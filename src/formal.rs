@@ -1,7 +1,7 @@
-// fusa:req REQ-FORMAL-001
-// fusa:req REQ-FORMAL-002
-// fusa:req REQ-FORMAL-003
-// fusa:req REQ-FORMAL-004
+//fusa:req REQ-FORMAL-001
+//fusa:req REQ-FORMAL-002
+//fusa:req REQ-FORMAL-003
+//fusa:req REQ-FORMAL-004
 
 //! Formal model helpers — state-machine invariant checking and property witnesses.
 //!
@@ -12,7 +12,7 @@
 // ── Invariant types ───────────────────────────────────────────────────────────
 
 /// A named invariant with a checkable predicate.
-// fusa:req REQ-FORMAL-001
+//fusa:req REQ-FORMAL-001
 pub struct Invariant<S> {
     pub name: &'static str,
     pub predicate: Box<dyn Fn(&S) -> bool + Send + Sync>,
@@ -32,7 +32,7 @@ impl<S> Invariant<S> {
 }
 
 /// Result of checking a set of invariants against a state.
-// fusa:req REQ-FORMAL-002
+//fusa:req REQ-FORMAL-002
 #[derive(Debug, Default)]
 pub struct CheckResult {
     pub passed: Vec<&'static str>,
@@ -46,7 +46,7 @@ impl CheckResult {
 }
 
 /// Check all invariants against `state`.
-// fusa:req REQ-FORMAL-003
+//fusa:req REQ-FORMAL-003
 pub fn check_all<S>(state: &S, invs: &[Invariant<S>]) -> CheckResult {
     let mut result = CheckResult::default();
     for inv in invs {
@@ -60,7 +60,7 @@ pub fn check_all<S>(state: &S, invs: &[Invariant<S>]) -> CheckResult {
 }
 
 /// Witness: records the first state that violates an invariant.
-// fusa:req REQ-FORMAL-004
+//fusa:req REQ-FORMAL-004
 pub fn witness<S: Clone>(states: &[S], inv: &Invariant<S>) -> Option<S> {
     states.iter().find(|s| !inv.check(s)).cloned()
 }
@@ -73,8 +73,8 @@ mod tests {
     use super::*;
 
     #[test]
-    // fusa:test REQ-FORMAL-001
-    // fusa:test REQ-FORMAL-003
+    //fusa:test REQ-FORMAL-001
+    //fusa:test REQ-FORMAL-003
     fn invariant_passes_when_predicate_true() {
         let inv = Invariant::new("non-negative", |x: &i32| *x >= 0);
         let result = check_all(&42i32, std::slice::from_ref(&inv));
@@ -82,7 +82,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FORMAL-003
+    //fusa:test REQ-FORMAL-003
     fn invariant_fails_when_predicate_false() {
         let inv = Invariant::new("always-false", |_: &i32| false);
         let result = check_all(&0i32, std::slice::from_ref(&inv));
@@ -91,7 +91,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FORMAL-002
+    //fusa:test REQ-FORMAL-002
     fn check_result_tracks_pass_fail() {
         let invs = vec![
             Invariant::new("pass", |x: &i32| *x >= 0),
@@ -103,7 +103,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FORMAL-004
+    //fusa:test REQ-FORMAL-004
     fn witness_finds_first_violation() {
         let inv = Invariant::new("positive", |x: &i32| *x > 0);
         let states = vec![1, 2, -1, 3, -2];
@@ -112,7 +112,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FORMAL-004
+    //fusa:test REQ-FORMAL-004
     fn witness_returns_none_when_no_violation() {
         let inv = Invariant::new("positive", |x: &i32| *x > 0);
         let states = vec![1, 2, 3];

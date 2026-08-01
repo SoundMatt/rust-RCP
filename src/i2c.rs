@@ -1,9 +1,9 @@
-// fusa:req REQ-I2C-001
-// fusa:req REQ-I2C-002
-// fusa:req REQ-I2C-003
-// fusa:req REQ-I2C-004
-// fusa:req REQ-I2C-005
-// fusa:req REQ-I2C-006
+//fusa:req REQ-I2C-001
+//fusa:req REQ-I2C-002
+//fusa:req REQ-I2C-003
+//fusa:req REQ-I2C-004
+//fusa:req REQ-I2C-005
+//fusa:req REQ-I2C-006
 
 //! The I²C endpoint type (`ep_type 0x04`) — `ROADMAP.md` Milestone 4
 //! ("Basic Endpoint Types"), third checklist bullet: "controller-only, raw
@@ -124,7 +124,7 @@ use crate::RcpError;
 /// speed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-// fusa:req REQ-I2C-001
+//fusa:req REQ-I2C-001
 pub enum I2cSpeedMode {
     /// Standard-mode speed preset (this crate's slowest, most broadly
     /// compatible preset).
@@ -145,7 +145,8 @@ pub enum I2cSpeedMode {
 
 impl I2cSpeedMode {
     /// Encode this speed preset as its `i2c_mode` wire byte value.
-    // fusa:req REQ-I2C-001
+    //fusa:req REQ-I2C-001
+    //fusa:req REQ-I2C-009
     pub fn to_u8(self) -> u8 {
         self as u8
     }
@@ -155,7 +156,9 @@ impl I2cSpeedMode {
     /// Returns `Err(RcpError::InvalidParameter)` for any byte outside
     /// `0..=4`, matching [`crate::spi::SpiChannelSelect::from_sub_opcode`]'s
     /// own range-check discipline. Never panics for any input.
-    // fusa:req REQ-I2C-002
+    //fusa:req REQ-I2C-002
+    //fusa:req REQ-I2C-009
+    //fusa:req REQ-I2C-010
     pub fn from_u8(raw: u8) -> Result<Self, RcpError> {
         match raw {
             0 => Ok(Self::Standard),
@@ -171,7 +174,8 @@ impl I2cSpeedMode {
     /// — the two adjacent high-speed `i2c_mode` rows this module's doc
     /// comment flags as unresolved pending errata. False for
     /// [`I2cSpeedMode::Standard`]/[`I2cSpeedMode::Fast`]/[`I2cSpeedMode::FastPlus`].
-    // fusa:req REQ-I2C-003
+    //fusa:req REQ-I2C-003
+    //fusa:req REQ-I2C-010
     pub fn is_ambiguous_high_speed_row(self) -> bool {
         matches!(self, Self::HighSpeedRowA | Self::HighSpeedRowB)
     }
@@ -195,7 +199,7 @@ impl Default for I2cSpeedMode {
 /// this is a dedicated type rather than content added directly to
 /// [`crate::regmap::PerEpTypeFunctionalConfig`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-I2C-004
+//fusa:req REQ-I2C-004
 pub struct I2cFunctionalConfig {
     /// This endpoint's configured `i2c_mode` speed preset.
     pub speed_mode: I2cSpeedMode,
@@ -209,7 +213,7 @@ impl I2cFunctionalConfig {
     /// This module does not itself call that function — it only shows how a
     /// caller would obtain the matching tag, per this module's doc comment
     /// "Relationship to `crate::regmap`".
-    // fusa:req REQ-I2C-004
+    //fusa:req REQ-I2C-004
     pub fn layer_tag(&self) -> crate::regmap::PerEpTypeFunctionalConfig {
         crate::regmap::PerEpTypeFunctionalConfig::new(crate::regmap::EndpointType::I2c)
     }
@@ -228,7 +232,7 @@ impl I2cFunctionalConfig {
 /// an empty one, has a valid encoding, so [`I2cByteTransfer::decode`] is
 /// infallible.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-// fusa:req REQ-I2C-005
+//fusa:req REQ-I2C-005
 pub struct I2cByteTransfer {
     /// The raw bytes sent from controller to bus, address byte(s) included.
     pub bytes: Vec<u8>,
@@ -237,7 +241,8 @@ pub struct I2cByteTransfer {
 impl I2cByteTransfer {
     /// Encode this transfer to its raw wire representation: `bytes`,
     /// unmodified and unframed.
-    // fusa:req REQ-I2C-005
+    //fusa:req REQ-I2C-005
+    //fusa:req REQ-I2C-011
     pub fn encode(&self) -> Vec<u8> {
         self.bytes.clone()
     }
@@ -246,7 +251,8 @@ impl I2cByteTransfer {
     ///
     /// Every possible byte slice, including an empty one, is a valid I²C
     /// transfer, so this never fails and never panics for any input.
-    // fusa:req REQ-I2C-005
+    //fusa:req REQ-I2C-005
+    //fusa:req REQ-I2C-011
     pub fn decode(b: &[u8]) -> Self {
         Self { bytes: b.to_vec() }
     }
@@ -259,7 +265,7 @@ impl I2cByteTransfer {
 /// variable-length byte-stream modeling for the opposite transfer
 /// direction.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-// fusa:req REQ-I2C-006
+//fusa:req REQ-I2C-006
 pub struct I2cByteTransferResult {
     /// The raw bytes returned from bus to controller.
     pub bytes: Vec<u8>,
@@ -268,7 +274,7 @@ pub struct I2cByteTransferResult {
 impl I2cByteTransferResult {
     /// Encode this transfer result to its raw wire representation: `bytes`,
     /// unmodified and unframed.
-    // fusa:req REQ-I2C-006
+    //fusa:req REQ-I2C-006
     pub fn encode(&self) -> Vec<u8> {
         self.bytes.clone()
     }
@@ -277,7 +283,8 @@ impl I2cByteTransferResult {
     ///
     /// Every possible byte slice, including an empty one, is a valid I²C
     /// transfer result, so this never fails and never panics for any input.
-    // fusa:req REQ-I2C-006
+    //fusa:req REQ-I2C-006
+    //fusa:req REQ-I2C-011
     pub fn decode(b: &[u8]) -> Self {
         Self { bytes: b.to_vec() }
     }
@@ -298,7 +305,7 @@ mod tests {
     ];
 
     #[test]
-    // fusa:test REQ-I2C-001
+    //fusa:test REQ-I2C-001
     fn i2c_speed_mode_round_trips_through_to_u8_from_u8_for_all_five_values() {
         for mode in ALL_SPEED_MODES {
             let raw = mode.to_u8();
@@ -307,7 +314,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-I2C-001
+    //fusa:test REQ-I2C-001
     fn i2c_speed_mode_to_u8_values_are_the_full_0_to_4_range() {
         let mut raws: Vec<u8> = ALL_SPEED_MODES.iter().map(|m| m.to_u8()).collect();
         raws.sort_unstable();
@@ -315,7 +322,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-I2C-002
+    //fusa:test REQ-I2C-002
     fn i2c_speed_mode_from_u8_rejects_out_of_range() {
         for raw in [5u8, 6, 0x7F, 0xFF] {
             assert_eq!(I2cSpeedMode::from_u8(raw), Err(RcpError::InvalidParameter));
@@ -323,7 +330,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-I2C-003
+    //fusa:test REQ-I2C-003
     fn i2c_speed_mode_is_ambiguous_high_speed_row_true_only_for_the_two_flagged_rows() {
         for mode in ALL_SPEED_MODES {
             let expected = matches!(
@@ -335,24 +342,107 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-I2C-003
+    //fusa:test REQ-I2C-003
     fn i2c_speed_mode_default_is_standard_and_not_an_ambiguous_row() {
         let mode = I2cSpeedMode::default();
         assert_eq!(mode, I2cSpeedMode::Standard);
         assert!(!mode.is_ambiguous_high_speed_row());
     }
 
+    // ── TC18 Table 46: i2c_mode preset wire values ──────────────────────────
+
+    #[test]
+    //fusa:test REQ-I2C-009
+    fn i2c_mode_wire_values_match_tc18_table_46_unambiguous_rows() {
+        // TC18 §13.7.7.2 Table 46 (TC18.txt lines 4815-4817), i2c_mode
+        // (relative address 0x0007, 8 bit R/W):
+        //   0: Standard Mode 100kbit/s
+        //   1: Fast Mode 400kbit/s
+        //   2: Fast Mode plus 1Mbit/s
+        assert_eq!(I2cSpeedMode::from_u8(0), Ok(I2cSpeedMode::Standard));
+        assert_eq!(I2cSpeedMode::from_u8(1), Ok(I2cSpeedMode::Fast));
+        assert_eq!(I2cSpeedMode::from_u8(2), Ok(I2cSpeedMode::FastPlus));
+        assert_eq!(I2cSpeedMode::Standard.to_u8(), 0);
+        assert_eq!(I2cSpeedMode::Fast.to_u8(), 1);
+        assert_eq!(I2cSpeedMode::FastPlus.to_u8(), 2);
+        // None of these three rows is one of Table 46's duplicated
+        // high-speed rows, so none may be reported as unresolved.
+        for mode in [
+            I2cSpeedMode::Standard,
+            I2cSpeedMode::Fast,
+            I2cSpeedMode::FastPlus,
+        ] {
+            assert!(!mode.is_ambiguous_high_speed_row());
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-I2C-010
+    fn i2c_mode_value_three_is_not_resolved_to_a_single_high_speed_rate() {
+        // TC18 §13.7.7.2 Table 46 (TC18.txt lines 4818-4819) lists two
+        // adjacent High-speed rows that both carry the same i2c_mode wire
+        // value 3:
+        //   3: High-speed mode 1.7Mbit/s
+        //   3: High-speed mode 3.4Mbit/s
+        // Decoding value 3 must therefore be flagged as unresolved rather
+        // than silently picking either bit rate.
+        let decoded = I2cSpeedMode::from_u8(3).expect("3 is an enumerated Table 46 i2c_mode value");
+        assert!(decoded.is_ambiguous_high_speed_row());
+        assert_eq!(decoded.to_u8(), 3);
+    }
+
+    // ── TC18 §13.7.7.3: address-format transparency ─────────────────────────
+
+    #[test]
+    //fusa:test REQ-I2C-011
+    fn i2c_byte_transfer_is_transparent_to_seven_and_ten_bit_addressing() {
+        // TC18 §13.7.7.3 (TC18.txt line 4830): "The byte msg payload is the
+        // I2C payload including the address. The I2C endpoint does not know
+        // whether there is a 7- or 10-bit address, since the endpoint is just
+        // transparent." The worked example there (Figure 29) is an I²C
+        // transfer with a 10-bit address and 5 bytes of data — 2 address
+        // bytes + 5 data bytes = a 7-byte byte_msg_payload.
+        let ten_bit_addressed = vec![0xF2, 0x34, 0x11, 0x22, 0x33, 0x44, 0x55];
+        assert_eq!(ten_bit_addressed.len(), 7);
+        let transfer = I2cByteTransfer {
+            bytes: ten_bit_addressed.clone(),
+        };
+        // Emitted verbatim: no length prefix, no address framing, no
+        // reordering, nothing stripped.
+        assert_eq!(transfer.encode(), ten_bit_addressed);
+        assert_eq!(
+            I2cByteTransfer::decode(&ten_bit_addressed).bytes,
+            ten_bit_addressed
+        );
+
+        // The same 5 data bytes behind a single 7-bit address byte are
+        // carried identically — exactly one byte shorter, nothing else
+        // differs, and no addressing scheme is inferred either way.
+        let seven_bit_addressed = vec![0xA0, 0x11, 0x22, 0x33, 0x44, 0x55];
+        assert_eq!(seven_bit_addressed.len(), ten_bit_addressed.len() - 1);
+        assert_eq!(
+            I2cByteTransfer::decode(&seven_bit_addressed).bytes,
+            seven_bit_addressed
+        );
+
+        // The bus-to-controller direction is equally transparent.
+        assert_eq!(
+            I2cByteTransferResult::decode(&ten_bit_addressed).encode(),
+            ten_bit_addressed
+        );
+    }
+
     // ── I2cFunctionalConfig / layer_tag ─────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-I2C-004
+    //fusa:test REQ-I2C-004
     fn i2c_functional_config_default_uses_default_speed_mode() {
         let config = I2cFunctionalConfig::default();
         assert_eq!(config.speed_mode, I2cSpeedMode::default());
     }
 
     #[test]
-    // fusa:test REQ-I2C-004
+    //fusa:test REQ-I2C-004
     fn i2c_functional_config_layer_tag_matches_ep_type_i2c() {
         let functional = I2cFunctionalConfig::default();
         let generic = crate::regmap::PerEpConfigBlock::new(crate::regmap::EndpointType::I2c);
@@ -368,7 +458,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-I2C-004
+    //fusa:test REQ-I2C-004
     fn i2c_functional_config_layer_tag_rejects_mismatched_ep_type() {
         let functional = I2cFunctionalConfig::default();
         let generic = crate::regmap::PerEpConfigBlock::new(crate::regmap::EndpointType::Spi);
@@ -381,7 +471,7 @@ mod tests {
     // ── I2cByteTransfer: round-trip / never-panic ───────────────────────────
 
     #[test]
-    // fusa:test REQ-I2C-005
+    //fusa:test REQ-I2C-005
     fn i2c_byte_transfer_round_trips_through_encode_decode() {
         for bytes in [
             vec![],
@@ -400,7 +490,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-I2C-005
+    //fusa:test REQ-I2C-005
     fn i2c_byte_transfer_decode_never_panics_for_any_sampled_input() {
         for len in [0usize, 1, 2, 7, 64] {
             let buf = vec![0x5Au8; len];
@@ -411,7 +501,7 @@ mod tests {
     // ── I2cByteTransferResult: round-trip / never-panic ─────────────────────
 
     #[test]
-    // fusa:test REQ-I2C-006
+    //fusa:test REQ-I2C-006
     fn i2c_byte_transfer_result_round_trips_through_encode_decode() {
         for bytes in [vec![], vec![0xFF], vec![0x01, 0x02, 0x03]] {
             let result = I2cByteTransferResult {
@@ -422,7 +512,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-I2C-006
+    //fusa:test REQ-I2C-006
     fn i2c_byte_transfer_result_decode_never_panics_for_any_sampled_input() {
         for len in [0usize, 1, 5, 32] {
             let buf = vec![0xA5u8; len];

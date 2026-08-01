@@ -1,11 +1,11 @@
-// fusa:req REQ-WDG-001
-// fusa:req REQ-WDG-002
-// fusa:req REQ-WDG-003
-// fusa:req REQ-WDG-004
-// fusa:req REQ-WDG-005
-// fusa:req REQ-WDG-006
-// fusa:req REQ-WDG-007
-// fusa:req REQ-WDG-008
+//fusa:req REQ-WDG-001
+//fusa:req REQ-WDG-002
+//fusa:req REQ-WDG-003
+//fusa:req REQ-WDG-004
+//fusa:req REQ-WDG-005
+//fusa:req REQ-WDG-006
+//fusa:req REQ-WDG-007
+//fusa:req REQ-WDG-008
 
 //! Per-stream watchdog liveness model (`ROADMAP.md` Milestone 6, "Per-stream
 //! safety config" bullet).
@@ -95,7 +95,7 @@
 /// own width. See this module's doc comment "Provenance note: the
 /// timeout's clock-tick unit" for why the unit itself is left opaque.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-WDG-001
+//fusa:req REQ-WDG-001
 pub struct StreamWatchdogTimeout(pub u16);
 
 /// One stream's watchdog liveness record: the tick at which it was last
@@ -104,14 +104,14 @@ pub struct StreamWatchdogTimeout(pub u16);
 /// Never panics for any input. See this module's doc comment for the
 /// "reset on every request, no periodic poll" design this type backs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-WDG-002
+//fusa:req REQ-WDG-002
 pub struct StreamWatchdogState {
     last_reset_tick: u64,
 }
 
 impl StreamWatchdogState {
     /// Start a fresh liveness record, as if just reset at `now_tick`.
-    // fusa:req REQ-WDG-002
+    //fusa:req REQ-WDG-002
     pub fn new(now_tick: u64) -> Self {
         StreamWatchdogState {
             last_reset_tick: now_tick,
@@ -122,7 +122,7 @@ impl StreamWatchdogState {
     /// as this stream's most recent liveness reset, replacing whatever was
     /// recorded before. Intended to be called once per request the stream
     /// receives, never on a periodic timer independent of real traffic.
-    // fusa:req REQ-WDG-002
+    //fusa:req REQ-WDG-002
     pub fn reset_on_request(self, now_tick: u64) -> Self {
         StreamWatchdogState {
             last_reset_tick: now_tick,
@@ -130,7 +130,7 @@ impl StreamWatchdogState {
     }
 
     /// The tick this record was last reset at.
-    // fusa:req REQ-WDG-002
+    //fusa:req REQ-WDG-002
     pub fn last_reset_tick(&self) -> u64 {
         self.last_reset_tick
     }
@@ -143,7 +143,7 @@ impl StreamWatchdogState {
 /// `state.last_reset_tick()` (a caller-supplied clock going backwards) is
 /// read as "no time has elapsed" rather than panicking or wrapping. Never
 /// panics for any input.
-// fusa:req REQ-WDG-003
+//fusa:req REQ-WDG-003
 pub fn is_stream_watchdog_expired(
     state: StreamWatchdogState,
     now_tick: u64,
@@ -160,8 +160,8 @@ pub fn is_stream_watchdog_expired(
 /// See [`evaluate_stream_watchdog`] for the full `rx_wd_enable`/
 /// `rx_wd_safestate_enable` gating rule this type's three variants encode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-WDG-004
-// fusa:req REQ-WDG-005
+//fusa:req REQ-WDG-004
+//fusa:req REQ-WDG-005
 pub enum StreamWatchdogOutcome {
     /// The watchdog is disabled, or is enabled but has not yet expired.
     Alive,
@@ -180,7 +180,7 @@ impl StreamWatchdogOutcome {
     /// [`crate::request::check_watchdog_overflow_purge`]/
     /// [`crate::request::purge_normal_priority_on_watchdog_overflow`]
     /// already take as `watchdog_overflowed`. Never panics for any input.
-    // fusa:req REQ-WDG-006
+    //fusa:req REQ-WDG-006
     pub fn watchdog_overflowed(&self) -> bool {
         !matches!(self, Self::Alive)
     }
@@ -188,7 +188,7 @@ impl StreamWatchdogOutcome {
     /// True only for [`Self::ExpiredSafestate`] — whether this outcome
     /// should drive the stream's endpoints to their configured safe state.
     /// Never panics for any input.
-    // fusa:req REQ-WDG-007
+    //fusa:req REQ-WDG-007
     pub fn drives_safestate(&self) -> bool {
         matches!(self, Self::ExpiredSafestate)
     }
@@ -204,8 +204,8 @@ impl StreamWatchdogOutcome {
 /// Returns [`StreamWatchdogOutcome::ExpiredSafestate`] or
 /// [`StreamWatchdogOutcome::ExpiredNoSafestate`] on expiry, selected by
 /// `rx_wd_safestate_enable`. Never panics for any input.
-// fusa:req REQ-WDG-004
-// fusa:req REQ-WDG-005
+//fusa:req REQ-WDG-004
+//fusa:req REQ-WDG-005
 pub fn evaluate_stream_watchdog(
     state: StreamWatchdogState,
     now_tick: u64,
@@ -233,14 +233,14 @@ mod tests {
     // ── StreamWatchdogState ──────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-WDG-002
+    //fusa:test REQ-WDG-002
     fn new_records_the_construction_tick() {
         let state = StreamWatchdogState::new(42);
         assert_eq!(state.last_reset_tick(), 42);
     }
 
     #[test]
-    // fusa:test REQ-WDG-002
+    //fusa:test REQ-WDG-002
     fn reset_on_request_overwrites_the_prior_tick() {
         let state = StreamWatchdogState::new(10).reset_on_request(99);
         assert_eq!(state.last_reset_tick(), 99);
@@ -249,8 +249,8 @@ mod tests {
     // ── is_stream_watchdog_expired ───────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-WDG-001
-    // fusa:test REQ-WDG-003
+    //fusa:test REQ-WDG-001
+    //fusa:test REQ-WDG-003
     fn not_expired_before_the_timeout_elapses() {
         let state = StreamWatchdogState::new(100);
         assert!(!is_stream_watchdog_expired(
@@ -261,7 +261,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WDG-003
+    //fusa:test REQ-WDG-003
     fn expired_exactly_at_the_timeout_boundary() {
         let state = StreamWatchdogState::new(100);
         assert!(is_stream_watchdog_expired(
@@ -272,7 +272,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WDG-003
+    //fusa:test REQ-WDG-003
     fn expired_well_past_the_timeout() {
         let state = StreamWatchdogState::new(0);
         assert!(is_stream_watchdog_expired(
@@ -283,7 +283,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WDG-003
+    //fusa:test REQ-WDG-003
     fn reset_pushes_expiry_back_out() {
         let state = StreamWatchdogState::new(100).reset_on_request(190);
         assert!(!is_stream_watchdog_expired(
@@ -294,7 +294,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WDG-003
+    //fusa:test REQ-WDG-003
     fn never_panics_when_now_tick_precedes_last_reset() {
         let state = StreamWatchdogState::new(1_000);
         assert!(!is_stream_watchdog_expired(
@@ -307,7 +307,7 @@ mod tests {
     // ── evaluate_stream_watchdog / StreamWatchdogOutcome ─────────────────────
 
     #[test]
-    // fusa:test REQ-WDG-004
+    //fusa:test REQ-WDG-004
     fn disabled_watchdog_is_always_alive_even_when_long_expired() {
         let state = StreamWatchdogState::new(0);
         let outcome =
@@ -318,7 +318,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WDG-004
+    //fusa:test REQ-WDG-004
     fn enabled_watchdog_is_alive_before_expiry() {
         let state = StreamWatchdogState::new(0);
         let outcome = evaluate_stream_watchdog(state, 5, StreamWatchdogTimeout(100), true, true);
@@ -326,7 +326,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WDG-005
+    //fusa:test REQ-WDG-005
     fn expired_with_safestate_enabled_drives_safestate() {
         let state = StreamWatchdogState::new(0);
         let outcome = evaluate_stream_watchdog(state, 100, StreamWatchdogTimeout(100), true, true);
@@ -336,7 +336,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WDG-005
+    //fusa:test REQ-WDG-005
     fn expired_without_safestate_enabled_overflows_but_does_not_drive_safestate() {
         let state = StreamWatchdogState::new(0);
         let outcome = evaluate_stream_watchdog(state, 100, StreamWatchdogTimeout(100), true, false);
@@ -346,8 +346,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WDG-006
-    // fusa:test REQ-WDG-007
+    //fusa:test REQ-WDG-006
+    //fusa:test REQ-WDG-007
     fn watchdog_overflowed_and_drives_safestate_agree_with_variant_identity() {
         assert!(!StreamWatchdogOutcome::Alive.watchdog_overflowed());
         assert!(!StreamWatchdogOutcome::Alive.drives_safestate());
@@ -358,7 +358,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WDG-008
+    //fusa:test REQ-WDG-008
     fn evaluate_stream_watchdog_never_panics_for_any_sampled_input() {
         let ticks = [0u64, 1, 100, u64::MAX];
         let timeouts = [0u16, 1, 100, u16::MAX];

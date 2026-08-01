@@ -1,12 +1,12 @@
-// fusa:req REQ-CLI-001
-// fusa:req REQ-CLI-002
-// fusa:req REQ-CLI-003
-// fusa:req REQ-CLI-004
-// fusa:req REQ-CLI-005
-// fusa:req REQ-CLI-006
-// fusa:req REQ-CLI-007
-// fusa:req REQ-CLI-008
-// fusa:req REQ-CLI-009
+//fusa:req REQ-CLI-001
+//fusa:req REQ-CLI-002
+//fusa:req REQ-CLI-003
+//fusa:req REQ-CLI-004
+//fusa:req REQ-CLI-005
+//fusa:req REQ-CLI-006
+//fusa:req REQ-CLI-007
+//fusa:req REQ-CLI-008
+//fusa:req REQ-CLI-009
 
 //! RCP command-line interface — RELAY spec §12 conformant.
 //!
@@ -107,8 +107,8 @@ fn main() {
 
     match args[1].as_str() {
         // ── §12.1 version ─────────────────────────────────────────────────────
-        // fusa:req REQ-CLI-003
-        // fusa:req REQ-CLI-006
+        //fusa:req REQ-CLI-003
+        //fusa:req REQ-CLI-006
         "version" => {
             let format = flag_value(&args, "--format").unwrap_or("text");
             if format == "json" {
@@ -144,7 +144,7 @@ fn main() {
         }
 
         // ── §12.2 capabilities ────────────────────────────────────────────────
-        // fusa:req REQ-CLI-007
+        //fusa:req REQ-CLI-007
         // "fragmentation" reflects ROADMAP.md Milestone 8's "go" decision:
         // crate::fragment::FragmentReassemblyBuffer implements ms/segment_num
         // multi-AVTPDU reassembly bounded by rx_stream_max_request_size.
@@ -197,7 +197,7 @@ fn main() {
         }
 
         // ── §12.3 status ──────────────────────────────────────────────────────
-        // fusa:req REQ-CLI-008
+        //fusa:req REQ-CLI-008
         // The old --zone-addressed subscription branch is gone (there is no
         // Zone/Controller left to subscribe against — see rcp::mock's own
         // doc comment on why RcServer models no live-notification mechanism
@@ -236,7 +236,7 @@ fn main() {
         }
 
         // ── §11.2 convert ─────────────────────────────────────────────────────
-        // fusa:req REQ-CLI-009
+        //fusa:req REQ-CLI-009
         "convert" => {
             let protocol = flag_value(&args, "--protocol").unwrap_or("");
             if protocol != PROTOCOL {
@@ -258,21 +258,21 @@ fn main() {
         }
 
         // ── discover ──────────────────────────────────────────────────────────
-        // fusa:req REQ-CLI-001
+        //fusa:req REQ-CLI-001
         "discover" => cmd_discover(&args),
 
         // ── register read / register write ──────────────────────────────────
-        // fusa:req REQ-CLI-002
-        // fusa:req REQ-CLI-005
+        //fusa:req REQ-CLI-002
+        //fusa:req REQ-CLI-005
         "register" => cmd_register(&args),
 
         // ── endpoint read / endpoint write ───────────────────────────────────
-        // fusa:req REQ-CLI-004
-        // fusa:req REQ-CLI-005
+        //fusa:req REQ-CLI-004
+        //fusa:req REQ-CLI-005
         "endpoint" => cmd_endpoint(&args),
 
         // ── serve ─────────────────────────────────────────────────────────────
-        // fusa:req REQ-CLI-010
+        //fusa:req REQ-CLI-010
         "serve" => cmd_serve(&args),
 
         cmd => {
@@ -290,7 +290,7 @@ fn main() {
 /// then answers it — against a fresh in-process [`RcServer`] (see this
 /// file's own doc comment) — via [`discovery::build_discovery_response`],
 /// and decodes/prints the resulting [`GeneralRegisters`] snapshot.
-// fusa:req REQ-CLI-001
+//fusa:req REQ-CLI-001
 fn cmd_discover(args: &[String]) {
     let transaction_num = parse_u8_arg(args, "--transaction").unwrap_or(0);
     let format = flag_value(args, "--format").unwrap_or("text");
@@ -350,7 +350,7 @@ fn cmd_discover(args: &[String]) {
 ///
 /// Dispatches to [`cmd_register_read`]/[`cmd_register_write`], both
 /// addressed via [`EP0_BYTE_BUS_ID`] through [`RcServer::handle_abb`].
-// fusa:req REQ-CLI-002
+//fusa:req REQ-CLI-002
 fn cmd_register(args: &[String]) {
     match args.get(2).map(String::as_str) {
         Some("read") => cmd_register_read(args),
@@ -368,7 +368,7 @@ fn cmd_register(args: &[String]) {
 /// [`AcfAbbMessage`] read request, dispatched through
 /// [`RcServer::handle_abb`] — never root-client-gated, per
 /// [`rcp::ep0::check_ep0_access_for_stream`]'s own doc comment.
-// fusa:req REQ-CLI-005
+//fusa:req REQ-CLI-005
 fn cmd_register_read(args: &[String]) {
     let stream = parse_stream_arg(args, "--stream").unwrap_or_else(|| StreamId::from_u64(0));
     let format = flag_value(args, "--format").unwrap_or("text");
@@ -429,7 +429,7 @@ fn cmd_register_read(args: &[String]) {
 /// `RcpError::LockedMemAccess` for the root client itself: see
 /// [`RcServer::handle_abb`]'s own doc comment for why a general-register
 /// write is currently never actually accepted by this in-process server.
-// fusa:req REQ-CLI-005
+//fusa:req REQ-CLI-005
 fn cmd_register_write(args: &[String]) {
     let stream = parse_stream_arg(args, "--stream").unwrap_or_else(|| StreamId::from_u64(0));
     let payload = match parse_hex_arg(args, "--payload") {
@@ -471,7 +471,7 @@ fn cmd_register_write(args: &[String]) {
 /// Dispatches to [`cmd_endpoint_read`]/[`cmd_endpoint_write`], both
 /// addressed via `(--stream, --bus-id)` through [`RcServer::handle_abb`]'s
 /// `DeviceEndpoint` route.
-// fusa:req REQ-CLI-004
+//fusa:req REQ-CLI-004
 fn cmd_endpoint(args: &[String]) {
     match args.get(2).map(String::as_str) {
         Some("read") => cmd_endpoint_read(args),
@@ -491,7 +491,7 @@ fn cmd_endpoint(args: &[String]) {
 /// `(--stream, --bus-id)`, then issues a read request for `--read-size`
 /// bytes (default `u8::MAX`, matching [`rcp::adapt::from_message`]'s own
 /// default) via [`RcServer::handle_abb`].
-// fusa:req REQ-CLI-005
+//fusa:req REQ-CLI-005
 fn cmd_endpoint_read(args: &[String]) {
     let stream = parse_stream_arg(args, "--stream").unwrap_or_else(|| StreamId::from_u64(0));
     let bus_id = match parse_u16_arg(args, "--bus-id") {
@@ -558,7 +558,7 @@ fn cmd_endpoint_read(args: &[String]) {
 /// [`EndpointType::Gpio`]) holding `--initial` (default empty) under
 /// `(--stream, --bus-id)`, then issues a write request carrying
 /// `--payload` via [`RcServer::handle_abb`].
-// fusa:req REQ-CLI-005
+//fusa:req REQ-CLI-005
 fn cmd_endpoint_write(args: &[String]) {
     let stream = parse_stream_arg(args, "--stream").unwrap_or_else(|| StreamId::from_u64(0));
     let bus_id = match parse_u16_arg(args, "--bus-id") {
@@ -627,7 +627,7 @@ fn cmd_endpoint_write(args: &[String]) {
 /// This is the first `rust-rcp` command to talk to a real OS socket rather
 /// than dispatching directly against an in-process `RcServer` — see this
 /// file's own module doc comment.
-// fusa:req REQ-CLI-010
+//fusa:req REQ-CLI-010
 fn cmd_serve(args: &[String]) {
     let bind_ip_str = match flag_value(args, "--udp") {
         Some(ip) => ip,
@@ -897,7 +897,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CLI-002
+    //fusa:test REQ-CLI-002
     fn flag_value_finds_option() {
         let args: Vec<String> = vec![
             "rcp".into(),
@@ -911,7 +911,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CLI-002
+    //fusa:test REQ-CLI-002
     fn parse_hex_arg_decodes_bytes() {
         let args: Vec<String> = vec!["rcp".into(), "--payload".into(), "deadbeef".into()];
         let bytes = parse_hex_arg(&args, "--payload").unwrap();
@@ -919,42 +919,42 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CLI-002
+    //fusa:test REQ-CLI-002
     fn parse_hex_arg_absent_returns_none() {
         let args: Vec<String> = vec!["rcp".into(), "register".into(), "write".into()];
         assert!(parse_hex_arg(&args, "--payload").is_none());
     }
 
     #[test]
-    // fusa:test REQ-CLI-002
+    //fusa:test REQ-CLI-002
     fn parse_u16_arg_parses_decimal() {
         let args: Vec<String> = vec!["rcp".into(), "--bus-id".into(), "42".into()];
         assert_eq!(parse_u16_arg(&args, "--bus-id"), Some(42u16));
     }
 
     #[test]
-    // fusa:test REQ-CLI-010
+    //fusa:test REQ-CLI-010
     fn parse_u32_arg_parses_decimal() {
         let args: Vec<String> = vec!["rcp".into(), "--max-requests".into(), "5".into()];
         assert_eq!(parse_u32_arg(&args, "--max-requests"), Some(5u32));
     }
 
     #[test]
-    // fusa:test REQ-CLI-010
+    //fusa:test REQ-CLI-010
     fn parse_u32_arg_absent_returns_none() {
         let args: Vec<String> = vec!["rcp".into(), "serve".into()];
         assert!(parse_u32_arg(&args, "--max-requests").is_none());
     }
 
     #[test]
-    // fusa:test REQ-CLI-002
+    //fusa:test REQ-CLI-002
     fn parse_u8_arg_parses_transaction() {
         let args: Vec<String> = vec!["rcp".into(), "--transaction".into(), "2".into()];
         assert_eq!(parse_u8_arg(&args, "--transaction"), Some(2u8));
     }
 
     #[test]
-    // fusa:test REQ-CLI-002
+    //fusa:test REQ-CLI-002
     fn has_flag_detects_bare_flag() {
         let args: Vec<String> = vec![
             "rcp".into(),
@@ -967,7 +967,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CLI-002
+    //fusa:test REQ-CLI-002
     fn parse_stream_arg_roundtrips_hex() {
         let sid = stream(0x1234);
         let hex = format_stream_hex(sid);
@@ -976,54 +976,54 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CLI-002
+    //fusa:test REQ-CLI-002
     fn parse_stream_arg_absent_returns_none() {
         let args: Vec<String> = vec!["rcp".into()];
         assert!(parse_stream_arg(&args, "--stream").is_none());
     }
 
     #[test]
-    // fusa:test REQ-CLI-002
+    //fusa:test REQ-CLI-002
     fn parse_ep_type_arg_defaults_to_gpio() {
         let args: Vec<String> = vec!["rcp".into()];
         assert_eq!(parse_ep_type_arg(&args), Some(EndpointType::Gpio));
     }
 
     #[test]
-    // fusa:test REQ-CLI-002
+    //fusa:test REQ-CLI-002
     fn parse_ep_type_arg_rejects_unrecognized_byte() {
         let args: Vec<String> = vec!["rcp".into(), "--ep-type".into(), "255".into()];
         assert_eq!(parse_ep_type_arg(&args), None);
     }
 
     #[test]
-    // fusa:test REQ-CLI-003
-    // fusa:test REQ-CLI-006
+    //fusa:test REQ-CLI-003
+    //fusa:test REQ-CLI-006
     fn spec_version_is_non_empty() {
         assert!(!rcp::SPEC_VERSION.is_empty());
     }
 
     #[test]
-    // fusa:test REQ-CLI-006
+    //fusa:test REQ-CLI-006
     fn spec_version_is_relay_2_0() {
         assert_eq!(rcp::SPEC_VERSION, "2.0", "must track RELAY spec v2.0");
     }
 
     #[test]
-    // fusa:test REQ-SPEC-001
+    //fusa:test REQ-SPEC-001
     fn relay_spec_version_alias_matches_spec_version() {
         assert_eq!(rcp::RELAY_SPEC_VERSION, rcp::SPEC_VERSION);
     }
 
     #[test]
-    // fusa:test REQ-CLI-007
+    //fusa:test REQ-CLI-007
     fn capabilities_json_is_valid() {
         assert!(!rcp::SPEC_VERSION.is_empty());
         assert!(!env!("CARGO_PKG_VERSION").is_empty());
     }
 
     #[test]
-    // fusa:test REQ-CLI-008
+    //fusa:test REQ-CLI-008
     fn status_json_fields_present() {
         assert!(!env!("CARGO_PKG_VERSION").is_empty());
     }
@@ -1031,7 +1031,7 @@ mod tests {
     // ── discover ──────────────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-CLI-001
+    //fusa:test REQ-CLI-001
     fn discover_request_is_recognized_and_answered() {
         let server = RcServer::new(GeneralRegisters {
             svr_vendor_id: 0x1234,
@@ -1053,7 +1053,7 @@ mod tests {
     // ── register read / register write ───────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-CLI-005
+    //fusa:test REQ-CLI-005
     fn register_read_returns_general_registers_snapshot() {
         let server = RcServer::new(GeneralRegisters {
             svr_device_id: 0xBEEF,
@@ -1075,7 +1075,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CLI-005
+    //fusa:test REQ-CLI-005
     fn register_write_succeeds_for_the_root_client() {
         // Mirrors rcp::mock::rc_server_tests::ep0_write_succeeds_for_the_root_client
         // — RegisterCategory::General now has LockPolicy::W, writable
@@ -1107,7 +1107,7 @@ mod tests {
     // ── endpoint read / endpoint write ───────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-CLI-004
+    //fusa:test REQ-CLI-004
     fn endpoint_read_returns_registered_endpoint_payload() {
         let server = RcServer::new(GeneralRegisters::default());
         let sid = stream(1);
@@ -1128,7 +1128,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CLI-004
+    //fusa:test REQ-CLI-004
     fn endpoint_write_replaces_endpoint_buffer() {
         let server = RcServer::new(GeneralRegisters::default());
         let sid = stream(1);
@@ -1160,7 +1160,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CLI-004
+    //fusa:test REQ-CLI-004
     fn endpoint_read_unregistered_bus_id_is_ep_not_found() {
         let server = RcServer::new(GeneralRegisters::default());
         let sid = stream(1);
@@ -1185,7 +1185,7 @@ mod tests {
     // comment.
 
     #[test]
-    // fusa:test REQ-CLI-009
+    //fusa:test REQ-CLI-009
     fn convert_official_golden_vector() {
         // RELAY spec/vectors/rcp-message.json — the exact vector
         // `relay interop` feeds this binary's `convert` in CI.
@@ -1203,7 +1203,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CLI-009
+    //fusa:test REQ-CLI-009
     fn convert_write_with_body_uses_decimal_byte_bus_id_as_id() {
         let input = r#"{"byte_bus_id":7,"transaction_num":17,"control":32,"body":"3q2+7w=="}"#;
         let output = convert_rcp_message(input).unwrap();
@@ -1214,7 +1214,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CLI-009
+    //fusa:test REQ-CLI-009
     fn convert_read_with_read_size_omits_no_payload_field() {
         let input =
             r#"{"byte_bus_id":1,"transaction_num":17,"control":64,"read_size_or_segment":4}"#;
@@ -1227,7 +1227,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CLI-009
+    //fusa:test REQ-CLI-009
     fn convert_minimal_request_defaults_absent_fields_to_zero() {
         let input = r#"{"byte_bus_id":0,"control":32}"#;
         let output = convert_rcp_message(input).unwrap();
@@ -1239,7 +1239,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CLI-009
+    //fusa:test REQ-CLI-009
     fn convert_error_control_bit_sets_rcp_error_meta() {
         let input = r#"{"byte_bus_id":99,"control":72}"#; // Read | Error
         let output = convert_rcp_message(input).unwrap();
@@ -1250,7 +1250,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CLI-009
+    //fusa:test REQ-CLI-009
     fn convert_rejects_byte_bus_id_out_of_range() {
         // byte_bus_id is 0-255 (u8) per spec/schemas/rcp-message.json;
         // the real reference implementation rejects an out-of-range value
@@ -1260,21 +1260,21 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-CLI-009
+    //fusa:test REQ-CLI-009
     fn convert_rejects_unknown_field() {
         let input = r#"{"byte_bus_id":1,"control":32,"extra":"bad"}"#;
         assert!(convert_rcp_message(input).is_err());
     }
 
     #[test]
-    // fusa:test REQ-CLI-009
+    //fusa:test REQ-CLI-009
     fn convert_rejects_malformed_json() {
         assert!(convert_rcp_message("not json").is_err());
         assert!(convert_rcp_message("[]").is_err());
     }
 
     #[test]
-    // fusa:test REQ-CLI-009
+    //fusa:test REQ-CLI-009
     fn convert_rejects_invalid_body_base64() {
         let input = r#"{"byte_bus_id":1,"control":32,"body":"not-base64!!"}"#;
         assert!(convert_rcp_message(input).is_err());

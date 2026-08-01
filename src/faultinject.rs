@@ -1,10 +1,10 @@
-// fusa:req REQ-FI-001
-// fusa:req REQ-FI-002
-// fusa:req REQ-FI-003
-// fusa:req REQ-FI-004
-// fusa:req REQ-FI-005
-// fusa:req REQ-FI-006
-// fusa:req REQ-FI-007
+//fusa:req REQ-FI-001
+//fusa:req REQ-FI-002
+//fusa:req REQ-FI-003
+//fusa:req REQ-FI-004
+//fusa:req REQ-FI-005
+//fusa:req REQ-FI-006
+//fusa:req REQ-FI-007
 
 //! Fault injection — deterministic error injection for safety test campaigns.
 //!
@@ -31,7 +31,7 @@ use crate::RcpError;
 // ── FaultRule ─────────────────────────────────────────────────────────────────
 
 /// Rule controlling when a fault is injected.
-// fusa:req REQ-FI-002
+//fusa:req REQ-FI-002
 #[derive(Clone, Debug)]
 pub enum FaultRule {
     /// Inject on every call.
@@ -43,7 +43,7 @@ pub enum FaultRule {
 }
 
 /// A configured fault to inject.
-// fusa:req REQ-FI-001
+//fusa:req REQ-FI-001
 #[derive(Clone, Debug)]
 pub struct FaultSpec {
     pub rule: FaultRule,
@@ -58,7 +58,7 @@ struct Inner {
 }
 
 /// Fault-injecting endpoint wrapper.
-// fusa:req REQ-FI-003
+//fusa:req REQ-FI-003
 pub struct FaultInjectEndpoint {
     inner: Arc<dyn Endpoint>,
     state: Mutex<Inner>,
@@ -78,13 +78,13 @@ impl FaultInjectEndpoint {
     }
 
     /// Install a fault rule.
-    // fusa:req REQ-FI-004
+    //fusa:req REQ-FI-004
     pub fn inject(&self, spec: FaultSpec) {
         self.state.lock().unwrap().faults.push(spec);
     }
 
     /// Remove all fault rules.
-    // fusa:req REQ-FI-005
+    //fusa:req REQ-FI-005
     pub fn clear(&self) {
         self.state.lock().unwrap().faults.clear();
     }
@@ -125,7 +125,7 @@ impl Endpoint for FaultInjectEndpoint {
         self.inner.ep_type()
     }
 
-    // fusa:req REQ-FI-006
+    //fusa:req REQ-FI-006
     fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
         if let Some(err) = self.next_fault() {
             return Err(err);
@@ -133,7 +133,7 @@ impl Endpoint for FaultInjectEndpoint {
         self.inner.read(read_size)
     }
 
-    // fusa:req REQ-FI-006
+    //fusa:req REQ-FI-006
     fn write(&self, payload: &[u8]) -> Result<(), RcpError> {
         if let Some(err) = self.next_fault() {
             return Err(err);
@@ -156,16 +156,16 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FI-001
-    // fusa:test REQ-FI-003
+    //fusa:test REQ-FI-001
+    //fusa:test REQ-FI-003
     fn no_fault_passes_through() {
         let fi = fi();
         fi.write(b"x").unwrap();
     }
 
     #[test]
-    // fusa:test REQ-FI-002
-    // fusa:test REQ-FI-006
+    //fusa:test REQ-FI-002
+    //fusa:test REQ-FI-006
     fn always_fault_injects_every_call() {
         let fi = fi();
         fi.inject(FaultSpec {
@@ -179,8 +179,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FI-002
-    // fusa:test REQ-FI-006
+    //fusa:test REQ-FI-002
+    //fusa:test REQ-FI-006
     fn nth_call_fault_triggers_only_on_n() {
         let fi = fi();
         fi.inject(FaultSpec {
@@ -194,8 +194,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FI-002
-    // fusa:test REQ-FI-006
+    //fusa:test REQ-FI-002
+    //fusa:test REQ-FI-006
     fn after_nth_call_triggers_from_n_onwards() {
         let fi = fi();
         fi.inject(FaultSpec {
@@ -211,7 +211,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FI-004
+    //fusa:test REQ-FI-004
     fn inject_multiple_rules_first_match_wins() {
         let fi = fi();
         fi.inject(FaultSpec {
@@ -228,7 +228,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FI-005
+    //fusa:test REQ-FI-005
     fn clear_removes_all_faults() {
         let fi = fi();
         fi.inject(FaultSpec {
@@ -240,7 +240,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FI-007
+    //fusa:test REQ-FI-007
     fn call_count_tracks_both_ops() {
         let fi = fi();
         fi.write(b"x").unwrap();

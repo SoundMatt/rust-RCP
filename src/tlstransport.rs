@@ -1,8 +1,8 @@
-// fusa:req REQ-TLS-001
-// fusa:req REQ-TLS-002
-// fusa:req REQ-TLS-003
-// fusa:req REQ-TLS-004
-// fusa:req REQ-TLS-005
+//fusa:req REQ-TLS-001
+//fusa:req REQ-TLS-002
+//fusa:req REQ-TLS-003
+//fusa:req REQ-TLS-004
+//fusa:req REQ-TLS-005
 
 //! TLS transport bridge — wraps TC18 AVTPDU/ACF frames in a TLS stream.
 //!
@@ -35,17 +35,17 @@ use crate::RcpError;
 // ── TLS configuration ─────────────────────────────────────────────────────────
 
 /// Minimum acceptable TLS version.
-// fusa:req REQ-TLS-001
+//fusa:req REQ-TLS-001
 pub const MIN_TLS_VERSION: &str = "TLSv1.2";
 
 /// Whether mutual (client + server) authentication is required.
-// fusa:req REQ-TLS-002
+//fusa:req REQ-TLS-002
 pub const REQUIRE_MUTUAL_AUTH: bool = true;
 
 // ── TlsStream trait ───────────────────────────────────────────────────────────
 
 /// Abstract TLS stream for bridge testability.
-// fusa:req REQ-TLS-003
+//fusa:req REQ-TLS-003
 pub trait TlsStream: Send + Sync {
     fn write_all(&self, data: &[u8]) -> Result<(), RcpError>;
     fn read_to_vec(&self, timeout: Option<Duration>) -> Result<Vec<u8>, RcpError>;
@@ -56,7 +56,7 @@ pub trait TlsStream: Send + Sync {
 
 /// TLS-secured transport, addressed by `local_stream`
 /// ([`crate::avtp::StreamId`]) rather than the legacy `Zone`.
-// fusa:req REQ-TLS-004
+//fusa:req REQ-TLS-004
 pub struct TlsBridge {
     local_stream: StreamId,
     stream: Arc<dyn TlsStream>,
@@ -66,7 +66,7 @@ impl TlsBridge {
     /// Create a TLS bridge. Returns `Err(RcpError::NotConnected)` if mutual
     /// auth is required but the peer is not verified. Unchanged from this
     /// module's pre-Milestone-9 version, per its ADAPT scope.
-    // fusa:req REQ-TLS-002
+    //fusa:req REQ-TLS-002
     pub fn new(local_stream: StreamId, stream: Arc<dyn TlsStream>) -> Result<Self, RcpError> {
         if REQUIRE_MUTUAL_AUTH && !stream.peer_verified() {
             return Err(RcpError::NotConnected);
@@ -87,8 +87,8 @@ impl TlsBridge {
     /// ([`crate::acf::verify_echo_back`]) — the same framing
     /// `crate::udp::UdpTransport::send_acf_abb` uses, over a [`TlsStream`]
     /// instead of a UDP socket.
-    // fusa:req REQ-TLS-004
-    // fusa:req REQ-WIRE-006
+    //fusa:req REQ-TLS-004
+    //fusa:req REQ-WIRE-006
     pub fn send_acf_abb(
         &self,
         msg: &AcfAbbMessage,
@@ -109,8 +109,8 @@ impl TlsBridge {
     }
 
     /// Same as [`Self::send_acf_abb`], for an ACF_GBB request/response pair.
-    // fusa:req REQ-TLS-004
-    // fusa:req REQ-WIRE-006
+    //fusa:req REQ-TLS-004
+    //fusa:req REQ-WIRE-006
     pub fn send_acf_gbb(
         &self,
         msg: &AcfGbbMessage,
@@ -131,7 +131,7 @@ impl TlsBridge {
     }
 
     /// No-op, matching this module's pre-Milestone-9 behavior.
-    // fusa:req REQ-TLS-005
+    //fusa:req REQ-TLS-005
     pub fn close(&self) -> Result<(), RcpError> {
         Ok(())
     }
@@ -188,7 +188,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TLS-002
+    //fusa:test REQ-TLS-002
     fn unverified_peer_rejected() {
         let stream = Arc::new(MockTls {
             verified: false,
@@ -199,10 +199,10 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TLS-002
-    // fusa:test REQ-TLS-003
-    // fusa:test REQ-TLS-004
-    // fusa:test REQ-WIRE-006
+    //fusa:test REQ-TLS-002
+    //fusa:test REQ-TLS-003
+    //fusa:test REQ-TLS-004
+    //fusa:test REQ-WIRE-006
     fn tls_send_acf_abb_ok_with_verified_peer() {
         let stream = Arc::new(MockTls {
             verified: true,
@@ -215,7 +215,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TLS-004
+    //fusa:test REQ-TLS-004
     fn tls_send_acf_abb_rejects_echo_back_mismatch() {
         let stream = Arc::new(MockTls {
             verified: true,
@@ -227,13 +227,13 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TLS-001
+    //fusa:test REQ-TLS-001
     fn min_tls_version_constant() {
         assert_eq!(MIN_TLS_VERSION, "TLSv1.2");
     }
 
     #[test]
-    // fusa:test REQ-TLS-005
+    //fusa:test REQ-TLS-005
     fn close_is_noop() {
         let stream = Arc::new(MockTls {
             verified: true,

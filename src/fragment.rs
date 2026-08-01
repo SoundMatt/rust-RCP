@@ -1,11 +1,11 @@
-// fusa:req REQ-FRAG-001
-// fusa:req REQ-FRAG-002
-// fusa:req REQ-FRAG-003
-// fusa:req REQ-FRAG-004
-// fusa:req REQ-FRAG-005
-// fusa:req REQ-FRAG-006
-// fusa:req REQ-FRAG-007
-// fusa:req REQ-FRAG-008
+//fusa:req REQ-FRAG-001
+//fusa:req REQ-FRAG-002
+//fusa:req REQ-FRAG-003
+//fusa:req REQ-FRAG-004
+//fusa:req REQ-FRAG-005
+//fusa:req REQ-FRAG-006
+//fusa:req REQ-FRAG-007
+//fusa:req REQ-FRAG-008
 
 //! Multi-AVTPDU fragmentation reassembly (`ROADMAP.md` Milestone 8,
 //! "Fragmentation Go/No-Go").
@@ -134,7 +134,7 @@ pub enum FragmentAcceptOutcome {
 /// see this module's doc comment for the full provenance notes behind this
 /// type's ordering and bounding rules.
 #[derive(Debug, Clone, PartialEq, Eq)]
-// fusa:req REQ-FRAG-001
+//fusa:req REQ-FRAG-001
 pub struct FragmentReassemblyBuffer {
     max_request_size: u16,
     segments: Vec<Vec<u8>>,
@@ -147,7 +147,7 @@ impl FragmentReassemblyBuffer {
     /// bytes of *combined* payload. `0` is accepted here (it is the
     /// stream-config field's own "fragmentation unsupported" sentinel); see
     /// [`Self::fragmentation_supported`] and [`Self::accept_fragment`].
-    // fusa:req REQ-FRAG-001
+    //fusa:req REQ-FRAG-001
     pub fn new(rx_stream_max_request_size: u16) -> Self {
         FragmentReassemblyBuffer {
             max_request_size: rx_stream_max_request_size,
@@ -161,7 +161,7 @@ impl FragmentReassemblyBuffer {
     /// `false` exactly when this buffer was constructed with
     /// `rx_stream_max_request_size == 0`, per that field's own documented
     /// sentinel meaning.
-    // fusa:req REQ-FRAG-001
+    //fusa:req REQ-FRAG-001
     pub fn fragmentation_supported(&self) -> bool {
         self.max_request_size != 0
     }
@@ -195,10 +195,10 @@ impl FragmentReassemblyBuffer {
     /// `info.ms` is `true`, or [`FragmentAcceptOutcome::Complete`] when it
     /// is `false` — the final-fragment signal this crate's Milestone 1 "ACF
     /// Messages" item already decodes.
-    // fusa:req REQ-FRAG-002
-    // fusa:req REQ-FRAG-003
-    // fusa:req REQ-FRAG-004
-    // fusa:req REQ-FRAG-005
+    //fusa:req REQ-FRAG-002
+    //fusa:req REQ-FRAG-003
+    //fusa:req REQ-FRAG-004
+    //fusa:req REQ-FRAG-005
     pub fn accept_fragment(
         &mut self,
         info: &ByteMessageInfo,
@@ -241,14 +241,14 @@ impl FragmentReassemblyBuffer {
     /// The combined payload of every segment accepted so far, concatenated
     /// in arrival order by composing (not re-deriving)
     /// [`crate::e2e::CombinedFragmentPayload::assemble`].
-    // fusa:req REQ-FRAG-005
+    //fusa:req REQ-FRAG-005
     pub fn combined_payload(&self) -> CombinedFragmentPayload {
         CombinedFragmentPayload::assemble(&self.segment_refs())
     }
 
     /// Clears all accumulated state, readying this buffer for a new train.
     /// Does not change the configured `rx_stream_max_request_size` bound.
-    // fusa:req REQ-FRAG-006
+    //fusa:req REQ-FRAG-006
     pub fn reset(&mut self) {
         self.segments.clear();
         self.total_len = 0;
@@ -272,7 +272,7 @@ impl FragmentReassemblyBuffer {
 /// with the "final fragment carries a CRC" rule, or
 /// `Err(RcpError::InvalidSize)` if `final_fragment`'s own header fields
 /// fail [`crate::acf::encode_byte_message_info`]'s field-width validation.
-// fusa:req REQ-FRAG-007
+//fusa:req REQ-FRAG-007
 pub fn verify_reassembled_train_crc(
     buffer: &FragmentReassemblyBuffer,
     header: &HeaderVariant,
@@ -303,21 +303,21 @@ mod tests {
     // ── fragmentation_supported / new ────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-FRAG-001
+    //fusa:test REQ-FRAG-001
     fn new_with_zero_bound_reports_fragmentation_unsupported() {
         let buf = FragmentReassemblyBuffer::new(0);
         assert!(!buf.fragmentation_supported());
     }
 
     #[test]
-    // fusa:test REQ-FRAG-001
+    //fusa:test REQ-FRAG-001
     fn new_with_nonzero_bound_reports_fragmentation_supported() {
         let buf = FragmentReassemblyBuffer::new(128);
         assert!(buf.fragmentation_supported());
     }
 
     #[test]
-    // fusa:test REQ-FRAG-001
+    //fusa:test REQ-FRAG-001
     fn new_buffer_is_not_in_progress() {
         let buf = FragmentReassemblyBuffer::new(128);
         assert!(!buf.is_in_progress());
@@ -327,7 +327,7 @@ mod tests {
     // ── unsupported-stream rejection ─────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-FRAG-002
+    //fusa:test REQ-FRAG-002
     fn accept_fragment_rejects_on_zero_bound_stream() {
         let mut buf = FragmentReassemblyBuffer::new(0);
         let info = fragment_info(true, 0);
@@ -341,7 +341,7 @@ mod tests {
     // ── segment_num ordering ─────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-FRAG-003
+    //fusa:test REQ-FRAG-003
     fn accept_fragment_accepts_strictly_incrementing_zero_based_segment_nums() {
         let mut buf = FragmentReassemblyBuffer::new(64);
         assert_eq!(
@@ -363,7 +363,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FRAG-003
+    //fusa:test REQ-FRAG-003
     fn accept_fragment_rejects_gap_in_segment_num() {
         let mut buf = FragmentReassemblyBuffer::new(64);
         buf.accept_fragment(&fragment_info(true, 0), b"a").unwrap();
@@ -374,7 +374,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FRAG-003
+    //fusa:test REQ-FRAG-003
     fn accept_fragment_rejects_duplicate_segment_num() {
         let mut buf = FragmentReassemblyBuffer::new(64);
         buf.accept_fragment(&fragment_info(true, 0), b"a").unwrap();
@@ -385,7 +385,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FRAG-003
+    //fusa:test REQ-FRAG-003
     fn accept_fragment_rejects_out_of_order_segment_num() {
         let mut buf = FragmentReassemblyBuffer::new(64);
         buf.accept_fragment(&fragment_info(true, 0), b"a").unwrap();
@@ -397,7 +397,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FRAG-003
+    //fusa:test REQ-FRAG-003
     fn accept_fragment_first_call_must_start_at_segment_num_zero() {
         let mut buf = FragmentReassemblyBuffer::new(64);
         assert_eq!(
@@ -407,7 +407,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FRAG-003
+    //fusa:test REQ-FRAG-003
     fn rejected_fragment_does_not_mutate_buffer_state() {
         let mut buf = FragmentReassemblyBuffer::new(64);
         buf.accept_fragment(&fragment_info(true, 0), b"a").unwrap();
@@ -419,7 +419,7 @@ mod tests {
     // ── rx_stream_max_request_size bound ─────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-FRAG-004
+    //fusa:test REQ-FRAG-004
     fn accept_fragment_rejects_when_combined_length_exceeds_bound() {
         let mut buf = FragmentReassemblyBuffer::new(3);
         buf.accept_fragment(&fragment_info(true, 0), b"ab").unwrap();
@@ -430,7 +430,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FRAG-004
+    //fusa:test REQ-FRAG-004
     fn accept_fragment_accepts_combined_length_exactly_at_bound() {
         let mut buf = FragmentReassemblyBuffer::new(4);
         buf.accept_fragment(&fragment_info(true, 0), b"ab").unwrap();
@@ -441,7 +441,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FRAG-004
+    //fusa:test REQ-FRAG-004
     fn overflowing_fragment_does_not_mutate_buffer_state() {
         let mut buf = FragmentReassemblyBuffer::new(2);
         buf.accept_fragment(&fragment_info(true, 0), b"ab").unwrap();
@@ -453,7 +453,7 @@ mod tests {
     // ── Continuing / Complete / combined payload ─────────────────────────────
 
     #[test]
-    // fusa:test REQ-FRAG-005
+    //fusa:test REQ-FRAG-005
     fn single_fragment_train_completes_immediately() {
         let mut buf = FragmentReassemblyBuffer::new(64);
         assert_eq!(
@@ -467,7 +467,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FRAG-005
+    //fusa:test REQ-FRAG-005
     fn combined_payload_matches_e2e_combined_fragment_payload_assemble() {
         let mut buf = FragmentReassemblyBuffer::new(64);
         let segments: [&[u8]; 3] = [b"seg-one-", b"seg-two-", b"seg-three"];
@@ -485,7 +485,7 @@ mod tests {
     // ── reset ─────────────────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-FRAG-006
+    //fusa:test REQ-FRAG-006
     fn reset_clears_state_for_a_new_train() {
         let mut buf = FragmentReassemblyBuffer::new(64);
         buf.accept_fragment(&fragment_info(false, 0), b"first-train")
@@ -503,7 +503,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FRAG-006
+    //fusa:test REQ-FRAG-006
     fn accepting_a_fragment_after_complete_without_reset_is_rejected() {
         let mut buf = FragmentReassemblyBuffer::new(64);
         buf.accept_fragment(&fragment_info(false, 0), b"done")
@@ -520,7 +520,7 @@ mod tests {
     // ── never panics ──────────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-FRAG-008
+    //fusa:test REQ-FRAG-008
     fn accept_fragment_never_panics_across_arbitrary_payload_lengths() {
         for len in [0usize, 1, 2, 3, 17, 64, 257] {
             let mut buf = FragmentReassemblyBuffer::new(u16::MAX);
@@ -530,7 +530,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FRAG-008
+    //fusa:test REQ-FRAG-008
     fn accept_fragment_never_panics_across_segment_num_wraparound() {
         let mut buf = FragmentReassemblyBuffer::new(u16::MAX);
         // 65540 fragments is well past the 16-bit segment_num field's own
@@ -569,7 +569,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FRAG-007
+    //fusa:test REQ-FRAG-007
     fn verify_reassembled_train_crc_matches_manual_e2e_computation() {
         let mut buf = FragmentReassemblyBuffer::new(64);
         buf.accept_fragment(&fragment_info(true, 0), b"hello-")
@@ -592,7 +592,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FRAG-007
+    //fusa:test REQ-FRAG-007
     fn verify_reassembled_train_crc_rejects_missing_crc_on_completed_train() {
         let mut buf = FragmentReassemblyBuffer::new(64);
         buf.accept_fragment(&fragment_info(false, 0), b"solo")
@@ -607,7 +607,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FRAG-007
+    //fusa:test REQ-FRAG-007
     fn verify_reassembled_train_crc_propagates_length_overflow_error() {
         let mut buf = FragmentReassemblyBuffer::new(64);
         buf.accept_fragment(&fragment_info(false, 0), b"x").unwrap();
@@ -621,7 +621,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-FRAG-007
+    //fusa:test REQ-FRAG-007
     fn verify_reassembled_train_crc_on_empty_buffer_matches_empty_segments() {
         let buf = FragmentReassemblyBuffer::new(64);
         let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());

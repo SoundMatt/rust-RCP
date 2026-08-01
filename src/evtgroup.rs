@@ -1,7 +1,7 @@
-// fusa:req REQ-EVTGRP-001
-// fusa:req REQ-EVTGRP-002
-// fusa:req REQ-EVTGRP-003
-// fusa:req REQ-EVTGRP-004
+//fusa:req REQ-EVTGRP-001
+//fusa:req REQ-EVTGRP-002
+//fusa:req REQ-EVTGRP-003
+//fusa:req REQ-EVTGRP-004
 
 //! The "Groups A/B/C" `evt[2:0]` sub-opcode convention — `ROADMAP.md`
 //! Milestone 4 ("Basic Endpoint Types"), final checklist bullet: "Generic
@@ -92,7 +92,7 @@ use crate::RcpError;
 /// assignment logic of its own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-// fusa:req REQ-EVTGRP-001
+//fusa:req REQ-EVTGRP-001
 pub enum EvtGroup {
     /// Group A.
     A = 0,
@@ -110,7 +110,7 @@ impl EvtGroup {
     /// internal identity for the label itself, not a `sub_opcode` value —
     /// see this module's doc comment for why no `sub_opcode`-keyed
     /// encoding is provided.
-    // fusa:req REQ-EVTGRP-001
+    //fusa:req REQ-EVTGRP-001
     pub fn to_u8(self) -> u8 {
         self as u8
     }
@@ -119,7 +119,7 @@ impl EvtGroup {
     ///
     /// Returns `Err(RcpError::InvalidParameter)` for any value outside
     /// `0..=2`. Never panics for any input.
-    // fusa:req REQ-EVTGRP-002
+    //fusa:req REQ-EVTGRP-002
     pub fn from_u8(raw: u8) -> Result<Self, RcpError> {
         match raw {
             0 => Ok(Self::A),
@@ -142,8 +142,8 @@ impl EvtGroup {
 /// "Provenance note: the Groups A/B/C classification" — this is not a
 /// bug, it is this function's honest total answer given the ambiguity.
 /// Never panics for any input.
-// fusa:req REQ-EVTGRP-003
-// fusa:req REQ-EVTGRP-004
+//fusa:req REQ-EVTGRP-003
+//fusa:req REQ-EVTGRP-004
 pub fn classify_evt_sub_opcode(sub_opcode: u8) -> Result<Option<EvtGroup>, RcpError> {
     if sub_opcode > EVT_SUB_OPCODE_MAX {
         return Err(RcpError::InvalidParameter);
@@ -158,7 +158,7 @@ mod tests {
     // ── EvtGroup: round-trip / never-panic ──────────────────────────────────
 
     #[test]
-    // fusa:test REQ-EVTGRP-001
+    //fusa:test REQ-EVTGRP-001
     fn evt_group_to_u8_round_trips_through_from_u8() {
         for group in EvtGroup::ALL {
             assert_eq!(EvtGroup::from_u8(group.to_u8()).unwrap(), group);
@@ -166,7 +166,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-EVTGRP-001
+    //fusa:test REQ-EVTGRP-001
     fn evt_group_ordinal_values_match_roadmap_listed_order() {
         assert_eq!(EvtGroup::A.to_u8(), 0);
         assert_eq!(EvtGroup::B.to_u8(), 1);
@@ -174,7 +174,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-EVTGRP-002
+    //fusa:test REQ-EVTGRP-002
     fn evt_group_from_u8_rejects_out_of_range_values() {
         for raw in 3..=u8::MAX {
             assert_eq!(EvtGroup::from_u8(raw), Err(RcpError::InvalidParameter));
@@ -184,7 +184,7 @@ mod tests {
     // ── classify_evt_sub_opcode ──────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-EVTGRP-003
+    //fusa:test REQ-EVTGRP-003
     fn classify_evt_sub_opcode_returns_none_for_every_in_range_value() {
         for sub_opcode in 0..=EVT_SUB_OPCODE_MAX {
             assert_eq!(classify_evt_sub_opcode(sub_opcode), Ok(None));
@@ -192,7 +192,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-EVTGRP-004
+    //fusa:test REQ-EVTGRP-004
     fn classify_evt_sub_opcode_rejects_out_of_range_values() {
         for sub_opcode in (EVT_SUB_OPCODE_MAX + 1)..=u8::MAX {
             assert_eq!(
@@ -203,7 +203,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-EVTGRP-004
+    //fusa:test REQ-EVTGRP-004
     fn classify_evt_sub_opcode_never_panics_across_full_u8_range() {
         for sub_opcode in 0..=u8::MAX {
             let _ = classify_evt_sub_opcode(sub_opcode);

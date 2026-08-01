@@ -1,10 +1,10 @@
-// fusa:req REQ-LOAN-001
-// fusa:req REQ-LOAN-002
-// fusa:req REQ-LOAN-003
-// fusa:req REQ-LOAN-004
-// fusa:req REQ-LOAN-005
-// fusa:req REQ-LOAN-006
-// fusa:req REQ-LOAN-007
+//fusa:req REQ-LOAN-001
+//fusa:req REQ-LOAN-002
+//fusa:req REQ-LOAN-003
+//fusa:req REQ-LOAN-004
+//fusa:req REQ-LOAN-005
+//fusa:req REQ-LOAN-006
+//fusa:req REQ-LOAN-007
 
 //! Pool-based zero-copy payload loaning.
 //!
@@ -39,7 +39,7 @@ use crate::{Loan, RcpError};
 // ── LoanPool ──────────────────────────────────────────────────────────────────
 
 /// Pre-allocated buffer pool.
-// fusa:req REQ-LOAN-001
+//fusa:req REQ-LOAN-001
 pub struct LoanPool {
     state: Arc<(Mutex<Vec<Vec<u8>>>, Condvar)>,
     size: usize,
@@ -47,7 +47,7 @@ pub struct LoanPool {
 
 impl LoanPool {
     /// Create a pool with `count` buffers each of `size` bytes.
-    // fusa:req REQ-LOAN-002
+    //fusa:req REQ-LOAN-002
     pub fn new(count: usize, size: usize) -> Self {
         let pool: Vec<Vec<u8>> = (0..count).map(|_| vec![0u8; size]).collect();
         LoanPool {
@@ -57,7 +57,7 @@ impl LoanPool {
     }
 
     /// Obtain a buffer from the pool, blocking until one is available.
-    // fusa:req REQ-LOAN-003
+    //fusa:req REQ-LOAN-003
     pub fn acquire(&self) -> Loan {
         let state = Arc::clone(&self.state);
         let buf = {
@@ -78,7 +78,7 @@ impl LoanPool {
     }
 
     /// Try to obtain a buffer without blocking. Returns `None` if pool is empty.
-    // fusa:req REQ-LOAN-004
+    //fusa:req REQ-LOAN-004
     pub fn try_acquire(&self) -> Option<Loan> {
         let state = Arc::clone(&self.state);
         let (lock, _) = &*self.state;
@@ -104,7 +104,7 @@ impl LoanPool {
 // ── LoanPoolEndpoint ─────────────────────────────────────────────────────────
 
 /// An endpoint decorator backed by a `LoanPool` for zero-copy writes.
-// fusa:req REQ-LOAN-005
+//fusa:req REQ-LOAN-005
 pub struct LoanPoolEndpoint {
     inner: Arc<dyn Endpoint>,
     pool: Arc<LoanPool>,
@@ -119,7 +119,7 @@ impl LoanPoolEndpoint {
     ///
     /// Returns `Err(RcpError::PayloadTooLarge)` if `size` exceeds the
     /// pool's buffer size.
-    // fusa:req REQ-LOAN-006
+    //fusa:req REQ-LOAN-006
     pub fn loan(&self, size: usize) -> Result<Loan, RcpError> {
         if size > self.pool.buffer_size() {
             return Err(RcpError::PayloadTooLarge);
@@ -131,7 +131,7 @@ impl LoanPoolEndpoint {
     ///
     /// The buffer is returned to the pool once this call completes (the
     /// `loan` is dropped either way).
-    // fusa:req REQ-LOAN-007
+    //fusa:req REQ-LOAN-007
     pub fn write_loaned(&self, loan: Loan) -> Result<(), RcpError> {
         let payload = loan.payload.clone();
         // Buffer returned to pool on drop (loan's release fn fires).
@@ -167,8 +167,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LOAN-001
-    // fusa:test REQ-LOAN-002
+    //fusa:test REQ-LOAN-001
+    //fusa:test REQ-LOAN-002
     fn pool_created_with_correct_count() {
         let pool = LoanPool::new(3, 64);
         assert_eq!(pool.available(), 3);
@@ -176,7 +176,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LOAN-003
+    //fusa:test REQ-LOAN-003
     fn acquire_reduces_available() {
         let pool = LoanPool::new(2, 64);
         let _loan = pool.acquire();
@@ -184,7 +184,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LOAN-003
+    //fusa:test REQ-LOAN-003
     fn buffer_returned_on_drop() {
         let pool = LoanPool::new(1, 64);
         {
@@ -195,7 +195,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LOAN-004
+    //fusa:test REQ-LOAN-004
     fn try_acquire_returns_none_when_empty() {
         let pool = LoanPool::new(1, 64);
         let _l1 = pool.acquire();
@@ -203,7 +203,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LOAN-006
+    //fusa:test REQ-LOAN-006
     fn loan_rejects_oversized_request() {
         let pool = Arc::new(LoanPool::new(2, 64));
         let ep = LoanPoolEndpoint::new(inner(), Arc::clone(&pool));
@@ -212,7 +212,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LOAN-007
+    //fusa:test REQ-LOAN-007
     fn write_loaned_forwards_payload() {
         let received = Arc::new(std::sync::Mutex::new(vec![]));
         let recv2 = Arc::clone(&received);
@@ -257,7 +257,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-LOAN-005
+    //fusa:test REQ-LOAN-005
     fn loan_endpoint_ep_type_matches_inner() {
         let pool = Arc::new(LoanPool::new(1, 64));
         let ep = LoanPoolEndpoint::new(inner(), pool);

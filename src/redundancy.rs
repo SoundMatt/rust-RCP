@@ -1,11 +1,11 @@
-// fusa:req REQ-RED-001
-// fusa:req REQ-RED-002
-// fusa:req REQ-RED-003
-// fusa:req REQ-RED-004
-// fusa:req REQ-RED-005
-// fusa:req REQ-RED-006
-// fusa:req REQ-RED-007
-// fusa:req REQ-RED-008
+//fusa:req REQ-RED-001
+//fusa:req REQ-RED-002
+//fusa:req REQ-RED-003
+//fusa:req REQ-RED-004
+//fusa:req REQ-RED-005
+//fusa:req REQ-RED-006
+//fusa:req REQ-RED-007
+//fusa:req REQ-RED-008
 
 //! Redundant endpoint pair with automatic failover (1-of-2 hot standby).
 //!
@@ -39,7 +39,7 @@ struct Inner {
 }
 
 /// Hot-standby redundant endpoint.
-// fusa:req REQ-RED-001
+//fusa:req REQ-RED-001
 pub struct RedundancyEndpoint {
     ep_type: EndpointType,
     state: Mutex<Inner>,
@@ -47,7 +47,7 @@ pub struct RedundancyEndpoint {
 
 impl RedundancyEndpoint {
     /// Create with a primary and a secondary endpoint.
-    // fusa:req REQ-RED-002
+    //fusa:req REQ-RED-002
     pub fn new(primary: Arc<dyn Endpoint>, secondary: Arc<dyn Endpoint>) -> Self {
         let ep_type = primary.ep_type();
         RedundancyEndpoint {
@@ -61,13 +61,13 @@ impl RedundancyEndpoint {
     }
 
     /// Number of times failover has occurred.
-    // fusa:req REQ-RED-006
+    //fusa:req REQ-RED-006
     pub fn failover_count(&self) -> u32 {
         self.state.lock().unwrap().failovers
     }
 
     /// True if a secondary is still available.
-    // fusa:req REQ-RED-007
+    //fusa:req REQ-RED-007
     pub fn has_secondary(&self) -> bool {
         self.state.lock().unwrap().secondary.is_some()
     }
@@ -109,14 +109,14 @@ impl Endpoint for RedundancyEndpoint {
         self.ep_type
     }
 
-    // fusa:req REQ-RED-003
-    // fusa:req REQ-RED-004
-    // fusa:req REQ-RED-005
+    //fusa:req REQ-RED-003
+    //fusa:req REQ-RED-004
+    //fusa:req REQ-RED-005
     fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
         self.dispatch(|ep| ep.read(read_size))
     }
 
-    // fusa:req REQ-RED-008
+    //fusa:req REQ-RED-008
     fn write(&self, payload: &[u8]) -> Result<(), RcpError> {
         self.dispatch(|ep| ep.write(payload))
     }
@@ -152,8 +152,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RED-001
-    // fusa:test REQ-RED-003
+    //fusa:test REQ-RED-001
+    //fusa:test REQ-RED-003
     fn primary_success_no_failover() {
         let r = RedundancyEndpoint::new(ok_ep(EndpointType::Gpio), ok_ep(EndpointType::Gpio));
         r.write(b"x").unwrap();
@@ -161,8 +161,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RED-004
-    // fusa:test REQ-RED-005
+    //fusa:test REQ-RED-004
+    //fusa:test REQ-RED-005
     fn primary_failure_triggers_failover_to_secondary() {
         let r = RedundancyEndpoint::new(failing_ep(), ok_ep(EndpointType::Gpio));
         r.write(b"x").unwrap();
@@ -170,7 +170,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RED-006
+    //fusa:test REQ-RED-006
     fn failover_count_increments() {
         let r = RedundancyEndpoint::new(failing_ep(), ok_ep(EndpointType::Gpio));
         r.write(b"x").unwrap(); // triggers failover
@@ -180,7 +180,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RED-007
+    //fusa:test REQ-RED-007
     fn no_secondary_after_failover() {
         let r = RedundancyEndpoint::new(failing_ep(), ok_ep(EndpointType::Gpio));
         assert!(r.has_secondary());
@@ -189,7 +189,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RED-005
+    //fusa:test REQ-RED-005
     fn both_failed_returns_error() {
         let r = RedundancyEndpoint::new(failing_ep(), failing_ep());
         let err = r.write(b"x").unwrap_err();
@@ -197,14 +197,14 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RED-002
+    //fusa:test REQ-RED-002
     fn ep_type_matches_primary() {
         let r = RedundancyEndpoint::new(ok_ep(EndpointType::Adc), ok_ep(EndpointType::Adc));
         assert_eq!(r.ep_type(), EndpointType::Adc);
     }
 
     #[test]
-    // fusa:test REQ-RED-008
+    //fusa:test REQ-RED-008
     fn read_forwarded_to_primary() {
         let r = RedundancyEndpoint::new(ok_ep(EndpointType::Gpio), ok_ep(EndpointType::Gpio));
         r.read(4).unwrap();

@@ -28,7 +28,7 @@ See `HARA.md` and `.fusa-hara.json` for the full HARA. Ten hazards (H-001 to H-0
 
 ### 4.2 Requirements Tracing
 
-All safety requirements are annotated with `// fusa:req REQ-XXX` in source files. Test cases are annotated with `// fusa:test REQ-XXX`. The `rsfusa` tool validates traceability in CI.
+All safety requirements are annotated with `//fusa:req REQ-XXX` in source files. Test cases are annotated with `//fusa:test REQ-XXX`. The `rsfusa` tool validates traceability in CI.
 
 ### 4.3 Verification Strategy
 

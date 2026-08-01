@@ -1,21 +1,21 @@
-// fusa:req REQ-BMI-001
-// fusa:req REQ-BMI-002
-// fusa:req REQ-BMI-003
-// fusa:req REQ-BMI-004
-// fusa:req REQ-ABB-001
-// fusa:req REQ-ABB-002
-// fusa:req REQ-ABB-003
-// fusa:req REQ-ABB-004
-// fusa:req REQ-ABB-005
-// fusa:req REQ-GBB-001
-// fusa:req REQ-GBB-002
-// fusa:req REQ-GBB-003
-// fusa:req REQ-GBB-004
-// fusa:req REQ-GBB-005
-// fusa:req REQ-ECHO-001
-// fusa:req REQ-ECHO-002
-// fusa:req REQ-ECHO-003
-// fusa:req REQ-ECHO-004
+//fusa:req REQ-BMI-001
+//fusa:req REQ-BMI-002
+//fusa:req REQ-BMI-003
+//fusa:req REQ-BMI-004
+//fusa:req REQ-ABB-001
+//fusa:req REQ-ABB-002
+//fusa:req REQ-ABB-003
+//fusa:req REQ-ABB-004
+//fusa:req REQ-ABB-005
+//fusa:req REQ-GBB-001
+//fusa:req REQ-GBB-002
+//fusa:req REQ-GBB-003
+//fusa:req REQ-GBB-004
+//fusa:req REQ-GBB-005
+//fusa:req REQ-ECHO-001
+//fusa:req REQ-ECHO-002
+//fusa:req REQ-ECHO-003
+//fusa:req REQ-ECHO-004
 
 //! ACF (AVTP Control Format) messages — TC18 wire format core (`ROADMAP.md`
 //! Milestone 1, "ACF Messages" subsection).
@@ -200,12 +200,28 @@ pub const BYTE_MESSAGE_INFO_LEN: usize = 8;
 
 /// The `evt` field: a 1-bit ack flag + 3-bit sub-opcode pair, packed into
 /// row 2's 4-bit `evt` nibble (octet 4 bits 7:4).
+///
+/// The split into `ack` + `sub_opcode` is exactly TC18 §13.5's own split of
+/// the `evt` nibble for **requests** (TC18.txt lines 3672-3673): "event bits
+/// evt[2:0] are used to control the usage of the byte_msg_payload"
+/// ([`Evt::sub_opcode`]) and "evt[3] is used to request an acknowledge. I.e.
+/// evt[3]=1 requests acknowledge" ([`Evt::ack`]).
+///
+/// Note that TC18 §11.3 Table 15 gives the *response* direction a different,
+/// whole-nibble reading of the same four bits (0x0 simple/data/error, 0x1…0x8
+/// a further-responses counter, 0x9…0xE reserved, 0xF acknowledge) which this
+/// two-field split does not model — see requirement `REQ-RESP-004`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-BMI-001
+//fusa:req REQ-BMI-001
+//fusa:req REQ-EVT-001
+//fusa:req REQ-EVT-002
 pub struct Evt {
-    /// The ack-flag bit of `evt`.
+    /// The ack-flag bit of `evt` — TC18 §13.5's `evt[3]`, which a request
+    /// sets to 1 to request an acknowledge (TC18.txt line 3673).
     pub ack: bool,
-    /// The 3-bit sub-opcode of `evt`. Valid range is `0..=EVT_SUB_OPCODE_MAX`.
+    /// The 3-bit sub-opcode of `evt` — TC18 §13.5's `evt[2:0]`, which
+    /// controls the endpoint-specific usage of the `byte_msg_payload`
+    /// (TC18.txt line 3672). Valid range is `0..=EVT_SUB_OPCODE_MAX`.
     pub sub_opcode: u8,
 }
 
@@ -226,7 +242,7 @@ pub struct Evt {
 /// which apply the `op`-bit selection this module's provenance note
 /// describes rather than assuming one interpretation unconditionally.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-BMI-001
+//fusa:req REQ-BMI-001
 pub struct ReadSizeOrSegment(pub u16);
 
 impl ReadSizeOrSegment {
@@ -253,7 +269,7 @@ impl ReadSizeOrSegment {
 /// module does not implement `(stream_id, byte_bus_id)` addressing or the
 /// echo-back rule; those are the separate "Addressing" checklist item.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-BMI-001
+//fusa:req REQ-BMI-001
 pub struct ByteMessageInfo {
     /// The ACF message-type discriminant (`ACF_ABB_MSG_TYPE`/
     /// `ACF_GBB_MSG_TYPE`). 7 bits; valid range is
@@ -313,7 +329,13 @@ impl ByteMessageInfo {
     /// describes: unlike [`ReadSizeOrSegment::as_read_size`]'s
     /// unconditional view of the raw field, this method refuses to hand
     /// back a value under the interpretation `op` says does not apply.
-    // fusa:req REQ-BMI-005
+    ///
+    /// The polarity is TC18 §11.2.1 Table 4's own (TC18.txt line 1163): "if
+    /// op = 0 this is read_size, else segment_num", with `op = 0b`
+    /// meaning "the sender of this request expects a response with data"
+    /// and `op = 1b` meaning it does not (TC18.txt lines 1160-1161).
+    //fusa:req REQ-BMI-005
+    //fusa:req REQ-ABB-009
     pub fn read_size(&self) -> Option<u16> {
         if self.op {
             None
@@ -330,7 +352,8 @@ impl ByteMessageInfo {
     /// See [`ByteMessageInfo::read_size`]'s doc comment for why this is the
     /// preferred accessor over [`ReadSizeOrSegment::as_segment_num`]'s
     /// unconditional view.
-    // fusa:req REQ-BMI-005
+    //fusa:req REQ-BMI-005
+    //fusa:req REQ-ABB-009
     pub fn segment_num(&self) -> Option<u16> {
         if self.op {
             Some(self.read_size_segment.as_segment_num())
@@ -347,8 +370,15 @@ impl ByteMessageInfo {
 /// width (`acf_msg_type`: 7 bits, `acf_msg_length`: 9 bits, `pad`: 2 bits,
 /// `byte_bus_id`: 11 bits, `evt.sub_opcode`: 3 bits, `read_size_segment`:
 /// 12 bits).
-// fusa:req REQ-BMI-002
-// fusa:req REQ-BMI-003
+///
+/// Both `rsv` bit-pairs are always transmitted as zero, per TC18 §11.2.1
+/// Table 4 (TC18.txt line 1153, "rsv 00b") and TC18 §11.3 Table 15
+/// (TC18.txt line 1867, "rsv 00b"). They are not modeled as
+/// [`ByteMessageInfo`] fields at all, so there is no way for a caller to
+/// set them to anything else.
+//fusa:req REQ-BMI-002
+//fusa:req REQ-BMI-003
+//fusa:req REQ-ABB-007
 pub fn encode_byte_message_info(
     info: &ByteMessageInfo,
 ) -> Result<[u8; BYTE_MESSAGE_INFO_LEN], RcpError> {
@@ -403,8 +433,8 @@ pub fn encode_byte_message_info(
 /// Never panics on short, truncated, or arbitrary input — always returns
 /// `Err(RcpError::ShortFrame)` for input shorter than
 /// [`BYTE_MESSAGE_INFO_LEN`] instead.
-// fusa:req REQ-BMI-002
-// fusa:req REQ-BMI-004
+//fusa:req REQ-BMI-002
+//fusa:req REQ-BMI-004
 pub fn decode_byte_message_info(b: &[u8]) -> Result<ByteMessageInfo, RcpError> {
     if b.len() < BYTE_MESSAGE_INFO_LEN {
         return Err(RcpError::ShortFrame);
@@ -454,9 +484,22 @@ pub fn decode_byte_message_info(b: &[u8]) -> Result<ByteMessageInfo, RcpError> {
 // ── Constants shared by both ACF message types ────────────────────────────────
 
 /// `acf_msg_type` discriminant identifying an ACF_ABB message.
+///
+/// TC18 §11.2.1 Table 4 (TC18.txt line 1149) fixes this at `0x0E` for a
+/// standard request ("acf_msg_type 0x0E (ABB message)"), and TC18 §11.3
+/// Table 15 (TC18.txt line 1863) repeats it for responses, spelling out
+/// what the value means: "0x0E - ABB message without message_timestamp".
+//fusa:req REQ-ABB-006
+//fusa:req REQ-GBB-007
 pub const ACF_ABB_MSG_TYPE: u8 = 0x0E;
 
 /// `acf_msg_type` discriminant identifying an ACF_GBB message.
+///
+/// TC18 §11.3 Table 15 (TC18.txt line 1863): "0x0D - GBB message, with
+/// message_timestamp". The one structural difference the two discriminants
+/// name is exactly the 8-octet `message_timestamp`, which is why
+/// [`ACF_GBB_HEADER_LEN`] - [`ACF_ABB_HEADER_LEN`] is 8.
+//fusa:req REQ-GBB-007
 pub const ACF_GBB_MSG_TYPE: u8 = 0x0D;
 
 /// Length, in bytes, of the ACF_ABB message header: just
@@ -561,7 +604,7 @@ fn take_message_bytes<'a>(
 /// There is intentionally no `timestamp` field on this struct at all — see
 /// the module doc comment's opening summary of ACF_ABB.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-// fusa:req REQ-ABB-001
+//fusa:req REQ-ABB-001
 pub struct AcfAbbMessage {
     /// The shared `byte_message_info` header. See [`ByteMessageInfo`].
     pub info: ByteMessageInfo,
@@ -587,8 +630,8 @@ pub struct AcfAbbMessage {
 /// the 9-bit quadlet-count range, or if `msg.info` (with those three
 /// fields so overwritten) otherwise fails
 /// [`encode_byte_message_info`]'s field-width validation.
-// fusa:req REQ-ABB-002
-// fusa:req REQ-ABB-003
+//fusa:req REQ-ABB-002
+//fusa:req REQ-ABB-003
 pub fn encode_acf_abb(msg: &AcfAbbMessage) -> Result<Vec<u8>, RcpError> {
     let (acf_msg_length, pad) =
         quadlets_and_pad_for_message(ACF_ABB_HEADER_LEN, msg.payload.len())?;
@@ -615,9 +658,9 @@ pub fn encode_acf_abb(msg: &AcfAbbMessage) -> Result<Vec<u8>, RcpError> {
 /// §12.9.1.1) are left unread rather than folded into `payload` or
 /// rejected — see [`decode_acf_abb_messages`] for splitting a frame that
 /// carries more than one.
-// fusa:req REQ-ABB-002
-// fusa:req REQ-ABB-004
-// fusa:req REQ-ABB-005
+//fusa:req REQ-ABB-002
+//fusa:req REQ-ABB-004
+//fusa:req REQ-ABB-005
 pub fn decode_acf_abb(b: &[u8]) -> Result<AcfAbbMessage, RcpError> {
     if b.len() < ACF_ABB_HEADER_LEN {
         return Err(RcpError::ShortFrame);
@@ -652,7 +695,7 @@ pub fn decode_acf_abb(b: &[u8]) -> Result<AcfAbbMessage, RcpError> {
 /// `b` is rejected the same way [`decode_acf_abb`] rejects it, rather than
 /// silently returning zero messages, so a caller cannot mistake "nothing
 /// to parse" for "one legitimately-empty-payload message".
-// fusa:req REQ-ABB-004
+//fusa:req REQ-ABB-004
 pub fn decode_acf_abb_messages(b: &[u8]) -> Result<Vec<AcfAbbMessage>, RcpError> {
     if b.is_empty() {
         return Err(RcpError::ShortFrame);
@@ -704,7 +747,7 @@ pub fn decode_acf_abb_messages(b: &[u8]) -> Result<Vec<AcfAbbMessage>, RcpError>
 /// encoded/decoded here as one opaque `u64`, with no `RequestKind`-specific
 /// handling of its own.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-// fusa:req REQ-GBB-001
+//fusa:req REQ-GBB-001
 pub struct AcfGbbMessage {
     /// The shared `byte_message_info` header. See [`ByteMessageInfo`].
     pub info: ByteMessageInfo,
@@ -733,8 +776,8 @@ pub struct AcfGbbMessage {
 /// 9-bit quadlet-count range, or if `msg.info` (with those three fields so
 /// overwritten) otherwise fails [`encode_byte_message_info`]'s
 /// field-width validation.
-// fusa:req REQ-GBB-002
-// fusa:req REQ-GBB-003
+//fusa:req REQ-GBB-002
+//fusa:req REQ-GBB-003
 pub fn encode_acf_gbb(msg: &AcfGbbMessage) -> Result<Vec<u8>, RcpError> {
     let (acf_msg_length, pad) =
         quadlets_and_pad_for_message(ACF_GBB_HEADER_LEN, msg.payload.len())?;
@@ -760,9 +803,9 @@ pub fn encode_acf_gbb(msg: &AcfGbbMessage) -> Result<Vec<u8>, RcpError> {
 /// `acf_msg_length` describes — see [`decode_acf_abb`]'s doc comment for
 /// the same rule, applied here over the region following
 /// `message_timestamp`.
-// fusa:req REQ-GBB-002
-// fusa:req REQ-GBB-004
-// fusa:req REQ-GBB-005
+//fusa:req REQ-GBB-002
+//fusa:req REQ-GBB-004
+//fusa:req REQ-GBB-005
 pub fn decode_acf_gbb(b: &[u8]) -> Result<AcfGbbMessage, RcpError> {
     if b.len() < ACF_GBB_HEADER_LEN {
         return Err(RcpError::ShortFrame);
@@ -828,8 +871,8 @@ fn wrong_discriminant_error(
 /// even if `request` is itself already a decoded response; rejecting that
 /// shape, if ever needed, is a separate concern for whichever later
 /// milestone builds the full request/response dispatch.
-// fusa:req REQ-ECHO-001
-// fusa:req REQ-ECHO-002
+//fusa:req REQ-ECHO-001
+//fusa:req REQ-ECHO-002
 pub fn build_response_info(
     request: &ByteMessageInfo,
     mut response: ByteMessageInfo,
@@ -849,9 +892,9 @@ pub fn build_response_info(
 /// since that is a separate concern from the byte_bus_id-echoing rule this
 /// function checks. Never panics: both inputs are already-decoded values,
 /// not raw bytes, so there is no truncated-input shape to reject.
-// fusa:req REQ-ECHO-001
-// fusa:req REQ-ECHO-003
-// fusa:req REQ-ECHO-004
+//fusa:req REQ-ECHO-001
+//fusa:req REQ-ECHO-003
+//fusa:req REQ-ECHO-004
 pub fn verify_echo_back(
     request: &ByteMessageInfo,
     response: &ByteMessageInfo,
@@ -890,6 +933,25 @@ pub fn verify_echo_back(
 /// crate's own working interpretation (Guiding Principle 5), matching the
 /// simplest reading of that text, and flagged here for reconciliation
 /// against real TC18 behavior before being relied on for interop.
+///
+/// The returned message is always an [`AcfAbbMessage`] — i.e. the
+/// timestamp-free ACF_ABB format. That matches TC18 §11.3 (TC18.txt line
+/// 1859: "In case responses include a timestamp, they are in ACF_GBB
+/// format, else in ACF_ABB format") and §11.4.2 (TC18.txt line 1963: "When
+/// timestamping was not requested, then the ACF_ABB type format without
+/// time stamp shall be default for any data transmitted by the RC Server"),
+/// since this crate has no capture-timestamp source to put in a
+/// `message_timestamp` in the first place.
+///
+/// **Known gap.** TC18 §11.3.4 (TC18.txt line 1904) additionally requires an
+/// error response to carry `evt[3:0] < 0x9`. This function copies
+/// `request`'s `evt` verbatim (via [`build_response_info`]), including
+/// `evt[3]` — TC18 §13.5's acknowledge-request bit — so an error response to
+/// a request that asked for an acknowledge can carry an `evt` nibble in
+/// TC18 Table 15's reserved `0x9…0xE` range, or even `0xF`, which Table 15
+/// defines as *acknowledge*. See requirement `REQ-RESP-007`.
+//fusa:req REQ-RESP-002
+//fusa:req REQ-RESP-003
 pub fn build_error_response(request: &ByteMessageInfo, error: &RcpError) -> Option<AcfAbbMessage> {
     let code = error.tc18_wire_code()?;
     let mut info = build_response_info(request, *request);
@@ -932,8 +994,8 @@ mod tests {
     // ── byte_message_info ──────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-BMI-001
-    // fusa:test REQ-BMI-002
+    //fusa:test REQ-BMI-001
+    //fusa:test REQ-BMI-002
     fn byte_message_info_round_trip() {
         let info = sample_info();
         let frame = encode_byte_message_info(&info).unwrap();
@@ -943,7 +1005,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-BMI-002
+    //fusa:test REQ-BMI-002
     fn byte_message_info_round_trip_zero_values() {
         let info = ByteMessageInfo::default();
         let frame = encode_byte_message_info(&info).unwrap();
@@ -952,7 +1014,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-BMI-002
+    //fusa:test REQ-BMI-002
     fn byte_message_info_round_trip_max_values() {
         let info = ByteMessageInfo {
             acf_msg_type: ACF_MSG_TYPE_7BIT_MAX,
@@ -979,7 +1041,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-BMI-003
+    //fusa:test REQ-BMI-003
     fn byte_message_info_encode_rejects_oversized_acf_msg_type() {
         let info = ByteMessageInfo {
             acf_msg_type: ACF_MSG_TYPE_7BIT_MAX + 1,
@@ -989,7 +1051,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-BMI-003
+    //fusa:test REQ-BMI-003
     fn byte_message_info_encode_rejects_oversized_acf_msg_length() {
         let info = ByteMessageInfo {
             acf_msg_length: ACF_MSG_LENGTH_9BIT_MAX + 1,
@@ -999,7 +1061,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-BMI-003
+    //fusa:test REQ-BMI-003
     fn byte_message_info_encode_rejects_oversized_pad() {
         let info = ByteMessageInfo {
             pad: PAD_2BIT_MAX + 1,
@@ -1009,7 +1071,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-BMI-003
+    //fusa:test REQ-BMI-003
     fn byte_message_info_encode_rejects_oversized_byte_bus_id() {
         let info = ByteMessageInfo {
             byte_bus_id: BYTE_MESSAGE_INFO_11BIT_MAX + 1,
@@ -1019,7 +1081,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-BMI-003
+    //fusa:test REQ-BMI-003
     fn byte_message_info_encode_rejects_oversized_sub_opcode() {
         let info = ByteMessageInfo {
             evt: Evt {
@@ -1032,7 +1094,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-BMI-003
+    //fusa:test REQ-BMI-003
     fn byte_message_info_encode_rejects_oversized_read_size_segment() {
         let info = ByteMessageInfo {
             read_size_segment: ReadSizeOrSegment(READ_SIZE_SEGMENT_12BIT_MAX + 1),
@@ -1042,7 +1104,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-BMI-004
+    //fusa:test REQ-BMI-004
     fn byte_message_info_decode_rejects_short_input() {
         assert_eq!(
             decode_byte_message_info(&[0u8; BYTE_MESSAGE_INFO_LEN - 1]),
@@ -1051,7 +1113,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-BMI-004
+    //fusa:test REQ-BMI-004
     fn byte_message_info_decode_never_panics_across_lengths() {
         let mut state: u32 = 0xB111_5713;
         let mut next = || {
@@ -1069,7 +1131,7 @@ mod tests {
     // ── op-gated read_size/segment_num selection ────────────────────────────
 
     #[test]
-    // fusa:test REQ-BMI-005
+    //fusa:test REQ-BMI-005
     fn byte_message_info_read_size_is_some_only_when_op_is_read() {
         let info = ByteMessageInfo {
             op: false,
@@ -1081,7 +1143,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-BMI-005
+    //fusa:test REQ-BMI-005
     fn byte_message_info_segment_num_is_some_only_when_op_is_write() {
         let info = ByteMessageInfo {
             op: true,
@@ -1093,7 +1155,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-BMI-005
+    //fusa:test REQ-BMI-005
     fn byte_message_info_read_size_segment_num_are_mutually_exclusive_across_op() {
         for op in [false, true] {
             let info = ByteMessageInfo {
@@ -1165,8 +1227,8 @@ mod tests {
     // ── ACF_ABB round-trip ─────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-ABB-001
-    // fusa:test REQ-ABB-002
+    //fusa:test REQ-ABB-001
+    //fusa:test REQ-ABB-002
     fn acf_abb_round_trip() {
         // acf_msg_type/acf_msg_length/pad are all derived/overwritten at
         // encode time (see encode_acf_abb's doc comment) — set them here to
@@ -1188,7 +1250,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ABB-002
+    //fusa:test REQ-ABB-002
     fn acf_abb_round_trip_empty_payload() {
         // header(8) + 0 payload = 8 -> already quadlet-aligned -> pad 0 ->
         // 2 quadlets.
@@ -1208,7 +1270,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ABB-002
+    //fusa:test REQ-ABB-002
     fn acf_abb_round_trip_large_payload() {
         // header(8) + 256 payload = 264 -> already quadlet-aligned -> pad 0
         // -> 66 quadlets.
@@ -1227,8 +1289,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ABB-002
-    // fusa:test REQ-ABB-003
+    //fusa:test REQ-ABB-002
+    //fusa:test REQ-ABB-003
     fn acf_abb_encoded_message_has_no_timestamp_region() {
         // The defining Milestone 1 constraint for ACF_ABB: unlike ACF_GBB's
         // 64-bit message_timestamp, there must be no reserved slot for a
@@ -1246,7 +1308,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ABB-003
+    //fusa:test REQ-ABB-003
     fn acf_abb_encoded_message_has_expected_discriminant() {
         let msg = AcfAbbMessage {
             info: ByteMessageInfo::default(),
@@ -1258,7 +1320,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ABB-002
+    //fusa:test REQ-ABB-002
     fn acf_abb_encode_propagates_byte_message_info_validation_error() {
         // acf_msg_type/acf_msg_length/pad are always overwritten by the
         // derived values before this validation runs, so this uses an
@@ -1276,7 +1338,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ABB-002
+    //fusa:test REQ-ABB-002
     fn acf_abb_encode_rejects_payload_too_large_for_the_quadlet_field() {
         // (ACF_MSG_LENGTH_9BIT_MAX + 1) quadlets' worth of bytes is one
         // quadlet past what the 9-bit acf_msg_length field can encode.
@@ -1291,13 +1353,13 @@ mod tests {
     // ── ACF_ABB decode rejection ────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-ABB-004
+    //fusa:test REQ-ABB-004
     fn acf_abb_decode_rejects_empty_input() {
         assert_eq!(decode_acf_abb(&[]), Err(RcpError::ShortFrame));
     }
 
     #[test]
-    // fusa:test REQ-ABB-004
+    //fusa:test REQ-ABB-004
     fn acf_abb_decode_rejects_wrong_discriminant() {
         assert!(matches!(
             decode_acf_abb(&[0xFFu8; ACF_ABB_HEADER_LEN]),
@@ -1306,7 +1368,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ABB-004
+    //fusa:test REQ-ABB-004
     fn acf_abb_decode_rejects_gbb_discriminant_with_specific_hint() {
         let msg = AcfGbbMessage {
             info: ByteMessageInfo::default(),
@@ -1322,7 +1384,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ABB-004
+    //fusa:test REQ-ABB-004
     fn acf_abb_decode_rejects_truncated_byte_message_info() {
         let short = vec![0u8; BYTE_MESSAGE_INFO_LEN - 1];
         assert_eq!(decode_acf_abb(&short), Err(RcpError::ShortFrame));
@@ -1331,7 +1393,7 @@ mod tests {
     // ── ACF_ABB fuzz-style: arbitrary bytes never panic ────────────────────
 
     #[test]
-    // fusa:test REQ-ABB-005
+    //fusa:test REQ-ABB-005
     fn acf_abb_decode_never_panics_on_arbitrary_input() {
         let inputs: &[&[u8]] = &[&[], &[0x0E], &[0x0D], &[0xFF; 32], &[0x00; 32], &[0x0E; 64]];
         for input in inputs {
@@ -1340,7 +1402,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ABB-005
+    //fusa:test REQ-ABB-005
     fn acf_abb_decode_never_panics_on_random_lengths() {
         let mut state: u32 = 0x0E0D_0E0D;
         let mut next = || {
@@ -1414,8 +1476,8 @@ mod tests {
     // ── ACF_GBB round-trip ──────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-GBB-001
-    // fusa:test REQ-GBB-002
+    //fusa:test REQ-GBB-001
+    //fusa:test REQ-GBB-002
     fn acf_gbb_round_trip() {
         // header(16) + 5 payload = 21 -> pad 3 -> 24 total -> 6 quadlets.
         let msg = AcfGbbMessage {
@@ -1434,7 +1496,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GBB-002
+    //fusa:test REQ-GBB-002
     fn acf_gbb_round_trip_zero_and_max_timestamp() {
         for message_timestamp in [0u64, u64::MAX] {
             let msg = AcfGbbMessage {
@@ -1455,7 +1517,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GBB-002
+    //fusa:test REQ-GBB-002
     fn acf_gbb_round_trip_large_payload() {
         // header(16) + 256 payload = 272 -> already aligned -> pad 0 -> 68
         // quadlets.
@@ -1475,13 +1537,13 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GBB-002
+    //fusa:test REQ-GBB-002
     fn acf_gbb_encoded_header_is_exactly_8_bytes_wider_than_acf_abb() {
         assert_eq!(ACF_GBB_HEADER_LEN, ACF_ABB_HEADER_LEN + 8);
     }
 
     #[test]
-    // fusa:test REQ-GBB-003
+    //fusa:test REQ-GBB-003
     fn acf_gbb_encoded_message_has_expected_discriminant() {
         let msg = AcfGbbMessage {
             info: ByteMessageInfo::default(),
@@ -1494,7 +1556,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GBB-002
+    //fusa:test REQ-GBB-002
     fn acf_gbb_encode_propagates_byte_message_info_validation_error() {
         let msg = AcfGbbMessage {
             info: ByteMessageInfo {
@@ -1510,13 +1572,13 @@ mod tests {
     // ── ACF_GBB decode rejection ────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-GBB-004
+    //fusa:test REQ-GBB-004
     fn acf_gbb_decode_rejects_empty_input() {
         assert_eq!(decode_acf_gbb(&[]), Err(RcpError::ShortFrame));
     }
 
     #[test]
-    // fusa:test REQ-GBB-004
+    //fusa:test REQ-GBB-004
     fn acf_gbb_decode_rejects_wrong_discriminant() {
         assert!(matches!(
             decode_acf_gbb(&[0xFFu8; ACF_GBB_HEADER_LEN]),
@@ -1525,7 +1587,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GBB-004
+    //fusa:test REQ-GBB-004
     fn acf_gbb_decode_rejects_abb_discriminant_with_specific_hint() {
         let msg = AcfAbbMessage {
             info: ByteMessageInfo::default(),
@@ -1542,7 +1604,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GBB-004
+    //fusa:test REQ-GBB-004
     fn acf_gbb_decode_rejects_truncated_timestamp() {
         // Correct discriminant and full byte_message_info, but truncated
         // before the 8-byte message_timestamp is complete.
@@ -1555,7 +1617,7 @@ mod tests {
     // ── ACF_GBB fuzz-style: arbitrary bytes never panic ────────────────────
 
     #[test]
-    // fusa:test REQ-GBB-005
+    //fusa:test REQ-GBB-005
     fn acf_gbb_decode_never_panics_on_arbitrary_input() {
         let inputs: &[&[u8]] = &[&[], &[0x0E], &[0x0D], &[0xFF; 32], &[0x00; 32], &[0x0D; 64]];
         for input in inputs {
@@ -1564,7 +1626,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-GBB-005
+    //fusa:test REQ-GBB-005
     fn acf_gbb_decode_never_panics_on_random_lengths() {
         let mut state: u32 = 0x0D0E_0D0E;
         let mut next = || {
@@ -1582,8 +1644,8 @@ mod tests {
     // ── Echo-back rule ──────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-ECHO-001
-    // fusa:test REQ-ECHO-002
+    //fusa:test REQ-ECHO-001
+    //fusa:test REQ-ECHO-002
     fn build_response_info_echoes_request_byte_bus_id_and_sets_rsp() {
         let request = ByteMessageInfo {
             byte_bus_id: 0x0123,
@@ -1605,8 +1667,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ECHO-002
-    // fusa:test REQ-ECHO-003
+    //fusa:test REQ-ECHO-002
+    //fusa:test REQ-ECHO-003
     fn build_response_info_output_passes_verify_echo_back() {
         let request = sample_info();
         let response = build_response_info(&request, ByteMessageInfo::default());
@@ -1614,7 +1676,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ECHO-003
+    //fusa:test REQ-ECHO-003
     fn verify_echo_back_accepts_matching_byte_bus_id() {
         let request = ByteMessageInfo {
             byte_bus_id: 0x0456,
@@ -1629,7 +1691,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ECHO-003
+    //fusa:test REQ-ECHO-003
     fn verify_echo_back_rejects_mismatched_byte_bus_id() {
         let request = ByteMessageInfo {
             byte_bus_id: 0x0001,
@@ -1647,7 +1709,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ECHO-003
+    //fusa:test REQ-ECHO-003
     fn verify_echo_back_ignores_rsp_flag() {
         // The echo-back rule this function checks is scoped to byte_bus_id
         // only; it deliberately does not require response.rsp to be set.
@@ -1664,7 +1726,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ECHO-004
+    //fusa:test REQ-ECHO-004
     fn echo_back_never_panics_across_arbitrary_field_combinations() {
         let mut state: u32 = 0xECC0_BACC;
         let mut next_u16 = || {
@@ -1697,6 +1759,7 @@ mod tests {
     // ── Wire-level error responses ──────────────────────────────────────────
 
     #[test]
+    //fusa:test REQ-RESP-003
     fn build_error_response_echoes_request_and_sets_err_and_rsp() {
         let request = ByteMessageInfo {
             byte_bus_id: 0x0042,
@@ -1712,6 +1775,7 @@ mod tests {
     }
 
     #[test]
+    //fusa:test REQ-RESP-003
     fn build_error_response_covers_all_seventeen_table_27_codes() {
         let request = sample_info();
         let errors_and_codes: &[(RcpError, u8)] = &[
@@ -1758,6 +1822,7 @@ mod tests {
     }
 
     #[test]
+    //fusa:test REQ-RESP-003
     fn build_error_response_is_a_valid_encodable_acf_abb_frame() {
         let request = sample_info();
         let response = build_error_response(&request, &RcpError::EpNotFound).unwrap();
@@ -1765,6 +1830,238 @@ mod tests {
         let decoded = decode_acf_abb(&frame).unwrap();
         assert!(decoded.info.err);
         assert_eq!(decoded.payload, vec![8]);
+    }
+
+    #[test]
+    //fusa:test REQ-RESP-002
+    fn build_error_response_is_always_the_timestamp_free_abb_format() {
+        // TC18 §11.3 (TC18.txt line 1859): "In case responses include a
+        // timestamp, they are in ACF_GBB format, else in ACF_ABB format."
+        // TC18 §11.4.2 (line 1963): "When timestamping was not requested,
+        // then the ACF_ABB type format without time stamp shall be default
+        // for any data transmitted by the RC Server."
+        //
+        // The encoded response's `acf_msg_type` must therefore be Table 15's
+        // literal 0x0E ("ABB message without message_timestamp"), never
+        // 0x0D ("GBB message, with message_timestamp"), and the encoded
+        // message must be exactly 8 octets shorter than the same payload
+        // would occupy in GBB form (Table 15's only structural difference).
+        let request = sample_info();
+        for error in [
+            RcpError::UnsupportedCmd,
+            RcpError::EpNotFound,
+            RcpError::InvalidParameter,
+        ] {
+            let response = build_error_response(&request, &error).unwrap();
+            let frame = encode_acf_abb(&response).unwrap();
+            let info = decode_byte_message_info(&frame[..BYTE_MESSAGE_INFO_LEN]).unwrap();
+            assert_eq!(info.acf_msg_type, 0x0E, "Table 15 ABB discriminant");
+            assert_ne!(info.acf_msg_type, 0x0D, "must not be the GBB form");
+
+            let gbb_equivalent = encode_acf_gbb(&AcfGbbMessage {
+                info: response.info,
+                message_timestamp: 0,
+                payload: response.payload.clone(),
+            })
+            .unwrap();
+            assert_eq!(
+                gbb_equivalent.len() - frame.len(),
+                8,
+                "the ABB form omits exactly the 8-octet message_timestamp"
+            );
+        }
+    }
+
+    // ── TC18 §11.2.1 Table 4 / §11.3 Table 15 literal field values ─────────
+
+    #[test]
+    //fusa:test REQ-ABB-006
+    fn abb_standard_request_msg_type_matches_table_4_literal_and_bit_position() {
+        // TC18 §11.2.1 Table 4 (TC18.txt line 1149): "acf_msg_type
+        // 0x0E (ABB message)". Per this module's canonical wire layout,
+        // acf_msg_type occupies octet 0 bits 7:1, with acf_msg_length's MSB
+        // in bit 0 — so for any message whose acf_msg_length fits in 8 bits,
+        // octet 0 must read exactly 0x0E << 1 == 0x1C.
+        assert_eq!(ACF_ABB_MSG_TYPE, 0x0E);
+
+        for payload_len in [0usize, 1, 4, 6, 7, 32] {
+            let msg = AcfAbbMessage {
+                info: ByteMessageInfo::default(),
+                payload: vec![0x5Au8; payload_len],
+            };
+            let frame = encode_acf_abb(&msg).unwrap();
+            assert_eq!(
+                frame[0], 0x1C,
+                "octet 0 for a {payload_len}-byte payload: 0x0E << 1"
+            );
+            assert_eq!(frame[0] >> 1, 0x0E, "acf_msg_type recovered from bits 7:1");
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-GBB-007
+    fn table_15_discriminants_differ_by_exactly_the_message_timestamp() {
+        // TC18 §11.3 Table 15 (TC18.txt line 1863):
+        //   acf_msg_type  0x0E - ABB message without message_timestamp
+        //                 0x0D - GBB message, with message_timestamp
+        // The message_timestamp is a 64-bit field (TC18 §11.4.1, line 1955:
+        // "message_timestamp = ... mod 2^64"), i.e. 8 octets.
+        assert_eq!(ACF_ABB_MSG_TYPE, 0x0E);
+        assert_eq!(ACF_GBB_MSG_TYPE, 0x0D);
+        assert_eq!(ACF_GBB_HEADER_LEN - ACF_ABB_HEADER_LEN, 8);
+
+        let payload = vec![0xAAu8; 4];
+        let abb = encode_acf_abb(&AcfAbbMessage {
+            info: ByteMessageInfo::default(),
+            payload: payload.clone(),
+        })
+        .unwrap();
+        let gbb = encode_acf_gbb(&AcfGbbMessage {
+            info: ByteMessageInfo::default(),
+            message_timestamp: 0x0102_0304_0506_0708,
+            payload,
+        })
+        .unwrap();
+        assert_eq!(abb[0] >> 1, 0x0E);
+        assert_eq!(gbb[0] >> 1, 0x0D);
+        assert_eq!(gbb.len() - abb.len(), 8);
+        assert_eq!(
+            &gbb[BYTE_MESSAGE_INFO_LEN..BYTE_MESSAGE_INFO_LEN + 8],
+            &0x0102_0304_0506_0708u64.to_be_bytes(),
+            "message_timestamp sits immediately after byte_message_info"
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-ABB-007
+    fn both_reserved_bit_pairs_are_always_transmitted_as_zero() {
+        // TC18 §11.2.1 Table 4 (TC18.txt line 1153) and §11.3 Table 15
+        // (line 1867) both fix `rsv` at 00b. Per this module's canonical
+        // wire layout the two rsv pairs are octet 2 bits 4:3 (mask 0x18)
+        // and octet 4 bits 3:2 (mask 0x0C). Encoding every other field at
+        // its own maximum must still leave both masks clear.
+        let info = ByteMessageInfo {
+            acf_msg_type: ACF_MSG_TYPE_7BIT_MAX,
+            acf_msg_length: ACF_MSG_LENGTH_9BIT_MAX,
+            pad: PAD_2BIT_MAX,
+            mtv: true,
+            byte_bus_id: BYTE_MESSAGE_INFO_11BIT_MAX,
+            evt: Evt {
+                ack: true,
+                sub_opcode: EVT_SUB_OPCODE_MAX,
+            },
+            hs: true,
+            cs: true,
+            transaction_num: 0xFF,
+            op: true,
+            rsp: true,
+            err: true,
+            ms: true,
+            read_size_segment: ReadSizeOrSegment(READ_SIZE_SEGMENT_12BIT_MAX),
+        };
+        let frame = encode_byte_message_info(&info).unwrap();
+        assert_eq!(frame[2] & 0x18, 0x00, "row-1 rsv (octet 2 bits 4:3) = 00b");
+        assert_eq!(frame[4] & 0x0C, 0x00, "row-2 rsv (octet 4 bits 3:2) = 00b");
+    }
+
+    #[test]
+    //fusa:test REQ-ABB-009
+    fn table_4_op_polarity_selects_read_size_at_zero_and_segment_num_at_one() {
+        // TC18 §11.2.1 Table 4 (TC18.txt line 1163): "read_size/segment_num
+        // — if op = 0 this is read_size, else segment_num", with op = 0b
+        // meaning the sender expects a response with data (line 1160).
+        let read_request = ByteMessageInfo {
+            op: false,
+            read_size_segment: ReadSizeOrSegment(0x123),
+            ..ByteMessageInfo::default()
+        };
+        assert_eq!(read_request.read_size(), Some(0x123));
+        assert_eq!(read_request.segment_num(), None);
+
+        let write_request = ByteMessageInfo {
+            op: true,
+            read_size_segment: ReadSizeOrSegment(0x123),
+            ..ByteMessageInfo::default()
+        };
+        assert_eq!(write_request.segment_num(), Some(0x123));
+        assert_eq!(write_request.read_size(), None);
+    }
+
+    // ── TC18 §13.5 general evt-bit semantics ───────────────────────────────
+
+    #[test]
+    //fusa:test REQ-EVT-001
+    fn evt_bit_3_is_the_acknowledge_request_bit() {
+        // TC18 §13.5 (TC18.txt line 3673): "evt[3] is used to request an
+        // acknowledge. I.e. evt[3]=1 requests acknowledge."
+        // The evt nibble occupies octet 4 bits 7:4, so evt[3] is octet 4
+        // bit 7 — mask 0x80.
+        let with_ack = encode_byte_message_info(&ByteMessageInfo {
+            evt: Evt {
+                ack: true,
+                sub_opcode: 0,
+            },
+            ..ByteMessageInfo::default()
+        })
+        .unwrap();
+        assert_eq!(with_ack[4], 0x80, "evt[3]=1, evt[2:0]=000b");
+
+        let without_ack = encode_byte_message_info(&ByteMessageInfo {
+            evt: Evt {
+                ack: false,
+                sub_opcode: 0,
+            },
+            ..ByteMessageInfo::default()
+        })
+        .unwrap();
+        assert_eq!(without_ack[4], 0x00, "evt[3]=0, evt[2:0]=000b");
+
+        // And it survives the round trip in both directions.
+        assert!(decode_byte_message_info(&with_ack).unwrap().evt.ack);
+        assert!(!decode_byte_message_info(&without_ack).unwrap().evt.ack);
+    }
+
+    #[test]
+    //fusa:test REQ-EVT-002
+    fn evt_bits_2_to_0_are_the_three_bit_payload_usage_sub_opcode() {
+        // TC18 §13.5 (TC18.txt line 3672): "event bits evt[2:0] are used to
+        // control the usage of the byte_msg_payload." Table 30's own rows
+        // range over 000b..=111b, i.e. exactly three bits.
+        assert_eq!(EVT_SUB_OPCODE_MAX, 0x07);
+
+        // evt[2:0] occupies octet 4 bits 6:4, so a sub_opcode of `n` with
+        // evt[3] clear must encode to octet 4 == n << 4.
+        for sub_opcode in 0u8..=EVT_SUB_OPCODE_MAX {
+            let frame = encode_byte_message_info(&ByteMessageInfo {
+                evt: Evt {
+                    ack: false,
+                    sub_opcode,
+                },
+                ..ByteMessageInfo::default()
+            })
+            .unwrap();
+            assert_eq!(
+                frame[4],
+                sub_opcode << 4,
+                "evt[2:0] = {sub_opcode:03b} at octet 4 bits 6:4"
+            );
+            let decoded = decode_byte_message_info(&frame).unwrap();
+            assert_eq!(decoded.evt.sub_opcode, sub_opcode);
+            assert!(!decoded.evt.ack, "evt[3] must not bleed into evt[2:0]");
+        }
+
+        // A 4-bit value must be rejected, not silently truncated into
+        // evt[3]'s acknowledge bit.
+        assert_eq!(
+            encode_byte_message_info(&ByteMessageInfo {
+                evt: Evt {
+                    ack: false,
+                    sub_opcode: EVT_SUB_OPCODE_MAX + 1,
+                },
+                ..ByteMessageInfo::default()
+            }),
+            Err(RcpError::InvalidSize)
+        );
     }
 
     // ── Golden vectors: TC18 Figure 19 / Figure 20 worked examples ──────────

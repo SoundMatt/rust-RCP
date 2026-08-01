@@ -1,25 +1,25 @@
-// fusa:req REQ-NTSCF-001
-// fusa:req REQ-NTSCF-002
-// fusa:req REQ-NTSCF-003
-// fusa:req REQ-NTSCF-004
-// fusa:req REQ-NTSCF-005
-// fusa:req REQ-NTSCF-006
-// fusa:req REQ-TSCF-001
-// fusa:req REQ-TSCF-002
-// fusa:req REQ-TSCF-003
-// fusa:req REQ-TSCF-004
-// fusa:req REQ-TSCF-005
-// fusa:req REQ-TSCF-006
-// fusa:req REQ-HVSEL-001
-// fusa:req REQ-HVSEL-002
-// fusa:req REQ-HVSEL-003
-// fusa:req REQ-HVSEL-004
-// fusa:req REQ-HVSEL-005
-// fusa:req REQ-SID-001
-// fusa:req REQ-SID-002
-// fusa:req REQ-SID-003
-// fusa:req REQ-SID-004
-// fusa:req REQ-SID-005
+//fusa:req REQ-NTSCF-001
+//fusa:req REQ-NTSCF-002
+//fusa:req REQ-NTSCF-003
+//fusa:req REQ-NTSCF-004
+//fusa:req REQ-NTSCF-005
+//fusa:req REQ-NTSCF-006
+//fusa:req REQ-TSCF-001
+//fusa:req REQ-TSCF-002
+//fusa:req REQ-TSCF-003
+//fusa:req REQ-TSCF-004
+//fusa:req REQ-TSCF-005
+//fusa:req REQ-TSCF-006
+//fusa:req REQ-HVSEL-001
+//fusa:req REQ-HVSEL-002
+//fusa:req REQ-HVSEL-003
+//fusa:req REQ-HVSEL-004
+//fusa:req REQ-HVSEL-005
+//fusa:req REQ-SID-001
+//fusa:req REQ-SID-002
+//fusa:req REQ-SID-003
+//fusa:req REQ-SID-004
+//fusa:req REQ-SID-005
 
 //! IEEE 1722 AVTPDU framing — TC18 wire format core (`ROADMAP.md` Milestone 1).
 //!
@@ -172,7 +172,7 @@ pub const NTSCF_DATA_LENGTH_MAX: u16 = 0x07FF;
 /// interpret or construct its sender-MAC/unique-id-suffix structure; see
 /// this module's doc comment for why the field remains untyped here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-NTSCF-001
+//fusa:req REQ-NTSCF-001
 pub struct NtscfHeader {
     /// Per-stream sequence number, incremented once per NTSCF AVTPDU sent.
     pub sequence_num: u8,
@@ -212,7 +212,7 @@ fn get_u64_be(b: &[u8]) -> u64 {
 ///
 /// Returns `Err(RcpError::InvalidSize)` if `ntscf_data_length` exceeds the
 /// 11-bit field width.
-// fusa:req REQ-NTSCF-002
+//fusa:req REQ-NTSCF-002
 pub fn encode_ntscf_header(hdr: &NtscfHeader) -> Result<[u8; NTSCF_HEADER_LEN], RcpError> {
     if hdr.ntscf_data_length > NTSCF_DATA_LENGTH_MAX {
         return Err(RcpError::InvalidSize);
@@ -233,9 +233,9 @@ pub fn encode_ntscf_header(hdr: &NtscfHeader) -> Result<[u8; NTSCF_HEADER_LEN], 
 ///
 /// Never panics on short, truncated, or arbitrary input — always returns
 /// `Err` instead.
-// fusa:req REQ-NTSCF-003
-// fusa:req REQ-NTSCF-004
-// fusa:req REQ-NTSCF-006
+//fusa:req REQ-NTSCF-003
+//fusa:req REQ-NTSCF-004
+//fusa:req REQ-NTSCF-006
 pub fn decode_ntscf_header(b: &[u8]) -> Result<NtscfHeader, RcpError> {
     if b.len() < NTSCF_HEADER_LEN {
         return Err(RcpError::ShortFrame);
@@ -302,7 +302,7 @@ pub const TSCF_DATA_LENGTH_MAX: u16 = 0xFFFF;
 /// 64-bit value, same as [`NtscfHeader::stream_id`] — see that field's doc
 /// comment for how to decompose/compose it via [`StreamId`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-TSCF-001
+//fusa:req REQ-TSCF-001
 pub struct TscfHeader {
     /// Per-stream sequence number, incremented once per TSCF AVTPDU sent.
     pub sequence_num: u8,
@@ -355,7 +355,7 @@ pub struct TscfHeader {
 /// the struct can hold is representable. The `Result` return type is kept
 /// for signature symmetry with [`encode_ntscf_header`] and so that adding
 /// a future validation rule is not itself a breaking change.
-// fusa:req REQ-TSCF-002
+//fusa:req REQ-TSCF-002
 pub fn encode_tscf_header(hdr: &TscfHeader) -> Result<[u8; TSCF_HEADER_LEN], RcpError> {
     let mut buf = [0u8; TSCF_HEADER_LEN];
     buf[0] = TSCF_SUBTYPE;
@@ -375,9 +375,9 @@ pub fn encode_tscf_header(hdr: &TscfHeader) -> Result<[u8; TSCF_HEADER_LEN], Rcp
 ///
 /// Never panics on short, truncated, or arbitrary input — always returns
 /// `Err` instead.
-// fusa:req REQ-TSCF-003
-// fusa:req REQ-TSCF-004
-// fusa:req REQ-TSCF-006
+//fusa:req REQ-TSCF-003
+//fusa:req REQ-TSCF-004
+//fusa:req REQ-TSCF-006
 pub fn decode_tscf_header(b: &[u8]) -> Result<TscfHeader, RcpError> {
     if b.len() < TSCF_HEADER_LEN {
         return Err(RcpError::ShortFrame);
@@ -423,7 +423,7 @@ pub fn decode_tscf_header(b: &[u8]) -> Result<TscfHeader, RcpError> {
 /// this type exists purely to make the header-variant selection rule below
 /// testable against both outcomes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-HVSEL-001
+//fusa:req REQ-HVSEL-001
 pub enum TimeSyncCapability {
     /// The server participates in time synchronization; TSCF-headed
     /// AVTPDUs may be decoded.
@@ -443,7 +443,7 @@ impl TimeSyncCapability {
 /// A decoded AVTPDU header, tagged by which Milestone 1 header variant
 /// produced it. Returned by [`select_header_variant`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// fusa:req REQ-HVSEL-001
+//fusa:req REQ-HVSEL-001
 pub enum HeaderVariant {
     /// Decoded via [`decode_ntscf_header`].
     Ntscf(NtscfHeader),
@@ -468,10 +468,18 @@ pub enum HeaderVariant {
 /// a subtype that is neither [`NTSCF_SUBTYPE`] nor [`TSCF_SUBTYPE`]. All
 /// other decode-rejection paths (short frame past the subtype byte, sv bit,
 /// ...) are delegated to [`decode_ntscf_header`]/[`decode_tscf_header`].
-// fusa:req REQ-HVSEL-002
-// fusa:req REQ-HVSEL-003
-// fusa:req REQ-HVSEL-004
-// fusa:req REQ-HVSEL-005
+/// TC18 §12.8.2 "Reception of frames" (TC18.txt line 3170) states the
+/// discard rule this function's `other =>` arm implements: "If neither a
+/// gPTP nor an IEEE1722 frame is found the received frame shall be
+/// discarded." Only the two subtypes RCP itself defines — NTSCF
+/// ([`NTSCF_SUBTYPE`], 0x82) and TSCF ([`TSCF_SUBTYPE`], 0x05) — are
+/// accepted; every other leading subtype octet is rejected without any
+/// attempt to interpret the bytes that follow it.
+//fusa:req REQ-HVSEL-002
+//fusa:req REQ-HVSEL-003
+//fusa:req REQ-HVSEL-004
+//fusa:req REQ-HVSEL-005
+//fusa:req REQ-NET-002
 pub fn select_header_variant(
     b: &[u8],
     time_sync: TimeSyncCapability,
@@ -503,7 +511,7 @@ pub fn select_header_variant(
 /// [`build_stream_id`]. See the module's provenance note for the bit-layout
 /// caveat that applies to both directions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
-// fusa:req REQ-SID-001
+//fusa:req REQ-SID-001
 pub struct StreamId {
     /// The stream's sender's 48-bit MAC address, occupying the upper 48
     /// bits of the wire `stream_id` (see the module's provenance note).
@@ -516,7 +524,7 @@ pub struct StreamId {
 
 impl StreamId {
     /// Compose a [`StreamId`] from its sender-MAC and unique-id parts.
-    // fusa:req REQ-SID-001
+    //fusa:req REQ-SID-001
     pub fn new(sender_mac: [u8; 6], unique_id: u16) -> Self {
         Self {
             sender_mac,
@@ -526,7 +534,7 @@ impl StreamId {
 
     /// Compose the opaque 64-bit wire `stream_id` value from this
     /// [`StreamId`]'s parts. Equivalent to [`build_stream_id`].
-    // fusa:req REQ-SID-001
+    //fusa:req REQ-SID-001
     pub fn to_u64(self) -> u64 {
         build_stream_id(self.sender_mac, self.unique_id)
     }
@@ -535,7 +543,7 @@ impl StreamId {
     /// [`StreamId`]. Equivalent to [`parse_stream_id`]. Infallible: every
     /// `u64` value — including all-zero and all-`0xFF` — maps to exactly
     /// one [`StreamId`].
-    // fusa:req REQ-SID-001
+    //fusa:req REQ-SID-001
     pub fn from_u64(raw: u64) -> Self {
         let (sender_mac, unique_id) = parse_stream_id(raw);
         Self::new(sender_mac, unique_id)
@@ -560,7 +568,7 @@ impl From<u64> for StreamId {
 /// upper 48 bits, `unique_id` the lower 16.
 ///
 /// Infallible — every `([u8; 6], u16)` pair maps to exactly one `u64`.
-// fusa:req REQ-SID-001
+//fusa:req REQ-SID-001
 pub fn build_stream_id(sender_mac: [u8; 6], unique_id: u16) -> u64 {
     let mac_bits = (u64::from(sender_mac[0]) << 56)
         | (u64::from(sender_mac[1]) << 48)
@@ -577,7 +585,7 @@ pub fn build_stream_id(sender_mac: [u8; 6], unique_id: u16) -> u64 {
 /// Never panics: a `u64` always carries exactly the 64 bits this function
 /// reads, so there is no truncated-input case to reject the way the header
 /// decoders above do.
-// fusa:req REQ-SID-001
+//fusa:req REQ-SID-001
 pub fn parse_stream_id(raw: u64) -> ([u8; 6], u16) {
     let sender_mac = [
         (raw >> 56) as u8,
@@ -604,10 +612,20 @@ pub fn parse_stream_id(raw: u64) -> ([u8; 6], u16) {
 /// `Err(RcpError::InvalidSize)` if that length exceeds
 /// [`NTSCF_DATA_LENGTH_MAX`] (the same 11-bit field width
 /// [`encode_ntscf_header`] itself enforces).
-// fusa:req REQ-WIRE-001
-// fusa:req REQ-WIRE-002
-// fusa:req REQ-WIRE-004
-// fusa:req REQ-WIRE-007
+/// This is also the only whole-frame composition entry point this crate
+/// has, and it always emits an NTSCF header — matching TC18 §11.1
+/// (TC18.txt line 1062: the NTSCF header "shall be used for RCP requests
+/// which shall be executed as soon as possible or under request specific
+/// conditions as well as for responses and acknowledge") and §11.4.3
+/// (TC18.txt line 1988: "The RC Server always uses NTSCF header"). There is
+/// deliberately no `encode_tscf_frame` counterpart: [`encode_tscf_header`]
+/// exists for a client's own use and for round-trip testing, but nothing in
+/// this crate assembles a TSCF-headed frame.
+//fusa:req REQ-WIRE-001
+//fusa:req REQ-WIRE-002
+//fusa:req REQ-WIRE-004
+//fusa:req REQ-WIRE-007
+//fusa:req REQ-NTSCF-007
 pub fn encode_ntscf_frame(
     stream_id: StreamId,
     sequence_num: u8,
@@ -635,10 +653,10 @@ pub fn encode_ntscf_frame(
 /// input: delegates directly to [`decode_ntscf_header`] for that case, then
 /// returns whatever trailing bytes remain (including zero of them)
 /// verbatim.
-// fusa:req REQ-WIRE-003
-// fusa:req REQ-WIRE-005
-// fusa:req REQ-WIRE-008
-// fusa:req REQ-WIRE-009
+//fusa:req REQ-WIRE-003
+//fusa:req REQ-WIRE-005
+//fusa:req REQ-WIRE-008
+//fusa:req REQ-WIRE-009
 pub fn decode_ntscf_frame(b: &[u8]) -> Result<(NtscfHeader, &[u8]), RcpError> {
     let hdr = decode_ntscf_header(b)?;
     Ok((hdr, &b[NTSCF_HEADER_LEN..]))
@@ -654,9 +672,9 @@ mod tests {
     // ── Round-trip ─────────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-NTSCF-001
-    // fusa:test REQ-NTSCF-002
-    // fusa:test REQ-NTSCF-003
+    //fusa:test REQ-NTSCF-001
+    //fusa:test REQ-NTSCF-002
+    //fusa:test REQ-NTSCF-003
     fn ntscf_header_round_trip() {
         let hdr = NtscfHeader {
             sequence_num: 0x42,
@@ -670,7 +688,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-NTSCF-002
+    //fusa:test REQ-NTSCF-002
     fn ntscf_header_round_trip_zero_values() {
         let hdr = NtscfHeader {
             sequence_num: 0,
@@ -683,7 +701,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-NTSCF-002
+    //fusa:test REQ-NTSCF-002
     fn ntscf_header_round_trip_max_values() {
         let hdr = NtscfHeader {
             sequence_num: 0xFF,
@@ -696,7 +714,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-NTSCF-002
+    //fusa:test REQ-NTSCF-002
     fn encode_rejects_oversized_data_length() {
         let hdr = NtscfHeader {
             ntscf_data_length: NTSCF_DATA_LENGTH_MAX + 1,
@@ -706,7 +724,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-NTSCF-002
+    //fusa:test REQ-NTSCF-002
     fn encoded_header_has_expected_subtype_and_sv_bit() {
         let frame = encode_ntscf_header(&NtscfHeader::default()).unwrap();
         assert_eq!(frame[0], NTSCF_SUBTYPE);
@@ -716,7 +734,7 @@ mod tests {
     // ── Decode rejection ──────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-NTSCF-004
+    //fusa:test REQ-NTSCF-004
     fn decode_rejects_short_input() {
         for len in 0..NTSCF_HEADER_LEN {
             let buf = vec![0u8; len];
@@ -725,7 +743,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-NTSCF-004
+    //fusa:test REQ-NTSCF-004
     fn decode_rejects_wrong_subtype() {
         let mut frame = encode_ntscf_header(&NtscfHeader::default()).unwrap();
         frame[0] = TSCF_SUBTYPE; // the other RCP subtype, not NTSCF
@@ -736,7 +754,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-NTSCF-004
+    //fusa:test REQ-NTSCF-004
     fn decode_rejects_sv_bit_unset() {
         let mut frame = encode_ntscf_header(&NtscfHeader::default()).unwrap();
         frame[1] &= 0x7F; // clear sv
@@ -747,7 +765,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-NTSCF-004
+    //fusa:test REQ-NTSCF-004
     fn decode_ignores_reserved_bits() {
         let hdr = NtscfHeader {
             sequence_num: 7,
@@ -769,8 +787,8 @@ mod tests {
     // ── Fuzz-style: arbitrary bytes never panic ───────────────────────────
 
     #[test]
-    // fusa:test REQ-NTSCF-005
-    // fusa:test REQ-NTSCF-006
+    //fusa:test REQ-NTSCF-005
+    //fusa:test REQ-NTSCF-006
     fn decode_never_panics_on_arbitrary_input() {
         let inputs: &[&[u8]] = &[
             &[],
@@ -790,7 +808,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-NTSCF-006
+    //fusa:test REQ-NTSCF-006
     fn decode_never_panics_on_random_lengths() {
         // Deterministic pseudo-random coverage across many lengths/contents,
         // matching wire.rs's fuzz-style discipline without adding a
@@ -815,9 +833,9 @@ mod tests {
     // ── Round-trip ─────────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-TSCF-001
-    // fusa:test REQ-TSCF-002
-    // fusa:test REQ-TSCF-003
+    //fusa:test REQ-TSCF-001
+    //fusa:test REQ-TSCF-002
+    //fusa:test REQ-TSCF-003
     fn tscf_header_round_trip() {
         let hdr = TscfHeader {
             sequence_num: 0x42,
@@ -832,7 +850,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TSCF-002
+    //fusa:test REQ-TSCF-002
     fn tscf_header_round_trip_zero_values() {
         let hdr = TscfHeader {
             sequence_num: 0,
@@ -846,7 +864,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TSCF-002
+    //fusa:test REQ-TSCF-002
     fn tscf_header_round_trip_max_values() {
         let hdr = TscfHeader {
             sequence_num: 0xFF,
@@ -860,7 +878,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TSCF-002
+    //fusa:test REQ-TSCF-002
     fn tscf_accepts_the_full_16_bit_data_length_range() {
         // TC18 v0.5.1_RC §11.1 Figure 5 (p.22) gives `stream_data_length`
         // its own 16-bit half-quadlet, so — unlike NTSCF's 11-bit
@@ -880,7 +898,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TSCF-002
+    //fusa:test REQ-TSCF-002
     fn tscf_encoded_header_has_expected_subtype_and_sv_bit() {
         let frame = encode_tscf_header(&TscfHeader::default()).unwrap();
         assert_eq!(frame[0], TSCF_SUBTYPE);
@@ -890,7 +908,7 @@ mod tests {
     // ── Wire layout, pinned to the specification's worked examples ────────
 
     #[test]
-    // fusa:test REQ-NTSCF-003
+    //fusa:test REQ-NTSCF-003
     fn ntscf_header_matches_figure_20_worked_example() {
         // TC18 v0.5.1_RC page 79, Figure 20 ("Single ACF_GBB CRC32
         // mandatory fields"). Its AVTPDU header row reads, left to right:
@@ -925,7 +943,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TSCF-003
+    //fusa:test REQ-TSCF-003
     fn tscf_header_matches_figure_19_worked_example() {
         // TC18 v0.5.1_RC page 79, Figure 19 ("single ACF_ABB CRC32
         // mandatory fields"). Its AVTPDU header rows read:
@@ -960,7 +978,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TSCF-003
+    //fusa:test REQ-TSCF-003
     fn tscf_tv_bit_tracks_avtp_timestamp_presence() {
         // TC18 v0.5.1_RC §11.1 Figure 5 (p.22) bit 15, `tv`. See
         // `encode_tscf_header` for why this crate derives the bit from
@@ -985,7 +1003,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TSCF-002
+    //fusa:test REQ-TSCF-002
     fn tscf_and_ntscf_headers_use_distinct_subtypes() {
         assert_ne!(TSCF_SUBTYPE, NTSCF_SUBTYPE);
     }
@@ -993,7 +1011,7 @@ mod tests {
     // ── Decode rejection ──────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-TSCF-004
+    //fusa:test REQ-TSCF-004
     fn tscf_decode_rejects_short_input() {
         for len in 0..TSCF_HEADER_LEN {
             let buf = vec![0u8; len];
@@ -1002,7 +1020,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TSCF-004
+    //fusa:test REQ-TSCF-004
     fn tscf_decode_rejects_wrong_subtype() {
         let mut frame = encode_tscf_header(&TscfHeader::default()).unwrap();
         frame[0] = NTSCF_SUBTYPE; // NTSCF subtype, not TSCF
@@ -1013,7 +1031,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TSCF-004
+    //fusa:test REQ-TSCF-004
     fn tscf_decode_rejects_sv_bit_unset() {
         let mut frame = encode_tscf_header(&TscfHeader::default()).unwrap();
         frame[1] &= 0x7F; // clear sv
@@ -1024,7 +1042,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TSCF-004
+    //fusa:test REQ-TSCF-004
     fn tscf_decode_ignores_reserved_bits() {
         let hdr = TscfHeader {
             sequence_num: 7,
@@ -1052,8 +1070,8 @@ mod tests {
     // ── Fuzz-style: arbitrary bytes never panic ───────────────────────────
 
     #[test]
-    // fusa:test REQ-TSCF-005
-    // fusa:test REQ-TSCF-006
+    //fusa:test REQ-TSCF-005
+    //fusa:test REQ-TSCF-006
     fn tscf_decode_never_panics_on_arbitrary_input() {
         let inputs: &[&[u8]] = &[
             &[],
@@ -1076,7 +1094,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-TSCF-006
+    //fusa:test REQ-TSCF-006
     fn tscf_decode_never_panics_on_random_lengths() {
         // Deterministic pseudo-random coverage across many lengths/contents,
         // matching wire.rs's fuzz-style discipline without adding a
@@ -1099,14 +1117,14 @@ mod tests {
     // ═══════════════════════════════════════════════════════════════════
 
     #[test]
-    // fusa:test REQ-HVSEL-001
+    //fusa:test REQ-HVSEL-001
     fn time_sync_capability_accepts_tscf_only_when_capable() {
         assert!(TimeSyncCapability::Capable.accepts_tscf());
         assert!(!TimeSyncCapability::Incapable.accepts_tscf());
     }
 
     #[test]
-    // fusa:test REQ-HVSEL-004
+    //fusa:test REQ-HVSEL-004
     fn select_header_variant_accepts_ntscf_when_time_sync_capable() {
         let hdr = NtscfHeader {
             sequence_num: 3,
@@ -1119,7 +1137,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-HVSEL-004
+    //fusa:test REQ-HVSEL-004
     fn select_header_variant_accepts_ntscf_when_time_sync_incapable() {
         // NTSCF carries no timing assumption: it is accepted regardless of
         // the receiving server's time-sync capability.
@@ -1134,7 +1152,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-HVSEL-003
+    //fusa:test REQ-HVSEL-003
     fn select_header_variant_accepts_tscf_when_time_sync_capable() {
         let hdr = TscfHeader {
             sequence_num: 9,
@@ -1148,7 +1166,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-HVSEL-002
+    //fusa:test REQ-HVSEL-002
     fn select_header_variant_drops_tscf_when_time_sync_incapable() {
         let hdr = TscfHeader {
             sequence_num: 9,
@@ -1164,7 +1182,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-HVSEL-002
+    //fusa:test REQ-HVSEL-002
     fn select_header_variant_drops_tscf_before_decoding_body() {
         // Even a TSCF frame that would otherwise fail to decode (too short
         // past the subtype byte) must still be reported as the time-sync
@@ -1178,7 +1196,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-HVSEL-005
+    //fusa:test REQ-HVSEL-005
     fn select_header_variant_rejects_empty_input() {
         assert_eq!(
             select_header_variant(&[], TimeSyncCapability::Capable),
@@ -1191,7 +1209,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-HVSEL-005
+    //fusa:test REQ-HVSEL-005
     fn select_header_variant_rejects_unrecognized_subtype() {
         let frame = [0x01u8; TSCF_HEADER_LEN];
         assert!(matches!(
@@ -1201,8 +1219,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-HVSEL-002
-    // fusa:test REQ-HVSEL-003
+    //fusa:test REQ-HVSEL-002
+    //fusa:test REQ-HVSEL-003
     fn select_header_variant_propagates_tscf_decode_errors_when_capable() {
         // Wrong subtype byte inside an otherwise TSCF-length frame should
         // still surface as a genuine decode error (not the time-sync
@@ -1220,7 +1238,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-HVSEL-005
+    //fusa:test REQ-HVSEL-005
     fn select_header_variant_never_panics_on_arbitrary_input() {
         let mut state: u32 = 0x2468_ACE0;
         let mut next = || {
@@ -1241,7 +1259,7 @@ mod tests {
     // ═══════════════════════════════════════════════════════════════════
 
     #[test]
-    // fusa:test REQ-SID-002
+    //fusa:test REQ-SID-002
     fn stream_id_round_trip() {
         let mac = [0x00, 0x11, 0x22, 0x33, 0x44, 0x55];
         let unique_id = 0xBEEF;
@@ -1252,7 +1270,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SID-002
+    //fusa:test REQ-SID-002
     fn stream_id_round_trip_zero_values() {
         let raw = build_stream_id([0; 6], 0);
         assert_eq!(raw, 0);
@@ -1260,7 +1278,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SID-002
+    //fusa:test REQ-SID-002
     fn stream_id_round_trip_max_values() {
         let raw = build_stream_id([0xFF; 6], u16::MAX);
         assert_eq!(raw, u64::MAX);
@@ -1268,8 +1286,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SID-001
-    // fusa:test REQ-SID-002
+    //fusa:test REQ-SID-001
+    //fusa:test REQ-SID-002
     fn stream_id_type_round_trips_through_new_to_u64_from_u64() {
         let id = StreamId::new([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF], 0x1234);
         let raw = id.to_u64();
@@ -1280,7 +1298,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SID-003
+    //fusa:test REQ-SID-003
     fn stream_id_places_sender_mac_in_upper_48_bits() {
         // Each MAC octet must land at a distinct, predictable byte position
         // (upper 48 bits, most-significant octet first), independent of
@@ -1298,14 +1316,14 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SID-003
+    //fusa:test REQ-SID-003
     fn stream_id_places_unique_id_in_lower_16_bits() {
         let raw = build_stream_id([0; 6], 0x1234);
         assert_eq!(raw, 0x0000_0000_0000_1234);
     }
 
     #[test]
-    // fusa:test REQ-SID-004
+    //fusa:test REQ-SID-004
     fn parse_stream_id_never_panics_across_arbitrary_u64_values() {
         // parse_stream_id/build_stream_id operate on fixed-width integers
         // and fixed-size arrays only, so there is no truncated/malformed
@@ -1329,7 +1347,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SID-005
+    //fusa:test REQ-SID-005
     fn stream_id_interoperates_with_ntscf_header_opaque_field() {
         let id = StreamId::new([0x02, 0x42, 0xAC, 0x11, 0x00, 0x02], 0x0007);
         let hdr = NtscfHeader {
@@ -1343,7 +1361,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-SID-005
+    //fusa:test REQ-SID-005
     fn stream_id_interoperates_with_tscf_header_opaque_field() {
         let id = StreamId::new([0x02, 0x42, 0xAC, 0x11, 0x00, 0x03], 0x0008);
         let hdr = TscfHeader {
@@ -1362,11 +1380,11 @@ mod tests {
     // ═══════════════════════════════════════════════════════════════════
 
     #[test]
-    // fusa:test REQ-WIRE-001
-    // fusa:test REQ-WIRE-002
-    // fusa:test REQ-WIRE-003
-    // fusa:test REQ-WIRE-004
-    // fusa:test REQ-WIRE-005
+    //fusa:test REQ-WIRE-001
+    //fusa:test REQ-WIRE-002
+    //fusa:test REQ-WIRE-003
+    //fusa:test REQ-WIRE-004
+    //fusa:test REQ-WIRE-005
     fn ntscf_frame_round_trips_arbitrary_payload() {
         let sid = StreamId::new([0x02, 0x11, 0x22, 0x33, 0x44, 0x55], 0x0042);
         let payload = vec![0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03];
@@ -1380,7 +1398,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WIRE-005
+    //fusa:test REQ-WIRE-005
     fn ntscf_frame_round_trips_empty_payload() {
         let sid = StreamId::default();
         let frame = encode_ntscf_frame(sid, 0, &[]).unwrap();
@@ -1391,8 +1409,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WIRE-001
-    // fusa:test REQ-WIRE-007
+    //fusa:test REQ-WIRE-001
+    //fusa:test REQ-WIRE-007
     fn ntscf_frame_rejects_oversized_payload() {
         let oversized = vec![0u8; NTSCF_DATA_LENGTH_MAX as usize + 1];
         assert_eq!(
@@ -1402,7 +1420,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WIRE-008
+    //fusa:test REQ-WIRE-008
     fn decode_ntscf_frame_propagates_wrong_subtype() {
         let mut frame = encode_ntscf_frame(StreamId::default(), 0, &[1, 2, 3]).unwrap();
         frame[0] = TSCF_SUBTYPE;
@@ -1413,7 +1431,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WIRE-009
+    //fusa:test REQ-WIRE-009
     fn decode_ntscf_frame_rejects_short_input() {
         for len in 0..NTSCF_HEADER_LEN {
             let buf = vec![0u8; len];
@@ -1422,7 +1440,59 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-WIRE-009
+    //fusa:test REQ-NET-002
+    fn select_header_variant_discards_every_subtype_but_the_two_rcp_ones() {
+        // TC18 §12.8.2 (TC18.txt line 3170): "If neither a gPTP nor an
+        // IEEE1722 frame is found the received frame shall be discarded."
+        // The only two AVTPDU subtypes RCP defines are TC18 §11.1
+        // Figure 5's TSCF `subtype(0x05)` and Figure 6's NTSCF
+        // `subtype(0x82)` — every other value of that octet must be
+        // discarded rather than parsed. The literals below are read from
+        // those two figures, not from this crate's own constants.
+        const TC18_TSCF_SUBTYPE: u8 = 0x05;
+        const TC18_NTSCF_SUBTYPE: u8 = 0x82;
+
+        for subtype in 0u8..=0xFF {
+            // sv=1 in octet 1 and a full TSCF-length buffer, so the only
+            // thing that can decide accept-vs-discard is the subtype octet.
+            let mut buf = [0u8; TSCF_HEADER_LEN];
+            buf[0] = subtype;
+            buf[1] = 0x80;
+            let accepted = select_header_variant(&buf, TimeSyncCapability::Capable).is_ok();
+            let expected = subtype == TC18_TSCF_SUBTYPE || subtype == TC18_NTSCF_SUBTYPE;
+            assert_eq!(
+                accepted,
+                expected,
+                "subtype 0x{subtype:02X} must {} be accepted",
+                if expected { "" } else { "not" }
+            );
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-NTSCF-007
+    fn frame_composition_always_emits_the_server_side_ntscf_header() {
+        // TC18 §11.1 (TC18.txt line 1062) and §11.4.3 (line 1988): the RC
+        // Server always uses the NTSCF header, and responses/acknowledges
+        // are always carried under it. `encode_ntscf_frame` is this
+        // crate's only whole-frame composition entry point, and its first
+        // octet is always Figure 6's literal `subtype(0x82)`.
+        for payload_len in [0usize, 1, 4, 7, 64] {
+            let payload = vec![0xA5u8; payload_len];
+            let frame = encode_ntscf_frame(StreamId::default(), 0x11, &payload).unwrap();
+            assert_eq!(
+                frame[0], 0x82,
+                "TC18 Figure 6 subtype(0x82) for a {payload_len}-byte payload"
+            );
+            assert_ne!(
+                frame[0], 0x05,
+                "must never be TC18 Figure 5's client-only TSCF subtype"
+            );
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-WIRE-009
     fn ntscf_frame_functions_never_panic_on_arbitrary_input() {
         let mut state: u32 = 0x1357_9BDF;
         let mut next = || {

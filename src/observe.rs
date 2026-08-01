@@ -1,9 +1,9 @@
-// fusa:req REQ-OBS-001
-// fusa:req REQ-OBS-002
-// fusa:req REQ-OBS-003
-// fusa:req REQ-OBS-004
-// fusa:req REQ-OBS-005
-// fusa:req REQ-OBS-006
+//fusa:req REQ-OBS-001
+//fusa:req REQ-OBS-002
+//fusa:req REQ-OBS-003
+//fusa:req REQ-OBS-004
+//fusa:req REQ-OBS-005
+//fusa:req REQ-OBS-006
 
 //! Observability hooks — latency histogram, error counters, and event
 //! callbacks over an [`Endpoint`].
@@ -31,7 +31,7 @@ use crate::RcpError;
 // ── Metrics ───────────────────────────────────────────────────────────────────
 
 /// Aggregated call metrics for an endpoint.
-// fusa:req REQ-OBS-001
+//fusa:req REQ-OBS-001
 #[derive(Debug, Default)]
 pub struct Metrics {
     pub total_calls: AtomicU64,
@@ -71,7 +71,7 @@ type ReadHookFn = Box<dyn Fn(u16, &Result<Vec<u8>, RcpError>, Duration) + Send +
 type WriteHookFn = Box<dyn Fn(&[u8], &Result<(), RcpError>, Duration) + Send + Sync>;
 
 /// Observing wrapper that records metrics and fires post-call hooks.
-// fusa:req REQ-OBS-002
+//fusa:req REQ-OBS-002
 pub struct ObserveEndpoint {
     inner: Arc<dyn Endpoint>,
     metrics: Arc<Metrics>,
@@ -90,13 +90,13 @@ impl ObserveEndpoint {
     }
 
     /// Snapshot of aggregated metrics (covers both reads and writes).
-    // fusa:req REQ-OBS-003
+    //fusa:req REQ-OBS-003
     pub fn metrics(&self) -> Arc<Metrics> {
         Arc::clone(&self.metrics)
     }
 
     /// Register a post-read hook.
-    // fusa:req REQ-OBS-004
+    //fusa:req REQ-OBS-004
     pub fn add_read_hook(
         &self,
         f: impl Fn(u16, &Result<Vec<u8>, RcpError>, Duration) + Send + Sync + 'static,
@@ -105,7 +105,7 @@ impl ObserveEndpoint {
     }
 
     /// Register a post-write hook.
-    // fusa:req REQ-OBS-004
+    //fusa:req REQ-OBS-004
     pub fn add_write_hook(
         &self,
         f: impl Fn(&[u8], &Result<(), RcpError>, Duration) + Send + Sync + 'static,
@@ -119,7 +119,7 @@ impl Endpoint for ObserveEndpoint {
         self.inner.ep_type()
     }
 
-    // fusa:req REQ-OBS-005
+    //fusa:req REQ-OBS-005
     fn read(&self, read_size: u16) -> Result<Vec<u8>, RcpError> {
         let start = Instant::now();
         let result = self.inner.read(read_size);
@@ -131,7 +131,7 @@ impl Endpoint for ObserveEndpoint {
         result
     }
 
-    // fusa:req REQ-OBS-006
+    //fusa:req REQ-OBS-006
     fn write(&self, payload: &[u8]) -> Result<(), RcpError> {
         let start = Instant::now();
         let result = self.inner.write(payload);
@@ -170,8 +170,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-OBS-002
-    // fusa:test REQ-OBS-003
+    //fusa:test REQ-OBS-002
+    //fusa:test REQ-OBS-003
     fn call_count_increments() {
         let o = ObserveEndpoint::new(ok_ep());
         for _ in 0..5 {
@@ -181,7 +181,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-OBS-003
+    //fusa:test REQ-OBS-003
     fn error_count_increments_on_failure() {
         let o = ObserveEndpoint::new(Arc::new(AlwaysFail) as Arc<dyn Endpoint>);
         let _ = o.write(b"x");
@@ -189,8 +189,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-OBS-004
-    // fusa:test REQ-OBS-005
+    //fusa:test REQ-OBS-004
+    //fusa:test REQ-OBS-005
     fn read_hook_is_called_after_read() {
         let fired = Arc::new(AtomicU64::new(0));
         let f2 = Arc::clone(&fired);
@@ -203,7 +203,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-OBS-006
+    //fusa:test REQ-OBS-006
     fn write_hook_is_called_after_write() {
         let fired = Arc::new(AtomicU64::new(0));
         let f2 = Arc::clone(&fired);
@@ -216,7 +216,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-OBS-001
+    //fusa:test REQ-OBS-001
     fn mean_latency_is_non_negative() {
         let o = ObserveEndpoint::new(ok_ep());
         o.write(b"x").unwrap();

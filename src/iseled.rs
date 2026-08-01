@@ -1,13 +1,13 @@
-// fusa:req REQ-ISELED-001
-// fusa:req REQ-ISELED-002
-// fusa:req REQ-ISELED-003
-// fusa:req REQ-ISELED-004
-// fusa:req REQ-ISELED-005
-// fusa:req REQ-ISELED-006
-// fusa:req REQ-ISELED-007
-// fusa:req REQ-ISELED-008
-// fusa:req REQ-ISELED-009
-// fusa:req REQ-ISELED-010
+//fusa:req REQ-ISELED-001
+//fusa:req REQ-ISELED-002
+//fusa:req REQ-ISELED-003
+//fusa:req REQ-ISELED-004
+//fusa:req REQ-ISELED-005
+//fusa:req REQ-ISELED-006
+//fusa:req REQ-ISELED-007
+//fusa:req REQ-ISELED-008
+//fusa:req REQ-ISELED-009
+//fusa:req REQ-ISELED-010
 
 //! The ISELED endpoint type (`ep_type 0x0C`) — `ROADMAP.md` Milestone 7
 //! ("Remaining Endpoint Types"), third checklist bullet: native
@@ -144,6 +144,52 @@
 //! spec prose) is expected to update `iseled_frame_crc8`'s algorithm and
 //! reconsider this gate then, not now.
 //!
+//! ## TC18 reconciliation note (§13.7.12)
+//!
+//! Reconciling this module against TC18 §13.7.12 confirms one behavior and
+//! records a substantial set of gaps, all recorded as explicit
+//! not-implemented requirement entries rather than silently omitted.
+//!
+//! Confirmed: TC18 §13.7.12.3 (TC18.txt line 5578) states "The ISELED
+//! request and response contains plain data in the `byte_msg_payload` that
+//! is to be presented or has been received on the ISELED bus", and
+//! [`IseledFrame::encode`] emits its fields verbatim, in order, inserting
+//! nothing — in particular no CRC, which line 5595 confirms "is not present
+//! on the ISELED network" unless the endpoint is configured to generate one.
+//!
+//! Not implemented:
+//!
+//! - The request payload's own field layout. TC18 Figure 40 (line 5588) and
+//!   its accompanying example (line 5597) describe "4 bit instruction, 12
+//!   bit address and 3 bytes of data"; this module's [`IseledFrame`] instead
+//!   carries a full-byte `chain_address` and a full-byte `command`, so an
+//!   [`IseledFrame::encode`] buffer is **not** field-compatible with Figure
+//!   40 even though it is byte-order-preserving.
+//! - The response payload's own field layout. TC18 §13.7.12.3 (line 5600)
+//!   states "A response always contains the 12 bit address and 12 bit data
+//!   plus the optional 4 bit CRC"; [`IseledDeviceResponse`] carries a
+//!   full-byte `chain_address` plus opaque data bytes instead.
+//! - The 4/5-bit encoding's own code-group table. TC18 (line 5492) requires
+//!   data to be "4/5bit encoded according to the ISLED standard"; this crate
+//!   has no access to that standard's table and uses the public
+//!   FDDI/100BASE-TX one ([`NIBBLE_TO_5B`]) as an explicitly unconfirmed
+//!   stand-in, so conformance of the *values* is not claimed.
+//! - Aggregation of 5/4-bit-decoded responses into one or multiple ACF
+//!   messages bounded by the request's `read_size` (lines 5493-5494);
+//!   [`iseled_collect_resp`] performs no `read_size` accounting and emits no
+//!   ACF message.
+//! - Generating and attaching the optional native CRC to write messages, and
+//!   recomputing and checking it on read data (lines 5494-5496).
+//! - The single trigger event on completion of a data packet's transmission
+//!   (line 5497).
+//! - TC18 Table 55's functional-config register layout (§13.7.12.2, lines
+//!   5504-5545), including `iseled_collect_resp` (0x0007.3, 1 bit),
+//!   `iseled_use_rcv_clk` (0x0007.4, 1 bit), `iseled_nr_leds` (0x0008,
+//!   16 bit) and `iseled_rcv_timeout` (0x000A, 16 bit) — see
+//!   [`IseledFunctionalConfig`], which carries one `native_crc_enabled`
+//!   flag and nothing else — and the Freq_Sync-vs-ISP_N clock-recovery
+//!   choice that `iseled_use_rcv_clk` selects (lines 5549-5551).
+//!
 //! ## Multi-device response aggregation
 //!
 //! A daisy chain's devices each contribute their own response; per
@@ -226,7 +272,7 @@ fn symbol_to_nibble(symbol: u8) -> Option<u8> {
 /// module's doc comment for why this crate represents 4b/5b output at
 /// symbol-per-byte granularity rather than as a packed bitstream. Never
 /// panics for any input, including empty input.
-// fusa:req REQ-ISELED-001
+//fusa:req REQ-ISELED-001
 pub fn encode_4b5b(data: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(data.len() * 2);
     for &byte in data {
@@ -245,7 +291,7 @@ pub fn encode_4b5b(data: &[u8]) -> Vec<u8> {
 /// `symbols` has an odd length — every encoded byte contributes exactly two
 /// symbols, so a trailing lone symbol cannot complete a byte. Never panics
 /// for any input.
-// fusa:req REQ-ISELED-002
+//fusa:req REQ-ISELED-002
 pub fn decode_4b5b(symbols: &[u8]) -> Result<Vec<u8>, RcpError> {
     if symbols.len() % 2 != 0 {
         return Err(RcpError::ShortFrame);
@@ -268,7 +314,7 @@ pub fn decode_4b5b(symbols: &[u8]) -> Result<Vec<u8>, RcpError> {
 /// layout" for why this shape is this crate's own working interpretation,
 /// and for why `data` carries no length ceiling.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-// fusa:req REQ-ISELED-003
+//fusa:req REQ-ISELED-003
 pub struct IseledFrame {
     /// The client-supplied device-selector byte within the daisy chain,
     /// carried unparsed — this module takes no position on any
@@ -285,7 +331,17 @@ pub struct IseledFrame {
 impl IseledFrame {
     /// Encode this frame to its raw (pre-line-coding) wire representation:
     /// `chain_address`, then `command`, then `data`, unmodified.
-    // fusa:req REQ-ISELED-003
+    ///
+    /// This is the "plain data in the `byte_msg_payload` that is to be
+    /// presented ... on the ISELED bus" of TC18 §13.7.12.3 (TC18.txt line
+    /// 5578): the bytes are emitted verbatim, in supplied order, with
+    /// nothing inserted — in particular no CRC, which TC18.txt line 5595
+    /// confirms is not present on the ISELED network unless the endpoint is
+    /// configured to generate one. See this module's doc comment "TC18
+    /// reconciliation note (§13.7.12)" for the field-layout gaps this does
+    /// **not** close.
+    //fusa:req REQ-ISELED-003
+    //fusa:req REQ-ISELED-011
     pub fn encode(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(2 + self.data.len());
         buf.push(self.chain_address);
@@ -300,7 +356,7 @@ impl IseledFrame {
     /// Returns `Err(RcpError::ShortFrame)` for input shorter than 2 bytes
     /// (no room for both `chain_address` and `command`). Never panics for
     /// any input.
-    // fusa:req REQ-ISELED-004
+    //fusa:req REQ-ISELED-004
     pub fn decode(b: &[u8]) -> Result<Self, RcpError> {
         if b.len() < 2 {
             return Err(RcpError::ShortFrame);
@@ -315,7 +371,7 @@ impl IseledFrame {
     /// Encode this frame to its native 4b/5b line-coded form: composes
     /// [`IseledFrame::encode`] and [`encode_4b5b`] rather than re-deriving
     /// either.
-    // fusa:req REQ-ISELED-005
+    //fusa:req REQ-ISELED-005
     pub fn encode_line(&self) -> Vec<u8> {
         encode_4b5b(&self.encode())
     }
@@ -324,7 +380,7 @@ impl IseledFrame {
     /// composes [`decode_4b5b`] and [`IseledFrame::decode`] rather than
     /// re-deriving either. Propagates either function's own error variants
     /// unchanged, and never panics for any input.
-    // fusa:req REQ-ISELED-005
+    //fusa:req REQ-ISELED-005
     pub fn decode_line(symbols: &[u8]) -> Result<Self, RcpError> {
         let raw = decode_4b5b(symbols)?;
         Self::decode(&raw)
@@ -343,7 +399,7 @@ impl IseledFrame {
 /// default build rather than shipped as an ordinary, always-available item.
 #[cfg(feature = "iseled-unconfirmed-crc")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-ISELED-006
+//fusa:req REQ-ISELED-006
 pub struct IseledFrameCrc(pub u8);
 
 /// Computes `iseled_frame_crc8`'s underlying CRC-8/AUTOSAR value over
@@ -378,7 +434,7 @@ fn crc8_autosar(data: &[u8]) -> u8 {
 /// this module's doc comment "Provenance note: the native ISELED CRC is a
 /// distinct, additive layer" for why.
 #[cfg(feature = "iseled-unconfirmed-crc")]
-// fusa:req REQ-ISELED-006
+//fusa:req REQ-ISELED-006
 pub fn iseled_frame_crc8(frame: &IseledFrame) -> IseledFrameCrc {
     IseledFrameCrc(crc8_autosar(&frame.encode()))
 }
@@ -387,7 +443,7 @@ pub fn iseled_frame_crc8(frame: &IseledFrame) -> IseledFrameCrc {
 
 /// One daisy-chain device's own contribution to a multi-device response.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-// fusa:req REQ-ISELED-007
+//fusa:req REQ-ISELED-007
 pub struct IseledDeviceResponse {
     /// The responding device's chain-address selector byte, matching
     /// [`IseledFrame::chain_address`]'s own field.
@@ -406,7 +462,7 @@ pub struct IseledDeviceResponse {
 /// [`crate::can::CanXlCombinedPayload`]'s single-payload fragment
 /// concatenation.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-// fusa:req REQ-ISELED-008
+//fusa:req REQ-ISELED-008
 pub struct IseledCollectedResponse(pub Vec<IseledDeviceResponse>);
 
 /// Collects a daisy chain's per-device responses into one
@@ -420,7 +476,7 @@ pub struct IseledCollectedResponse(pub Vec<IseledDeviceResponse>);
 /// device order from any protocol-level position field this module does
 /// not model. An empty `per_device` slice yields an empty collected
 /// response; this function never panics for any input.
-// fusa:req REQ-ISELED-008
+//fusa:req REQ-ISELED-008
 pub fn iseled_collect_resp(per_device: &[IseledDeviceResponse]) -> IseledCollectedResponse {
     IseledCollectedResponse(per_device.to_vec())
 }
@@ -438,7 +494,7 @@ pub fn iseled_collect_resp(per_device: &[IseledDeviceResponse]) -> IseledCollect
 /// comment "Provenance note: the native ISELED CRC is a distinct, additive
 /// layer".
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// fusa:req REQ-ISELED-009
+//fusa:req REQ-ISELED-009
 pub struct IseledFunctionalConfig {
     /// Whether this ISELED endpoint is configured to append a native
     /// per-frame CRC (`iseled_frame_crc8`, when the `iseled-unconfirmed-crc`
@@ -458,7 +514,7 @@ impl IseledFunctionalConfig {
     /// This module does not itself call that function — it only shows how a
     /// caller would obtain the matching tag, per this module's doc comment
     /// "Relationship to `crate::regmap`".
-    // fusa:req REQ-ISELED-010
+    //fusa:req REQ-ISELED-010
     pub fn layer_tag(&self) -> crate::regmap::PerEpTypeFunctionalConfig {
         crate::regmap::PerEpTypeFunctionalConfig::new(crate::regmap::EndpointType::Iseled)
     }
@@ -471,7 +527,7 @@ mod tests {
     // ── 4b/5b line coding ────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-ISELED-001
+    //fusa:test REQ-ISELED-001
     fn nibble_to_5b_table_has_no_duplicate_code_groups() {
         let mut seen = std::collections::HashSet::new();
         for &code in NIBBLE_TO_5B.iter() {
@@ -481,8 +537,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ISELED-001
-    // fusa:test REQ-ISELED-002
+    //fusa:test REQ-ISELED-001
+    //fusa:test REQ-ISELED-002
     fn encode_4b5b_round_trips_through_decode_4b5b() {
         for data in [
             vec![],
@@ -498,7 +554,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ISELED-002
+    //fusa:test REQ-ISELED-002
     fn decode_4b5b_rejects_odd_length_input() {
         for len in [1usize, 3, 5] {
             let buf = vec![NIBBLE_TO_5B[0]; len];
@@ -507,7 +563,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ISELED-002
+    //fusa:test REQ-ISELED-002
     fn decode_4b5b_rejects_invalid_code_groups() {
         // 0b00000 and 0b11111 are not among NIBBLE_TO_5B's 16 data code
         // groups (they're FDDI/100BASE-TX's own reserved/control symbols
@@ -521,7 +577,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ISELED-002
+    //fusa:test REQ-ISELED-002
     fn decode_4b5b_never_panics_for_any_sampled_input() {
         for len in [0usize, 1, 2, 3, 7, 64] {
             let buf = vec![0x5Au8; len];
@@ -532,8 +588,8 @@ mod tests {
     // ── IseledFrame: round-trip / never-panic ────────────────────────────────
 
     #[test]
-    // fusa:test REQ-ISELED-003
-    // fusa:test REQ-ISELED-004
+    //fusa:test REQ-ISELED-003
+    //fusa:test REQ-ISELED-004
     fn iseled_frame_round_trips_through_encode_decode() {
         for (chain_address, command, data) in [
             (0x00u8, 0x00u8, vec![]),
@@ -553,7 +609,32 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ISELED-004
+    //fusa:test REQ-ISELED-011
+    fn iseled_byte_msg_payload_is_carried_as_plain_data_with_no_crc_inserted() {
+        // TC18 §13.7.12.3 (TC18.txt line 5578): "The ISELED request and
+        // response contains plain data in the byte_msg_payload that is to be
+        // presented or has been received on the ISELED bus." Figure 40's own
+        // on-wire example (line 5594) shows three data bytes; line 5595 adds
+        // that a safe-operation-mode CRC "is not present on the ISELED
+        // network", so encode() must never synthesise one.
+        const PAYLOAD: [u8; 5] = [0x01, 0x02, 0xAA, 0xBB, 0xCC];
+
+        let frame = IseledFrame {
+            chain_address: PAYLOAD[0],
+            command: PAYLOAD[1],
+            data: PAYLOAD[2..].to_vec(),
+        };
+        assert_eq!(frame.encode(), PAYLOAD.to_vec());
+        // Exactly the supplied bytes: no CRC byte/nibble appended, no length
+        // or framing prefix prepended.
+        assert_eq!(frame.encode().len(), 2 + frame.data.len());
+
+        let decoded = IseledFrame::decode(&PAYLOAD).unwrap();
+        assert_eq!(decoded, frame);
+    }
+
+    #[test]
+    //fusa:test REQ-ISELED-004
     fn iseled_frame_decode_rejects_short_input() {
         for len in [0usize, 1] {
             assert_eq!(
@@ -564,7 +645,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ISELED-004
+    //fusa:test REQ-ISELED-004
     fn iseled_frame_decode_never_panics_for_any_sampled_input() {
         for len in [0usize, 1, 2, 3, 9, 64] {
             let buf = vec![0x5Au8; len];
@@ -573,7 +654,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ISELED-005
+    //fusa:test REQ-ISELED-005
     fn iseled_frame_round_trips_through_encode_line_decode_line() {
         let frame = IseledFrame {
             chain_address: 0x03,
@@ -585,7 +666,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ISELED-005
+    //fusa:test REQ-ISELED-005
     fn iseled_frame_decode_line_propagates_4b5b_errors() {
         assert_eq!(IseledFrame::decode_line(&[0x5A]), Err(RcpError::ShortFrame));
         assert_eq!(
@@ -605,7 +686,7 @@ mod tests {
         use super::*;
 
         #[test]
-        // fusa:test REQ-ISELED-006
+        //fusa:test REQ-ISELED-006
         fn iseled_frame_crc8_is_deterministic_and_sensitive_to_frame_content() {
             let frame_a = IseledFrame {
                 chain_address: 0x01,
@@ -622,7 +703,7 @@ mod tests {
         }
 
         #[test]
-        // fusa:test REQ-ISELED-006
+        //fusa:test REQ-ISELED-006
         fn iseled_frame_crc8_is_independent_of_e2e_crc32_tc18() {
             // Both CRC layers can be computed over related content without
             // either function calling the other or the two outputs colliding
@@ -646,8 +727,8 @@ mod tests {
     // ── Multi-device response aggregation ────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-ISELED-007
-    // fusa:test REQ-ISELED-008
+    //fusa:test REQ-ISELED-007
+    //fusa:test REQ-ISELED-008
     fn iseled_collect_resp_preserves_per_device_structure_and_order() {
         let per_device = vec![
             IseledDeviceResponse {
@@ -668,7 +749,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ISELED-008
+    //fusa:test REQ-ISELED-008
     fn iseled_collect_resp_empty_input_yields_empty_collected_response() {
         assert_eq!(iseled_collect_resp(&[]), IseledCollectedResponse(vec![]));
     }
@@ -676,8 +757,8 @@ mod tests {
     // ── IseledFunctionalConfig / layer_tag ───────────────────────────────────
 
     #[test]
-    // fusa:test REQ-ISELED-009
-    // fusa:test REQ-ISELED-010
+    //fusa:test REQ-ISELED-009
+    //fusa:test REQ-ISELED-010
     fn iseled_functional_config_layer_tag_matches_ep_type_iseled() {
         let functional = IseledFunctionalConfig {
             native_crc_enabled: true,
@@ -695,7 +776,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ISELED-010
+    //fusa:test REQ-ISELED-010
     fn iseled_functional_config_layer_tag_rejects_mismatched_ep_type() {
         let functional = IseledFunctionalConfig::default();
         let generic = crate::regmap::PerEpConfigBlock::new(crate::regmap::EndpointType::Can);

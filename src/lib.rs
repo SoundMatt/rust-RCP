@@ -1,35 +1,35 @@
-// fusa:req REQ-ERR-001
-// fusa:req REQ-ERR-002
-// fusa:req REQ-ERR-003
-// fusa:req REQ-ERR-004
-// fusa:req REQ-ERR-005
-// fusa:req REQ-ERR-006
-// fusa:req REQ-ERR-007
-// fusa:req REQ-ERR-008
-// fusa:req REQ-ERR-009
-// fusa:req REQ-ERR-010
-// fusa:req REQ-ERR-012
-// fusa:req REQ-ERR-013
-// fusa:req REQ-ERR-014
-// fusa:req REQ-ERR-015
-// fusa:req REQ-ERR-016
-// fusa:req REQ-ERR-017
-// fusa:req REQ-ERR-019
-// fusa:req REQ-ERR-020
-// fusa:req REQ-ERRM-001
-// fusa:req REQ-ERRM-002
-// fusa:req REQ-ERRM-003
-// fusa:req REQ-ERRM-004
-// fusa:req REQ-ERRM-005
-// fusa:req REQ-ERRM-006
-// fusa:req REQ-ERRM-007
-// fusa:req REQ-ERRM-008
-// fusa:req REQ-ERRM-009
-// fusa:req REQ-ERRM-010
-// fusa:req REQ-ERRM-011
-// fusa:req REQ-ERRM-012
-// fusa:req REQ-ERRM-013
-// fusa:req REQ-SPEC-001
+//fusa:req REQ-ERR-001
+//fusa:req REQ-ERR-002
+//fusa:req REQ-ERR-003
+//fusa:req REQ-ERR-004
+//fusa:req REQ-ERR-005
+//fusa:req REQ-ERR-006
+//fusa:req REQ-ERR-007
+//fusa:req REQ-ERR-008
+//fusa:req REQ-ERR-009
+//fusa:req REQ-ERR-010
+//fusa:req REQ-ERR-012
+//fusa:req REQ-ERR-013
+//fusa:req REQ-ERR-014
+//fusa:req REQ-ERR-015
+//fusa:req REQ-ERR-016
+//fusa:req REQ-ERR-017
+//fusa:req REQ-ERR-019
+//fusa:req REQ-ERR-020
+//fusa:req REQ-ERRM-001
+//fusa:req REQ-ERRM-002
+//fusa:req REQ-ERRM-003
+//fusa:req REQ-ERRM-004
+//fusa:req REQ-ERRM-005
+//fusa:req REQ-ERRM-006
+//fusa:req REQ-ERRM-007
+//fusa:req REQ-ERRM-008
+//fusa:req REQ-ERRM-009
+//fusa:req REQ-ERRM-010
+//fusa:req REQ-ERRM-011
+//fusa:req REQ-ERRM-012
+//fusa:req REQ-ERRM-013
+//fusa:req REQ-SPEC-001
 
 //! Remote Control Protocol (RCP) — a Rust implementation of the OPEN
 //! Alliance TC18 Remote Control Protocol Specification v0.5.1_RC for
@@ -130,12 +130,12 @@ use std::fmt;
 // ── Spec version ────────────────────────────────────────────────────────────
 
 /// RELAY specification version this crate implements.
-// fusa:req REQ-SPEC-001
+//fusa:req REQ-SPEC-001
 pub const SPEC_VERSION: &str = "2.0";
 
 /// Alias for [`SPEC_VERSION`], exported from the crate root per RELAY spec
 /// §19.4 ("`RELAY_SPEC_VERSION` MUST be exported from the crate root").
-// fusa:req REQ-SPEC-001
+//fusa:req REQ-SPEC-001
 pub const RELAY_SPEC_VERSION: &str = SPEC_VERSION;
 
 // ── Error types ───────────────────────────────────────────────────────────────
@@ -409,7 +409,7 @@ pub enum RcpError {
     // continuing check_rx_enforce_e2e's earlier reuse of CrcMismatch, and
     // for why this stays separate from the eleven-member "TC18 RCP spec
     // error codes" group.
-    // fusa:req REQ-CRC-011
+    //fusa:req REQ-CRC-011
     #[error("rcp/error: CRC_ERROR — end-to-end CRC-32 safe-point verification failed")]
     CrcError,
 
@@ -451,38 +451,38 @@ impl RcpError {
     // ── RELAY sentinel membership queries ─────────────────────────────────
 
     /// True for the `Closed` sentinel (wraps `relay::ErrClosed`).
-    // fusa:req REQ-ERR-007
-    // fusa:req REQ-ERR-014
+    //fusa:req REQ-ERR-007
+    //fusa:req REQ-ERR-014
     pub fn is_relay_closed(&self) -> bool {
         matches!(self, Self::Closed)
     }
 
     /// True for `NotConnected` and `NotFound` (both wrap
     /// `relay::ErrNotConnected`).
-    // fusa:req REQ-ERR-008
-    // fusa:req REQ-ERR-015
+    //fusa:req REQ-ERR-008
+    //fusa:req REQ-ERR-015
     pub fn is_relay_not_connected(&self) -> bool {
         matches!(self, Self::NotConnected | Self::NotFound)
     }
 
     /// True for `Timeout` and `Busy` (both wrap `relay::ErrTimeout`).
-    // fusa:req REQ-ERR-010
-    // fusa:req REQ-ERR-016
-    // fusa:req REQ-ERR-020
+    //fusa:req REQ-ERR-010
+    //fusa:req REQ-ERR-016
+    //fusa:req REQ-ERR-020
     pub fn is_relay_timeout(&self) -> bool {
         matches!(self, Self::Timeout | Self::Busy)
     }
 
     /// True for the `PayloadTooLarge` sentinel.
-    // fusa:req REQ-ERR-013
-    // fusa:req REQ-ERR-017
+    //fusa:req REQ-ERR-013
+    //fusa:req REQ-ERR-017
     pub fn is_relay_payload_too_large(&self) -> bool {
         matches!(self, Self::PayloadTooLarge)
     }
 
     /// True for `AlreadyExists` (standalone per RELAY spec §5.4).
-    // fusa:req REQ-ERR-009
-    // fusa:req REQ-ERR-019
+    //fusa:req REQ-ERR-009
+    //fusa:req REQ-ERR-019
     pub fn is_already_exists(&self) -> bool {
         matches!(self, Self::AlreadyExists)
     }
@@ -493,7 +493,7 @@ impl RcpError {
     /// RELAY-sentinel, general-purpose, or wire/E2E variants above. See
     /// this enum's own doc comment for the full list and provenance/
     /// mapping note.
-    // fusa:req REQ-ERRM-012
+    //fusa:req REQ-ERRM-012
     pub fn is_tc18_error_code(&self) -> bool {
         matches!(
             self,
@@ -533,6 +533,8 @@ impl RcpError {
     /// `REQUEST_REJECTED` = 11, `POCI_FAILURE` = 12,
     /// `PRESENTATION_TIME_TOO_FAR` = 13, `GPTP_FAIL` = 14,
     /// `INVALID_PARAMETER` = 15, `CHAIN_ABORTED` = 16, `CHAIN_ERROR` = 17.
+    //fusa:req REQ-ERR-021
+    //fusa:req REQ-ERR-022
     pub fn tc18_wire_code(&self) -> Option<u8> {
         match self {
             Self::UnsupportedCmd => Some(1),
@@ -612,7 +614,7 @@ mod tests {
     // ── Error sentinels ───────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-ERR-001
+    //fusa:test REQ-ERR-001
     fn err_closed_is_distinct() {
         // Non-nil equivalent: it's a valid discriminant value
         let e = RcpError::Closed;
@@ -620,35 +622,35 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ERR-002
+    //fusa:test REQ-ERR-002
     fn err_not_found_is_distinct() {
         let e = RcpError::NotFound;
         assert!(e.is_relay_not_connected());
     }
 
     #[test]
-    // fusa:test REQ-ERR-003
+    //fusa:test REQ-ERR-003
     fn err_already_exists_is_distinct() {
         let e = RcpError::AlreadyExists;
         assert!(e.is_already_exists());
     }
 
     #[test]
-    // fusa:test REQ-ERR-004
+    //fusa:test REQ-ERR-004
     fn err_timeout_is_distinct() {
         let e = RcpError::Timeout;
         assert!(e.is_relay_timeout());
     }
 
     #[test]
-    // fusa:test REQ-ERR-005
+    //fusa:test REQ-ERR-005
     fn err_busy_is_distinct() {
         let e = RcpError::Busy;
         assert!(e.is_relay_timeout());
     }
 
     #[test]
-    // fusa:test REQ-ERR-006
+    //fusa:test REQ-ERR-006
     fn all_sentinels_are_mutually_distinct() {
         let sentinels = [
             RcpError::Closed,
@@ -665,8 +667,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ERR-007
-    // fusa:test REQ-ERR-014
+    //fusa:test REQ-ERR-007
+    //fusa:test REQ-ERR-014
     fn err_closed_is_relay_closed() {
         assert!(RcpError::Closed.is_relay_closed());
         assert!(!RcpError::Timeout.is_relay_closed());
@@ -674,7 +676,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ERR-008
+    //fusa:test REQ-ERR-008
     fn err_not_found_is_relay_not_connected() {
         assert!(RcpError::NotConnected.is_relay_not_connected());
         assert!(RcpError::NotFound.is_relay_not_connected());
@@ -683,8 +685,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ERR-009
-    // fusa:test REQ-ERR-019
+    //fusa:test REQ-ERR-009
+    //fusa:test REQ-ERR-019
     fn err_already_exists_is_standalone() {
         assert!(RcpError::AlreadyExists.is_already_exists());
         assert!(!RcpError::AlreadyExists.is_relay_closed());
@@ -693,8 +695,8 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ERR-010
-    // fusa:test REQ-ERR-020
+    //fusa:test REQ-ERR-010
+    //fusa:test REQ-ERR-020
     fn err_busy_wraps_timeout() {
         assert!(RcpError::Busy.is_relay_timeout());
         assert!(RcpError::Timeout.is_relay_timeout());
@@ -702,22 +704,22 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ERR-012
-    // fusa:test REQ-ERR-015
+    //fusa:test REQ-ERR-012
+    //fusa:test REQ-ERR-015
     fn err_not_connected_is_relay_not_connected() {
         assert!(RcpError::NotConnected.is_relay_not_connected());
     }
 
     #[test]
-    // fusa:test REQ-ERR-013
-    // fusa:test REQ-ERR-017
+    //fusa:test REQ-ERR-013
+    //fusa:test REQ-ERR-017
     fn err_payload_too_large_is_relay_payload_too_large() {
         assert!(RcpError::PayloadTooLarge.is_relay_payload_too_large());
         assert!(!RcpError::Closed.is_relay_payload_too_large());
     }
 
     #[test]
-    // fusa:test REQ-ERR-016
+    //fusa:test REQ-ERR-016
     fn err_timeout_is_relay_timeout() {
         assert!(RcpError::Timeout.is_relay_timeout());
     }
@@ -725,73 +727,73 @@ mod tests {
     // ── TC18 RCP spec error codes (Milestone 2 "Error Model") ────────────────
 
     #[test]
-    // fusa:test REQ-ERRM-001
+    //fusa:test REQ-ERRM-001
     fn err_unsupported_cmd_is_tc18_error_code() {
         assert!(RcpError::UnsupportedCmd.is_tc18_error_code());
     }
 
     #[test]
-    // fusa:test REQ-ERRM-002
+    //fusa:test REQ-ERRM-002
     fn err_sequencer_not_known_is_tc18_error_code() {
         assert!(RcpError::SequencerNotKnown.is_tc18_error_code());
     }
 
     #[test]
-    // fusa:test REQ-ERRM-003
+    //fusa:test REQ-ERRM-003
     fn err_unauthorized_access_is_tc18_error_code() {
         assert!(RcpError::UnauthorizedAccess.is_tc18_error_code());
     }
 
     #[test]
-    // fusa:test REQ-ERRM-004
+    //fusa:test REQ-ERRM-004
     fn err_locked_mem_access_is_tc18_error_code() {
         assert!(RcpError::LockedMemAccess.is_tc18_error_code());
     }
 
     #[test]
-    // fusa:test REQ-ERRM-005
+    //fusa:test REQ-ERRM-005
     fn err_request_canceled_is_tc18_error_code() {
         assert!(RcpError::RequestCanceled.is_tc18_error_code());
     }
 
     #[test]
-    // fusa:test REQ-ERRM-006
+    //fusa:test REQ-ERRM-006
     fn err_request_not_found_is_tc18_error_code() {
         assert!(RcpError::RequestNotFound.is_tc18_error_code());
     }
 
     #[test]
-    // fusa:test REQ-ERRM-007
+    //fusa:test REQ-ERRM-007
     fn err_ep_error_is_tc18_error_code() {
         assert!(RcpError::EpError.is_tc18_error_code());
     }
 
     #[test]
-    // fusa:test REQ-ERRM-008
+    //fusa:test REQ-ERRM-008
     fn err_ep_not_found_is_tc18_error_code() {
         assert!(RcpError::EpNotFound.is_tc18_error_code());
     }
 
     #[test]
-    // fusa:test REQ-ERRM-009
+    //fusa:test REQ-ERRM-009
     fn err_req_storage_ovfl_is_tc18_error_code() {
         assert!(RcpError::ReqStorageOvfl.is_tc18_error_code());
     }
 
     #[test]
-    // fusa:test REQ-ERRM-010
+    //fusa:test REQ-ERRM-010
     fn err_request_rejected_is_tc18_error_code() {
         assert!(RcpError::RequestRejected.is_tc18_error_code());
     }
 
     #[test]
-    // fusa:test REQ-ERRM-011
+    //fusa:test REQ-ERRM-011
     fn err_invalid_parameter_is_tc18_error_code() {
         assert!(RcpError::InvalidParameter.is_tc18_error_code());
     }
 
     #[test]
-    // fusa:test REQ-ERRM-012
+    //fusa:test REQ-ERRM-012
     fn tc18_error_codes_are_mutually_distinct_and_exclusive() {
         let codes = [
             RcpError::UnsupportedCmd,
@@ -821,6 +823,7 @@ mod tests {
     }
 
     #[test]
+    //fusa:test REQ-ERR-021
     fn tc18_wire_code_covers_all_seventeen_table_27_codes_with_distinct_values() {
         // rust-RCP-W05.
         let codes = [
@@ -853,6 +856,7 @@ mod tests {
     }
 
     #[test]
+    //fusa:test REQ-ERR-022
     fn tc18_wire_code_is_none_for_non_table_27_variants() {
         // rust-RCP-W05: RELAY sentinels, general-purpose, and wire/E2E
         // variants have no Table 27 counterpart.
@@ -874,7 +878,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-ERRM-013
+    //fusa:test REQ-ERRM-013
     fn tc18_error_code_messages_carry_spec_name() {
         assert!(RcpError::UnsupportedCmd
             .to_string()
@@ -910,13 +914,13 @@ mod tests {
     // ── Spec version ──────────────────────────────────────────────────────────
 
     #[test]
-    // fusa:test REQ-SPEC-001
+    //fusa:test REQ-SPEC-001
     fn spec_version_nonempty() {
         assert!(!SPEC_VERSION.is_empty());
     }
 
     #[test]
-    // fusa:test REQ-SPEC-001
+    //fusa:test REQ-SPEC-001
     fn relay_spec_version_is_exported_and_matches_spec_version() {
         assert!(!RELAY_SPEC_VERSION.is_empty());
         assert_eq!(RELAY_SPEC_VERSION, SPEC_VERSION);

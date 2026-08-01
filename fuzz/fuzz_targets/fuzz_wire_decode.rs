@@ -15,8 +15,8 @@ use libfuzzer_sys::fuzz_target;
 // into both ACF decoders. Each call is `let _ = ...;`: the only failure
 // mode under test is a panic inside the crate's own decode logic.
 fuzz_target!(|data: &[u8]| {
-    // fusa:req REQ-WIRE-008
-    // fusa:req REQ-WIRE-009
+    //fusa:req REQ-WIRE-008
+    //fusa:req REQ-WIRE-009
     if let Ok((_hdr, payload)) = rcp::avtp::decode_ntscf_frame(data) {
         let _ = rcp::acf::decode_acf_abb(payload);
         let _ = rcp::acf::decode_acf_gbb(payload);

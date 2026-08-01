@@ -1,4 +1,4 @@
-// fusa:req REQ-RELAY-009
+//fusa:req REQ-RELAY-009
 
 //! Serde helper: serialize `Vec<u8>` as a base64 string per RELAY spec §15.1.
 //!
@@ -47,7 +47,7 @@ mod tests {
     }
 
     #[test]
-    // fusa:test REQ-RELAY-009
+    //fusa:test REQ-RELAY-009
     fn base64_round_trip() {
         let w = Wrapper {
             data: vec![0xDE, 0xAD, 0xBE, 0xEF],
