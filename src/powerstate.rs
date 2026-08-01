@@ -25,18 +25,22 @@
 //!
 //! - [`PowerMode`] — the four power modes themselves: [`PowerMode::Normal`],
 //!   [`PowerMode::StandBy`], [`PowerMode::Sleep`], and
-//!   [`PowerMode::Unpowered`]. See "Provenance note: mode ordering and
-//!   `Unpowered`'s software-model semantics" below for how this crate reads
-//!   the four names' own relative depth and for what `Unpowered` can and
-//!   cannot mean for a running software model.
+//!   [`PowerMode::Unpowered`], each as TC18 v0.5.1_RC §12.4 defines it. See
+//!   "Mode reachability, per TC18 §12.4 Figure 17" below for which modes
+//!   are reachable from which, and "Provenance note: `Unpowered`'s
+//!   software-model semantics" for what `Unpowered` can and cannot mean for
+//!   a running software model.
 //! - [`is_power_mode_transition_defined`] — the coarse, state-shape check
 //!   (mirroring [`crate::lifecycle::is_transition_defined`]'s own role)
-//!   naming exactly which powered-mode pairs this module implements a
-//!   transition between: `Normal` <-> `StandBy` and `StandBy` <-> `Sleep`.
-//!   `Unpowered` is deliberately excluded from this check — see
-//!   [`shutdown_to_unpowered`] and the cold/hot-start functions below for
-//!   why entering or leaving `Unpowered` is never a member of this
-//!   ordinary, gated transition set.
+//!   naming exactly which powered-mode pairs this module implements an
+//!   *ordinary* (non-start-up) transition between: the two "Go to" edges of
+//!   the specification's own state diagram, `Normal` -> `StandBy` and
+//!   `Normal` -> `Sleep`. The two reverse edges are start-up paths with
+//!   their own extra gating and their own functions ([`try_hot_start`] for
+//!   `StandBy` -> `Normal`, [`try_cold_start`] for `Sleep` -> `Normal`), so
+//!   they are deliberately not members of this ordinary set. `Unpowered` is
+//!   likewise excluded — see [`shutdown_to_unpowered`] and the
+//!   cold/hot-start functions below.
 //! - [`PowerModeGateInput`] / [`is_power_mode_gate_satisfied`] — the
 //!   shared entry/exit precondition `ROADMAP.md`'s own checklist wording
 //!   names as the reason this item is sequenced into Milestone 6 at all:
@@ -57,21 +61,28 @@
 //!   [`crate::lifecycle::RcServerState::try_transition`]'s own
 //!   unconditional `HW_CONFIGURED` -> `HW_UNCONFIGURED` demotion path.
 //! - [`StartupPath`] / [`try_cold_start`] / [`try_hot_start`] — the two
-//!   distinct startup paths this checklist bullet names by name:
+//!   distinct start-up types the specification defines by name (TC18
+//!   v0.5.1_RC §12.4.1 "Power-On / Wake-Up / Start-Up behavior", p.46:
+//!   "There are two types of start-up: a cold start (after power-on or
+//!   wake-up from sleep) and a hot start (=wake-up from StandBy)").
 //!   [`try_cold_start`] (`StartupPath::Cold`) is the plain, no-handshake
-//!   `Unpowered` -> `Normal` path; [`try_hot_start`] (`StartupPath::Hot`)
-//!   is the `Sleep` -> `Normal` path, additionally gated by the
-//!   hot-start-from-Sleep WakeUp handshake below reaching completion.
+//!   path admitting **both** documented cold-start origins, `Unpowered` ->
+//!   `Normal` and `Sleep` -> `Normal`; [`try_hot_start`]
+//!   (`StartupPath::Hot`) is the `StandBy` -> `Normal` path, additionally
+//!   gated by the hot-start WakeUp handshake below reaching completion.
 //!   Both remain further gated by [`is_power_mode_gate_satisfied`], the
 //!   same shared precondition [`try_enter_power_mode`] uses.
 //! - [`WakeUpHandshakeState`] / [`send_wakeup_request`] /
 //!   [`acknowledge_wakeup_request`] / [`is_wakeup_handshake_complete`] —
-//!   the hot-start-from-Sleep WakeUp handshake itself, modeled as a real
-//!   two-step message exchange (`Idle` -> `RequestSent` ->
-//!   `Acknowledged`) rather than a single flag flip, per this checklist
-//!   bullet's own explicit wording. See "Provenance note: the WakeUp
-//!   handshake's own wire encoding" below for why this stays an abstract
-//!   state machine rather than a concrete wire message.
+//!   the hot-start WakeUp handshake itself, modeled as a real two-step
+//!   message exchange (`Idle` -> `RequestSent` -> `Acknowledged`) rather
+//!   than a single flag flip. §12.4.1's "Hot-start-up procedure" is what
+//!   attaches this handshake to the hot-start path specifically: the RC
+//!   Server "will send ... a repetitive response ... with a WakeUp message
+//!   and the WakeUp source. The message will be repeated until a valid
+//!   AVTPDU from the sleep request Client is received." See "Provenance
+//!   note: the WakeUp handshake's own wire encoding" below for why this
+//!   stays an abstract state machine rather than a concrete wire message.
 //!
 //! Same "additive standalone plumbing only" discipline as every Milestone
 //! 1-6 entry in `src/request.rs`/`src/e2e.rs`/`src/watchdog.rs`: every item
@@ -80,23 +91,48 @@
 //! receives a real WakeUp message over any transport, or is called from a
 //! decoder, CLI, or dispatch loop.
 //!
-//! ## Provenance note: mode ordering and `Unpowered`'s software-model
-//! semantics
+//! ## Mode reachability, per TC18 §12.4 Figure 17
 //!
-//! `ROADMAP.md`'s checklist bullet names the four modes in the order
-//! "Normal / StandBy / Sleep / Unpowered" but does not itself state their
-//! relative depth or which pairs are directly reachable from which. Per
-//! Guiding Principle 5, this module's working interpretation — flagged
-//! here rather than asserted as spec fact — reads that ordering as
-//! increasing power-down depth: `Normal` (fully operational) shallower than
-//! `StandBy`, `StandBy` shallower than `Sleep`, `Sleep` shallower than
-//! `Unpowered`. [`is_power_mode_transition_defined`] only names the two
-//! adjacent, powered-mode pairs (`Normal`<->`StandBy`, `StandBy`<->`Sleep`)
-//! as ordinary transitions, and reserves the deepest hop, `Sleep` all the
-//! way back to `Normal`, for the dedicated hot-start path below — this
-//! module's own reading of why the checklist bullet calls out the
-//! "hot-start-**from-Sleep**" WakeUp handshake specifically, rather than a
-//! handshake generic to any powered mode.
+//! The set of transitions below is **not** an inference from the four mode
+//! names' relative "depth" — earlier revisions of this module read it that
+//! way, and got the cold/hot-start mapping exactly backwards as a result.
+//! TC18 v0.5.1_RC §12.4 "Power- and operation modes", Figure 17 "power and
+//! operation modes" (p.46) is a labelled state diagram that names every
+//! edge explicitly. It has exactly five, and this module implements exactly
+//! those five:
+//!
+//! | Edge | Figure 17 label | Implemented by |
+//! |------|-----------------|----------------|
+//! | `Unpowered` -> `Normal` | "Cold start" | [`try_cold_start`] |
+//! | `Sleep` -> `Normal`     | "Cold start" | [`try_cold_start`] |
+//! | `StandBy` -> `Normal`   | "Hot start"  | [`try_hot_start`] |
+//! | `Normal` -> `StandBy`   | "Go to StandBy" | [`try_enter_power_mode`] |
+//! | `Normal` -> `Sleep`     | "Go to Sleep"   | [`try_enter_power_mode`] |
+//!
+//! Two consequences worth stating, because both contradict what this file
+//! previously asserted:
+//!
+//! - **There is no `StandBy` <-> `Sleep` edge at all.** Figure 17 places
+//!   `Normal` and `StandBy` inside a "Powered" box and `Sleep` inside a
+//!   separate "Only part of PHY powered" box, with no arrow of any kind
+//!   between `StandBy` and `Sleep`. Both low-power modes are entered from,
+//!   and returned to, `Normal` only. `Sleep` is not "one step down from
+//!   `StandBy`"; the two are siblings.
+//! - **`Sleep` -> `Normal` is a cold start, not a hot start**, and it is
+//!   therefore *not* behind the WakeUp handshake. §12.4.1 states the
+//!   mapping in one sentence — "a cold start (after power-on or wake-up
+//!   from sleep) and a hot start (=wake-up from StandBy)" — and Figure 17's
+//!   arrow labels agree: the `Sleep` -> `Normal` arrow reads "Cold start"
+//!   and the `StandBy` -> `Normal` arrow reads "Hot start". This is
+//!   consistent with each mode's own §12.4 definition: `StandBy` "maintains
+//!   ... configuration data ... alive", so resuming from it needs no
+//!   reconfiguration (a hot start, §12.4.1: "In hot-start the configuration
+//!   does not need to be redone"), whereas `Sleep` is only defined as "the
+//!   mode with the lowest possible power c[on]sumptio[n] still being able
+//!   to be woken by a dedicated WakePin or the network interface" and
+//!   carries no such retention guarantee.
+//!
+//! ## Provenance note: `Unpowered`'s software-model semantics
 //!
 //! `Unpowered` itself cannot be a state a live RC Server process is
 //! actually running in — by definition, unpowered hardware runs no
@@ -159,12 +195,18 @@
 //!
 //! ## Provenance note: the WakeUp handshake's own wire encoding
 //!
-//! `ROADMAP.md`'s checklist bullet names a "hot-start-from-Sleep WakeUp
-//! message handshake" but the confidential OPEN Alliance TC18 Remote
-//! Control Protocol Specification v0.5.1_RC's exact wire encoding for that
-//! message (its ACF/AVTPDU framing, field layout, or byte values) is out of
-//! reach of this item per this crate's own licensing constraint against
-//! reproducing spec text. Per Guiding Principle 5, this module does not
+//! TC18 §12.4.1's "Hot-start-up procedure" describes this handshake's
+//! *behavior* — the RC Server sends a repetitive WakeUp response carrying
+//! the WakeUp source over the responder stream configured for the original
+//! standby request, repeating "until a valid AVTPDU from the sleep request
+//! Client is received" — but the specification gives no field diagram for
+//! the WakeUp message itself, so its exact wire encoding (ACF/AVTPDU
+//! framing, field layout, byte values) is not recoverable from that text.
+//! §12.4.1 also states two distinct wake-up sources ("an internal EP signal
+//! of the RC Server or the dedicated wakepin", versus "a TC14/TC10 wake-up
+//! request on the network"), which differ only in whether the network
+//! interface must be enabled first — a distinction with no bearing on
+//! handshake *progress*. Per Guiding Principle 5, this module does not
 //! guess one: [`WakeUpHandshakeState`] models the handshake's *progress* —
 //! a request sent, then acknowledged — as an abstract state machine a
 //! future transport-level item can drive from real decoded messages,
@@ -201,25 +243,35 @@ use crate::RcpError;
 /// The RC Server's power mode, per the real four-mode model this item
 /// replaces the legacy `Active`/`Sleep`/`Standby` model with.
 ///
-/// See this module's doc comment "Provenance note: mode ordering and
-/// `Unpowered`'s software-model semantics" for this crate's own working
-/// interpretation of the four variants' relative depth, and for what
+/// See this module's doc comment "Mode reachability, per TC18 §12.4
+/// Figure 17" for which variants are reachable from which, and
+/// "Provenance note: `Unpowered`'s software-model semantics" for what
 /// [`PowerMode::Unpowered`] can and cannot mean for a running process.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 // fusa:req REQ-PWR-001
 pub enum PowerMode {
-    /// Fully operational — every endpoint may be driven normally.
+    /// Fully operational — every endpoint may be driven normally. TC18
+    /// §12.4's "Powered" mode, in the lifecycle state the RC Server is
+    /// configured for. Figure 17 makes this the hub: it is the only mode
+    /// either low-power mode is entered from or returned to.
     Normal,
-    /// A shallow power-saving mode, one step down from `Normal`.
+    /// TC18 §12.4: "the mode in which the system maintains the lowest
+    /// possible power while keeping configuration data and functional wake
+    /// up sources alive." Because configuration survives, resuming from
+    /// here is the **hot start** — see [`try_hot_start`], which gates it
+    /// behind the WakeUp handshake.
     StandBy,
-    /// A deep power-saving mode, one step down from `StandBy`. Resuming
-    /// from this mode to `Normal` is the hot-start path this module
-    /// specifically gates behind the WakeUp handshake — see
-    /// [`try_hot_start`].
+    /// TC18 §12.4: "the mode with the lowest possible power c[on]sumptio[n]
+    /// still being able to be woken by a dedicated WakePin or the network
+    /// interface." Figure 17 places this outside the "Powered" box, in
+    /// "Only part of PHY powered". No configuration-retention guarantee is
+    /// stated, and §12.4.1 correspondingly classes wake-up from here as a
+    /// **cold start** — see [`try_cold_start`]. It is *not* one step below
+    /// [`PowerMode::StandBy`]: no edge joins the two.
     Sleep,
-    /// No power is applied to the RC Server hardware. See this module's
-    /// doc comment for the boundary this crate draws around what this
-    /// variant can mean for a live process.
+    /// TC18 §12.4: "the mode in which no sufficient power supply is
+    /// available." See this module's doc comment for the boundary this
+    /// crate draws around what this variant can mean for a live process.
     Unpowered,
 }
 
@@ -236,23 +288,32 @@ impl PowerMode {
     }
 }
 
-/// Whether `(from, to)` is one of the two adjacent, powered-mode pairs this
-/// module implements an ordinary transition between: `Normal` <->
-/// `StandBy` and `StandBy` <-> `Sleep`.
+/// Whether `(from, to)` is one of the two *ordinary* (non-start-up)
+/// transitions TC18 §12.4 Figure 17 defines: its "Go to StandBy" edge
+/// (`Normal` -> `StandBy`) and its "Go to Sleep" edge
+/// (`Normal` -> `Sleep`).
 ///
-/// Every other pair is `false`, including staying in the same mode, the
-/// direct `Normal` <-> `Sleep` hop (reserved for the dedicated hot-start
-/// path — see [`try_hot_start`]), and any pair naming
-/// [`PowerMode::Unpowered`] (reserved for [`shutdown_to_unpowered`] and
-/// [`try_cold_start`]). Never panics for any input.
+/// Every other pair is `false`. In particular:
+///
+/// - **`StandBy` <-> `Sleep` is `false` in both directions.** Figure 17 has
+///   no edge joining the two low-power modes; each is reached only from,
+///   and returns only to, `Normal`. (Earlier releases of this crate wrongly
+///   accepted this pair.)
+/// - The two reverse, wake-up directions — `StandBy` -> `Normal` and
+///   `Sleep` -> `Normal` — are `false` here because they are start-ups
+///   carrying extra preconditions, handled by [`try_hot_start`] and
+///   [`try_cold_start`] respectively rather than by
+///   [`try_enter_power_mode`].
+/// - Any pair naming [`PowerMode::Unpowered`] is `false` (reserved for
+///   [`shutdown_to_unpowered`] and [`try_cold_start`]), as is staying in
+///   the same mode.
+///
+/// Never panics for any input.
 // fusa:req REQ-PWR-002
 pub fn is_power_mode_transition_defined(from: PowerMode, to: PowerMode) -> bool {
     matches!(
         (from, to),
-        (PowerMode::Normal, PowerMode::StandBy)
-            | (PowerMode::StandBy, PowerMode::Normal)
-            | (PowerMode::StandBy, PowerMode::Sleep)
-            | (PowerMode::Sleep, PowerMode::StandBy)
+        (PowerMode::Normal, PowerMode::StandBy) | (PowerMode::Normal, PowerMode::Sleep)
     )
 }
 
@@ -345,29 +406,42 @@ pub fn shutdown_to_unpowered(_from: PowerMode) -> PowerMode {
 
 // ── StartupPath / cold and hot start ─────────────────────────────────────────
 
-/// The two distinct startup paths this checklist bullet names by name.
+/// The two start-up types TC18 §12.4.1 names: "There are two types of
+/// start-up: a cold start (after power-on or wake-up from sleep) and a hot
+/// start (=wake-up from StandBy)."
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StartupPath {
-    /// Powering up from [`PowerMode::Unpowered`] with no prior session to
-    /// resume. See [`try_cold_start`].
+    /// Powering up from [`PowerMode::Unpowered`], or waking from
+    /// [`PowerMode::Sleep`] — §12.4.1's "after power-on **or wake-up from
+    /// sleep**". Neither origin guarantees retained configuration, so after
+    /// either the RC Server comes up "in its configured lifecycle state",
+    /// possibly needing further configuration. See [`try_cold_start`].
     Cold,
-    /// Resuming from [`PowerMode::Sleep`]. See [`try_hot_start`] for the
-    /// additional WakeUp-handshake gate this path alone requires.
+    /// Waking from [`PowerMode::StandBy`] — §12.4.1's "=wake-up from
+    /// StandBy", where "the configuration does not need to be redone, as it
+    /// shall be maintained during low-power mode". See [`try_hot_start`]
+    /// for the additional WakeUp-handshake gate this path alone requires.
     Hot,
 }
 
-/// Attempt cold start: [`PowerMode::Unpowered`] -> [`PowerMode::Normal`],
-/// with no WakeUp handshake involved.
+/// Attempt cold start, with no WakeUp handshake involved.
 ///
-/// Returns `Ok(PowerMode::Normal)` when `from` is
-/// [`PowerMode::Unpowered`] and `gate` satisfies
-/// [`is_power_mode_gate_satisfied`]. Returns
-/// `Err(RcpError::RequestRejected)` when `from` is any other mode, or when
-/// it is [`PowerMode::Unpowered`] but `gate` is not yet satisfied. Never
-/// panics for any input.
+/// TC18 §12.4.1 gives the cold start **two** origins — "a cold start (after
+/// power-on or wake-up from sleep)" — and Figure 17 draws both as arrows
+/// labelled "Cold start". Both are accepted here:
+///
+/// - [`PowerMode::Unpowered`] -> [`PowerMode::Normal`] (power-on)
+/// - [`PowerMode::Sleep`] -> [`PowerMode::Normal`] (wake-up from sleep)
+///
+/// Returns `Ok(PowerMode::Normal)` when `from` is either of those and
+/// `gate` satisfies [`is_power_mode_gate_satisfied`]. Returns
+/// `Err(RcpError::RequestRejected)` when `from` is [`PowerMode::Normal`]
+/// (already started) or [`PowerMode::StandBy`] (whose resume is the hot
+/// start — see [`try_hot_start`]), or when the origin is valid but `gate`
+/// is not yet satisfied. Never panics for any input.
 // fusa:req REQ-PWRSTART-001
 pub fn try_cold_start(from: PowerMode, gate: PowerModeGateInput) -> Result<PowerMode, RcpError> {
-    if from != PowerMode::Unpowered {
+    if !matches!(from, PowerMode::Unpowered | PowerMode::Sleep) {
         return Err(RcpError::RequestRejected);
     }
     if !is_power_mode_gate_satisfied(gate) {
@@ -376,11 +450,19 @@ pub fn try_cold_start(from: PowerMode, gate: PowerModeGateInput) -> Result<Power
     Ok(PowerMode::Normal)
 }
 
-/// Attempt hot start: [`PowerMode::Sleep`] -> [`PowerMode::Normal`], gated
-/// by both a completed WakeUp handshake and the shared idle/no-pending-
-/// response precondition.
+/// Attempt hot start: [`PowerMode::StandBy`] -> [`PowerMode::Normal`],
+/// gated by both a completed WakeUp handshake and the shared idle/no-
+/// pending-response precondition.
 ///
-/// Returns `Ok(PowerMode::Normal)` when `from` is [`PowerMode::Sleep`],
+/// TC18 §12.4.1 defines the hot start as exactly one origin — "a hot start
+/// (=wake-up from StandBy)", drawn in Figure 17 as the single arrow
+/// labelled "Hot start" — and it is that section's "Hot-start-up procedure"
+/// that specifies the repeated WakeUp message awaiting "a valid AVTPDU from
+/// the sleep request Client", which [`WakeUpHandshakeState`] models. The
+/// handshake therefore gates *this* path, not the `Sleep` -> `Normal` cold
+/// start. (Earlier releases of this crate had the two origins swapped.)
+///
+/// Returns `Ok(PowerMode::Normal)` when `from` is [`PowerMode::StandBy`],
 /// `wakeup` has reached [`WakeUpHandshakeState::Acknowledged`] (see
 /// [`is_wakeup_handshake_complete`]), and `gate` satisfies
 /// [`is_power_mode_gate_satisfied`]. Returns
@@ -392,7 +474,7 @@ pub fn try_hot_start(
     wakeup: WakeUpHandshakeState,
     gate: PowerModeGateInput,
 ) -> Result<PowerMode, RcpError> {
-    if from != PowerMode::Sleep {
+    if from != PowerMode::StandBy {
         return Err(RcpError::RequestRejected);
     }
     if !is_wakeup_handshake_complete(wakeup) {
@@ -406,10 +488,12 @@ pub fn try_hot_start(
 
 // ── WakeUp handshake ──────────────────────────────────────────────────────────
 
-/// The hot-start-from-Sleep WakeUp handshake's own progress, modeled as a
+/// The hot-start-from-StandBy WakeUp handshake's own progress, modeled as a
 /// real two-step message exchange rather than a single flag flip: a
 /// WakeUp request must be sent and then acknowledged before
-/// [`try_hot_start`] will admit `Normal`.
+/// [`try_hot_start`] will admit `Normal`. Per TC18 §12.4.1's "Hot-start-up
+/// procedure", `Acknowledged` corresponds to that section's terminating
+/// condition, "a valid AVTPDU from the sleep request Client is received".
 ///
 /// See this module's doc comment "Provenance note: the WakeUp handshake's
 /// own wire encoding" for why this stays an abstract progress marker
@@ -527,33 +611,49 @@ mod tests {
 
     // ── is_power_mode_transition_defined ─────────────────────────────────
 
+    /// TC18 §12.4 Figure 17's two "Go to ..." edges, the only ordinary
+    /// (non-start-up) transitions the diagram draws. Both leave `Normal`.
     #[test]
     // fusa:test REQ-PWR-002
-    fn adjacent_powered_pairs_are_defined_both_directions() {
+    fn figure_17_go_to_edges_are_the_ordinary_transitions() {
+        // "Go to StandBy"
         assert!(is_power_mode_transition_defined(
             PowerMode::Normal,
             PowerMode::StandBy
         ));
+        // "Go to Sleep"
         assert!(is_power_mode_transition_defined(
-            PowerMode::StandBy,
-            PowerMode::Normal
+            PowerMode::Normal,
+            PowerMode::Sleep
         ));
-        assert!(is_power_mode_transition_defined(
+    }
+
+    /// Figure 17 draws no arrow of any kind between `StandBy` and `Sleep`:
+    /// they sit in different boxes ("Powered" vs "Only part of PHY
+    /// powered") and are reached only via `Normal`. Releases before
+    /// v5.0.0 wrongly accepted this pair in both directions.
+    #[test]
+    // fusa:test REQ-PWR-002
+    fn standby_sleep_pair_is_not_a_transition_in_either_direction() {
+        assert!(!is_power_mode_transition_defined(
             PowerMode::StandBy,
             PowerMode::Sleep
         ));
-        assert!(is_power_mode_transition_defined(
+        assert!(!is_power_mode_transition_defined(
             PowerMode::Sleep,
             PowerMode::StandBy
         ));
     }
 
+    /// Figure 17's two wake-up edges back to `Normal` are start-ups with
+    /// their own extra preconditions, so they are not members of the
+    /// ordinary set — [`try_hot_start`] and [`try_cold_start`] own them.
     #[test]
     // fusa:test REQ-PWR-002
-    fn direct_normal_sleep_hop_is_not_an_ordinary_transition() {
+    fn wakeup_edges_back_to_normal_are_not_ordinary_transitions() {
         assert!(!is_power_mode_transition_defined(
-            PowerMode::Normal,
-            PowerMode::Sleep
+            PowerMode::StandBy,
+            PowerMode::Normal
         ));
         assert!(!is_power_mode_transition_defined(
             PowerMode::Sleep,
@@ -576,6 +676,25 @@ mod tests {
         for &m in &ALL_MODES {
             assert!(!is_power_mode_transition_defined(m, m));
         }
+    }
+
+    /// Exhaustive cross-product: exactly the two Figure 17 "Go to" edges,
+    /// and nothing else, out of all 16 ordered pairs.
+    #[test]
+    // fusa:test REQ-PWR-002
+    fn exactly_two_ordered_pairs_are_defined() {
+        let defined: Vec<(PowerMode, PowerMode)> = ALL_MODES
+            .iter()
+            .flat_map(|&a| ALL_MODES.iter().map(move |&b| (a, b)))
+            .filter(|&(a, b)| is_power_mode_transition_defined(a, b))
+            .collect();
+        assert_eq!(
+            defined,
+            vec![
+                (PowerMode::Normal, PowerMode::StandBy),
+                (PowerMode::Normal, PowerMode::Sleep),
+            ]
+        );
     }
 
     // ── PowerModeGateInput / is_power_mode_gate_satisfied ────────────────
@@ -648,7 +767,7 @@ mod tests {
             Ok(PowerMode::StandBy)
         );
         assert_eq!(
-            try_enter_power_mode(PowerMode::StandBy, PowerMode::Sleep, gate),
+            try_enter_power_mode(PowerMode::Normal, PowerMode::Sleep, gate),
             Ok(PowerMode::Sleep)
         );
     }
@@ -660,8 +779,14 @@ mod tests {
             all_endpoints_idle: true,
             no_pending_response: true,
         };
+        // No Figure 17 edge joins the two low-power modes.
         assert_eq!(
-            try_enter_power_mode(PowerMode::Normal, PowerMode::Sleep, gate),
+            try_enter_power_mode(PowerMode::StandBy, PowerMode::Sleep, gate),
+            Err(RcpError::RequestRejected)
+        );
+        // Wake-up edges belong to the start-up functions, not here.
+        assert_eq!(
+            try_enter_power_mode(PowerMode::StandBy, PowerMode::Normal, gate),
             Err(RcpError::RequestRejected)
         );
         assert_eq!(
@@ -704,27 +829,58 @@ mod tests {
 
     // ── try_cold_start ────────────────────────────────────────────────────
 
+    /// TC18 §12.4.1: "a cold start (after power-on **or wake-up from
+    /// sleep**)". Both origins, and Figure 17 labels both arrows
+    /// "Cold start". Releases before v5.0.0 accepted only `Unpowered`.
     #[test]
     // fusa:test REQ-PWRSTART-001
-    fn cold_start_succeeds_from_unpowered_when_gated() {
+    fn cold_start_succeeds_from_both_documented_origins_when_gated() {
         let gate = PowerModeGateInput {
             all_endpoints_idle: true,
             no_pending_response: true,
         };
+        // "after power-on"
         assert_eq!(
             try_cold_start(PowerMode::Unpowered, gate),
             Ok(PowerMode::Normal)
         );
+        // "or wake-up from sleep"
+        assert_eq!(
+            try_cold_start(PowerMode::Sleep, gate),
+            Ok(PowerMode::Normal)
+        );
     }
 
+    /// `Sleep` -> `Normal` is a cold start, so it takes no WakeUp
+    /// handshake: §12.4.1 attaches the handshake to the "Hot-start-up
+    /// procedure" only. Releases before v5.0.0 gated this path behind the
+    /// handshake, blocking every wake-from-sleep that had not run one.
     #[test]
     // fusa:test REQ-PWRSTART-001
-    fn cold_start_rejected_from_a_powered_mode() {
+    fn cold_start_from_sleep_needs_no_wakeup_handshake() {
         let gate = PowerModeGateInput {
             all_endpoints_idle: true,
             no_pending_response: true,
         };
-        for &m in &[PowerMode::Normal, PowerMode::StandBy, PowerMode::Sleep] {
+        // The handshake state is not even an argument to try_cold_start;
+        // an origin in Sleep with the handshake still Idle must succeed.
+        assert!(!is_wakeup_handshake_complete(WakeUpHandshakeState::Idle));
+        assert_eq!(
+            try_cold_start(PowerMode::Sleep, gate),
+            Ok(PowerMode::Normal)
+        );
+    }
+
+    /// `StandBy` is the hot-start origin, not a cold-start one, and
+    /// `Normal` is already started.
+    #[test]
+    // fusa:test REQ-PWRSTART-001
+    fn cold_start_rejected_from_normal_and_standby() {
+        let gate = PowerModeGateInput {
+            all_endpoints_idle: true,
+            no_pending_response: true,
+        };
+        for &m in &[PowerMode::Normal, PowerMode::StandBy] {
             assert_eq!(try_cold_start(m, gate), Err(RcpError::RequestRejected));
         }
     }
@@ -733,35 +889,40 @@ mod tests {
     // fusa:test REQ-PWRSTART-001
     fn cold_start_rejected_when_not_gated() {
         let gate = PowerModeGateInput::default();
-        assert_eq!(
-            try_cold_start(PowerMode::Unpowered, gate),
-            Err(RcpError::RequestRejected)
-        );
+        for &m in &[PowerMode::Unpowered, PowerMode::Sleep] {
+            assert_eq!(try_cold_start(m, gate), Err(RcpError::RequestRejected));
+        }
     }
 
     // ── try_hot_start ─────────────────────────────────────────────────────
 
+    /// TC18 §12.4.1: "a hot start (=wake-up from StandBy)", Figure 17's
+    /// single "Hot start" arrow. Releases before v5.0.0 had this origin
+    /// as `Sleep`.
     #[test]
     // fusa:test REQ-PWRSTART-002
-    fn hot_start_succeeds_from_sleep_when_acknowledged_and_gated() {
+    fn hot_start_succeeds_from_standby_when_acknowledged_and_gated() {
         let gate = PowerModeGateInput {
             all_endpoints_idle: true,
             no_pending_response: true,
         };
         assert_eq!(
-            try_hot_start(PowerMode::Sleep, WakeUpHandshakeState::Acknowledged, gate),
+            try_hot_start(PowerMode::StandBy, WakeUpHandshakeState::Acknowledged, gate),
             Ok(PowerMode::Normal)
         );
     }
 
     #[test]
     // fusa:test REQ-PWRSTART-002
-    fn hot_start_rejected_from_a_non_sleep_mode() {
+    fn hot_start_rejected_from_every_non_standby_mode() {
         let gate = PowerModeGateInput {
             all_endpoints_idle: true,
             no_pending_response: true,
         };
-        for &m in &[PowerMode::Normal, PowerMode::StandBy, PowerMode::Unpowered] {
+        // Sleep in particular: that origin is a cold start (§12.4.1), so
+        // routing it through the hot-start path must be rejected even with
+        // a fully acknowledged handshake.
+        for &m in &[PowerMode::Normal, PowerMode::Sleep, PowerMode::Unpowered] {
             assert_eq!(
                 try_hot_start(m, WakeUpHandshakeState::Acknowledged, gate),
                 Err(RcpError::RequestRejected)
@@ -781,7 +942,7 @@ mod tests {
             WakeUpHandshakeState::RequestSent,
         ] {
             assert_eq!(
-                try_hot_start(PowerMode::Sleep, state, gate),
+                try_hot_start(PowerMode::StandBy, state, gate),
                 Err(RcpError::RequestRejected)
             );
         }
@@ -792,9 +953,34 @@ mod tests {
     fn hot_start_rejected_when_not_gated() {
         let gate = PowerModeGateInput::default();
         assert_eq!(
-            try_hot_start(PowerMode::Sleep, WakeUpHandshakeState::Acknowledged, gate),
+            try_hot_start(PowerMode::StandBy, WakeUpHandshakeState::Acknowledged, gate),
             Err(RcpError::RequestRejected)
         );
+    }
+
+    /// Cross-cutting: the cold- and hot-start origin sets are disjoint and
+    /// together cover exactly the three non-`Normal` modes, matching
+    /// Figure 17's three inbound arrows to `Normal`.
+    #[test]
+    // fusa:test REQ-PWRSTART-002
+    fn cold_and_hot_start_origins_partition_the_three_inbound_edges() {
+        let gate = PowerModeGateInput {
+            all_endpoints_idle: true,
+            no_pending_response: true,
+        };
+        let cold: Vec<PowerMode> = ALL_MODES
+            .iter()
+            .copied()
+            .filter(|&m| try_cold_start(m, gate).is_ok())
+            .collect();
+        let hot: Vec<PowerMode> = ALL_MODES
+            .iter()
+            .copied()
+            .filter(|&m| try_hot_start(m, WakeUpHandshakeState::Acknowledged, gate).is_ok())
+            .collect();
+        assert_eq!(cold, vec![PowerMode::Sleep, PowerMode::Unpowered]);
+        assert_eq!(hot, vec![PowerMode::StandBy]);
+        assert!(cold.iter().all(|m| !hot.contains(m)));
     }
 
     // ── WakeUpHandshakeState progression ──────────────────────────────────

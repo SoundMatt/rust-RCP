@@ -2768,26 +2768,36 @@ impl core::panic::unwind_safe::RefUnwindSafe for rcp::regmap::PerEpTypeFunctiona
 impl core::panic::unwind_safe::UnwindSafe for rcp::regmap::PerEpTypeFunctionalConfig
 pub struct rcp::regmap::RequestStreamConfigEntry
 pub rcp::regmap::RequestStreamConfigEntry::rx_ack_stream_index: u8
-pub rcp::regmap::RequestStreamConfigEntry::rx_enforce_e2e: u8
-pub rcp::regmap::RequestStreamConfigEntry::rx_enforce_seq: u8
-pub rcp::regmap::RequestStreamConfigEntry::rx_ovrflw_safestate_enable: u8
+pub rcp::regmap::RequestStreamConfigEntry::rx_enforce_e2e: bool
+pub rcp::regmap::RequestStreamConfigEntry::rx_enforce_seq: bool
+pub rcp::regmap::RequestStreamConfigEntry::rx_ovrflw_safestate_enable: bool
 pub rcp::regmap::RequestStreamConfigEntry::rx_resp_stream_index: u8
 pub rcp::regmap::RequestStreamConfigEntry::rx_safe_sequencer_state: u8
 pub rcp::regmap::RequestStreamConfigEntry::rx_safestate_sequencer: u8
-pub rcp::regmap::RequestStreamConfigEntry::rx_safety_measure: u8
+pub rcp::regmap::RequestStreamConfigEntry::rx_safety_measure: bool
 pub rcp::regmap::RequestStreamConfigEntry::rx_secure_channel_index: u8
-pub rcp::regmap::RequestStreamConfigEntry::rx_seq_safestate_enable: u8
+pub rcp::regmap::RequestStreamConfigEntry::rx_seq_safestate_enable: bool
 pub rcp::regmap::RequestStreamConfigEntry::rx_stream_id: u64
 pub rcp::regmap::RequestStreamConfigEntry::rx_stream_max_request_size: u16
-pub rcp::regmap::RequestStreamConfigEntry::rx_wd_enable: u8
-pub rcp::regmap::RequestStreamConfigEntry::rx_wd_info_enable: u8
-pub rcp::regmap::RequestStreamConfigEntry::rx_wd_safestate_enable: u8
+pub rcp::regmap::RequestStreamConfigEntry::rx_wd_enable: bool
+pub rcp::regmap::RequestStreamConfigEntry::rx_wd_info_enable: bool
+pub rcp::regmap::RequestStreamConfigEntry::rx_wd_safestate_enable: bool
 pub rcp::regmap::RequestStreamConfigEntry::rx_wd_timeout_interval: u16
 impl rcp::regmap::RequestStreamConfigEntry
 pub const rcp::regmap::RequestStreamConfigEntry::CATEGORY: rcp::lifecycle::RegisterCategory
 pub const rcp::regmap::RequestStreamConfigEntry::ENCODED_LEN: usize
+pub const rcp::regmap::RequestStreamConfigEntry::FLAGS_OFFSET: usize
+pub const rcp::regmap::RequestStreamConfigEntry::FLAG_ENFORCE_E2E: u8
+pub const rcp::regmap::RequestStreamConfigEntry::FLAG_ENFORCE_SEQ: u8
+pub const rcp::regmap::RequestStreamConfigEntry::FLAG_OVRFLW_SAFESTATE_ENABLE: u8
+pub const rcp::regmap::RequestStreamConfigEntry::FLAG_SAFETY_MEASURE: u8
+pub const rcp::regmap::RequestStreamConfigEntry::FLAG_SEQ_SAFESTATE_ENABLE: u8
+pub const rcp::regmap::RequestStreamConfigEntry::FLAG_WD_ENABLE: u8
+pub const rcp::regmap::RequestStreamConfigEntry::FLAG_WD_INFO_ENABLE: u8
+pub const rcp::regmap::RequestStreamConfigEntry::FLAG_WD_SAFESTATE_ENABLE: u8
 pub fn rcp::regmap::RequestStreamConfigEntry::decode(&[u8]) -> core::result::Result<Self, rcp::RcpError>
-pub fn rcp::regmap::RequestStreamConfigEntry::encode(&self) -> [u8; 25]
+pub fn rcp::regmap::RequestStreamConfigEntry::encode(&self) -> [u8; 24]
+pub fn rcp::regmap::RequestStreamConfigEntry::flags_byte(&self) -> u8
 impl core::clone::Clone for rcp::regmap::RequestStreamConfigEntry
 pub fn rcp::regmap::RequestStreamConfigEntry::clone(&self) -> rcp::regmap::RequestStreamConfigEntry
 impl core::cmp::Eq for rcp::regmap::RequestStreamConfigEntry
@@ -2852,12 +2862,13 @@ impl core::marker::UnsafeUnpin for rcp::regmap::ResponseStreamConfigEntry
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::regmap::ResponseStreamConfigEntry
 impl core::panic::unwind_safe::UnwindSafe for rcp::regmap::ResponseStreamConfigEntry
 pub struct rcp::regmap::SequencerStateEntry
+pub rcp::regmap::SequencerStateEntry::request_stream_index: u8
 pub rcp::regmap::SequencerStateEntry::seq_state: u8
 impl rcp::regmap::SequencerStateEntry
 pub const rcp::regmap::SequencerStateEntry::CATEGORY: rcp::lifecycle::RegisterCategory
 pub const rcp::regmap::SequencerStateEntry::ENCODED_LEN: usize
 pub fn rcp::regmap::SequencerStateEntry::decode(&[u8]) -> core::result::Result<Self, rcp::RcpError>
-pub fn rcp::regmap::SequencerStateEntry::encode(&self) -> [u8; 1]
+pub fn rcp::regmap::SequencerStateEntry::encode(&self) -> [u8; 2]
 pub fn rcp::regmap::SequencerStateEntry::power_on_default() -> Self
 impl core::clone::Clone for rcp::regmap::SequencerStateEntry
 pub fn rcp::regmap::SequencerStateEntry::clone(&self) -> rcp::regmap::SequencerStateEntry

@@ -7,6 +7,100 @@ OPEN Alliance TC18 core replacement; from `v1.0.0` on, each entry is a real
 release. See `docs/SEMVER.md` for the versioning scheme, including why a
 wire-format change is a MAJOR bump even when it is a fix.
 
+## v5.0.0 (2026-07-31 TC18-conformant power-mode model + register-map config tables) — closed
+
+**Breaking**, on the wire for three register-map config-table row types and
+behaviourally for the power-mode model. Four independently-confirmed
+findings, each verified against the specification's own tables and figures
+before being changed — and, where the layout question was one of bit
+packing or table structure that text extraction cannot settle, against a
+600/300 dpi render of the relevant page rather than extracted text.
+
+The register-map row types are not yet reachable from any live decode path
+(nothing in this crate performs register I/O against a real RC Server), so
+the interop urgency is lower than `v3.0.0`/`v4.0.0`; the power-mode finding
+is a real behavioural bug in code that is callable today.
+
+A common root cause runs through three of the four: this crate's own
+provenance notes asserted that the specification records these tables'
+field names and purpose "in prose" with "no explicit per-field bit-width or
+byte-offset table" and "no textual basis for a specific bit-position
+assignment". That was false — §12.7.7 Table 22, §12.7.8 Table 23 and
+§12.7.10 Table 25 each carry explicit "Relative address" and "Type"
+columns, and Table 22 additionally gives `0x000D.0`-`0x000D.7` bit
+addresses. The layouts built on that false scarcity were wrong, and the
+notes have been corrected rather than merely the code.
+
+A second contributing cause: every affected encoder's tests asserted only
+`decode(encode(x)) == x`. A round trip through one's own encoder cannot
+detect a wrong layout. Every fix below adds literal expected-byte vectors
+laid out by hand from the specification's address columns, chosen so that a
+transposition or a mis-sized row cannot pass.
+
+- **rust-RCP-P01 (BREAKING, ASIL-B):** the cold-/hot-start mapping in
+  `src/powerstate.rs` was inverted. §12.4.1 "Power-On / Wake-Up / Start-Up
+  behavior" (p.46) states it in one sentence — "There are two types of
+  start-up: a cold start (after power-on **or wake-up from sleep**) and a
+  hot start (**=wake-up from StandBy**)" — and §12.4 Figure 17 labels the
+  arrows to match. `try_cold_start` accepted only `Unpowered -> Normal`,
+  omitting the `Sleep -> Normal` cold start entirely; `try_hot_start`
+  claimed `Sleep -> Normal` and gated it behind the WakeUp handshake, when
+  TC18's hot start is `StandBy -> Normal` and it is the *hot*-start
+  procedure that §12.4.1 attaches that handshake to. Net effect on a caller
+  wiring this up: every wake-from-sleep was rejected until a handshake that
+  the specification does not require there had completed, and every
+  wake-from-standby was rejected outright, there being no path admitting
+  that origin at all. `try_cold_start` now admits both documented origins
+  and `try_hot_start` admits `StandBy`.
+- **rust-RCP-P02 (BREAKING):** `is_power_mode_transition_defined` accepted
+  `StandBy <-> Sleep` as an ordinary transition. Figure 17 draws no edge of
+  any kind between the two low-power modes — it places `Normal`/`StandBy`
+  in a "Powered" box and `Sleep` in a separate "Only part of PHY powered"
+  box, with both low-power modes entered from and returned to `Normal`
+  only. It also omitted `Normal -> Sleep`, which Figure 17 *does* draw
+  ("Go to Sleep"). The function now returns `true` for exactly Figure 17's
+  two "Go to ..." edges, `Normal -> StandBy` and `Normal -> Sleep`, and
+  `false` for all fourteen other ordered pairs. The prior set was derived
+  from reading the four mode *names* as a depth ordering, which the
+  specification never states; that inference is what produced P01 as well,
+  and the module's doc comment now reproduces Figure 17's edge list
+  directly instead.
+- **rust-RCP-P03 (BREAKING, wire):** `regmap::RequestStreamConfigEntry`
+  used the wrong row layout. §12.7.7 Table 22 (pp.57-58) packs eight
+  per-stream flags (`rx_enforce_e2e` .. `rx_wd_info_enable`) into the
+  single bit-addressed byte at `0x000D` — they are the only fields in the
+  table addressed with a `.bit` suffix — and closes each row with a 16-bit
+  reserved word at `0x0012` and a 32-bit reserved block at `0x0014`, the
+  next row's `rx_stream_id2` at `0x0018` fixing the stride at **24 bytes**.
+  This crate gave each flag a whole byte of its own and dropped all six
+  reserved bytes, for `ENCODED_LEN = 25` and a wrong offset for every field
+  from `0x000D` onward. `ENCODED_LEN` is now 24, the eight flag fields are
+  typed `bool` to match their 1-bit width (a `u8` could not round-trip
+  losslessly through one bit), and `FLAGS_OFFSET` plus eight `FLAG_*` mask
+  constants and a `flags_byte()` accessor expose the packing.
+- **rust-RCP-P04 (BREAKING, wire):** `regmap::EpByteBusIdMapEntry`
+  transposed two fields. §12.7.8 Table 23 "EP_ID_config" (p.59) tabulates
+  `Request_Stream_Index` at `0x0000`, `EP_Nr` at `0x0001` and `BBID` at
+  `0x0002`; this crate emitted `[stream_index, BBID_hi, BBID_lo, EP_Nr]`.
+  The row length was coincidentally right; the middle three bytes were not.
+- **rust-RCP-P05 (BREAKING, wire):** `regmap::SequencerStateEntry` modeled
+  one of the row's two fields. §12.7.10 Table 25 "SEQUENCER_config" (p.61)
+  gives each sequencer `Seq_state` at `0x0000` **and**
+  `Request_stream_index` at `0x0001` — the latter being the access-control
+  binding the section describes ("Each sequencer is dedicated to a specific
+  RC Client and its bound endpoints"; the field "refers the Client Nr
+  allowed to access this sequencer") — with `Seq_2` at `0x0002` fixing the
+  stride at 2 bytes. This crate carried only `seq_state` with
+  `ENCODED_LEN = 1`, so a multi-sequencer table read through `decode_rows`
+  both lost every sequencer's client binding and misaligned every row after
+  the first. The field is now present and `ENCODED_LEN` is 2.
+
+Not changed, and still to reconcile: `regmap::ResponseStreamConfigEntry`'s
+layout has not been checked against §12.7.9 in this pass and remains this
+crate's own inference; and `RequestStreamConfigEntry::default()` is still
+all-zero, where Table 22 documents a default of `1` for
+`rx_resp_stream_index`.
+
 ## v4.0.0 (2026-07-31 TC18-conformant NTSCF/TSCF AVTPDU header) — closed
 
 **Breaking, on the wire.** `src/avtp.rs`'s NTSCF and TSCF header
