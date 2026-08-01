@@ -27,8 +27,9 @@ and the version has moved normally ever since.
 one.** A change to the bytes this crate puts on the wire breaks
 interoperation with any peer built against a prior release just as surely
 as removing a `pub` item breaks compilation, so it takes a MAJOR bump even
-when — as in `v3.0.0` (ACF message layout) and `v4.0.0` (NTSCF/TSCF header
-layout) — the change is a *fix* and the previous bytes were nobody's
+when — as in `v3.0.0` (ACF message layout), `v4.0.0` (NTSCF/TSCF header
+layout) and `v5.0.0` (register-map config-table row layouts) — the change
+is a *fix* and the previous bytes were nobody's
 correct behavior. Calling such a release a PATCH would hide, behind a
 version number that promises compatibility, the one thing a downstream
 integrator most needs told. (`v3.1.0`, which reordered the E2E CRC

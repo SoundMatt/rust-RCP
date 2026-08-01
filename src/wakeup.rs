@@ -635,6 +635,11 @@ mod tests {
             ),
             Ok(PowerMode::StandBy)
         );
+        // TC18 §12.4 Figure 17's other "Go to ..." edge.
+        assert_eq!(
+            request_sleep_via_sleep_cmd(SleepCmdRequest, PowerMode::Normal, PowerMode::Sleep, gate),
+            Ok(PowerMode::Sleep)
+        );
     }
 
     #[test]
@@ -644,8 +649,24 @@ mod tests {
             all_endpoints_idle: true,
             no_pending_response: true,
         };
+        // Figure 17 draws no edge between the two low-power modes: both
+        // are entered from `Normal` only.
         assert_eq!(
-            request_sleep_via_sleep_cmd(SleepCmdRequest, PowerMode::Normal, PowerMode::Sleep, gate),
+            request_sleep_via_sleep_cmd(
+                SleepCmdRequest,
+                PowerMode::StandBy,
+                PowerMode::Sleep,
+                gate
+            ),
+            Err(RcpError::RequestRejected)
+        );
+        assert_eq!(
+            request_sleep_via_sleep_cmd(
+                SleepCmdRequest,
+                PowerMode::Normal,
+                PowerMode::Unpowered,
+                gate
+            ),
             Err(RcpError::RequestRejected)
         );
     }
