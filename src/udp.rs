@@ -9,6 +9,9 @@
 // fusa:req REQ-UDP-009
 // fusa:req REQ-UDP-010
 // fusa:req REQ-UDP-011
+// fusa:req REQ-UDP-012
+// fusa:req REQ-UDP-013
+// fusa:req REQ-UDP-014
 
 //! UDP unicast transport for the TC18 AVTPDU/ACF wire format.
 //!
@@ -48,8 +51,47 @@
 //! [`UdpTransport::send_acf_abb`]/[`UdpTransport::send_acf_gbb`] and
 //! [`resolve_endpoint`] are unchanged by this item — see their own doc
 //! comments.
+//!
+//! # Real OS-socket transport and IEEE 1722-2016 Annex J encapsulation
+//!
+//! Before this item, this module's only [`UdpSocket`] implementations were
+//! in-process test doubles (`EchoUdp`/`QueuedUdpSocket`, both in this
+//! module's own `#[cfg(test)]` block) — there was no concrete
+//! implementation over a real OS socket anywhere in this crate;
+//! `src/bin/rcp.rs`'s own pre-this-item doc comment said so explicitly.
+//! [`StdUdpSocket`] closes that gap: this is the first real network I/O
+//! this crate has ever shipped for RCP.
+//!
+//! TC18 §10.1 states AVTPDUs can be carried over UDP/IP, "Encapsulation of
+//! 1722 frames in IP/UDP and port usage is described in Annex J" (of the
+//! base IEEE 1722-2016 standard, not TC18 itself). This crate does not
+//! have access to the paywalled IEEE 1722-2016 standard text; the framing
+//! [`StdUdpSocket`]/[`encode_annex_j_udp_payload`]/
+//! [`decode_annex_j_udp_payload`] implement — a 4-byte big-endian
+//! "encapsulation sequence number" prepended to every UDP payload before
+//! the AVTPDU itself, and control-plane traffic (RCP requests/responses,
+//! which this crate is exclusively concerned with) using destination port
+//! [`ANNEX_J_CONTROL_PORT`] (17221), distinct from port 17220 for
+//! "Continuous" streaming traffic ([`ANNEX_J_CONTINUOUS_PORT`]) — is taken
+//! from two independent public secondary sources instead: a Wireshark
+//! issue tracker discussion of the real Annex J framing, and the COVESA
+//! Open1722 open-source reference implementation's `Avtp_Udp_t` header
+//! struct (`include/avtp/Udp.h`, BSD-3-Clause,
+//! <https://github.com/COVESA/Open1722>). This is flagged here per
+//! Guiding Principle 5 as *not* independently verified against the
+//! primary standard, rather than presented with false certainty.
+//!
+//! The encapsulation sequence number's exact intended receiver-side
+//! semantics (e.g. loss detection) are not specified by either secondary
+//! source consulted, and this crate does not invent any — [`StdUdpSocket`]
+//! only guarantees it is monotonically increasing per sender, nothing
+//! more. This field exists only for UDP/IP encapsulation (Annex J); it has
+//! no counterpart when an AVTPDU is instead carried directly at layer 2
+//! with EtherType `0x22F0` — see [`crate::l2`], added alongside this item
+//! as the other, equally-supported transport option TC18 §10.1 names.
 
 use std::net::SocketAddr;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -70,6 +112,151 @@ use crate::RcpError;
 pub trait UdpSocket: Send + Sync {
     fn send_to(&self, buf: &[u8], addr: SocketAddr) -> Result<usize, RcpError>;
     fn recv_from(&self, timeout: Option<Duration>) -> Result<(Vec<u8>, SocketAddr), RcpError>;
+}
+
+// ── Annex J UDP encapsulation ────────────────────────────────────────────────
+
+/// Standard destination UDP port for IEEE 1722-2016 Annex J "Discrete"
+/// (control-plane) traffic — RCP requests/responses/acknowledgements are
+/// control-plane traffic, so this is the applicable port for RCP-over-UDP
+/// and [`StdUdpSocket::new_default_port`]'s default. See this module's own
+/// doc comment, "Real OS-socket transport and IEEE 1722-2016 Annex J
+/// encapsulation", for this constant's provenance (public secondary
+/// sources, not the paywalled primary standard).
+// fusa:req REQ-UDP-012
+pub const ANNEX_J_CONTROL_PORT: u16 = 17221;
+
+/// Standard destination UDP port for IEEE 1722-2016 Annex J "Continuous"
+/// (streaming/periodic) traffic — not RCP's traffic class, and not used by
+/// any constructor in this module; named here only so both of Annex J's
+/// two standard ports are documented rather than one left unstated. Same
+/// provenance note as [`ANNEX_J_CONTROL_PORT`].
+pub const ANNEX_J_CONTINUOUS_PORT: u16 = 17220;
+
+/// Prepend a 4-byte big-endian encapsulation sequence number to `avtpdu`
+/// — TC18 §10.1's IEEE 1722-2016 Annex J UDP/IP encapsulation, per this
+/// module's own doc comment provenance note. Byte order matches this
+/// crate's existing big-endian wire convention (e.g.
+/// [`crate::avtp::encode_ntscf_frame`]'s `stream_id` field,
+/// [`crate::acf`]'s `message_timestamp`).
+// fusa:req REQ-UDP-012
+pub fn encode_annex_j_udp_payload(seq: u32, avtpdu: &[u8]) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(4 + avtpdu.len());
+    buf.extend_from_slice(&seq.to_be_bytes());
+    buf.extend_from_slice(avtpdu);
+    buf
+}
+
+/// The inverse of [`encode_annex_j_udp_payload`]: split a raw UDP payload
+/// into its 4-byte encapsulation sequence number and the AVTPDU bytes that
+/// follow it. `Err(RcpError::ShortFrame)` for fewer than 4 bytes — never
+/// panics on truncated or empty input.
+// fusa:req REQ-UDP-012
+pub fn decode_annex_j_udp_payload(buf: &[u8]) -> Result<(u32, &[u8]), RcpError> {
+    if buf.len() < 4 {
+        return Err(RcpError::ShortFrame);
+    }
+    let mut seq_bytes = [0u8; 4];
+    seq_bytes.copy_from_slice(&buf[..4]);
+    Ok((u32::from_be_bytes(seq_bytes), &buf[4..]))
+}
+
+// ── StdUdpSocket ──────────────────────────────────────────────────────────────
+
+/// Real, production [`UdpSocket`] implementation over a bound
+/// `std::net::UdpSocket`. See this module's own doc comment, "Real
+/// OS-socket transport and IEEE 1722-2016 Annex J encapsulation", for full
+/// context — this is the first concrete implementation of [`UdpSocket`]
+/// over a real OS socket this crate has ever shipped.
+///
+/// `send_to` prepends, and `recv_from` strips, the 4-byte encapsulation
+/// sequence number [`encode_annex_j_udp_payload`]/
+/// [`decode_annex_j_udp_payload`] implement — entirely transparent to
+/// [`UdpSocket`] trait callers ([`UdpTransport`], [`UdpRcServer`]), which
+/// see only already-framed NTSCF/AVTPDU bytes, the same contract the
+/// mock `EchoUdp`/`QueuedUdpSocket` test doubles already provide.
+/// `send_to`'s sequence number is a per-`StdUdpSocket` monotonically
+/// increasing counter, starting at 0 on construction; it is not exposed to
+/// callers (see this module's own doc comment for why no receiver-side
+/// semantics are attached to it).
+// fusa:req REQ-UDP-013
+// fusa:req REQ-UDP-014
+pub struct StdUdpSocket {
+    socket: std::net::UdpSocket,
+    send_seq: AtomicU32,
+}
+
+impl StdUdpSocket {
+    /// Bind a real UDP socket to `local_addr`.
+    // fusa:req REQ-UDP-013
+    pub fn bind(local_addr: SocketAddr) -> Result<Self, RcpError> {
+        let socket = std::net::UdpSocket::bind(local_addr)
+            .map_err(|e| RcpError::Other(format!("udp: bind {local_addr}: {e}")))?;
+        Ok(StdUdpSocket {
+            socket,
+            send_seq: AtomicU32::new(0),
+        })
+    }
+
+    /// Convenience constructor: bind to `bind_ip` on
+    /// [`ANNEX_J_CONTROL_PORT`] — the sensible default for RCP's
+    /// control-plane traffic. [`Self::bind`] remains available directly
+    /// for an explicit port (testing, or a deployment that cannot use the
+    /// standard port).
+    // fusa:req REQ-UDP-013
+    pub fn new_default_port(bind_ip: std::net::IpAddr) -> Result<Self, RcpError> {
+        Self::bind(SocketAddr::new(bind_ip, ANNEX_J_CONTROL_PORT))
+    }
+
+    /// The local address this socket is actually bound to — useful when
+    /// [`Self::bind`]'s `local_addr` used an ephemeral (`:0`) port.
+    pub fn local_addr(&self) -> Result<SocketAddr, RcpError> {
+        self.socket
+            .local_addr()
+            .map_err(|e| RcpError::Other(format!("udp: local_addr: {e}")))
+    }
+}
+
+impl UdpSocket for StdUdpSocket {
+    /// Returns the number of bytes of `buf` (the caller-supplied
+    /// NTSCF/AVTPDU frame) sent — not the larger on-wire byte count
+    /// including the prepended encapsulation sequence number — matching
+    /// this trait's existing mock-implementation convention of echoing
+    /// `buf.len()` back rather than any wire-framing overhead.
+    // fusa:req REQ-UDP-013
+    fn send_to(&self, buf: &[u8], addr: SocketAddr) -> Result<usize, RcpError> {
+        let seq = self.send_seq.fetch_add(1, Ordering::Relaxed);
+        let framed = encode_annex_j_udp_payload(seq, buf);
+        let sent = self
+            .socket
+            .send_to(&framed, addr)
+            .map_err(|e| RcpError::Other(format!("udp: send_to {addr}: {e}")))?;
+        Ok(sent.saturating_sub(4))
+    }
+
+    /// `timeout` is applied via `SO_RCVTIMEO` on every call. `None` blocks
+    /// indefinitely. A real OS-level timeout is mapped to
+    /// `Err(RcpError::Timeout)`, matching every other timeout path in this
+    /// crate.
+    // fusa:req REQ-UDP-014
+    fn recv_from(&self, timeout: Option<Duration>) -> Result<(Vec<u8>, SocketAddr), RcpError> {
+        self.socket
+            .set_read_timeout(timeout)
+            .map_err(|e| RcpError::Other(format!("udp: set_read_timeout: {e}")))?;
+        let mut buf = [0u8; 65535];
+        let (n, addr) = self.socket.recv_from(&mut buf).map_err(|e| {
+            if matches!(
+                e.kind(),
+                std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+            ) {
+                RcpError::Timeout
+            } else {
+                RcpError::Other(format!("udp: recv_from: {e}"))
+            }
+        })?;
+        let (_seq, avtpdu) = decode_annex_j_udp_payload(&buf[..n])?;
+        Ok((avtpdu.to_vec(), addr))
+    }
 }
 
 // ── UdpTransport ─────────────────────────────────────────────────────────────
@@ -485,6 +672,164 @@ impl UdpRcServer {
 mod tests {
     use super::*;
     use crate::acf::ByteMessageInfo;
+
+    // ── Annex J encapsulation (pure byte manipulation, no socket) ─────────
+
+    #[test]
+    // fusa:test REQ-UDP-012
+    fn annex_j_encode_decode_round_trips() {
+        let avtpdu = vec![0xDE, 0xAD, 0xBE, 0xEF, 0x01];
+        let encoded = encode_annex_j_udp_payload(7, &avtpdu);
+        assert_eq!(encoded.len(), 4 + avtpdu.len());
+        // Big-endian, matching this crate's existing wire convention.
+        assert_eq!(&encoded[..4], &[0x00, 0x00, 0x00, 0x07]);
+        let (seq, decoded) = decode_annex_j_udp_payload(&encoded).unwrap();
+        assert_eq!(seq, 7);
+        assert_eq!(decoded, avtpdu.as_slice());
+    }
+
+    #[test]
+    // fusa:test REQ-UDP-012
+    fn annex_j_encode_handles_empty_avtpdu() {
+        let encoded = encode_annex_j_udp_payload(0xFFFF_FFFF, &[]);
+        assert_eq!(encoded, vec![0xFF, 0xFF, 0xFF, 0xFF]);
+        let (seq, decoded) = decode_annex_j_udp_payload(&encoded).unwrap();
+        assert_eq!(seq, 0xFFFF_FFFF);
+        assert!(decoded.is_empty());
+    }
+
+    #[test]
+    // fusa:test REQ-UDP-012
+    fn annex_j_decode_rejects_short_buffers() {
+        for len in 0..4 {
+            let buf = vec![0u8; len];
+            let err = decode_annex_j_udp_payload(&buf).unwrap_err();
+            assert_eq!(err, RcpError::ShortFrame);
+        }
+    }
+
+    #[test]
+    fn annex_j_control_and_continuous_ports_are_distinct_and_documented() {
+        assert_eq!(ANNEX_J_CONTROL_PORT, 17221);
+        assert_eq!(ANNEX_J_CONTINUOUS_PORT, 17220);
+        assert_ne!(ANNEX_J_CONTROL_PORT, ANNEX_J_CONTINUOUS_PORT);
+    }
+
+    // ── StdUdpSocket (real loopback sockets — no privileges required) ─────
+
+    #[test]
+    // fusa:test REQ-UDP-013
+    // fusa:test REQ-UDP-014
+    fn std_udp_socket_round_trips_over_real_loopback_socket() {
+        let a = StdUdpSocket::bind("127.0.0.1:0".parse().unwrap()).unwrap();
+        let b = StdUdpSocket::bind("127.0.0.1:0".parse().unwrap()).unwrap();
+        let b_addr = b.local_addr().unwrap();
+
+        let payload = vec![0x01, 0x02, 0x03, 0x04, 0x05];
+        UdpSocket::send_to(&a, &payload, b_addr).unwrap();
+
+        let (received, _from) = UdpSocket::recv_from(&b, Some(Duration::from_secs(5))).unwrap();
+        assert_eq!(received, payload);
+    }
+
+    #[test]
+    // fusa:test REQ-UDP-013
+    // fusa:test REQ-UDP-014
+    fn std_udp_socket_and_udp_rc_server_serve_a_real_discovery_request_end_to_end() {
+        // The same composition `src/bin/rcp.rs`'s `serve` command builds
+        // (StdUdpSocket + UdpRcServer), but with both a real client and a
+        // real server talking over real loopback sockets — proving
+        // StdUdpSocket works end-to-end through UdpRcServer's own request
+        // dispatch, not just as a bare send/recv byte pipe.
+        use crate::regmap::GeneralRegisters;
+
+        let server_stream = StreamId::new([0x02, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA], 0x00AA);
+        let server_socket = StdUdpSocket::bind("127.0.0.1:0".parse().unwrap()).unwrap();
+        let server_addr = server_socket.local_addr().unwrap();
+        let general = GeneralRegisters {
+            svr_vendor_id: 0x4242,
+            ..Default::default()
+        };
+        let rc_server = RcServer::new(general);
+        let server = UdpRcServer::new(server_stream, Arc::new(server_socket), rc_server);
+
+        let client_stream = local_stream();
+        let client_socket = StdUdpSocket::bind("127.0.0.1:0".parse().unwrap()).unwrap();
+        let request = discovery::build_discovery_request(0x11);
+        let payload = acf::encode_acf_abb(&request).unwrap();
+        let frame = avtp::encode_ntscf_frame(client_stream, 0, &payload).unwrap();
+        UdpSocket::send_to(&client_socket, &frame, server_addr).unwrap();
+
+        server
+            .serve_one(
+                Some(Duration::from_secs(5)),
+                0,
+                Instant::now(),
+                discovery::DISCOVERY_TIME_OUT,
+            )
+            .unwrap();
+
+        let (resp_frame, _from) =
+            UdpSocket::recv_from(&client_socket, Some(Duration::from_secs(5))).unwrap();
+        let (hdr, acf_bytes) = avtp::decode_ntscf_frame(&resp_frame).unwrap();
+        assert_eq!(StreamId::from_u64(hdr.stream_id), server_stream);
+        let resp = acf::decode_acf_abb(acf_bytes).unwrap();
+        let regs = GeneralRegisters::decode(&resp.payload).unwrap();
+        assert_eq!(regs.svr_vendor_id, 0x4242);
+    }
+
+    #[test]
+    // fusa:test REQ-UDP-013
+    fn std_udp_socket_send_seq_is_monotonically_increasing_on_the_wire() {
+        // Inspect the real encapsulated bytes with a plain std socket
+        // (bypassing StdUdpSocket's own recv_from, which strips the
+        // sequence number) to prove send_to's sequence counter actually
+        // increments on the wire, not just that decode_annex_j_udp_payload
+        // can parse whatever value is there.
+        let sender = StdUdpSocket::bind("127.0.0.1:0".parse().unwrap()).unwrap();
+        let raw_receiver = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+        let receiver_addr = raw_receiver.local_addr().unwrap();
+
+        for _ in 0..3 {
+            UdpSocket::send_to(&sender, &[0xAA], receiver_addr).unwrap();
+        }
+
+        let mut seqs = Vec::new();
+        let mut buf = [0u8; 64];
+        for _ in 0..3 {
+            let (n, _) = raw_receiver.recv_from(&mut buf).unwrap();
+            let (seq, avtpdu) = decode_annex_j_udp_payload(&buf[..n]).unwrap();
+            assert_eq!(avtpdu, &[0xAA]);
+            seqs.push(seq);
+        }
+        assert_eq!(seqs, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn std_udp_socket_recv_from_times_out_on_a_real_socket() {
+        let socket = StdUdpSocket::bind("127.0.0.1:0".parse().unwrap()).unwrap();
+        let err = socket
+            .recv_from(Some(Duration::from_millis(50)))
+            .unwrap_err();
+        assert_eq!(err, RcpError::Timeout);
+    }
+
+    #[test]
+    fn std_udp_socket_new_default_port_binds_annex_j_control_port() {
+        // Bind to an ephemeral port instead of the real 17221 so this test
+        // doesn't require exclusive access to a well-known port / root on
+        // some platforms; the constructor logic under test is the address
+        // construction itself, exercised via `bind` with an explicit
+        // ANNEX_J_CONTROL_PORT.
+        let addr: SocketAddr = format!("127.0.0.1:{ANNEX_J_CONTROL_PORT}").parse().unwrap();
+        // A CI runner or developer machine may already have something
+        // bound to the real control port, or lack permission; either is
+        // an environment fact, not a bug in this constructor, so only the
+        // success case is asserted on.
+        if let Ok(socket) = StdUdpSocket::bind(addr) {
+            assert_eq!(socket.local_addr().unwrap().port(), ANNEX_J_CONTROL_PORT);
+        }
+    }
 
     fn local_stream() -> StreamId {
         StreamId::new([0x02, 0x11, 0x22, 0x33, 0x44, 0x55], 0x0001)

@@ -4932,6 +4932,114 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-UDP-012",
+      "title": "Annex J UDP encapsulation sequence number is prepended/stripped correctly",
+      "text": "encode_annex_j_udp_payload(seq, avtpdu) prepends seq as 4 big-endian octets before avtpdu with no other framing; decode_annex_j_udp_payload(buf) is its exact inverse, returning (seq, avtpdu_bytes) for any buf of at least 4 bytes and Err(RcpError::ShortFrame) for fewer than 4 bytes; ANNEX_J_CONTROL_PORT (17221) and ANNEX_J_CONTINUOUS_PORT (17220) are distinct constants documented as taken from public secondary sources (a Wireshark issue tracker discussion and the COVESA Open1722 reference implementation), not the paywalled IEEE 1722-2016 primary standard text",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-UDP-013",
+      "title": "StdUdpSocket::send_to encapsulates outgoing datagrams with a monotonically increasing sequence number",
+      "text": "StdUdpSocket is a real UdpSocket implementation over a bound std::net::UdpSocket; StdUdpSocket::bind/new_default_port construct it against a real OS socket, and every StdUdpSocket::send_to call prepends the current value of a per-instance monotonically increasing u32 counter (starting at 0) via encode_annex_j_udp_payload before writing to the real socket, with no receiver-side semantics (e.g. loss detection) invented or implied for that counter beyond monotonic increase",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-UDP-014",
+      "title": "StdUdpSocket::recv_from strips the Annex J sequence number and maps a real socket timeout to RcpError::Timeout",
+      "text": "StdUdpSocket::recv_from applies timeout via the real socket's SO_RCVTIMEO (None blocks indefinitely), strips the leading 4-byte Annex J sequence number from whatever datagram is received via decode_annex_j_udp_payload before returning the remaining AVTPDU bytes to the caller, and maps a real OS-level receive timeout (WouldBlock/TimedOut) to Err(RcpError::Timeout) rather than propagating the raw std::io::Error",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-L2-001",
+      "title": "ETHERTYPE_AVTP names the real IEEE 1722 EtherType and is placed big-endian in the Ethernet header",
+      "text": "ETHERTYPE_AVTP is 0x22F0, matching TC18 \u00a710.1 (\u201can AVTPDU is marked by an EtherType value of 0x22F0\u201d); encode_ethernet_frame writes it as bytes 12-13 of the frame in big-endian order, and decode_ethernet_frame reads bytes 12-13 the same way when validating a frame's EtherType",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-L2-002",
+      "title": "encode_ethernet_frame/decode_ethernet_frame round-trip a raw Ethernet II frame with no encapsulation sequence number",
+      "text": "encode_ethernet_frame(dest_mac, src_mac, avtpdu) produces dest_mac (6 bytes) || src_mac (6 bytes) || ETHERTYPE_AVTP (2 bytes, big-endian) || avtpdu directly, with no additional framing (unlike crate::udp::encode_annex_j_udp_payload's 4-byte sequence number, which has no L2 counterpart); decode_ethernet_frame is its exact inverse for any well-formed input, returns Err(RcpError::ShortFrame) for fewer than 14 bytes, and returns Err(RcpError::Other(_)) (not a panic) when the EtherType field is not ETHERTYPE_AVTP",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-L2-003",
+      "title": "L2Socket trait mirrors UdpSocket's testable-abstraction shape for MAC-addressed raw Ethernet frames",
+      "text": "L2Socket::send(frame) and L2Socket::recv(timeout) operate on already-framed encode_ethernet_frame/decode_ethernet_frame bytes, the same already-framed-bytes-in-bytes-out contract crate::udp::UdpSocket documents, letting L2Transport be tested against a mock L2Socket with no real socket involved",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-L2-004",
+      "title": "L2Transport is constructed with a local StreamId, an L2Socket, a caller-supplied destination MAC, and this transport's own source MAC",
+      "text": "L2Transport::new(local_stream, socket, dest_mac, src_mac) stores all four; L2Transport::local_stream/dest_mac/src_mac each return exactly the value passed to the constructor; dest_mac may be unicast or multicast and is always a caller input, since this crate does not derive or allocate a multicast MAC of its own",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-L2-005",
+      "title": "L2Transport::send_acf_abb/send_acf_gbb reject a zero timeout immediately, matching UdpTransport's own discipline",
+      "text": "L2Transport::send_acf_abb and L2Transport::send_acf_gbb both return Err(RcpError::Timeout) immediately, without ever calling the underlying L2Socket, when passed Some(Duration::ZERO), mirroring crate::udp::UdpTransport::send_acf_abb's own zero-timeout short-circuit",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-L2-006",
+      "title": "L2Transport::send_acf_abb/send_acf_gbb build an NTSCF/AVTPDU frame, wrap it as a raw Ethernet frame, and verify the response echoes byte_bus_id",
+      "text": "L2Transport::send_acf_abb/send_acf_gbb encode the request via crate::acf::encode_acf_abb/encode_acf_gbb, wrap it in an NTSCF frame via crate::avtp::encode_ntscf_frame under this transport's local_stream, wrap that in a raw Ethernet frame via encode_ethernet_frame addressed to dest_mac from src_mac, send it, decode the received response through decode_ethernet_frame/crate::avtp::decode_ntscf_frame/crate::acf::decode_acf_abb (or decode_acf_gbb), and reject it via crate::acf::verify_echo_back if the response's byte_bus_id does not match the request's",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-L2-007",
+      "title": "RawEthernetSocket (Linux) binds an AF_PACKET/SOCK_RAW socket to a named interface, reading that interface's own MAC rather than requiring the caller to supply one",
+      "text": "On target_os = \"linux\", RawEthernetSocket::bind(interface_name) opens a real AF_PACKET/SOCK_RAW socket (requiring CAP_NET_RAW or root) and binds it to interface_name, reading that interface's own link-layer address via getifaddrs for RawEthernetSocket::mac() rather than accepting a caller-supplied MAC; RawEthernetSocket::send/recv implement L2Socket over that real socket and round-trip a real Ethernet frame byte-for-byte over a veth pair",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-L2-008",
+      "title": "RawEthernetSocket exists and fails explicitly, never silently, on every non-Linux target",
+      "text": "On any target where target_os != \"linux\", crate::l2::RawEthernetSocket still exists as a type (so downstream code can reference it unconditionally) but RawEthernetSocket::bind always returns Err(RcpError::Other(_)) explaining that AF_PACKET raw sockets are a Linux-specific facility, rather than silently no-op-ing or panicking",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CLI-010",
+      "title": "serve --udp <bind-ip> [--port <n>] [--stream <hex>] [--max-requests <n>] runs UdpRcServer over a real StdUdpSocket",
+      "text": "The CLI must, when invoked with serve --udp <bind-ip>, bind a real rcp::udp::StdUdpSocket to <bind-ip>:--port (default rcp::udp::ANNEX_J_CONTROL_PORT) and dispatch inbound requests through rcp::udp::UdpRcServer::serve_one against a fresh RcServer, stopping after --max-requests requests have been served if given (default: unbounded, until a fatal socket error), exiting 3 on a bind or fatal serve error",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test"
     }
   ]
 }

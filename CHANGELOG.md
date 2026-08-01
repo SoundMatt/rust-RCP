@@ -5,6 +5,125 @@ the roadmap milestone that produced them (see `ROADMAP.md`), since this
 crate's `Cargo.toml` version does not move until the OPEN Alliance TC18
 core replacement reaches `v1.0.0`.
 
+## v3.2.0 (2026-07-31 real UDP socket + new L2 raw-Ethernet transport) — closed
+
+This crate's transport layer had two real gaps, confirmed by direct
+inspection rather than assumption: no raw-Ethernet/L2 transport existed at
+all (the same gap every other RCP-family repo — `go-RCP`, `cpp-RCP`,
+`c-RCP` — has), and `src/udp.rs`'s `UdpSocket` trait had no implementation
+over a real OS socket either — only the in-process `EchoUdp`/
+`QueuedUdpSocket` test doubles, and `src/bin/rcp.rs`'s own prior doc
+comment admitted this plainly. TC18 §10.1 names both a layer-2 EtherType
+(`0x22F0`) and UDP/IP encapsulation ("described in Annex J", of the base
+IEEE 1722-2016 standard) as legal transports; this item builds both as
+permanent, first-class, equally-supported options, closing all three real
+gaps rather than just one — this is the first real network I/O this crate
+has ever shipped for RCP.
+
+- **rust-RCP-NET-01 (feature):** `src/udp.rs` gains
+  [`StdUdpSocket`], a real `UdpSocket` implementation over a bound
+  `std::net::UdpSocket`, corrected to IEEE 1722-2016 Annex J framing from
+  the start (there was no legacy UDP wire format to preserve). Every
+  `send_to` prepends, and every `recv_from` strips, a 4-byte big-endian
+  "encapsulation sequence number" ([`encode_annex_j_udp_payload`]/
+  [`decode_annex_j_udp_payload`]) — a per-`StdUdpSocket` monotonically
+  increasing counter with no invented receiver-side semantics (e.g. loss
+  detection) beyond that. New constants `ANNEX_J_CONTROL_PORT` (17221,
+  the applicable port for RCP's control-plane request/response/
+  acknowledgement traffic, and `StdUdpSocket::new_default_port`'s
+  default) and `ANNEX_J_CONTINUOUS_PORT` (17220, streaming traffic, named
+  but unused). **Provenance note**, stated once here and referenced from
+  every touchpoint in code: this crate has no access to the paywalled
+  IEEE 1722-2016 standard text: the port numbers and the sequence-number
+  field are taken from two independent public secondary sources instead
+  — a Wireshark issue tracker discussion of the real Annex J framing, and
+  the COVESA Open1722 open-source reference implementation's `Avtp_Udp_t`
+  header struct (`include/avtp/Udp.h`, BSD-3-Clause,
+  <https://github.com/COVESA/Open1722>) — and are flagged as such rather
+  than presented with false certainty. New `REQ-UDP-012`/`REQ-UDP-013`/
+  `REQ-UDP-014`.
+- **rust-RCP-NET-02 (feature):** new `src/l2.rs` — a raw-Ethernet (layer
+  2) transport, Linux only, mirroring `src/udp.rs`'s own
+  `UdpSocket`/`UdpTransport` abstraction one wire layer down:
+  [`encode_ethernet_frame`]/[`decode_ethernet_frame`] (destination MAC +
+  source MAC + EtherType `0x22F0` big-endian + the AVTPDU bytes directly
+  — no encapsulation sequence number; that field is Annex J/UDP-specific
+  and has no L2 counterpart), an [`L2Socket`] trait mirroring `UdpSocket`
+  (`SocketAddr` replaced by a raw `[u8; 6]` MAC), [`L2Transport`]
+  mirroring `UdpTransport`'s `send_acf_abb`/`send_acf_gbb` client shape,
+  and — `target_os = "linux"` only — [`RawEthernetSocket`], a real
+  `AF_PACKET`/`SOCK_RAW` production `L2Socket` that reads its own
+  interface's MAC via `getifaddrs` rather than requiring the caller to
+  supply one (a caller-supplied destination MAC is still required —
+  multicast-MAC derivation is a base-IEEE-1722 algorithm this crate does
+  not have). Every other target gets a same-named stub whose `bind`
+  always returns a clear `Err` rather than silently no-op-ing, so the
+  type can be referenced unconditionally. Server-side L2 dispatch (an
+  `L2RcServer` mirroring `UdpRcServer`) is out of scope for this item —
+  flagged as a deliberate follow-up, not bundled in silently; this item's
+  server-facing wiring is `UdpRcServer` run over `StdUdpSocket` (see
+  rust-RCP-NET-03 below). New `REQ-L2-001` through `REQ-L2-008`.
+- **A flagged judgment call — `nix`, not raw `libc` `unsafe` syscalls:**
+  this crate is `#![forbid(unsafe_code)]` crate-wide, and `forbid` cannot
+  be locally overridden (E0453) — `src/capi.rs`'s own doc comment already
+  named this rule as the reason this crate has never built a raw-pointer
+  FFI boundary. A direct `libc` `socket()`/`bind()`/`sendto()`/
+  `recvfrom()` implementation would require `unsafe extern "C"` calls in
+  this crate's own source, which is not available at all here, not a
+  style choice. `RawEthernetSocket` is instead built on the `nix` crate
+  (`target_os = "linux"`-only dependency, new to `Cargo.toml`), whose
+  `socket`/`bind`/`sendto`/`recvfrom`/`setsockopt`/`getifaddrs` functions
+  are all safe Rust `fn`s — `unsafe` lives inside `nix`'s own crate,
+  never this one's — confirmed against `nix` 0.31's published API before
+  writing the module, not assumed. `nix` is a narrowly-scoped
+  POSIX-bindings crate, not a heavyweight packet-crafting framework like
+  `pnet`, matching this item's own minimal-footprint intent.
+- **rust-RCP-NET-03 (feature):** `src/bin/rcp.rs` gains a new `serve --udp
+  <bind-ip> [--port <n>] [--stream <hex>] [--max-requests <n>]` command —
+  the first `rust-rcp` command backed by a real OS socket instead of an
+  in-process `RcServer` invoked directly. It binds a real `StdUdpSocket`
+  and runs `UdpRcServer` (previously only ever exercised against mock
+  sockets in this crate's own unit tests) against it. `discover`/
+  `register`/`endpoint` remain deliberately ephemeral/in-process, per
+  this file's own pre-existing "Provenance note" (unchanged by this
+  item); `serve` is a new, additive, real-network-facing command, not a
+  replacement for them. The module doc comment's prior "no concrete
+  `rcp::udp::UdpSocket` implementation over a real OS socket" note is
+  updated accordingly. New `REQ-CLI-010`.
+- **Tests, no privileges/Linux required:** pure byte-manipulation round
+  trips for both the Annex J encapsulation
+  (`annex_j_encode_decode_round_trips`, short-buffer rejection) and the
+  Ethernet frame encode/decode (`ethernet_frame_encode_decode_round_trips`,
+  short-frame/wrong-EtherType rejection), plus mock-socket-backed
+  `L2Transport`/`UdpTransport` request/response tests (`EchoL2`/`QueuedL2`,
+  the `L2Socket` analogs of `udp`'s own `EchoUdp`/`QueuedUdpSocket`) — all
+  run everywhere, no real socket involved.
+- **Tests, real sockets:** a real loopback `StdUdpSocket` round trip
+  (`std_udp_socket_round_trips_over_real_loopback_socket`), a test
+  proving the encapsulation sequence number actually increments on the
+  wire by inspecting raw bytes with a bypass `std::net::UdpSocket`, a
+  real receive-timeout test, and a new end-to-end test composing a real
+  `StdUdpSocket` client against a real `StdUdpSocket` + `UdpRcServer`
+  server over real loopback sockets
+  (`std_udp_socket_and_udp_rc_server_serve_a_real_discovery_request_end_to_end`)
+  — all run in the normal cross-platform `test` CI job (ubuntu/macos/
+  windows), no privileges required.
+- **New Linux-only CI job (`l2-veth`):** creates a real `veth0`/`veth1`
+  pair under `sudo`, then runs a `#[cfg(target_os = "linux")]`,
+  `#[ignore]`d-by-default test
+  (`real_raw_ethernet_socket_round_trips_a_frame_over_a_veth_pair`) with
+  `-- --ignored`, proving a real `RawEthernetSocket` frame round-trips
+  byte-for-byte over a real (virtual) Ethernet link — not just that the
+  framing/trait logic type-checks.
+- This is a MINOR (additive, non-breaking) release: `StdUdpSocket`,
+  `ANNEX_J_CONTROL_PORT`/`ANNEX_J_CONTINUOUS_PORT`,
+  `encode_annex_j_udp_payload`/`decode_annex_j_udp_payload`, and the
+  entire new `l2` module are new `pub` items only — no existing item
+  changed shape. `docs/PUBLIC_API.txt` is regenerated accordingly (purely
+  additive diff) per `docs/SEMVER.md`; `.fusa-reqs.json` gains
+  `REQ-UDP-012`-`REQ-UDP-014`, `REQ-L2-001`-`REQ-L2-008`, and
+  `REQ-CLI-010` (564/564 traced).
+
 ## v3.1.0 (2026-07-31 E2E CRC trailer wire-order fix) — closed
 
 While independently verifying `v3.0.0`'s `acf` wire-format rework byte-for-

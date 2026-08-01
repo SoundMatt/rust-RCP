@@ -45,14 +45,13 @@
 //!                           [--initial <hex>] [--read-size <n>] [--format json]
 //!   rust-rcp endpoint write --bus-id <n> --payload <hex> [--stream <hex>]
 //!                           [--ep-type <n>] [--initial <hex>]
+//!   rust-rcp serve --udp <bind-ip> [--port <n>] [--stream <hex>]
+//!                  [--max-requests <n>]
 //!
 //! ## Provenance note
 //!
-//! This crate has no concrete `rcp::udp::UdpSocket` implementation over a
-//! real OS socket — only the in-process [`rcp::mock::RcServer`] test
-//! double and `rcp::udp`'s own unit-test fakes exist. `discover`/
-//! `register`/`endpoint` therefore each construct and address a fresh
-//! in-process `RcServer` for the lifetime of one invocation, the same
+//! `discover`/`register`/`endpoint` each construct and address a fresh
+//! in-process [`RcServer`] for the lifetime of one invocation, the same
 //! ephemeral-server discipline this file's pre-Milestone-10 `send`/
 //! `status --zone` commands already used against a fresh
 //! `rcp::mock::MockRegistry` each invocation — not a regression this item
@@ -61,9 +60,25 @@
 //! [`GeneralRegisters::default`] and an empty endpoint table; there is no
 //! state carried between separate `rust-rcp` invocations. This is flagged
 //! here per Guiding Principle 5 rather than left an unstated limitation.
+//!
+//! `serve` (added alongside [`rcp::udp::StdUdpSocket`]) is this binary's
+//! first command backed by a real OS socket rather than an in-process
+//! `RcServer` invoked directly: it runs [`rcp::udp::UdpRcServer`] —
+//! previously only ever exercised in this crate's own unit tests, against
+//! mock sockets — over a real, bound [`rcp::udp::StdUdpSocket`], serving
+//! real inbound UDP datagrams until `--max-requests` is reached (default:
+//! unbounded, run until a fatal socket error). Before this item, this
+//! crate had no concrete `rcp::udp::UdpSocket` implementation over a real
+//! OS socket at all — only the in-process [`rcp::mock::RcServer`] test
+//! double and `rcp::udp`'s own unit-test fakes existed, and every command
+//! above predates that gap closing. `discover`/`register`/`endpoint`
+//! remain deliberately ephemeral/in-process per the note above; `serve` is
+//! the new, real-network-facing counterpart, not a replacement for them.
 
 use std::io::Read;
 use std::process;
+use std::sync::Arc;
+use std::time::Instant;
 
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
@@ -73,6 +88,7 @@ use rcp::discovery;
 use rcp::ep0::EP0_BYTE_BUS_ID;
 use rcp::mock::{MockEndpoint, RcServer};
 use rcp::regmap::{EndpointType, GeneralRegisters};
+use rcp::udp::{StdUdpSocket, UdpRcServer};
 
 const TOOL: &str = "rust-rcp";
 const PROTOCOL: &str = "RCP";
@@ -83,7 +99,9 @@ fn main() {
 
     if args.len() < 2 {
         eprintln!("Usage: rust-rcp <command> [options]");
-        eprintln!("Commands: version, capabilities, status, convert, discover, register, endpoint");
+        eprintln!(
+            "Commands: version, capabilities, status, convert, discover, register, endpoint, serve"
+        );
         process::exit(1);
     }
 
@@ -252,6 +270,10 @@ fn main() {
         // fusa:req REQ-CLI-004
         // fusa:req REQ-CLI-005
         "endpoint" => cmd_endpoint(&args),
+
+        // ── serve ─────────────────────────────────────────────────────────────
+        // fusa:req REQ-CLI-010
+        "serve" => cmd_serve(&args),
 
         cmd => {
             eprintln!("unknown command: {}", cmd);
@@ -589,6 +611,89 @@ fn cmd_endpoint_write(args: &[String]) {
     }
 }
 
+// ── serve ────────────────────────────────────────────────────────────────────
+
+/// `rust-rcp serve --udp <bind-ip> [--port <n>] [--stream <hex>]
+/// [--max-requests <n>]`.
+///
+/// Binds a real [`StdUdpSocket`] to `--udp:--port` (default
+/// [`rcp::udp::ANNEX_J_CONTROL_PORT`]) and runs [`UdpRcServer`] against it
+/// — a fresh [`RcServer`] with [`GeneralRegisters::default`] and an empty
+/// endpoint table, the same starting state `discover`/`register`/
+/// `endpoint` already use (see this file's own "Provenance note") — until
+/// `--max-requests` requests have been served (default: unbounded; runs
+/// until a fatal socket error). Each served request is logged to stdout.
+///
+/// This is the first `rust-rcp` command to talk to a real OS socket rather
+/// than dispatching directly against an in-process `RcServer` — see this
+/// file's own module doc comment.
+// fusa:req REQ-CLI-010
+fn cmd_serve(args: &[String]) {
+    let bind_ip_str = match flag_value(args, "--udp") {
+        Some(ip) => ip,
+        None => {
+            eprintln!("error: --udp <bind-ip> required (e.g. --udp 0.0.0.0)");
+            process::exit(1);
+        }
+    };
+    let bind_ip: std::net::IpAddr = match bind_ip_str.parse() {
+        Ok(ip) => ip,
+        Err(e) => {
+            eprintln!("error: invalid --udp address {bind_ip_str:?}: {e}");
+            process::exit(1);
+        }
+    };
+    let port = parse_u16_arg(args, "--port").unwrap_or(rcp::udp::ANNEX_J_CONTROL_PORT);
+    let local_stream = parse_stream_arg(args, "--stream").unwrap_or_else(|| StreamId::from_u64(0));
+    let max_requests = parse_u32_arg(args, "--max-requests");
+
+    let socket = match StdUdpSocket::bind(std::net::SocketAddr::new(bind_ip, port)) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("error: {}", e);
+            process::exit(3);
+        }
+    };
+    let bound_addr = socket
+        .local_addr()
+        .map(|a| a.to_string())
+        .unwrap_or_else(|_| format!("{bind_ip}:{port}"));
+
+    let rc_server = RcServer::new(GeneralRegisters::default());
+    let server = UdpRcServer::new(local_stream, Arc::new(socket), rc_server);
+
+    println!(
+        "serve: listening on udp {} (stream={})",
+        bound_addr,
+        format_stream_hex(local_stream)
+    );
+
+    let mut served: u32 = 0;
+    loop {
+        if let Some(max) = max_requests {
+            if served >= max {
+                println!("serve: reached --max-requests={max}, stopping");
+                break;
+            }
+        }
+        match server.serve_one(
+            None,
+            served as u8,
+            Instant::now(),
+            discovery::DISCOVERY_TIME_OUT,
+        ) {
+            Ok(()) => {
+                served += 1;
+                println!("serve: dispatched request #{served}");
+            }
+            Err(e) => {
+                eprintln!("serve: fatal error after {served} request(s): {e}");
+                process::exit(3);
+            }
+        }
+    }
+}
+
 // ── §11.2 / §15.5 rcp.Message → relay.Message conversion ────────────────────
 //
 // RELAY spec §11.2's `convert` driver reads one canonical-type value for the
@@ -756,6 +861,10 @@ fn parse_u8_arg(args: &[String], flag: &str) -> Option<u8> {
     flag_value(args, flag).and_then(|v| v.parse().ok())
 }
 
+fn parse_u32_arg(args: &[String], flag: &str) -> Option<u32> {
+    flag_value(args, flag).and_then(|v| v.parse().ok())
+}
+
 fn parse_hex_arg(args: &[String], flag: &str) -> Option<Vec<u8>> {
     flag_value(args, flag).map(|v| {
         (0..v.len())
@@ -821,6 +930,20 @@ mod tests {
     fn parse_u16_arg_parses_decimal() {
         let args: Vec<String> = vec!["rcp".into(), "--bus-id".into(), "42".into()];
         assert_eq!(parse_u16_arg(&args, "--bus-id"), Some(42u16));
+    }
+
+    #[test]
+    // fusa:test REQ-CLI-010
+    fn parse_u32_arg_parses_decimal() {
+        let args: Vec<String> = vec!["rcp".into(), "--max-requests".into(), "5".into()];
+        assert_eq!(parse_u32_arg(&args, "--max-requests"), Some(5u32));
+    }
+
+    #[test]
+    // fusa:test REQ-CLI-010
+    fn parse_u32_arg_absent_returns_none() {
+        let args: Vec<String> = vec!["rcp".into(), "serve".into()];
+        assert!(parse_u32_arg(&args, "--max-requests").is_none());
     }
 
     #[test]

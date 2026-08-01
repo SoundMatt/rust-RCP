@@ -1,6 +1,6 @@
 [package]
 name = "rcp"
-version = "3.1.0"
+version = "3.2.0"
 edition = "2021"
 rust-version = "1.75"
 license = "MPL-2.0"
@@ -44,3 +44,16 @@ strip        = true
 opt-level    = "z"
 lto          = true
 codegen-units = 1
+
+# `src/l2.rs`'s raw AF_PACKET/SOCK_RAW transport: this crate is
+# `#![forbid(unsafe_code)]` crate-wide (`src/lib.rs`), which rules out a
+# direct `libc` `socket()`/`bind()`/`sendto()`/`recvfrom()` implementation
+# (that would require `unsafe extern "C"` calls in this crate's own
+# source, and `forbid` cannot be locally overridden). `nix` wraps those
+# same syscalls in a fully safe Rust API (`unsafe` lives inside `nix`'s
+# own crate, not this one) and is gated to `target_os = "linux"` here so
+# no other build target's dependency graph grows because of it — see
+# `src/l2.rs`'s own module doc comment, "Why `nix`, not raw `libc`
+# `unsafe` syscalls — a flagged judgment call", for the full reasoning.
+[target.'cfg(target_os = "linux")'.dependencies]
+nix = { version = "0.31.3", features = ["socket", "net"] }
