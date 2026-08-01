@@ -96,6 +96,7 @@ pub mod gpio;
 pub mod i2c;
 pub mod iseled;
 pub mod iso21434;
+pub mod l2;
 pub mod lifecycle;
 pub mod lin;
 pub mod loan;

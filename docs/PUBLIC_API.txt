@@ -1765,6 +1765,49 @@ impl core::panic::unwind_safe::RefUnwindSafe for rcp::iso21434::Threat
 impl core::panic::unwind_safe::UnwindSafe for rcp::iso21434::Threat
 pub fn rcp::iso21434::filter_by_risk(&[rcp::iso21434::Threat], rcp::iso21434::RiskLevel) -> alloc::vec::Vec<&rcp::iso21434::Threat>
 pub fn rcp::iso21434::risk_level(rcp::iso21434::Feasibility, rcp::iso21434::Impact) -> rcp::iso21434::RiskLevel
+pub mod rcp::l2
+pub struct rcp::l2::L2Transport
+impl rcp::l2::L2Transport
+pub fn rcp::l2::L2Transport::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::l2::L2Transport::dest_mac(&self) -> [u8; 6]
+pub fn rcp::l2::L2Transport::local_stream(&self) -> rcp::avtp::StreamId
+pub fn rcp::l2::L2Transport::new(rcp::avtp::StreamId, alloc::sync::Arc<dyn rcp::l2::L2Socket>, [u8; 6], [u8; 6]) -> Self
+pub fn rcp::l2::L2Transport::send_acf_abb(&self, &rcp::acf::AcfAbbMessage, u8, core::option::Option<core::time::Duration>) -> core::result::Result<rcp::acf::AcfAbbMessage, rcp::RcpError>
+pub fn rcp::l2::L2Transport::send_acf_gbb(&self, &rcp::acf::AcfGbbMessage, u8, core::option::Option<core::time::Duration>) -> core::result::Result<rcp::acf::AcfGbbMessage, rcp::RcpError>
+pub fn rcp::l2::L2Transport::src_mac(&self) -> [u8; 6]
+impl core::marker::Freeze for rcp::l2::L2Transport
+impl core::marker::Send for rcp::l2::L2Transport
+impl core::marker::Sync for rcp::l2::L2Transport
+impl core::marker::Unpin for rcp::l2::L2Transport
+impl core::marker::UnsafeUnpin for rcp::l2::L2Transport
+impl !core::panic::unwind_safe::RefUnwindSafe for rcp::l2::L2Transport
+impl !core::panic::unwind_safe::UnwindSafe for rcp::l2::L2Transport
+pub struct rcp::l2::RawEthernetSocket
+impl rcp::l2::RawEthernetSocket
+pub fn rcp::l2::RawEthernetSocket::bind(&str) -> core::result::Result<Self, rcp::RcpError>
+pub fn rcp::l2::RawEthernetSocket::mac(&self) -> [u8; 6]
+impl core::fmt::Debug for rcp::l2::RawEthernetSocket
+pub fn rcp::l2::RawEthernetSocket::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl rcp::l2::L2Socket for rcp::l2::RawEthernetSocket
+pub fn rcp::l2::RawEthernetSocket::recv(&self, core::option::Option<core::time::Duration>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::l2::RawEthernetSocket::send(&self, &[u8]) -> core::result::Result<usize, rcp::RcpError>
+impl core::marker::Freeze for rcp::l2::RawEthernetSocket
+impl core::marker::Send for rcp::l2::RawEthernetSocket
+impl core::marker::Sync for rcp::l2::RawEthernetSocket
+impl core::marker::Unpin for rcp::l2::RawEthernetSocket
+impl core::marker::UnsafeUnpin for rcp::l2::RawEthernetSocket
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::l2::RawEthernetSocket
+impl core::panic::unwind_safe::UnwindSafe for rcp::l2::RawEthernetSocket
+pub const rcp::l2::ETHERTYPE_AVTP: u16
+pub trait rcp::l2::L2Socket: core::marker::Send + core::marker::Sync
+pub fn rcp::l2::L2Socket::recv(&self, core::option::Option<core::time::Duration>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::l2::L2Socket::send(&self, &[u8]) -> core::result::Result<usize, rcp::RcpError>
+impl rcp::l2::L2Socket for rcp::l2::RawEthernetSocket
+pub fn rcp::l2::RawEthernetSocket::recv(&self, core::option::Option<core::time::Duration>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::l2::RawEthernetSocket::send(&self, &[u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::l2::decode_ethernet_frame(&[u8]) -> core::result::Result<rcp::l2::DecodedEthernetFrame<'_>, rcp::RcpError>
+pub fn rcp::l2::encode_ethernet_frame([u8; 6], [u8; 6], &[u8]) -> alloc::vec::Vec<u8>
+pub type rcp::l2::DecodedEthernetFrame<'a> = ([u8; 6], [u8; 6], &'a [u8])
 pub mod rcp::lifecycle
 pub enum rcp::lifecycle::LockPolicy
 pub rcp::lifecycle::LockPolicy::W
@@ -4014,6 +4057,21 @@ impl core::marker::Unpin for rcp::udp::ResolvedEndpoint
 impl core::marker::UnsafeUnpin for rcp::udp::ResolvedEndpoint
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::udp::ResolvedEndpoint
 impl core::panic::unwind_safe::UnwindSafe for rcp::udp::ResolvedEndpoint
+pub struct rcp::udp::StdUdpSocket
+impl rcp::udp::StdUdpSocket
+pub fn rcp::udp::StdUdpSocket::bind(core::net::socket_addr::SocketAddr) -> core::result::Result<Self, rcp::RcpError>
+pub fn rcp::udp::StdUdpSocket::local_addr(&self) -> core::result::Result<core::net::socket_addr::SocketAddr, rcp::RcpError>
+pub fn rcp::udp::StdUdpSocket::new_default_port(core::net::ip_addr::IpAddr) -> core::result::Result<Self, rcp::RcpError>
+impl rcp::udp::UdpSocket for rcp::udp::StdUdpSocket
+pub fn rcp::udp::StdUdpSocket::recv_from(&self, core::option::Option<core::time::Duration>) -> core::result::Result<(alloc::vec::Vec<u8>, core::net::socket_addr::SocketAddr), rcp::RcpError>
+pub fn rcp::udp::StdUdpSocket::send_to(&self, &[u8], core::net::socket_addr::SocketAddr) -> core::result::Result<usize, rcp::RcpError>
+impl !core::marker::Freeze for rcp::udp::StdUdpSocket
+impl core::marker::Send for rcp::udp::StdUdpSocket
+impl core::marker::Sync for rcp::udp::StdUdpSocket
+impl core::marker::Unpin for rcp::udp::StdUdpSocket
+impl core::marker::UnsafeUnpin for rcp::udp::StdUdpSocket
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::udp::StdUdpSocket
+impl core::panic::unwind_safe::UnwindSafe for rcp::udp::StdUdpSocket
 pub struct rcp::udp::UdpRcServer
 impl rcp::udp::UdpRcServer
 pub fn rcp::udp::UdpRcServer::discovery_claim(&self) -> core::option::Option<rcp::discovery::DiscoveryClaim>
@@ -4042,9 +4100,16 @@ impl core::marker::Unpin for rcp::udp::UdpTransport
 impl core::marker::UnsafeUnpin for rcp::udp::UdpTransport
 impl !core::panic::unwind_safe::RefUnwindSafe for rcp::udp::UdpTransport
 impl !core::panic::unwind_safe::UnwindSafe for rcp::udp::UdpTransport
+pub const rcp::udp::ANNEX_J_CONTINUOUS_PORT: u16
+pub const rcp::udp::ANNEX_J_CONTROL_PORT: u16
 pub trait rcp::udp::UdpSocket: core::marker::Send + core::marker::Sync
 pub fn rcp::udp::UdpSocket::recv_from(&self, core::option::Option<core::time::Duration>) -> core::result::Result<(alloc::vec::Vec<u8>, core::net::socket_addr::SocketAddr), rcp::RcpError>
 pub fn rcp::udp::UdpSocket::send_to(&self, &[u8], core::net::socket_addr::SocketAddr) -> core::result::Result<usize, rcp::RcpError>
+impl rcp::udp::UdpSocket for rcp::udp::StdUdpSocket
+pub fn rcp::udp::StdUdpSocket::recv_from(&self, core::option::Option<core::time::Duration>) -> core::result::Result<(alloc::vec::Vec<u8>, core::net::socket_addr::SocketAddr), rcp::RcpError>
+pub fn rcp::udp::StdUdpSocket::send_to(&self, &[u8], core::net::socket_addr::SocketAddr) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::udp::decode_annex_j_udp_payload(&[u8]) -> core::result::Result<(u32, &[u8]), rcp::RcpError>
+pub fn rcp::udp::encode_annex_j_udp_payload(u32, &[u8]) -> alloc::vec::Vec<u8>
 pub fn rcp::udp::resolve_endpoint(&rcp::addressing::EndpointTable, rcp::avtp::StreamId, u16) -> core::result::Result<rcp::udp::ResolvedEndpoint, rcp::RcpError>
 pub mod rcp::wakeup
 pub struct rcp::wakeup::SleepCmdRequest

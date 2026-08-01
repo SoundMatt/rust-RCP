@@ -47,6 +47,36 @@ jobs:
       - name: test release
         run: cargo test --all-targets --release --locked
 
+  # ── L2 (raw Ethernet) real veth round trip (Linux only) ───────────────────
+  # `src/l2.rs`'s RawEthernetSocket needs CAP_NET_RAW (or root) to open an
+  # AF_PACKET/SOCK_RAW socket at all — not exercisable by the normal `test`
+  # job above, which is why the round-trip test itself is #[ignore]d by
+  # default. This job creates a real veth0/veth1 pair and runs that one
+  # test under sudo against it, proving a real frame round-trips
+  # byte-for-byte over a real (virtual) Ethernet link — not just that the
+  # framing/trait logic type-checks.
+  l2-veth:
+    name: L2 raw-Ethernet veth round trip (Linux)
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: create veth0/veth1 pair
+        run: |
+          sudo ip link add veth0 type veth peer name veth1
+          sudo ip link set veth0 up
+          sudo ip link set veth1 up
+      - name: build l2 tests
+        run: cargo test --lib --no-run --locked --message-format=json > build.json
+      - name: run real_raw_ethernet_socket_round_trips_a_frame_over_a_veth_pair under sudo
+        run: |
+          bin=$(jq -r 'select(.profile.test == true and (.target.name == "rcp")) | .filenames[]' build.json | head -n1)
+          test -n "$bin"
+          sudo "$bin" l2::tests::real_raw_ethernet_socket_round_trips_a_frame_over_a_veth_pair \
+            --exact --ignored --nocapture
+
   # ── Coverage ──────────────────────────────────────────────────────────────
   coverage:
     name: Coverage (llvm-cov)

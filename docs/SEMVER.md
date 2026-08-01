@@ -88,7 +88,7 @@ wire-codec modules (`can`, `lin`, `gpio`, `i2c`, `spi`, `uart`, `adc`,
 (`ratelimit`, `deadline`, `faultinject`, `proxy`, `redundancy`, `observe`,
 `authz`, `record`, `loan`, `admin`, `powerstate`, `watchdog`, `evtgroup`,
 `federation`, `dyndata`, `config`), and the transport bridges (`udp`,
-`tlstransport`, `shmem`, `mdns`). These get the same semver *mechanics* as
+`l2`, `tlstransport`, `shmem`, `mdns`). These get the same semver *mechanics* as
 Tier 1 (a breaking change here is still a MAJOR bump post-`v1.0.0`) but are
 individually newer and less exercised end-to-end than Tier 1, so expect
 more of them to gain `#[non_exhaustive]`/other stability annotations as
