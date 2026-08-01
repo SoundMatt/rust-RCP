@@ -92,43 +92,74 @@
 //! parses or interprets the ACF payload itself; that remains `crate::acf`'s
 //! job.
 //!
-//! ## Provenance note
+//! ## Provenance
 //!
-//! Field names (`ntscf_data_length`, `sequence_num`, `avtp_timestamp`,
-//! `stream_data_length`) are taken from this crate's `ROADMAP.md`, which
-//! itself cites the OPEN Alliance TC18 Remote Control Protocol
-//! Specification v0.5.1_RC by section number only. The specific byte
-//! offsets and bit widths implemented below are this crate's own working
-//! interpretation of IEEE 1722 AVTPDU control-format framing, not a
-//! transcription of that (confidential, OPEN-Members-only) document's text.
-//! Per Guiding Principle 5, this is flagged for reconciliation against the
-//! specification's behavior (never its prose) before being relied on for
-//! interop with a real TC18 RC Server. In particular, `TSCF_SUBTYPE`
-//! (`0x83`) and the header's total length are this crate's own placeholder
-//! values pending that reconciliation.
+//! Every byte offset, bit width and constant below is transcribed from the
+//! OPEN Alliance TC18 "Remote Control Specification for Ethernet"
+//! v0.5.1_RC, §11.1 "Usage of IEEE1722 for RCP", page 22:
+//!
+//! - **Figure 5 — TSCF-Header Version 0** (normative), six quadlets:
+//!   `subtype(0x05)` (bits 0-7), `sv` (8), `version(0x0)` (9-11), `mr`
+//!   (12), `rsv` (13-14), `tv` (15), `sequence_num` (16-23), `reserved`
+//!   (24-30), `tu` (31); then `stream_id` (2 quadlets), `avtp_timestamp`
+//!   (1 quadlet), `reserved` (1 quadlet), and a final quadlet holding
+//!   `stream_data_length(octets)` (16 bits) + `reserved` (16 bits).
+//!   Total: 24 octets, immediately followed by `acf_payload_data`.
+//! - **Figure 6 — NTSCF-Header Version 0** (normative), three quadlets:
+//!   `subtype(0x82)` (bits 0-7), `sv` (8), `version(0x0)` (9-11), `r`
+//!   (12), `ntscf_data_length` (13-23), `sequence_num` (24-31); then
+//!   `stream_id` (2 quadlets). Total: 12 octets, immediately followed by
+//!   `acf_payload_data` — there is **no** reserved gap between the first
+//!   quadlet and `stream_id`, and no `avtp_timestamp`/`reserved` quadlets
+//!   at all.
+//!
+//! Both figures are cross-checked against the specification's own worked
+//! examples on page 79 — Figure 19 (single ACF_ABB under a TSCF header,
+//! `subtype(0x05)`, `stream_data_length(octets) = 0x003C`) and Figure 20
+//! (single ACF_GBB under an NTSCF header, `subtype(0x82)`,
+//! `ntscf_data_length = 0x038`) — which reproduce the same field order
+//! and widths. Figures 5/6/19/20 are vector images in the source PDF with
+//! no extractable text layer; the bit-boundary tick marks were read
+//! directly from a 600 dpi render of pages 22 and 79.
+//!
+//! Note the asymmetry, which is real and not a transcription slip:
+//! NTSCF's `ntscf_data_length` is an **11-bit** field packed into the
+//! first quadlet, while TSCF's `stream_data_length` is a **16-bit** field
+//! occupying its own quadlet. See [`NTSCF_DATA_LENGTH_MAX`] and
+//! [`TSCF_DATA_LENGTH_MAX`].
 //!
 //! [`StreamId`]'s split — sender MAC in the upper 48 bits, locally-assigned
 //! unique-id suffix in the lower 16 bits — follows the widely used IEEE
 //! 1722 AVTP convention of that name (talker MAC high, per-talker stream
-//! discriminant low). It has not been independently reconciled against the
-//! OPEN Alliance TC18 Remote Control Protocol Specification's own
-//! `stream_id` construction rule, and per Guiding Principle 5 is flagged
-//! here as this crate's own working interpretation, not a spec-confirmed
-//! fact, pending that reconciliation.
+//! discriminant low), and is confirmed by TC18 v0.5.1_RC §12.6.1 Table 16
+//! ("Discovery request") and §12.6.2 Table 17 ("Discovery response"),
+//! page 48, which both spell the field out as
+//! `stream_id = streamMAC + unique_id` with `streamMAC: 6bytes` and
+//! `unique_id = 0x0000` (2 bytes) — MAC first, suffix second, in a 64-bit
+//! field. This was previously flagged under Guiding Principle 5 as an
+//! unreconciled working interpretation; those two tables are the
+//! reconciliation.
 
 use crate::RcpError;
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 /// AVTPDU `subtype` value identifying an NTSCF-headed PDU.
+///
+/// TC18 v0.5.1_RC §11.1 Figure 6 (p.22), `subtype(0x82)`.
 pub const NTSCF_SUBTYPE: u8 = 0x82;
 
 /// Total NTSCF header length in bytes (up to, but not including, the first
 /// ACF message).
-pub const NTSCF_HEADER_LEN: usize = 16;
+///
+/// TC18 v0.5.1_RC §11.1 Figure 6 (p.22): exactly three quadlets — one
+/// packed quadlet plus a 64-bit `stream_id` — with `acf_payload_data`
+/// starting immediately at octet 12.
+pub const NTSCF_HEADER_LEN: usize = 12;
 
-/// `ntscf_data_length` is an 11-bit field; this is its maximum representable
-/// value.
+/// `ntscf_data_length` is an 11-bit field (TC18 v0.5.1_RC §11.1 Figure 6,
+/// p.22, bits 13-23 of the first quadlet); this is its maximum
+/// representable value.
 pub const NTSCF_DATA_LENGTH_MAX: u16 = 0x07FF;
 
 // ── NtscfHeader ───────────────────────────────────────────────────────────────
@@ -167,7 +198,17 @@ fn get_u64_be(b: &[u8]) -> u64 {
 
 // ── Encode / decode ───────────────────────────────────────────────────────────
 
-/// Encode an [`NtscfHeader`] to its 16-byte wire representation.
+/// Encode an [`NtscfHeader`] to its 12-byte wire representation.
+///
+/// Layout, per TC18 v0.5.1_RC §11.1 Figure 6 (p.22):
+///
+/// ```text
+/// octet 0    : subtype = 0x82
+/// octet 1    : sv(1) | version(3) | r(1) | ntscf_data_length[10:8](3)
+/// octet 2    : ntscf_data_length[7:0]
+/// octet 3    : sequence_num
+/// octets 4-11: stream_id (big-endian u64)
+/// ```
 ///
 /// Returns `Err(RcpError::InvalidSize)` if `ntscf_data_length` exceeds the
 /// 11-bit field width.
@@ -179,13 +220,12 @@ pub fn encode_ntscf_header(hdr: &NtscfHeader) -> Result<[u8; NTSCF_HEADER_LEN], 
 
     let mut buf = [0u8; NTSCF_HEADER_LEN];
     buf[0] = NTSCF_SUBTYPE;
-    buf[1] = 0x80; // sv=1 (stream_id valid), version=000, reserved=0000
-    buf[2] = hdr.sequence_num;
-    // ntscf_data_length (11 bits) = byte[3] (high 8 bits) + top 3 bits of byte[4].
-    buf[3] = (hdr.ntscf_data_length >> 3) as u8;
-    buf[4] = ((hdr.ntscf_data_length & 0x07) as u8) << 5;
-    // bytes[5..8] reserved, left zeroed.
-    put_u64_be(&mut buf, 8, hdr.stream_id);
+    // sv=1 (stream_id valid), version=000, r=0, then ntscf_data_length's
+    // top 3 bits share this octet's low nibble-and-a-bit.
+    buf[1] = 0x80 | ((hdr.ntscf_data_length >> 8) as u8 & 0x07);
+    buf[2] = (hdr.ntscf_data_length & 0x00FF) as u8;
+    buf[3] = hdr.sequence_num;
+    put_u64_be(&mut buf, 4, hdr.stream_id);
     Ok(buf)
 }
 
@@ -213,11 +253,11 @@ pub fn decode_ntscf_header(b: &[u8]) -> Result<NtscfHeader, RcpError> {
         ));
     }
 
-    let sequence_num = b[2];
-    let len_hi = u16::from(b[3]);
-    let len_lo = u16::from(b[4] >> 5);
-    let ntscf_data_length = (len_hi << 3) | len_lo;
-    let stream_id = get_u64_be(&b[8..16]);
+    // ntscf_data_length (11 bits) = low 3 bits of octet 1 (its high bits)
+    // followed by all of octet 2. TC18 §11.1 Figure 6 (p.22), bits 13-23.
+    let ntscf_data_length = (u16::from(b[1] & 0x07) << 8) | u16::from(b[2]);
+    let sequence_num = b[3];
+    let stream_id = get_u64_be(&b[4..12]);
 
     Ok(NtscfHeader {
         sequence_num,
@@ -229,15 +269,29 @@ pub fn decode_ntscf_header(b: &[u8]) -> Result<NtscfHeader, RcpError> {
 // ── TscfHeader ────────────────────────────────────────────────────────────────
 
 /// AVTPDU `subtype` value identifying a TSCF-headed PDU.
-pub const TSCF_SUBTYPE: u8 = 0x83;
+///
+/// TC18 v0.5.1_RC §11.1 Figure 5 (p.22), `subtype(0x05)`, confirmed by the
+/// worked example in Figure 19 (p.79). Note that this is *not* `0x82 | 1`
+/// or any other offset from [`NTSCF_SUBTYPE`] — the two subtypes are
+/// unrelated code points assigned by IEEE 1722, and TSCF's is the smaller
+/// of the two.
+pub const TSCF_SUBTYPE: u8 = 0x05;
 
 /// Total TSCF header length in bytes (up to, but not including, the first
-/// ACF message). Wider than [`NTSCF_HEADER_LEN`] to carry `avtp_timestamp`.
+/// ACF message). Wider than [`NTSCF_HEADER_LEN`] to carry `avtp_timestamp`
+/// and the two extra reserved/length quadlets.
+///
+/// TC18 v0.5.1_RC §11.1 Figure 5 (p.22): six quadlets.
 pub const TSCF_HEADER_LEN: usize = 24;
 
-/// `stream_data_length` is an 11-bit field; this is its maximum
-/// representable value.
-pub const TSCF_DATA_LENGTH_MAX: u16 = 0x07FF;
+/// `stream_data_length` is a full 16-bit field occupying the first half of
+/// TSCF's sixth quadlet (TC18 v0.5.1_RC §11.1 Figure 5, p.22); this is its
+/// maximum representable value.
+///
+/// This deliberately differs from [`NTSCF_DATA_LENGTH_MAX`]'s 11 bits —
+/// the two header variants really do size their length fields
+/// differently, so a value legal under TSCF may be too large for NTSCF.
+pub const TSCF_DATA_LENGTH_MAX: u16 = 0xFFFF;
 
 /// Decoded TSCF AVTPDU header.
 ///
@@ -259,7 +313,8 @@ pub struct TscfHeader {
     /// (see [`crate::timestamp`]).
     pub avtp_timestamp: u32,
     /// Length, in bytes, of the ACF message(s) carried after this header.
-    /// Valid range is `0..=TSCF_DATA_LENGTH_MAX` (11 bits).
+    /// The wire field is a full 16 bits wide
+    /// ([`TSCF_DATA_LENGTH_MAX`]), so every `u16` is representable.
     pub stream_data_length: u16,
     /// AVTP `stream_id`, carried as a plain `u64`. See
     /// [`NtscfHeader::stream_id`].
@@ -268,25 +323,51 @@ pub struct TscfHeader {
 
 /// Encode a [`TscfHeader`] to its 24-byte wire representation.
 ///
-/// Returns `Err(RcpError::InvalidSize)` if `stream_data_length` exceeds the
-/// 11-bit field width.
+/// Layout, per TC18 v0.5.1_RC §11.1 Figure 5 (p.22):
+///
+/// ```text
+/// octet  0    : subtype = 0x05
+/// octet  1    : sv(1) | version(3) | mr(1) | rsv(2) | tv(1)
+/// octet  2    : sequence_num
+/// octet  3    : reserved(7) | tu(1)
+/// octets 4-11 : stream_id (big-endian u64)
+/// octets 12-15: avtp_timestamp (big-endian u32)
+/// octets 16-19: reserved
+/// octets 20-21: stream_data_length (big-endian u16)
+/// octets 22-23: reserved
+/// ```
+///
+/// `tv` ("timestamp valid") is derived rather than modeled as a field on
+/// [`TscfHeader`]: it is set exactly when `avtp_timestamp` is non-zero,
+/// which is the same all-zero-is-untimed sentinel
+/// [`crate::timestamp::AvtpTimestamp`] already defines for this crate. A
+/// peer's `tv` bit is not surfaced on decode for the same reason — there
+/// is no field to surface it into, and the timestamp value itself already
+/// carries the distinction.
+///
+/// `mr`/`tu` are transmitted as zero: media-clock restart and
+/// timestamp-uncertain signalling are base-IEEE-1722 stream concerns with
+/// no RCP-level meaning this crate models.
+///
+/// Always returns `Ok`. Unlike [`encode_ntscf_header`], there is no
+/// oversize-rejection path to take: `stream_data_length`'s wire field is a
+/// full 16 bits ([`TSCF_DATA_LENGTH_MAX`] == [`u16::MAX`]), so every value
+/// the struct can hold is representable. The `Result` return type is kept
+/// for signature symmetry with [`encode_ntscf_header`] and so that adding
+/// a future validation rule is not itself a breaking change.
 // fusa:req REQ-TSCF-002
 pub fn encode_tscf_header(hdr: &TscfHeader) -> Result<[u8; TSCF_HEADER_LEN], RcpError> {
-    if hdr.stream_data_length > TSCF_DATA_LENGTH_MAX {
-        return Err(RcpError::InvalidSize);
-    }
-
     let mut buf = [0u8; TSCF_HEADER_LEN];
     buf[0] = TSCF_SUBTYPE;
-    buf[1] = 0x80; // sv=1 (stream_id valid), version=000, reserved=0000
+    // sv=1 (stream_id valid), version=000, mr=0, rsv=00, tv per timestamp.
+    buf[1] = 0x80 | u8::from(hdr.avtp_timestamp != 0);
     buf[2] = hdr.sequence_num;
-    // stream_data_length (11 bits) = byte[3] (high 8 bits) + top 3 bits of byte[4].
-    buf[3] = (hdr.stream_data_length >> 3) as u8;
-    buf[4] = ((hdr.stream_data_length & 0x07) as u8) << 5;
-    // bytes[5..8] reserved, left zeroed.
-    put_u64_be(&mut buf, 8, hdr.stream_id);
-    buf[16..20].copy_from_slice(&hdr.avtp_timestamp.to_be_bytes());
-    // bytes[20..24] reserved, left zeroed.
+    buf[3] = 0x00; // reserved(7) | tu=0
+    put_u64_be(&mut buf, 4, hdr.stream_id);
+    buf[12..16].copy_from_slice(&hdr.avtp_timestamp.to_be_bytes());
+    // octets 16..20 reserved, left zeroed.
+    buf[20..22].copy_from_slice(&hdr.stream_data_length.to_be_bytes());
+    // octets 22..24 reserved, left zeroed.
     Ok(buf)
 }
 
@@ -315,13 +396,13 @@ pub fn decode_tscf_header(b: &[u8]) -> Result<TscfHeader, RcpError> {
     }
 
     let sequence_num = b[2];
-    let len_hi = u16::from(b[3]);
-    let len_lo = u16::from(b[4] >> 5);
-    let stream_data_length = (len_hi << 3) | len_lo;
-    let stream_id = get_u64_be(&b[8..16]);
+    let stream_id = get_u64_be(&b[4..12]);
     let mut ts_bytes = [0u8; 4];
-    ts_bytes.copy_from_slice(&b[16..20]);
+    ts_bytes.copy_from_slice(&b[12..16]);
     let avtp_timestamp = u32::from_be_bytes(ts_bytes);
+    // stream_data_length is a full 16-bit big-endian field in its own
+    // quadlet. TC18 §11.1 Figure 5 (p.22), octets 20-21.
+    let stream_data_length = u16::from_be_bytes([b[20], b[21]]);
 
     Ok(TscfHeader {
         sequence_num,
@@ -647,7 +728,7 @@ mod tests {
     // fusa:test REQ-NTSCF-004
     fn decode_rejects_wrong_subtype() {
         let mut frame = encode_ntscf_header(&NtscfHeader::default()).unwrap();
-        frame[0] = 0x83; // TSCF subtype, not NTSCF
+        frame[0] = TSCF_SUBTYPE; // the other RCP subtype, not NTSCF
         assert!(matches!(
             decode_ntscf_header(&frame),
             Err(RcpError::Other(_))
@@ -674,13 +755,13 @@ mod tests {
             stream_id: 0xABCD,
         };
         let mut frame = encode_ntscf_header(&hdr).unwrap();
-        // Scribble over version/reserved bits and the reserved quadlet;
-        // decode must still succeed and recover the same named fields.
-        frame[1] |= 0x7F; // set everything but sv
-        frame[4] |= 0x1F; // set the 5 reserved low bits of byte 4
-        frame[5] = 0xFF;
-        frame[6] = 0xFF;
-        frame[7] = 0xFF;
+        // Per TC18 v0.5.1_RC §11.1 Figure 6 (p.22), the only bits of this
+        // header this crate does not model are `version` (bits 9-11) and
+        // `r` (bit 12) — octet 1's `0x78` mask. Every other bit is a named
+        // field, so there is nothing else to scribble over: unlike the
+        // pre-v4.0.0 layout, there is no reserved quadlet after the first
+        // one. Setting them must not disturb any decoded field.
+        frame[1] |= 0x78;
         let decoded = decode_ntscf_header(&frame).unwrap();
         assert_eq!(decoded, hdr);
     }
@@ -780,12 +861,22 @@ mod tests {
 
     #[test]
     // fusa:test REQ-TSCF-002
-    fn tscf_encode_rejects_oversized_data_length() {
-        let hdr = TscfHeader {
-            stream_data_length: TSCF_DATA_LENGTH_MAX + 1,
-            ..Default::default()
-        };
-        assert_eq!(encode_tscf_header(&hdr), Err(RcpError::InvalidSize));
+    fn tscf_accepts_the_full_16_bit_data_length_range() {
+        // TC18 v0.5.1_RC §11.1 Figure 5 (p.22) gives `stream_data_length`
+        // its own 16-bit half-quadlet, so — unlike NTSCF's 11-bit
+        // `ntscf_data_length` — there is no `u16` this field cannot carry
+        // and no oversize-rejection path to exercise. This is the
+        // positive-direction check that replaces the rejection test that
+        // used to live here, back when the field was modeled as 11 bits.
+        assert_eq!(TSCF_DATA_LENGTH_MAX, u16::MAX);
+        for len in [0u16, 1, 0x07FF, 0x0800, 0xFFFE, u16::MAX] {
+            let hdr = TscfHeader {
+                stream_data_length: len,
+                ..Default::default()
+            };
+            let frame = encode_tscf_header(&hdr).expect("every u16 is in range");
+            assert_eq!(decode_tscf_header(&frame).unwrap().stream_data_length, len);
+        }
     }
 
     #[test]
@@ -794,6 +885,103 @@ mod tests {
         let frame = encode_tscf_header(&TscfHeader::default()).unwrap();
         assert_eq!(frame[0], TSCF_SUBTYPE);
         assert_eq!(frame[1] & 0x80, 0x80, "sv bit must be set for TSCF");
+    }
+
+    // ── Wire layout, pinned to the specification's worked examples ────────
+
+    #[test]
+    // fusa:test REQ-NTSCF-003
+    fn ntscf_header_matches_figure_20_worked_example() {
+        // TC18 v0.5.1_RC page 79, Figure 20 ("Single ACF_GBB CRC32
+        // mandatory fields"). Its AVTPDU header row reads, left to right:
+        //   subtype(0x82) | sv | version(0x0) | r |
+        //   ntscf_data_length=0x038 | sequence_num_lsb
+        // followed by a `stream_id` row spanning two quadlets. The example
+        // does not fix a `sequence_num` or `stream_id` value, so only the
+        // first three octets are pinned from it; the fourth is this
+        // test's own input.
+        let hdr = NtscfHeader {
+            ntscf_data_length: 0x038,
+            sequence_num: 0x5A,
+            stream_id: 0x1122_3344_5566_7788,
+        };
+        let frame = encode_ntscf_header(&hdr).unwrap();
+
+        assert_eq!(frame[0], 0x82, "subtype(0x82), Figure 20 bits 0-7");
+        // sv=1 (bit 8), version=000 (9-11), r=0 (12),
+        // ntscf_data_length[10:8] = 0x038 >> 8 = 0 (bits 13-15).
+        assert_eq!(frame[1], 0x80, "Figure 20 bits 8-15");
+        assert_eq!(
+            frame[2], 0x38,
+            "ntscf_data_length[7:0], Figure 20 bits 16-23"
+        );
+        assert_eq!(frame[3], 0x5A, "sequence_num, Figure 20 bits 24-31");
+        assert_eq!(
+            &frame[4..12],
+            &0x1122_3344_5566_7788u64.to_be_bytes(),
+            "stream_id occupies quadlets 1-2 with no reserved gap before it"
+        );
+        assert_eq!(frame.len(), 12, "Figure 20's header is three quadlets");
+    }
+
+    #[test]
+    // fusa:test REQ-TSCF-003
+    fn tscf_header_matches_figure_19_worked_example() {
+        // TC18 v0.5.1_RC page 79, Figure 19 ("single ACF_ABB CRC32
+        // mandatory fields"). Its AVTPDU header rows read:
+        //   subtype(0x05) | sv | version(0x0) | mr | rsv | tv |
+        //   sequence_num_lsb | reserved | tu
+        //   stream_id (2 quadlets) / avtp_timestamp / reserved
+        //   stream_data_length(octets) = 0x003C | reserved
+        let hdr = TscfHeader {
+            stream_data_length: 0x003C,
+            sequence_num: 0x5A,
+            avtp_timestamp: 0x1234_5678,
+            stream_id: 0x1122_3344_5566_7788,
+        };
+        let frame = encode_tscf_header(&hdr).unwrap();
+
+        assert_eq!(frame[0], 0x05, "subtype(0x05), Figure 19 bits 0-7");
+        // sv=1 (bit 8), version=000 (9-11), mr=0 (12), rsv=00 (13-14),
+        // tv=1 (15) because avtp_timestamp is non-zero.
+        assert_eq!(frame[1], 0x81, "Figure 19 bits 8-15");
+        assert_eq!(frame[2], 0x5A, "sequence_num, Figure 19 bits 16-23");
+        assert_eq!(frame[3], 0x00, "reserved(7)|tu, Figure 19 bits 24-31");
+        assert_eq!(&frame[4..12], &0x1122_3344_5566_7788u64.to_be_bytes());
+        assert_eq!(&frame[12..16], &0x1234_5678u32.to_be_bytes());
+        assert_eq!(&frame[16..20], &[0u8; 4], "Figure 19's reserved quadlet");
+        assert_eq!(
+            &frame[20..22],
+            &[0x00, 0x3C],
+            "stream_data_length(octets) = 0x003C, Figure 19's sixth quadlet"
+        );
+        assert_eq!(&frame[22..24], &[0u8; 2], "Figure 19's trailing reserved");
+        assert_eq!(frame.len(), 24, "Figure 19's header is six quadlets");
+    }
+
+    #[test]
+    // fusa:test REQ-TSCF-003
+    fn tscf_tv_bit_tracks_avtp_timestamp_presence() {
+        // TC18 v0.5.1_RC §11.1 Figure 5 (p.22) bit 15, `tv`. See
+        // `encode_tscf_header` for why this crate derives the bit from
+        // `avtp_timestamp` rather than storing it on `TscfHeader`.
+        let untimed = encode_tscf_header(&TscfHeader::default()).unwrap();
+        assert_eq!(
+            untimed[1] & 0x01,
+            0,
+            "tv must be clear for a zero timestamp"
+        );
+
+        let timed = encode_tscf_header(&TscfHeader {
+            avtp_timestamp: 1,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(
+            timed[1] & 0x01,
+            1,
+            "tv must be set for a non-zero timestamp"
+        );
     }
 
     #[test]
@@ -845,17 +1033,18 @@ mod tests {
             stream_id: 0xABCD,
         };
         let mut frame = encode_tscf_header(&hdr).unwrap();
-        // Scribble over version/reserved bits and the reserved bytes;
-        // decode must still succeed and recover the same named fields.
-        frame[1] |= 0x7F; // set everything but sv
-        frame[4] |= 0x1F; // set the 5 reserved low bits of byte 4
-        frame[5] = 0xFF;
-        frame[6] = 0xFF;
-        frame[7] = 0xFF;
-        frame[20] = 0xFF;
-        frame[21] = 0xFF;
-        frame[22] = 0xFF;
-        frame[23] = 0xFF;
+        // Per TC18 v0.5.1_RC §11.1 Figure 5 (p.22), the bits of this
+        // header this crate does not surface as decoded fields are
+        // `version` (9-11), `mr` (12), `rsv` (13-14) and `tv` (15) in
+        // octet 1; `reserved`+`tu` in octet 3; the whole reserved quadlet
+        // at octets 16-19; and the reserved half-quadlet at octets 22-23.
+        // Setting all of them must not disturb any decoded field —
+        // `stream_data_length` at octets 20-21 in particular must survive
+        // its neighbours being scribbled on.
+        frame[1] |= 0x7F;
+        frame[3] = 0xFF;
+        frame[16..20].copy_from_slice(&[0xFF; 4]);
+        frame[22..24].copy_from_slice(&[0xFF; 2]);
         let decoded = decode_tscf_header(&frame).unwrap();
         assert_eq!(decoded, hdr);
     }
@@ -868,14 +1057,17 @@ mod tests {
     fn tscf_decode_never_panics_on_arbitrary_input() {
         let inputs: &[&[u8]] = &[
             &[],
-            &[0x83],
-            &[0x83, 0x80],
+            &[0x05],
+            &[0x05, 0x80],
             &[0xFF; 24],
             &[0x00; 24],
             &[
-                0x83, 0x80, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                0x05, 0x80, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
                 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
             ],
+            &[0x05; 40],
+            // The pre-v4.0.0 placeholder subtype: no longer recognized,
+            // and must be rejected rather than panicked on.
             &[0x83; 40],
         ];
         for input in inputs {

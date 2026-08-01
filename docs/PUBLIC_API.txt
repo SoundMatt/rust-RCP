@@ -520,7 +520,7 @@ pub fn rcp::avtp::decode_ntscf_frame(&[u8]) -> core::result::Result<(rcp::avtp::
 pub fn rcp::avtp::decode_ntscf_header(&[u8]) -> core::result::Result<rcp::avtp::NtscfHeader, rcp::RcpError>
 pub fn rcp::avtp::decode_tscf_header(&[u8]) -> core::result::Result<rcp::avtp::TscfHeader, rcp::RcpError>
 pub fn rcp::avtp::encode_ntscf_frame(rcp::avtp::StreamId, u8, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
-pub fn rcp::avtp::encode_ntscf_header(&rcp::avtp::NtscfHeader) -> core::result::Result<[u8; 16], rcp::RcpError>
+pub fn rcp::avtp::encode_ntscf_header(&rcp::avtp::NtscfHeader) -> core::result::Result<[u8; 12], rcp::RcpError>
 pub fn rcp::avtp::encode_tscf_header(&rcp::avtp::TscfHeader) -> core::result::Result<[u8; 24], rcp::RcpError>
 pub fn rcp::avtp::parse_stream_id(u64) -> ([u8; 6], u16)
 pub fn rcp::avtp::select_header_variant(&[u8], rcp::avtp::TimeSyncCapability) -> core::result::Result<rcp::avtp::HeaderVariant, rcp::RcpError>

@@ -7,27 +7,35 @@ that commitment is enforced.
 
 ## Versioning scheme
 
-This crate follows [Semantic Versioning 2.0.0](https://semver.org/), with
-one repo-specific rule recorded here rather than left implicit: per
-`CHANGELOG.md`'s own header note, `Cargo.toml`'s `version` field does not
-move while the OPEN Alliance TC18 Remote Control Protocol Specification
-v0.5.1_RC uplift (`ROADMAP.md` Milestones 1-10) is in progress — every
-milestone's work lands under `CHANGELOG.md`'s `## Unreleased` heading
-against the crate's last real release, `v0.3.0`. The version jumps directly
-from `0.3.0` to `1.0.0` once Milestone 10's own two remaining checklist
-items (this one, and conformance test vectors / interop verification) are
-both done and the milestone's Success Criteria are met. This is a
-deliberate choice, not an oversight: bumping `0.x` versions incrementally
-for each milestone's intentionally breaking rewrite would claim a
-stability signal ("this is now a coherent, checked-out point") that
-Milestones 1-9's work did not yet provide, since earlier milestones each
-built additive, standalone plumbing not yet wired into a live decode ->
-route -> dispatch -> encode path (see e.g. `src/mock.rs`'s own doc comment
-history). `1.0.0` is the first version number this crate assigns after
-that path exists and this stability policy is enforced by CI (see
-"Enforcement" below).
+This crate follows [Semantic Versioning 2.0.0](https://semver.org/).
 
-After `v1.0.0`:
+Historically, one repo-specific rule applied: `Cargo.toml`'s `version`
+field was held still for the whole OPEN Alliance TC18 Remote Control
+Protocol Specification v0.5.1_RC uplift (`ROADMAP.md` Milestones 1-10),
+with every milestone's work landing under `CHANGELOG.md`'s `## Unreleased`
+heading against the crate's last real release, `v0.3.0`, and the version
+jumping straight from `0.3.0` to `1.0.0` when Milestone 10's Success
+Criteria were met. That was deliberate rather than an oversight: bumping
+`0.x` versions for each milestone's intentionally breaking rewrite would
+have claimed a stability signal ("this is now a coherent, checked-out
+point") that Milestones 1-9 did not yet provide, since each built
+additive, standalone plumbing not yet wired into a live decode -> route ->
+dispatch -> encode path. That rule is now **spent** — `v1.0.0` shipped,
+and the version has moved normally ever since.
+
+**Wire-format correctness is a MAJOR-version concern here, not a PATCH
+one.** A change to the bytes this crate puts on the wire breaks
+interoperation with any peer built against a prior release just as surely
+as removing a `pub` item breaks compilation, so it takes a MAJOR bump even
+when — as in `v3.0.0` (ACF message layout) and `v4.0.0` (NTSCF/TSCF header
+layout) — the change is a *fix* and the previous bytes were nobody's
+correct behavior. Calling such a release a PATCH would hide, behind a
+version number that promises compatibility, the one thing a downstream
+integrator most needs told. (`v3.1.0`, which reordered the E2E CRC
+trailer's pad and CRC octets, predates this rule being written down and
+shipped as a MINOR; it should have been a MAJOR by the rule above.)
+
+From `v1.0.0` onward:
 
 - **MAJOR**: any change that breaks a Tier 1 or Tier 2 stability guarantee
   below (removing/renaming a public item, adding a required field to a

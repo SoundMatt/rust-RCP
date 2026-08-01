@@ -1,9 +1,101 @@
 # Changelog
 
-All notable changes to rust-RCP are documented here. Entries are grouped by
-the roadmap milestone that produced them (see `ROADMAP.md`), since this
-crate's `Cargo.toml` version does not move until the OPEN Alliance TC18
-core replacement reaches `v1.0.0`.
+All notable changes to rust-RCP are documented here. Entries below `v1.0.0`
+are grouped by the roadmap milestone that produced them (see `ROADMAP.md`),
+because `Cargo.toml`'s version was deliberately held still for the whole
+OPEN Alliance TC18 core replacement; from `v1.0.0` on, each entry is a real
+release. See `docs/SEMVER.md` for the versioning scheme, including why a
+wire-format change is a MAJOR bump even when it is a fix.
+
+## v4.0.0 (2026-07-31 TC18-conformant NTSCF/TSCF AVTPDU header) — closed
+
+**Breaking, on the wire.** `src/avtp.rs`'s NTSCF and TSCF header
+encode/decode were never reconciled against the specification — that
+module's own provenance note said as much, calling `TSCF_SUBTYPE` and "the
+header's total length" this crate's "own placeholder values pending that
+reconciliation" — and both were wrong. This matters more than the
+comparable `v3.0.0` ACF finding did: TC18 §12.2 lists "NTSCF header
+processing" as the first of exactly four **mandatory** features, and every
+transport this crate ships (`udp`, `l2`, `shmem`, `tlstransport`, `mock`)
+frames through it unconditionally. Every NTSCF/TSCF frame rust-RCP has ever
+emitted was malformed; no release before this one could have interoperated
+with a conformant RC Server, and there is correspondingly no
+backward-compatibility constraint to preserve.
+
+Verified against the specification's own **normative** field diagrams,
+§11.1 "Usage of IEEE1722 for RCP", page 22 — Figure 5 "TSCF-Header Version
+0" and Figure 6 "NTSCF-Header Version 0" — and cross-checked against the
+worked examples on page 79, Figure 19 (ACF_ABB under TSCF,
+`stream_data_length(octets) = 0x003C`) and Figure 20 (ACF_GBB under NTSCF,
+`ntscf_data_length = 0x038`). All four are vector images with no
+extractable text layer in the source PDF; the bit-boundary tick marks were
+counted from a 600 dpi render of both pages.
+
+- **rust-RCP-H01 (BREAKING):** `avtp::NTSCF_HEADER_LEN` is **12**, was 16.
+  Figure 6's NTSCF header is exactly three quadlets — one packed quadlet
+  plus a 64-bit `stream_id` — with `acf_payload_data` starting immediately
+  at octet 12. The previous layout inserted three fabricated reserved
+  octets between the length field and `stream_id` that the specification
+  does not have.
+- **rust-RCP-H02 (BREAKING):** NTSCF's first quadlet is reordered to
+  Figure 6's actual field order. `ntscf_data_length` (11 bits) sits at bits
+  13-23, i.e. *before* `sequence_num` (bits 24-31) — packed as the low 3
+  bits of octet 1 followed by all of octet 2. The previous layout put
+  `sequence_num` at octet 2 and split the length across octets 3-4 with its
+  low 3 bits left-justified into octet 4's top 3 bits. Neither the order
+  nor the packing was right.
+- **rust-RCP-H03 (BREAKING):** `avtp::TSCF_SUBTYPE` is **`0x05`**, was
+  `0x83`. Figures 5 and 19 both give `subtype(0x05)`. `0x83` was invented
+  as "`NTSCF_SUBTYPE` plus one"; the two subtypes are unrelated IEEE 1722
+  code points and TSCF's is the smaller.
+- **rust-RCP-H04 (BREAKING):** TSCF's field positions are corrected
+  throughout to Figure 5's six quadlets — `stream_id` at octets 4-11 (was
+  8-15), `avtp_timestamp` at 12-15 (was 16-19), a reserved quadlet at
+  16-19, and `stream_data_length` at 20-21 (was split across octets 3-4).
+  The 24-octet *total* was coincidentally right; nothing inside it was.
+- **rust-RCP-H05 (BREAKING):** `avtp::TSCF_DATA_LENGTH_MAX` is
+  **`0xFFFF`**, was `0x07FF`. Figure 5 gives `stream_data_length` a full
+  16-bit half-quadlet of its own; only NTSCF's `ntscf_data_length` is
+  11 bits. `encode_tscf_header` previously rejected every legal length from
+  2048 upward with `InvalidSize`, and now accepts the whole `u16` range —
+  it can no longer fail, though it keeps its `Result` return for symmetry
+  with `encode_ntscf_header` and for future validation headroom.
+- **rust-RCP-H06:** `encode_tscf_header` now emits Figure 5's `tv`
+  ("timestamp valid") bit at bit 15, derived from `avtp_timestamp` being
+  non-zero — the same all-zero-is-untimed sentinel `timestamp::AvtpTimestamp`
+  already defines. Previously that bit was always transmitted as zero, so
+  every TSCF frame this crate sent declared its own timestamp invalid.
+- **rust-RCP-H07 (test quality):** `conformance::golden`'s NTSCF/TSCF/frame
+  byte arrays were *captured from this crate's own encoder output*, which
+  made them tautological — they could only ever catch drift away from
+  whatever the encoder did first, never that it was wrong to begin with,
+  and in practice they certified all six defects above as correct. Every
+  golden array is now derived by hand from the TC18 figures, and each
+  constant's doc comment carries an octet-by-octet derivation table naming
+  the exact figure, page, and field. New spec-anchored tests
+  `ntscf_header_matches_figure_20_worked_example`,
+  `tscf_header_matches_figure_19_worked_example` and
+  `tscf_tv_bit_tracks_avtp_timestamp_presence` pin the worked examples
+  directly, mirroring `v3.0.0`'s `acf_*_matches_figure_*` tests.
+- **rust-RCP-H08 (docs):** `src/conformance.rs`'s module doc comment
+  recorded this exact byte divergence against go-RCP (13 vs. 16 octets) and
+  explicitly declined to resolve it, calling reconciliation "out of scope
+  for this item". That was the wrong call: it was the real bug. The section
+  is rewritten as a resolved finding, including the observation that both
+  implementations *agreed* on the wrong `subtype 0x83` — a cross-
+  implementation comparison can show that one side is wrong, never which,
+  and when both agree it cannot show even that. go-RCP's own 13-octet
+  untimed header is likewise non-conformant and is now recorded as such.
+- `.fusa-reqs.json`: `REQ-NTSCF-001..004`, `REQ-TSCF-001..004`,
+  `REQ-WIRE-001/004/007/009` and `REQ-CONF-001/002/005` are rewritten to
+  state the real wire format and cite the TC18 figure and page each derives
+  from, replacing text that specified the wrong constants as correct (e.g.
+  `REQ-NTSCF-004` read "rejects frames shorter than 16 bytes"). 564/564
+  requirements still fully traced.
+- `docs/PUBLIC_API.txt`: `encode_ntscf_header`'s return type narrows to
+  `Result<[u8; 12], RcpError>`. `docs/SEMVER.md` gains an explicit rule
+  that a wire-format change is a MAJOR bump even when it is a fix, and its
+  stale "the version does not move until `v1.0.0`" scheme note is retired.
 
 ## v3.2.0 (2026-07-31 real UDP socket + new L2 raw-Ethernet transport) — closed
 
