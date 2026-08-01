@@ -225,6 +225,19 @@ pub struct Evt {
     pub sub_opcode: u8,
 }
 
+impl Evt {
+    /// The raw 4-bit `evt` nibble this value packs to on the wire
+    /// (`ack << 3 | sub_opcode`), the same arithmetic
+    /// [`encode_byte_message_info`] uses. Needed by
+    /// [`ByteMessageInfo::response_kind`], which reads `evt` under TC18
+    /// §11.3 Table 15's whole-nibble response encoding rather than this
+    /// type's own request-side ack+sub_opcode split — see this struct's
+    /// doc comment.
+    pub fn raw_nibble(&self) -> u8 {
+        ((self.ack as u8) << 3) | (self.sub_opcode & 0x7)
+    }
+}
+
 /// The dual-purpose 12-bit field TC18 Table 4 calls
 /// `read_size_or_segment_num` (row 2, octet 6 bits 3:0 + octet 7) — a
 /// requested read byte count when the enclosing [`ByteMessageInfo::op`]
@@ -361,6 +374,57 @@ impl ByteMessageInfo {
             None
         }
     }
+
+    /// Classify this header under TC18 §11.3 Table 15/§11.3.1-§11.3.4's
+    /// response-direction reading of `evt` — the whole-nibble split
+    /// [`Evt`]'s own doc comment says its `ack`+`sub_opcode` fields do
+    /// *not* model. Meaningless for a request header, whose `evt` carries
+    /// §13.5's entirely different per-endpoint meaning instead (see
+    /// [`Evt`]).
+    ///
+    /// `evt[3:0] == 0xF` (§11.3.1) identifies an Acknowledge
+    /// unconditionally, checked before `err`/`op`: a rejected Acknowledge
+    /// (`err == true`) is still an Acknowledge, not a
+    /// [`ResponseKind::Error`], which is a distinct `evt[3:0] < 0x9`
+    /// case (§11.3.4).
+    //fusa:req REQ-RESP-004
+    pub fn response_kind(&self) -> ResponseKind {
+        if self.evt.raw_nibble() == EVT_RESPONSE_ACKNOWLEDGE {
+            ResponseKind::Acknowledge
+        } else if self.err {
+            ResponseKind::Error
+        } else if self.op {
+            ResponseKind::Write
+        } else {
+            ResponseKind::Read
+        }
+    }
+}
+
+/// TC18 §11.3 Table 15's `evt[3:0] == 0xF` response-kind marker
+/// (TC18.txt line 1876: "evt[3:0] = 0xF - acknowledge").
+pub const EVT_RESPONSE_ACKNOWLEDGE: u8 = 0x0F;
+
+/// The four response semantics TC18 §11.3 Table 15/§11.3.1-§11.3.4 define
+/// for a decoded [`ByteMessageInfo`] whose `rsp` bit is set. See
+/// [`ByteMessageInfo::response_kind`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResponseKind {
+    /// `evt[3:0] == 0xF` (§11.3.1): `err == false` confirms the request
+    /// was filed into the endpoint's request storage with no
+    /// `byte_msg_payload`; `err == true` indicates the request was
+    /// rejected and `byte_msg_payload` carries an error code. A rejected
+    /// Acknowledge stays an Acknowledge — it is not [`ResponseKind::Error`].
+    Acknowledge,
+    /// `evt[3:0] < 0x9` and `op == true` (§11.3.2): confirms successful
+    /// execution of a write request, no `byte_msg_payload`.
+    Write,
+    /// `evt[3:0] < 0x9` and `op == false` (§11.3.3): confirms successful
+    /// execution of a read request, `byte_msg_payload` present.
+    Read,
+    /// `evt[3:0] < 0x9` and `err == true` (§11.3.4): execution of the
+    /// request failed, `byte_msg_payload` carries an error code.
+    Error,
 }
 
 /// Encode a [`ByteMessageInfo`] to its 8-byte wire representation, per this
@@ -407,8 +471,7 @@ pub fn encode_byte_message_info(
 
     // octet 4: evt (ack:1 + sub_opcode:3) in bits 7:4, rsv(2 bits, zero) in
     // bits 3:2, hs in bit 1, cs in bit 0.
-    let evt_bits = ((info.evt.ack as u8) << 3) | (info.evt.sub_opcode & 0x7);
-    buf[4] = (evt_bits << 4) | ((info.hs as u8) << 1) | (info.cs as u8);
+    buf[4] = (info.evt.raw_nibble() << 4) | ((info.hs as u8) << 1) | (info.cs as u8);
 
     // octet 5: transaction_num, full byte — comes before the op/rsp/err/ms
     // group, per Table 4's row-2 ordering.
@@ -1165,6 +1228,120 @@ mod tests {
             };
             assert_ne!(info.read_size().is_some(), info.segment_num().is_some());
         }
+    }
+
+    // ── response_kind (TC18 §11.3 Table 15) ─────────────────────────────────
+
+    #[test]
+    //fusa:test REQ-RESP-004
+    fn response_kind_acknowledge() {
+        let info = ByteMessageInfo {
+            evt: Evt {
+                ack: true,
+                sub_opcode: 0x7,
+            },
+            op: true,
+            err: false,
+            ..Default::default()
+        };
+        assert_eq!(info.response_kind(), ResponseKind::Acknowledge);
+    }
+
+    #[test]
+    //fusa:test REQ-RESP-004
+    fn response_kind_acknowledge_from_read_op() {
+        let info = ByteMessageInfo {
+            evt: Evt {
+                ack: true,
+                sub_opcode: 0x7,
+            },
+            op: false,
+            err: false,
+            ..Default::default()
+        };
+        assert_eq!(info.response_kind(), ResponseKind::Acknowledge);
+    }
+
+    // A rejected Acknowledge (evt[3:0] = 0xF, err = true) is still an
+    // Acknowledge per TC18 §11.3.1, not a ResponseKind::Error -- that's a
+    // distinct evt[3:0] < 0x9 case (§11.3.4). err must not take priority
+    // over evt here.
+    #[test]
+    //fusa:test REQ-RESP-004
+    fn response_kind_acknowledge_rejected_is_not_error() {
+        let info = ByteMessageInfo {
+            evt: Evt {
+                ack: true,
+                sub_opcode: 0x7,
+            },
+            op: true,
+            err: true,
+            ..Default::default()
+        };
+        assert_eq!(info.response_kind(), ResponseKind::Acknowledge);
+    }
+
+    #[test]
+    //fusa:test REQ-RESP-004
+    fn response_kind_write() {
+        let info = ByteMessageInfo {
+            evt: Evt {
+                ack: false,
+                sub_opcode: 0,
+            },
+            op: true,
+            err: false,
+            ..Default::default()
+        };
+        assert_eq!(info.response_kind(), ResponseKind::Write);
+    }
+
+    #[test]
+    //fusa:test REQ-RESP-004
+    fn response_kind_read() {
+        let info = ByteMessageInfo {
+            evt: Evt {
+                ack: false,
+                sub_opcode: 0,
+            },
+            op: false,
+            err: false,
+            ..Default::default()
+        };
+        assert_eq!(info.response_kind(), ResponseKind::Read);
+    }
+
+    #[test]
+    //fusa:test REQ-RESP-004
+    fn response_kind_error() {
+        let info = ByteMessageInfo {
+            evt: Evt {
+                ack: false,
+                sub_opcode: 0,
+            },
+            op: false,
+            err: true,
+            ..Default::default()
+        };
+        assert_eq!(info.response_kind(), ResponseKind::Error);
+    }
+
+    // evt[3:0] = 0x1..0x8 is the multi-response counter range (§11.3, not
+    // yet modeled as its own concept), which must still fall through to
+    // the ordinary err/op classification, not be misread as Acknowledge.
+    #[test]
+    //fusa:test REQ-RESP-004
+    fn response_kind_counter_range_falls_through_to_write() {
+        let info = ByteMessageInfo {
+            evt: Evt {
+                ack: false,
+                sub_opcode: 0x3,
+            },
+            op: true,
+            err: false,
+            ..Default::default()
+        };
+        assert_eq!(info.response_kind(), ResponseKind::Write);
     }
 
     // ── Canonical layout: bit-position pins ─────────────────────────────────
