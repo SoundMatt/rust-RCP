@@ -7,6 +7,31 @@ OPEN Alliance TC18 core replacement; from `v1.0.0` on, each entry is a real
 release. See `docs/SEMVER.md` for the versioning scheme, including why a
 wire-format change is a MAJOR bump even when it is a fix.
 
+## v5.2.0 (2026-08-02 SHOULD/MAY extraction + references) — closed
+
+Mirrors c-RCP's and cpp-RCP's own identical SHOULD/MAY audits. Grepped
+the full TC18 spec text for every SHOULD (12) and MAY (44) occurrence,
+excluded 6 legal-boilerplate hits, and individually classified the
+remaining 51. Seven already-implemented optional capabilities got a real
+`tc18` citation added to their existing requirement entry — a field this
+crate's `.fusa-reqs.json` had never used before (0/608 requirements cited
+TC18 prior to this pass). The non-testable lines are individually cited
+in new `docs/TC18-NON-NORMATIVE-CLAUSES.md`.
+
+This pass also honestly flags four MAY-described capabilities as
+genuinely uncertain rather than papering over them with a citation —
+most notably, `REQ-TIME-002`/`REQ-TIME-003`'s Timed-request readiness
+check uses `AvtpTimestamp`, a 32-bit/~4.3-second-rollover type, for what
+TC18 §11.2.2.5 defines as a 48-bit/3.25-day-rollover `presentation_time`
+value — the same class of time-domain conflation bug found and fixed
+this session in go-RCP's conditional-request envelopes. Not fixed here;
+recorded for its own dedicated investigation. The other three flagged
+gaps (multi-request-per-frame's citation, the EP_USED bit, and
+integrated-PHY-via-MDIO) are recorded the same way.
+
+No code behavior changed. A fuller MUST-clause citation backfill remains
+separate, larger, future work.
+
 ## v5.0.0 (2026-07-31 TC18-conformant power-mode model + register-map config tables) — closed
 
 **Breaking**, on the wire for three register-map config-table row types and
