@@ -296,7 +296,8 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.4 (\"The RC Server may support different power modes\"), TC18.txt L2268"
     },
     {
       "id": "REQ-PWR-002",
@@ -2366,7 +2367,8 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.3 (\"The three lifecycle states the device may be in are...\"), TC18.txt L2063"
     },
     {
       "id": "REQ-LIFE-002",
@@ -3176,7 +3178,8 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.3.1 (\"the SPI endpoint may support up to 6 pre-configurable sets of SPI configurations\"), TC18.txt L4192"
     },
     {
       "id": "REQ-SPI-006",
@@ -3472,7 +3475,8 @@
     {
       "id": "REQ-ADC-007",
       "title": "resolve_adc_sample_window_ticks chains adc_sample_interval, adc_avg_intervals_per_request, and adc_combine_avg_values into a total elapsed tick count, and never panics",
-      "text": "resolve_adc_sample_window_ticks multiplies adc_avg_intervals_per_request by adc_combine_avg_values by adc_sample_interval to produce the total elapsed tick count one combined result takes to produce, using checked (never-wrapping, never-panicking) arithmetic throughout including at the all-MAX field-width boundary, and never panics for any sampled AdcAveragingConfig"
+      "text": "resolve_adc_sample_window_ticks multiplies adc_avg_intervals_per_request by adc_combine_avg_values by adc_sample_interval to produce the total elapsed tick count one combined result takes to produce, using checked (never-wrapping, never-panicking) arithmetic throughout including at the all-MAX field-width boundary, and never panics for any sampled AdcAveragingConfig",
+      "tc18": "§13.7.9.2 (\"an implementation may decide to fix\" the samples-per-interval field read-only; this implementation instead makes it writable, the more general of the two spec-permitted choices), TC18.txt L5040"
     },
     {
       "id": "REQ-PWM-007",
@@ -3653,7 +3657,8 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.2.3 (\"Each endpoint may be configured to start a request upon receiving a selected trigger signal\"), TC18.txt L1413"
     },
     {
       "id": "REQ-TRIG-002",
@@ -3788,7 +3793,8 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.2 (\"[an implementation] may support only a lower number of sequencers\"), TC18.txt L3473"
     },
     {
       "id": "REQ-SEQ-002",
@@ -4184,7 +4190,8 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.7 (\"a safe state may be enforced. The safe state to enter can be chosen via the Safety_Measure parameter\"), TC18.txt L2935"
     },
     {
       "id": "REQ-SAFEMEAS-002",
