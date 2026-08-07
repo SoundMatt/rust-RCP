@@ -1,0 +1,28 @@
+{
+  "_readme": "Staging area for TC18 MUST/SHOULD/MAY requirements confirmed missing from .fusa-reqs.json (no corresponding requirement AND no implementation found). NOT consumed by rsfusa -- entries here have no //fusa:req/test trace and would fail the repo's 100% traceability CI gate if merged into .fusa-reqs.json directly (RELAY spec section 20.1.2). Migrate an entry into .fusa-reqs.json only once real impl + test tags exist for it. Same schema as .fusa-reqs.json (id/title/text/standard/level/asil/verificationMethod/tc18) plus a 'gap' field describing what's missing. See RELAY's project_xrcp_relay_master_checklist memory record for the cross-repo tracking convention this file follows.",
+  "schemaVersion": "1.0",
+  "requirements": [
+    {
+      "id": "REQ-CMP-010",
+      "title": "Compound/CompoundWait require cmp_repetitions/cmpw_repetitions, not just start-state gating and exec_delay",
+      "text": "A Compound or CompoundWait request's decoded parameters shall include cmp_repetitions/cmpw_repetitions (the number of times the request shall be repeated once its gate condition and exec_delay are satisfied, 0 meaning indefinitely until the sequencer leaves its start state), in addition to the already-implemented start/next-state gate (check_compound_gate) and cmp_exec_delay/cmpw_exec_delay (resolve_compound_exec_delay).",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§11.2.2.1 Figure 8 / Table 6 (\"cmp_repetitions\"), TC18.txt L1223,L1266; §11.2.2.2 (cmpw_ equivalent)",
+      "gap": "Confirmed absent (2026-08-07): grepped src/request.rs for repetition/repeat_count/CompoundRepeat/cmp_repeat/cmpw_repeat -- zero hits outside Triggered's own TriggerRepeatCount (which is Triggered-specific, not shared). cmp_exec_delay/cmpw_exec_delay (TimerDelay/resolve_compound_exec_delay) are correctly implemented and well-tested; the analogous repeat-count concept for Compound/CompoundWait simply does not exist anywhere in this module."
+    },
+    {
+      "id": "REQ-TRIG-010",
+      "title": "Triggered requires trigger_source_ep/trigger_signal_nr/trigger_threshold, not just repeat_count and exec_delay",
+      "text": "A Triggered request's decoded parameters shall include trigger_source_ep (the endpoint issuing the trigger), trigger_signal_nr (which of that endpoint's trigger signals this request watches), and trigger_threshold (how many occurrences of that specific signal must be observed before the request first executes) -- not merely count occurrences of trigger events generically via should_count_trigger_occurrence and gate repeat execution via TriggerRepeatCount/is_trigger_repeat_exhausted.",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§11.2.2.3 Figure 10 (\"trigger_source_ep\", \"trigger_signal_nr\", \"trigger_threshold\"), TC18.txt L1420,L1454-1456",
+      "gap": "Confirmed absent (2026-08-07): grepped src/request.rs (case-insensitive) for threshold/signal_nr/source_ep/SignalNumber/SourceEndpoint -- zero real hits (one unrelated 'threshold' match, about the compound-bundle sequencer-count minimum, not trigger gating). should_count_trigger_occurrence(endpoint_busy) always returns true regardless of which signal or endpoint fired -- there is no mechanism today to specify or check which specific trigger source/signal a pending Triggered request is actually waiting for, nor an occurrence-threshold gate before its first execution. TriggerRepeatCount/is_trigger_repeat_exhausted correctly implement the separate, later post-first-execution repeat-count concept (trigger_repetitions) and are not affected by this gap."
+    }
+  ]
+}
