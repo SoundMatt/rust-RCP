@@ -3329,7 +3329,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.7.3 Figure 30 (\"i2c request format\"), TC18.txt L5240-5257",
+      "tc18_master_id": "TC18-13.7.7.3-001"
     },
     {
       "id": "REQ-I2C-006",
@@ -3338,7 +3340,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.7.3 Figure 30 (\"i2c request format\"), TC18.txt L5240-5257",
+      "tc18_master_id": "TC18-13.7.7.3-001"
     },
     {
       "id": "REQ-UART-001",
@@ -4350,7 +4354,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.10.3 Figure 39 (\"lin request format\"), TC18.txt L5719-5736",
+      "tc18_master_id": "TC18-13.7.10.3-001"
     },
     {
       "id": "REQ-LIN-003",
@@ -4359,7 +4365,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.10.3 Figure 39 (\"lin request format\"), TC18.txt L5719-5736",
+      "tc18_master_id": "TC18-13.7.10.3-001"
     },
     {
       "id": "REQ-LIN-004",
@@ -4395,7 +4403,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.11.3 Table 57 (\"can frame formats\"), TC18.txt L5863-5872",
+      "tc18_master_id": "TC18-13.7.11.3-003"
     },
     {
       "id": "REQ-CAN-002",
@@ -4404,7 +4414,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.11.3 Table 57 (\"can frame formats\"), TC18.txt L5863-5872",
+      "tc18_master_id": "TC18-13.7.11.3-003"
     },
     {
       "id": "REQ-CAN-003",
@@ -4440,7 +4452,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.11.3 (\"For CAN XL this can be up to 2054 bytes (2048 + 6, see below), which requires segmentation.\"), TC18.txt L5859-5860",
+      "tc18_master_id": "TC18-13.7.11.3-002"
     },
     {
       "id": "REQ-CAN-007",
@@ -4449,7 +4463,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.11.3 (\"For CAN XL this can be up to 2054 bytes (2048 + 6, see below), which requires segmentation.\"), TC18.txt L5859-5860",
+      "tc18_master_id": "TC18-13.7.11.3-002"
     },
     {
       "id": "REQ-CAN-008",
@@ -4458,7 +4474,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.11.3 (\"For CAN XL this can be up to 2054 bytes (2048 + 6, see below), which requires segmentation.\"), TC18.txt L5859-5860",
+      "tc18_master_id": "TC18-13.7.11.3-002"
     },
     {
       "id": "REQ-CAN-009",
@@ -4467,7 +4485,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.11.3 (\"For CAN XL this can be up to 2054 bytes (2048 + 6, see below), which requires segmentation.\"), TC18.txt L5859-5860",
+      "tc18_master_id": "TC18-13.7.11.3-002"
     },
     {
       "id": "REQ-CAN-010",
@@ -4566,7 +4586,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.12.1 (\"The optional CRC generation as specified in the ISLED standard can be enabled.\"), TC18.txt L5910-5911",
+      "tc18_master_id": "TC18-13.7.12.1-001"
     },
     {
       "id": "REQ-ISELED-010",
@@ -5141,7 +5163,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.11.3 Table 57 (\"can frame formats\"), TC18.txt L5863-5872",
+      "tc18_master_id": "TC18-13.7.11.3-003"
     },
     {
       "id": "REQ-CAN-013",
@@ -5150,7 +5174,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a713.7.11.3 Table 57 (\"can frame formats\"), TC18.txt L5863-5872",
+      "tc18_master_id": "TC18-13.7.11.3-003"
     },
     {
       "id": "REQ-CAN-014",
@@ -5159,7 +5185,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a713.7.11.3 (\"In case the CAN ID is 11bits, then it shall be right aligned in the CAN ID field.\"), TC18.txt L5887",
+      "tc18_master_id": "TC18-13.7.11.3-005"
     },
     {
       "id": "REQ-CAN-015",
@@ -5168,7 +5196,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a713.7.11.3 (\"Sending remote frames is not supported.\"), TC18.txt L5887",
+      "tc18_master_id": "TC18-13.7.11.3-004"
     },
     {
       "id": "REQ-CAN-016",
@@ -5177,7 +5207,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a713.7.11.3 (\"For CAN XL this can be up to 2054 bytes (2048 + 6, see below), which requires segmentation.\"), TC18.txt L5859-5860",
+      "tc18_master_id": "TC18-13.7.11.3-002"
     },
     {
       "id": "REQ-CMP-009",
@@ -5357,7 +5389,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.7.3 Figure 30 (\"i2c request format\"), TC18.txt L5240-5257",
+      "tc18_master_id": "TC18-13.7.7.3-001"
     },
     {
       "id": "REQ-ISELED-011",
@@ -5366,7 +5400,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a713.7.12.3 (\"In case of safe-operation mode a CRC will be added, that is not present on the ISELED network.\"), TC18.txt L6001-6003",
+      "tc18_master_id": "TC18-13.7.12.3-003"
     },
     {
       "id": "REQ-LIFE-015",
@@ -5393,7 +5429,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a713.7.10.3 Figure 39 (\"lin request format\"), TC18.txt L5719-5736",
+      "tc18_master_id": "TC18-13.7.10.3-001"
     },
     {
       "id": "REQ-NET-002",
