@@ -396,7 +396,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.1 Figure 6 (\"NTSCF-Header Version 0\"), TC18.txt L1130-1138",
+      "tc18_master_id": "TC18-11.1-004"
     },
     {
       "id": "REQ-WIRE-002",
@@ -405,7 +407,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.1 Figure 6 (\"NTSCF-Header Version 0\"), TC18.txt L1130-1138",
+      "tc18_master_id": "TC18-11.1-004"
     },
     {
       "id": "REQ-WIRE-003",
@@ -423,7 +427,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.1 Figure 6 (\"NTSCF-Header Version 0\"), TC18.txt L1130-1138",
+      "tc18_master_id": "TC18-11.1-004"
     },
     {
       "id": "REQ-WIRE-005",
@@ -441,7 +447,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.1 (\"The corresponding NTSCF header in version 0 shall be used for RCP requests which shall be executed as soon as possible or under request specific conditions as well as for responses and acknowledge.\"), TC18.txt L1130-1132",
+      "tc18_master_id": "TC18-11.1-003"
     },
     {
       "id": "REQ-WIRE-007",
@@ -450,7 +458,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.1 Figure 6 (\"NTSCF-Header Version 0\"), TC18.txt L1130-1138",
+      "tc18_master_id": "TC18-11.1-004"
     },
     {
       "id": "REQ-WIRE-008",
@@ -1908,7 +1918,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.1 Figure 6 (\"NTSCF-Header Version 0\"), TC18.txt L1130-1138",
+      "tc18_master_id": "TC18-11.1-004"
     },
     {
       "id": "REQ-NTSCF-002",
@@ -1917,7 +1929,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.1 Figure 6 (\"NTSCF-Header Version 0\"), TC18.txt L1130-1138",
+      "tc18_master_id": "TC18-11.1-004"
     },
     {
       "id": "REQ-NTSCF-003",
@@ -1926,7 +1940,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.1 Figure 6 (\"NTSCF-Header Version 0\"), TC18.txt L1130-1138",
+      "tc18_master_id": "TC18-11.1-004"
     },
     {
       "id": "REQ-NTSCF-004",
@@ -1962,7 +1978,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.1 Figure 5 (\"TSCF-Header Version 0\"), TC18.txt L1121-1128",
+      "tc18_master_id": "TC18-11.1-002"
     },
     {
       "id": "REQ-TSCF-002",
@@ -1971,7 +1989,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.1 Figure 5 (\"TSCF-Header Version 0\"), TC18.txt L1121-1128",
+      "tc18_master_id": "TC18-11.1-002"
     },
     {
       "id": "REQ-TSCF-003",
@@ -1980,7 +2000,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.1 Figure 5 (\"TSCF-Header Version 0\"), TC18.txt L1121-1128",
+      "tc18_master_id": "TC18-11.1-002"
     },
     {
       "id": "REQ-TSCF-004",
@@ -2061,7 +2083,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.1 Table 4 (\"Usage of ABB message for standard requests\"), TC18.txt L1208-1236",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-BMI-002",
@@ -2070,7 +2094,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.1 Table 4 (\"Usage of ABB message for standard requests\"), TC18.txt L1208-1236",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-BMI-003",
@@ -2079,7 +2105,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.1 Table 4 (\"Usage of ABB message for standard requests\"), TC18.txt L1208-1236",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-BMI-004",
@@ -2097,7 +2125,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.1 Table 4 (\"Usage of ABB message for standard requests\"), TC18.txt L1208-1236",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-ABB-001",
@@ -2106,7 +2136,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.3 Table 17 (\"Usage of ABB/GBB message for responses\"), TC18.txt L2242-2266",
+      "tc18_master_id": "TC18-11.3-003"
     },
     {
       "id": "REQ-ABB-002",
@@ -2115,7 +2147,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.3 Table 17 (\"Usage of ABB/GBB message for responses\"), TC18.txt L2242-2266",
+      "tc18_master_id": "TC18-11.3-003"
     },
     {
       "id": "REQ-ABB-003",
@@ -2124,7 +2158,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.3 Table 17 (\"Usage of ABB/GBB message for responses\"), TC18.txt L2242-2266",
+      "tc18_master_id": "TC18-11.3-003"
     },
     {
       "id": "REQ-ABB-004",
@@ -2151,7 +2187,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.3 Table 17 (\"Usage of ABB/GBB message for responses\"), TC18.txt L2242-2266",
+      "tc18_master_id": "TC18-11.3-003"
     },
     {
       "id": "REQ-GBB-002",
@@ -2160,7 +2198,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.3 Table 17 (\"Usage of ABB/GBB message for responses\"), TC18.txt L2242-2266",
+      "tc18_master_id": "TC18-11.3-003"
     },
     {
       "id": "REQ-GBB-003",
@@ -2169,7 +2209,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.3 Table 17 (\"Usage of ABB/GBB message for responses\"), TC18.txt L2242-2266",
+      "tc18_master_id": "TC18-11.3-003"
     },
     {
       "id": "REQ-GBB-004",
@@ -5055,7 +5097,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.3 Table 17 (\"Usage of ABB/GBB message for responses\"), TC18.txt L2242-2266",
+      "tc18_master_id": "TC18-11.3-003"
     },
     {
       "id": "REQ-GBB-007",
@@ -5064,7 +5108,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.3 Table 17 (\"Usage of ABB/GBB message for responses\"), TC18.txt L2242-2266",
+      "tc18_master_id": "TC18-11.3-003"
     },
     {
       "id": "REQ-ABB-007",
@@ -5073,7 +5119,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.1 Table 4 (\"Usage of ABB message for standard requests\"), TC18.txt L1208-1236",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-ABB-009",
@@ -5082,7 +5130,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.1 Table 4 (\"Usage of ABB message for standard requests\"), TC18.txt L1208-1236",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-CAN-012",
@@ -5361,7 +5411,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.4.3 (\"TSCF headers will only be sent by RC Clients, never by the RC Servers. The RC Server always uses NTSCF header and only uses message_timestamp in ACF_GBB to convey a capture timestamp.\"), TC18.txt L2354-2355",
+      "tc18_master_id": "TC18-11.4.3-004"
     },
     {
       "id": "REQ-PWMI-003",
