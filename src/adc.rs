@@ -8,6 +8,8 @@
 //fusa:req REQ-ADC-008
 //fusa:req REQ-ADC-009
 //fusa:req REQ-ADC-010
+//fusa:req REQ-ADC-011
+//fusa:req REQ-ADC-012
 
 //! The ADC endpoint type (`ep_type 0x09`) — `ROADMAP.md` Milestone 4
 //! ("Basic Endpoint Types"), fifth checklist bullet: "≤16-bit resolution;
@@ -18,7 +20,7 @@
 //! This follows directly on [`crate::uart`] (Milestone 4's fourth item):
 //! same milestone, same "additive standalone plumbing only" discipline, same
 //! doc-comment provenance-note style for anything this crate has not yet
-//! reconciled against confirmed wire behavior. Three named pieces are in
+//! reconciled against confirmed wire behavior. Four named pieces are in
 //! scope, all implemented here:
 //!
 //! - [`AdcResolutionBits`] / [`AdcSampleValue`] — a sample-resolution type
@@ -43,6 +45,18 @@
 //!   [`crate::uart::validate_uart_read_request`]'s payload-less-read-only
 //!   refusal path. See "Provenance note: request-driven sampling only"
 //!   below.
+//! - [`AdcRequest`]/[`AdcRequest::from_evt_sub_opcode`] — ADC's own
+//!   request-decode entry point, validating an incoming request's
+//!   `evt.sub_opcode` against [`crate::evtgroup::evt_row2_kind_of`]'s TC18
+//!   §13.5 Table 33 Row-2 rule. See "Provenance note: evt[2:0] request
+//!   validation" below — this piece was added after this module's own
+//!   original scope note below (which still accurately describes why no
+//!   `sub_opcode` reading existed here originally) as this crate's second
+//!   Row-2 endpoint-type module, following
+//!   [`crate::i2c::I2cRequest`]/[`crate::i2c::I2cRequest::from_evt_sub_opcode`]'s
+//!   pilot pattern. The remaining six Row-2 endpoint types
+//!   (`PWM_IN, LIN, CAN, UART, ISELED, MDIO`) are expected to follow the
+//!   same pattern in their own later items.
 //!
 //! Deliberately out of scope, for the same reasons
 //! [`crate::gpio`]'s/[`crate::spi`]'s/[`crate::i2c`]'s/[`crate::uart`]'s own
@@ -50,22 +64,72 @@
 //!
 //! - PWM_OUT / PWM_IN (`ep_type 0x07`/`0x08`) — `ROADMAP.md`'s next
 //!   Milestone 4 checklist bullet, not yet built.
-//! - The "Groups A/B/C" `evt[2:0]` sub-opcode convention as a general,
-//!   cross-endpoint-type classification scheme, and any use of
-//!   `evt.sub_opcode` at all — `ROADMAP.md`'s ADC checklist bullet names no
-//!   `sub_opcode`-keyed selection mechanism, so this module reads
-//!   `sub_opcode` nowhere. That convention is this milestone's still-open
-//!   final checklist bullet.
+//! - The "Groups A/B/C" `evt[2:0]` sub-opcode convention
+//!   ([`crate::evtgroup::EvtGroup`]) as a general, cross-endpoint-type
+//!   classification scheme — [`crate::evtgroup`]'s own doc comment already
+//!   flags that broader scheme as unresolved, independent of the narrower,
+//!   unambiguous Table 33 Row-2 rule this module's [`AdcRequest`] now
+//!   implements (see "Provenance note: evt[2:0] request validation" below).
 //! - [`crate::regmap::CommonFunctionalConfig`]'s fields — unchanged here, as
 //!   in every prior Milestone 1-4 entry.
 //! - Any actual sampling loop, timer, or scheduler that would *drive*
 //!   `adc_sample_interval`-spaced sampling. This module models the
 //!   averaging math and the request-driven-only validation rule as pure
 //!   functions only; nothing here runs on a clock.
-//! - Wiring any of the below into an actual decoder, dispatch loop, or
-//!   [`crate::avtp`]/[`crate::acf`]/[`crate::addressing`] caller. This
-//!   module remains additive standalone plumbing only, matching the
-//!   discipline every prior Milestone 1-4 entry already established.
+//! - Decoding [`AdcRequest::ConfigWrite`]'s own TC18 §12.7.1 payload shape.
+//!   [`AdcRequest::from_evt_sub_opcode`] recognizes a config-write request
+//!   as distinct from a [`Plain`](AdcRequest::Plain) one, but does not
+//!   itself interpret what the config-write payload contains — that is
+//!   separate, later work, same as every Row-2 endpoint-type module this
+//!   predicate lands in.
+//! - Wiring [`AdcRequest::from_evt_sub_opcode`] into an actual decoder,
+//!   dispatch loop, or [`crate::mock::Endpoint`] implementation.
+//!   [`crate::mock::Endpoint`]'s own trait signature does not carry an
+//!   `evt` value to any implementation at all yet — that gap is not
+//!   specific to ADC, it applies identically to
+//!   [`crate::i2c::I2cRequest::from_evt_sub_opcode`] (this crate's pilot
+//!   Row-2 endpoint type, confirmed still unwired against
+//!   [`crate::mock::Endpoint`]'s own doc comment) and to
+//!   [`crate::gpio::GpioWriteSemantics::from_sub_opcode`]/
+//!   [`crate::spi::SpiChannelSelect::from_sub_opcode`]. [`AdcRequest`] is
+//!   built to that same "additive standalone plumbing only" level, ready
+//!   for whichever later item first threads a live `evt` value through an
+//!   actual dispatch loop.
+//!
+//! ## Provenance note: evt[2:0] request validation
+//!
+//! ADC is one of the eight endpoint types TC18 §13.5 Table 33 groups into
+//! one shared "Row 2" `evt[2:0]` rule — see [`crate::evtgroup`]'s own doc
+//! comment "Provenance note: TC18 §13.5 Table 33's Row-2 rule
+//! (`evt_row2_kind_of`)" for the full citation, including the literal-text
+//! discrepancy that module's doc comment flags and resolves (Table 33's own
+//! printed Row-2 cell reads "000b to 110b reserved", including 000b, which
+//! this crate does not implement literally). [`AdcRequest::from_evt_sub_opcode`]
+//! is this module's own caller of that shared
+//! [`crate::evtgroup::evt_row2_kind_of`] predicate.
+//!
+//! Unlike [`crate::i2c::I2cRequest::Plain`], which decodes its payload bytes
+//! as an [`crate::i2c::I2cByteTransfer`], [`AdcRequest::Plain`]
+//! (`evt[2:0] == 000b`) carries no decoded payload struct at all: TC18
+//! §13.7.9.3 states plainly "The ADC request has no byte_msg_payload, while
+//! a wait-request needs a byte_msg_payload" — there is nothing to decode.
+//! [`AdcRequest::from_evt_sub_opcode`] enforces that stated fact rather than
+//! silently ignoring it: a [`Plain`](AdcRequest::Plain) request with a
+//! non-empty `payload` is rejected with `Err(`[`RcpError::InvalidParameter`]`)`.
+//! TC18 §13.7.9.3 names no dedicated violation code for this specific case
+//! (unlike Table 33's own `Reserved` sub_opcode rule, which explicitly names
+//! `UNSUPPORTED_CMD`, and unlike `ROADMAP.md`'s UART checklist bullet, which
+//! names `UNKNOWN_CMD` for UART's own payload-less-read violation — see
+//! [`crate::uart`]'s own "Provenance note: `UNKNOWN_CMD` and
+//! `RcpError::UnsupportedCmd`"). Per Guiding Principle 5, this module does
+//! not reuse either of those two more specific codes for an unrelated
+//! violation they were not cited for; [`RcpError::InvalidParameter`] is this
+//! crate's general malformed-input sentinel elsewhere in this same module
+//! (e.g. [`AdcResolutionBits::new`], [`AdcSampleValue::new`]), so it is
+//! reused here rather than invented. Every `Reserved` sub_opcode is
+//! rejected with `Err(`[`RcpError::UnsupportedCmd`]`)`, matching Table 33's
+//! own stated error code and
+//! [`crate::i2c::I2cRequest::from_evt_sub_opcode`]'s identical refusal.
 //!
 //! ## Relationship to [`crate::regmap`]
 //!
@@ -162,6 +226,7 @@
 //! nothing to run continuously — only the refusal a request-driven-only RC
 //! Server would need to give if asked to.
 
+use crate::evtgroup::{evt_row2_kind_of, EvtRow2Kind};
 use crate::RcpError;
 
 // ── AdcResolutionBits / AdcSampleValue ──────────────────────────────────────
@@ -434,6 +499,71 @@ pub fn validate_adc_sample_request(mode: AdcSamplingMode) -> Result<(), RcpError
     match mode {
         AdcSamplingMode::RequestDriven => Ok(()),
         AdcSamplingMode::Continuous => Err(RcpError::UnsupportedCmd),
+    }
+}
+
+// ── AdcRequest: evt[2:0] request validation ─────────────────────────────────
+
+/// The decoded shape of an incoming ADC request, after validating its
+/// `evt[2:0]` sub-opcode against TC18 §13.5 Table 33's Row-2 rule (ADC is
+/// one of that row's eight endpoint types —
+/// `{ADC, PWM_IN, I²C, LIN, CAN, UART, ISELED, MDIO}`).
+///
+/// See this module's doc comment "Provenance note: evt[2:0] request
+/// validation" for the full citation, and
+/// [`crate::evtgroup`]'s own doc comment for the literal-text discrepancy
+/// this crate resolves `evt[2:0] == 000b` against. Unlike
+/// [`crate::i2c::I2cRequest::Plain`], which carries a decoded
+/// [`crate::i2c::I2cByteTransfer`], [`AdcRequest::Plain`] carries no payload
+/// struct at all — TC18 §13.7.9.3 states the ADC request itself has none.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+//fusa:req REQ-ADC-011
+pub enum AdcRequest {
+    /// `evt[2:0] == 000b`: an ordinary ADC sample request. TC18 §13.7.9.3:
+    /// "The ADC request has no byte_msg_payload, while a wait-request needs
+    /// a byte_msg_payload."
+    Plain,
+    /// `evt[2:0] == 111b`: a functional-config write (TC18 §12.7.1) rather
+    /// than an ordinary sample request. This crate does not yet decode the
+    /// config-write payload shape itself — see this module's doc comment
+    /// "Deliberately out of scope" — so a caller receiving this variant
+    /// knows only that the request *is* a config-write, not its content.
+    ConfigWrite,
+}
+
+impl AdcRequest {
+    /// Decode an incoming ADC request from its `evt.sub_opcode`
+    /// ([`crate::acf::Evt::sub_opcode`]) and raw `byte_msg_payload` bytes.
+    ///
+    /// Returns `Err(`[`RcpError::UnsupportedCmd`]`)` for every
+    /// [`EvtRow2Kind::Reserved`] sub_opcode value — TC18 §13.5 Table 33's
+    /// Row-2 rule requires the request be rejected with error code
+    /// `UNSUPPORTED_CMD`, matching
+    /// [`crate::i2c::I2cRequest::from_evt_sub_opcode`]'s identical refusal
+    /// of its own table's reserved code. A [`Plain`](AdcRequest::Plain)
+    /// request additionally requires `payload` to be empty, per TC18
+    /// §13.7.9.3's own statement that the ADC request carries no
+    /// `byte_msg_payload` at all — a non-empty payload is rejected with
+    /// `Err(`[`RcpError::InvalidParameter`]`)` rather than silently accepted
+    /// or guessed at as meaningful; see this module's doc comment
+    /// "Provenance note: evt[2:0] request validation" for why
+    /// `InvalidParameter` rather than `UnsupportedCmd` is used for that
+    /// specific violation. Never panics for any `sub_opcode`/`payload`
+    /// combination.
+    //fusa:req REQ-ADC-011
+    //fusa:req REQ-ADC-012
+    pub fn from_evt_sub_opcode(sub_opcode: u8, payload: &[u8]) -> Result<Self, RcpError> {
+        match evt_row2_kind_of(sub_opcode) {
+            EvtRow2Kind::Plain => {
+                if payload.is_empty() {
+                    Ok(Self::Plain)
+                } else {
+                    Err(RcpError::InvalidParameter)
+                }
+            }
+            EvtRow2Kind::ConfigWrite => Ok(Self::ConfigWrite),
+            EvtRow2Kind::Reserved => Err(RcpError::UnsupportedCmd),
+        }
     }
 }
 
@@ -777,5 +907,80 @@ mod tests {
             validate_adc_sample_request(AdcSamplingMode::Continuous),
             Err(RcpError::UnsupportedCmd)
         );
+    }
+
+    // ── AdcRequest::from_evt_sub_opcode ──────────────────────────────────────
+
+    #[test]
+    //fusa:test REQ-ADC-011
+    //fusa:test REQ-ADC-012
+    fn adc_request_plain_evt_accepts_an_empty_payload() {
+        // TC18 §13.7.9.3: "The ADC request has no byte_msg_payload".
+        let request = AdcRequest::from_evt_sub_opcode(0b000, &[]).unwrap();
+        assert_eq!(request, AdcRequest::Plain);
+    }
+
+    #[test]
+    //fusa:test REQ-ADC-011
+    //fusa:test REQ-ADC-012
+    fn adc_request_plain_evt_rejects_a_non_empty_payload() {
+        // Unlike I2cRequest::Plain, AdcRequest::Plain decodes no payload
+        // struct -- TC18 §13.7.9.3 states the ADC request carries none at
+        // all, so a non-empty payload here is rejected rather than silently
+        // accepted or misread as meaningful.
+        for payload in [&[0x00][..], &[0x01, 0x02], &[0xFF; 16]] {
+            assert_eq!(
+                AdcRequest::from_evt_sub_opcode(0b000, payload),
+                Err(RcpError::InvalidParameter)
+            );
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-ADC-011
+    //fusa:test REQ-ADC-012
+    fn adc_request_config_write_evt_is_recognized_without_interpreting_payload() {
+        // The payload is not decoded at all for a config-write request --
+        // the variant carries no payload, so garbage bytes here cannot be
+        // silently misread.
+        let request = AdcRequest::from_evt_sub_opcode(0b111, &[0xDE, 0xAD, 0xBE, 0xEF]).unwrap();
+        assert_eq!(request, AdcRequest::ConfigWrite);
+    }
+
+    #[test]
+    //fusa:test REQ-ADC-012
+    fn adc_request_reserved_evt_values_are_rejected_with_unsupported_cmd() {
+        for sub_opcode in 0b001..=0b110u8 {
+            assert_eq!(
+                AdcRequest::from_evt_sub_opcode(sub_opcode, &[]),
+                Err(RcpError::UnsupportedCmd)
+            );
+            assert_eq!(
+                AdcRequest::from_evt_sub_opcode(sub_opcode, &[1, 2, 3]),
+                Err(RcpError::UnsupportedCmd)
+            );
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-ADC-012
+    fn adc_request_values_above_the_3_bit_field_are_also_rejected_with_unsupported_cmd() {
+        for sub_opcode in (crate::acf::EVT_SUB_OPCODE_MAX + 1)..=u8::MAX {
+            assert_eq!(
+                AdcRequest::from_evt_sub_opcode(sub_opcode, &[]),
+                Err(RcpError::UnsupportedCmd)
+            );
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-ADC-012
+    fn adc_request_from_evt_sub_opcode_never_panics_for_any_sampled_input() {
+        let payloads: [&[u8]; 3] = [&[], &[0x00], &[0xAA; 32]];
+        for sub_opcode in 0..=u8::MAX {
+            for payload in payloads {
+                let _ = AdcRequest::from_evt_sub_opcode(sub_opcode, payload);
+            }
+        }
     }
 }

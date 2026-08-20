@@ -3754,6 +3754,26 @@
       "tc18_master_id": "TC18-13.7.9.1-010"
     },
     {
+      "id": "REQ-ADC-011",
+      "title": "AdcRequest enumerates the decoded shape of a Row-2 ADC request after evt[2:0] validation",
+      "text": "AdcRequest's two variants (Plain, ConfigWrite) give an incoming ADC request's decoded shape after its evt.sub_opcode has been validated against evt_row2_kind_of's Table 33 Row-2 rule; AdcRequest::from_evt_sub_opcode is the request-decode entry point that performs that validation and dispatch. Unlike I2cRequest::Plain, AdcRequest::Plain carries no decoded payload struct at all, since TC18 §13.7.9.3 states the ADC request itself carries no byte_msg_payload",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.5 Table 33's Row-2 row (ADC is one of its eight endpoint types), TC18.txt L4085-4092, and §13.7.9.3 ADC request handling, TC18.txt L5577-5579"
+    },
+    {
+      "id": "REQ-ADC-012",
+      "title": "AdcRequest::from_evt_sub_opcode accepts Plain/ConfigWrite, rejects a non-empty Plain payload with InvalidParameter and Reserved sub_opcodes with UnsupportedCmd, never panicking",
+      "text": "AdcRequest::from_evt_sub_opcode recognizes a Plain (sub_opcode 0) request only when payload is empty, per TC18 §13.7.9.3's statement that the ADC request has no byte_msg_payload -- a non-empty payload on a Plain request returns Err(RcpError::InvalidParameter), this crate's general malformed-input sentinel, since TC18 names no dedicated violation code for this specific case (distinct from Table 33's own Reserved sub_opcode rule, which does name UNSUPPORTED_CMD). A ConfigWrite (sub_opcode 7) request is recognized without attempting to interpret its payload (full TC18 §12.7.1 config-write payload decoding is deferred, not silently guessed at). Every Reserved sub_opcode value returns Err(RcpError::UnsupportedCmd), matching TC18 Table 33's Row-2 error-code requirement and crate::i2c::I2cRequest::from_evt_sub_opcode's identical refusal of its own table's reserved code; never panics for any sub_opcode/payload combination",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.5 Table 33 (\"000b to 110b reserved – request to be rejected with error code = UNSUPPORTED_CMD\" / \"111b: ... used to change the configuration of the endpoint (see 12.7.1)\"), TC18.txt L4085-4092, and §13.7.9.3 (\"The ADC request has no byte_msg_payload, while a wait-request needs a byte_msg_payload\"), TC18.txt L5577-5579"
+    },
+    {
       "id": "REQ-PWM-009",
       "title": "resolve_pwm_in_read never panics for any sampled combination of config, last_measured, and elapsed inputs",
       "text": "resolve_pwm_in_read does not panic across sampled boundary combinations of no_signal_timeout (including 0 and u32::MAX), last_measured (None, a zeroed pair, and a maximal pair), and elapsed_since_last_edge (including 0 and u32::MAX)",
