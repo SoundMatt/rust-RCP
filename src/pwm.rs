@@ -7,6 +7,8 @@
 //fusa:req REQ-PWM-007
 //fusa:req REQ-PWM-008
 //fusa:req REQ-PWM-009
+//fusa:req REQ-PWMI-004
+//fusa:req REQ-PWMI-005
 
 //! The PWM_OUT / PWM_IN endpoint types (`ep_type 0x07`/`0x08`) —
 //! `ROADMAP.md` Milestone 4 ("Basic Endpoint Types"), fifth checklist
@@ -16,7 +18,7 @@
 //! PWM_IN's `PWM_IN_NO_SIGNAL` timeout instead of hanging or returning
 //! stale data."
 //!
-//! Two named pieces are in scope, both implemented here:
+//! Three named pieces are in scope, all implemented here:
 //!
 //! - [`PwmDurationPair`] / [`PwmOutFunctionalConfig`] /
 //!   [`PwmInFunctionalConfig`] — the shared period+active-duration pair
@@ -30,22 +32,55 @@
 //!   prose-rule-to-function discipline. See "Provenance note:
 //!   `PWM_IN_NO_SIGNAL`, hanging, and stale data" below for how this avoids
 //!   both failure modes the checklist bullet names.
+//! - [`PwmInRequest`]/[`PwmInRequest::from_evt_sub_opcode`] — PWM_IN's own
+//!   request-decode entry point, validating an incoming request's
+//!   `evt.sub_opcode` against [`crate::evtgroup::evt_row2_kind_of`]'s TC18
+//!   §13.5 Table 33 Row-2 rule. See "Provenance note: evt[2:0] request
+//!   validation" below — this piece was added after this module's own
+//!   original scope note below (which still accurately described why no
+//!   `sub_opcode` reading existed here originally, before this addition) as
+//!   this crate's third Row-2 endpoint-type module, following
+//!   [`crate::i2c::I2cRequest`]/[`crate::i2c::I2cRequest::from_evt_sub_opcode`]'s
+//!   pilot pattern and
+//!   [`crate::adc::AdcRequest`]/[`crate::adc::AdcRequest::from_evt_sub_opcode`]'s
+//!   second application of it. The remaining five Row-2 endpoint types
+//!   (`LIN, CAN, UART, ISELED, MDIO`) are expected to follow the same
+//!   pattern in their own later items.
 //!
 //! Deliberately out of scope, for the same reasons
 //! [`crate::gpio`]'s/[`crate::spi`]'s/[`crate::i2c`]'s/[`crate::uart`]'s own
 //! doc comments already give:
 //!
-//! - The "Groups A/B/C" `evt[2:0]` sub-opcode convention — this milestone's
-//!   own separate, still-open closing checklist bullet. This module reads
-//!   `sub_opcode` nowhere.
+//! - The "Groups A/B/C" `evt[2:0]` sub-opcode convention
+//!   ([`crate::evtgroup::EvtGroup`]) as a general, cross-endpoint-type
+//!   classification scheme — this milestone's own separate, still-open
+//!   closing checklist bullet. [`crate::evtgroup`]'s own doc comment already
+//!   flags that broader scheme as unresolved, independent of the narrower,
+//!   unambiguous Table 33 Row-2 rule this module's [`PwmInRequest`] now
+//!   implements (see "Provenance note: evt[2:0] request validation" below).
 //! - [`crate::regmap::CommonFunctionalConfig`]'s fields — unchanged here.
 //! - Any wire-level byte encoding for [`PwmDurationPair`]'s two fields, or
 //!   for a PWM_IN measurement response. See "Provenance note: field widths
-//!   and units" below.
-//! - Wiring any of the below into an actual decoder, dispatch loop, or
-//!   [`crate::avtp`]/[`crate::acf`]/[`crate::addressing`] caller. This
-//!   module remains additive standalone plumbing only, matching the
-//!   discipline every prior Milestone 1-4 entry already established.
+//!   and units" below — [`PwmInRequest::Plain`]'s own raw, undecoded payload
+//!   (see "Provenance note: evt[2:0] request validation") does not resolve
+//!   this either.
+//! - Decoding [`PwmInRequest::ConfigWrite`]'s own TC18 §12.7.1 payload
+//!   shape. [`PwmInRequest::from_evt_sub_opcode`] recognizes a config-write
+//!   request as distinct from a [`Plain`](PwmInRequest::Plain) one, but does
+//!   not itself interpret what the config-write payload contains — that is
+//!   separate, later work, same as every Row-2 endpoint-type module this
+//!   predicate lands in.
+//! - Wiring [`PwmInRequest::from_evt_sub_opcode`] into an actual decoder,
+//!   dispatch loop, or [`crate::mock::Endpoint`] implementation.
+//!   [`crate::mock::Endpoint`]'s own trait signature still does not carry an
+//!   `evt` value to any implementation at all — that gap is not specific to
+//!   PWM_IN, it applies identically to
+//!   [`crate::i2c::I2cRequest::from_evt_sub_opcode`]/
+//!   [`crate::adc::AdcRequest::from_evt_sub_opcode`] (confirmed still
+//!   unwired against [`crate::mock::Endpoint`]'s own doc comment) and to
+//!   [`crate::gpio::GpioWriteSemantics::from_sub_opcode`]/
+//!   [`crate::spi::SpiChannelSelect::from_sub_opcode`]. [`PwmInRequest`] is
+//!   built to that same "additive standalone plumbing only" level.
 //!
 //! ## Relationship to [`crate::regmap`]
 //!
@@ -142,8 +177,50 @@
 //! configured timeout, never by the measured pair's value — avoiding a
 //! fragile "an all-zero reading means no signal" convention the checklist
 //! text does not state.
+//!
+//! ## Provenance note: evt[2:0] request validation
+//!
+//! PWM_IN is one of the eight endpoint types TC18 §13.5 Table 33 groups
+//! into one shared "Row 2" `evt[2:0]` rule — see [`crate::evtgroup`]'s own
+//! doc comment "Provenance note: TC18 §13.5 Table 33's Row-2 rule
+//! (`evt_row2_kind_of`)" for the full citation, including the literal-text
+//! discrepancy that module's doc comment flags and resolves (Table 33's own
+//! printed Row-2 cell reads "000b to 110b reserved", including 000b, which
+//! this crate does not implement literally). [`PwmInRequest::from_evt_sub_opcode`]
+//! is this module's own caller of that shared
+//! [`crate::evtgroup::evt_row2_kind_of`] predicate.
+//!
+//! Unlike [`crate::adc::AdcRequest::Plain`], which carries no payload struct
+//! at all because TC18 §13.7.9.3 states the ADC request has none,
+//! [`PwmInRequest::Plain`] (`evt[2:0] == 000b`) does carry a payload: TC18
+//! §13.7.6.3 states plainly "The PWM_IN request and response contain two 16
+//! bit values in the payload." — the request side is explicitly named, not
+//! silently absent the way ADC's is. However, §13.7.6.3's very next
+//! sentence ("Responses include the measured active time of the PWM signal
+//! as well as the period of the signal...") states what the *response's*
+//! two values mean without ever stating what the *request's* two values
+//! mean, and this module's own pre-existing "Provenance note: field widths
+//! and units" above already flags [`PwmDurationPair`]'s exact wire-level
+//! width, units, and byte framing as unconfirmed, with no
+//! encode/decode pair defined for it at all. Per Guiding Principle 5, this
+//! module does not bridge those two open questions to invent a decode of
+//! the request payload into a [`PwmDurationPair`]: [`PwmInRequest::Plain`]
+//! instead carries the payload as [`PwmInByteTransfer`], a raw,
+//! byte-for-byte, uninterpreted transfer — mirroring
+//! [`crate::i2c::I2cByteTransfer`]'s identical "framing not yet confirmed,
+//! carry the bytes rather than guess a structure" discipline, rather than
+//! [`crate::adc::AdcRequest`]'s "the spec states there is no payload, so
+//! reject a non-empty one" discipline, since TC18 does not state PWM_IN's
+//! request payload is absent the way it does for ADC. Every `Reserved`
+//! sub_opcode is rejected with `Err(`[`RcpError::UnsupportedCmd`]`)`,
+//! matching Table 33's own stated error code and
+//! [`crate::i2c::I2cRequest::from_evt_sub_opcode`]'s/
+//! [`crate::adc::AdcRequest::from_evt_sub_opcode`]'s identical refusal of
+//! their own table's reserved code.
 
+use crate::evtgroup::{evt_row2_kind_of, EvtRow2Kind};
 use crate::regmap::{EndpointType, PerEpTypeFunctionalConfig};
+use crate::RcpError;
 
 // ── PwmDurationPair ──────────────────────────────────────────────────────────
 
@@ -273,6 +350,97 @@ pub fn resolve_pwm_in_read(
         (_, true) => Some(PwmInReadResolution::NoSignal),
         (Some(pair), false) => Some(PwmInReadResolution::Measured(pair)),
         (None, false) => None,
+    }
+}
+
+// ── PwmInRequest: evt[2:0] request validation ───────────────────────────────
+
+/// A raw, unstructured `byte_msg_payload` transfer carried by a
+/// [`PwmInRequest::Plain`] request.
+///
+/// TC18 §13.7.6.3 states the PWM_IN request (like its response) contains a
+/// `byte_msg_payload` of "two 16 bit values", but — unlike the response,
+/// whose two values §13.7.6.3 names explicitly (measured active time,
+/// period) — never states what the request's own two values mean. This
+/// crate also has not resolved [`PwmDurationPair`]'s own wire-level width,
+/// units, or byte framing (see this module's doc comment "Provenance note:
+/// field widths and units"). Per this module's doc comment "Provenance
+/// note: evt[2:0] request validation", this type therefore carries the
+/// payload bytes exactly as received, unparsed, mirroring
+/// [`crate::i2c::I2cByteTransfer`]'s identical "framing not yet confirmed"
+/// discipline rather than guessing at a [`PwmDurationPair`] decode.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+//fusa:req REQ-PWMI-004
+pub struct PwmInByteTransfer {
+    /// The raw `byte_msg_payload` bytes, unmodified and unframed.
+    pub bytes: Vec<u8>,
+}
+
+impl PwmInByteTransfer {
+    /// Encode this transfer to its raw wire representation: `bytes`,
+    /// unmodified and unframed.
+    //fusa:req REQ-PWMI-004
+    pub fn encode(&self) -> Vec<u8> {
+        self.bytes.clone()
+    }
+
+    /// Decode a [`PwmInByteTransfer`] from a byte slice.
+    ///
+    /// Every possible byte slice, including an empty one, is a valid
+    /// transfer, so this never fails and never panics for any input.
+    //fusa:req REQ-PWMI-004
+    pub fn decode(b: &[u8]) -> Self {
+        Self { bytes: b.to_vec() }
+    }
+}
+
+/// The decoded shape of an incoming PWM_IN request, after validating its
+/// `evt[2:0]` sub-opcode against TC18 §13.5 Table 33's Row-2 rule (PWM_IN is
+/// one of that row's eight endpoint types —
+/// `{ADC, PWM_IN, I²C, LIN, CAN, UART, ISELED, MDIO}`).
+///
+/// See this module's doc comment "Provenance note: evt[2:0] request
+/// validation" for the full citation, why [`PwmInRequest::Plain`] carries a
+/// raw [`PwmInByteTransfer`] rather than either a decoded
+/// [`PwmDurationPair`] or no payload at all, and
+/// [`crate::evtgroup`]'s own doc comment for the literal-text discrepancy
+/// this crate resolves `evt[2:0] == 000b` against.
+#[derive(Debug, Clone, PartialEq, Eq)]
+//fusa:req REQ-PWMI-004
+pub enum PwmInRequest {
+    /// `evt[2:0] == 000b`: an ordinary PWM_IN request. TC18 §13.7.6.3: "The
+    /// PWM_IN request and response contain two 16 bit values in the
+    /// payload." — carried here as a raw, undecoded [`PwmInByteTransfer`].
+    Plain(PwmInByteTransfer),
+    /// `evt[2:0] == 111b`: a functional-config write (TC18 §12.7.1) rather
+    /// than an ordinary request. This crate does not yet decode the
+    /// config-write payload shape itself — see this module's doc comment
+    /// "Deliberately out of scope" — so a caller receiving this variant
+    /// knows only that the request *is* a config-write, not its content.
+    ConfigWrite,
+}
+
+impl PwmInRequest {
+    /// Decode an incoming PWM_IN request from its `evt.sub_opcode`
+    /// ([`crate::acf::Evt::sub_opcode`]) and raw `byte_msg_payload` bytes.
+    ///
+    /// Returns `Err(`[`RcpError::UnsupportedCmd`]`)` for every
+    /// [`EvtRow2Kind::Reserved`] sub_opcode value — TC18 §13.5 Table 33's
+    /// Row-2 rule requires the request be rejected with error code
+    /// `UNSUPPORTED_CMD`, matching
+    /// [`crate::i2c::I2cRequest::from_evt_sub_opcode`]'s/
+    /// [`crate::adc::AdcRequest::from_evt_sub_opcode`]'s identical refusal
+    /// of their own table's reserved code. Never panics for any
+    /// `sub_opcode`/`payload` combination — [`PwmInByteTransfer::decode`] is
+    /// itself infallible and total over every byte slice.
+    //fusa:req REQ-PWMI-004
+    //fusa:req REQ-PWMI-005
+    pub fn from_evt_sub_opcode(sub_opcode: u8, payload: &[u8]) -> Result<Self, RcpError> {
+        match evt_row2_kind_of(sub_opcode) {
+            EvtRow2Kind::Plain => Ok(Self::Plain(PwmInByteTransfer::decode(payload))),
+            EvtRow2Kind::ConfigWrite => Ok(Self::ConfigWrite),
+            EvtRow2Kind::Reserved => Err(RcpError::UnsupportedCmd),
+        }
     }
 }
 
@@ -524,6 +692,79 @@ mod tests {
                 for &elapsed in &elapsed_samples {
                     let _ = resolve_pwm_in_read(config, measured, elapsed);
                 }
+            }
+        }
+    }
+
+    // ── PwmInRequest::from_evt_sub_opcode ────────────────────────────────
+
+    #[test]
+    //fusa:test REQ-PWMI-004
+    //fusa:test REQ-PWMI-005
+    fn pwm_in_request_plain_evt_decodes_payload_as_raw_byte_transfer() {
+        // TC18 §13.7.6.3 Figure 29: two 16-bit values in the payload.
+        let payload = [0x12, 0x34, 0x56, 0x78];
+        let request = PwmInRequest::from_evt_sub_opcode(0b000, &payload).unwrap();
+        assert_eq!(
+            request,
+            PwmInRequest::Plain(PwmInByteTransfer {
+                bytes: payload.to_vec()
+            })
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-PWMI-004
+    //fusa:test REQ-PWMI-005
+    fn pwm_in_request_plain_evt_accepts_an_empty_payload() {
+        let request = PwmInRequest::from_evt_sub_opcode(0b000, &[]).unwrap();
+        assert_eq!(request, PwmInRequest::Plain(PwmInByteTransfer::default()));
+    }
+
+    #[test]
+    //fusa:test REQ-PWMI-004
+    //fusa:test REQ-PWMI-005
+    fn pwm_in_request_config_write_evt_is_recognized_without_interpreting_payload() {
+        // The payload is not decoded as a PwmInByteTransfer for a
+        // config-write request -- the variant carries no payload at all, so
+        // garbage bytes here cannot be silently misread as a transfer.
+        let request = PwmInRequest::from_evt_sub_opcode(0b111, &[0xDE, 0xAD, 0xBE, 0xEF]).unwrap();
+        assert_eq!(request, PwmInRequest::ConfigWrite);
+    }
+
+    #[test]
+    //fusa:test REQ-PWMI-005
+    fn pwm_in_request_reserved_evt_values_are_rejected_with_unsupported_cmd() {
+        for sub_opcode in 0b001..=0b110u8 {
+            assert_eq!(
+                PwmInRequest::from_evt_sub_opcode(sub_opcode, &[]),
+                Err(RcpError::UnsupportedCmd)
+            );
+            assert_eq!(
+                PwmInRequest::from_evt_sub_opcode(sub_opcode, &[1, 2, 3]),
+                Err(RcpError::UnsupportedCmd)
+            );
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-PWMI-005
+    fn pwm_in_request_values_above_the_3_bit_field_are_also_rejected_with_unsupported_cmd() {
+        for sub_opcode in (crate::acf::EVT_SUB_OPCODE_MAX + 1)..=u8::MAX {
+            assert_eq!(
+                PwmInRequest::from_evt_sub_opcode(sub_opcode, &[]),
+                Err(RcpError::UnsupportedCmd)
+            );
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-PWMI-005
+    fn pwm_in_request_from_evt_sub_opcode_never_panics_for_any_sampled_input() {
+        let payloads: [&[u8]; 3] = [&[], &[0x00], &[0xAA; 32]];
+        for sub_opcode in 0..=u8::MAX {
+            for payload in payloads {
+                let _ = PwmInRequest::from_evt_sub_opcode(sub_opcode, payload);
             }
         }
     }

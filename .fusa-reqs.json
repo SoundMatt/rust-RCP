@@ -5883,6 +5883,26 @@
       "tc18_master_id": "TC18-13.7.6.2-001"
     },
     {
+      "id": "REQ-PWMI-004",
+      "title": "PwmInRequest enumerates the decoded shape of a Row-2 PWM_IN request after evt[2:0] validation",
+      "text": "PwmInRequest's two variants (Plain(PwmInByteTransfer), ConfigWrite) give an incoming PWM_IN request's decoded shape after its evt.sub_opcode has been validated against evt_row2_kind_of's Table 33 Row-2 rule; PwmInRequest::from_evt_sub_opcode is the request-decode entry point that performs that validation and dispatch. Unlike AdcRequest::Plain, which carries no payload struct at all because TC18 §13.7.9.3 states the ADC request has none, PwmInRequest::Plain carries a PwmInByteTransfer of the request's raw byte_msg_payload bytes, since TC18 §13.7.6.3 states the PWM_IN request (like its response) contains a byte_msg_payload of two 16-bit values -- but that payload is carried raw and undecoded rather than as a structured period/active-duration pair, since neither PwmDurationPair's own wire-level width/framing (already flagged unconfirmed in pwm.rs's own 'Provenance note: field widths and units') nor the request's own two-value meaning (TC18 §13.7.6.3 states only what the response's two values mean) is confirmed; mirrors I2cByteTransfer's identical unclear-framing discipline",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.5 Table 33's Row-2 row (PWM_IN is one of its eight endpoint types), TC18.txt L4085-4092, and §13.7.6.3 PWM_IN EP request handling (\"The PWM_IN request and response contain two 16 bit values in the payload.\"), TC18.txt L5168-5170"
+    },
+    {
+      "id": "REQ-PWMI-005",
+      "title": "PwmInRequest::from_evt_sub_opcode accepts Plain/ConfigWrite and rejects Reserved sub_opcodes with UnsupportedCmd, never panicking",
+      "text": "PwmInRequest::from_evt_sub_opcode decodes a Plain (sub_opcode 0) request's payload bytes as a PwmInByteTransfer via PwmInByteTransfer::decode, recognizes a ConfigWrite (sub_opcode 7) request without attempting to interpret its payload (full TC18 §12.7.1 config-write payload decoding is deferred, not silently guessed at), and returns Err(RcpError::UnsupportedCmd) for every Reserved sub_opcode value, matching TC18 Table 33's Row-2 error-code requirement and crate::i2c::I2cRequest::from_evt_sub_opcode's/crate::adc::AdcRequest::from_evt_sub_opcode's identical refusal of their own table's reserved code; never panics for any sub_opcode/payload combination",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.5 Table 33 (\"000b to 110b reserved – request to be rejected with error code = UNSUPPORTED_CMD\" / \"111b: ... used to change the configuration of the endpoint (see 12.7.1)\"), TC18.txt L4085-4092"
+    },
+    {
       "id": "REQ-RESP-002",
       "title": "build_error_response reuses the request's evt nibble verbatim, including evt[3]",
       "text": "build_error_response copies the originating request's evt field verbatim (via build_response_info), including evt[3] (the acknowledge-request bit) -- a known gap, since TC18 \u00a711.3.4 (TC18.txt:1904) additionally requires an error response to carry evt[3:0] < 0x9, and this function does not enforce that bound (tracked further as REQ-RESP-007).",

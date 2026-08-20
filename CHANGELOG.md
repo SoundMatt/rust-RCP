@@ -7,6 +7,54 @@ OPEN Alliance TC18 core replacement; from `v1.0.0` on, each entry is a real
 release. See `docs/SEMVER.md` for the versioning scheme, including why a
 wire-format change is a MAJOR bump even when it is a fix.
 
+## v5.6.0 (Table 30/33 Row-2 evt[2:0] validation — PWM_IN, 3rd endpoint type) — closed
+
+Direct follow-up to v5.5.0: `pwm.rs` becomes the third of the eight TC18
+§13.5 Table 33 Row-2 endpoint types (`{ADC, PWM_IN, I2C, LIN, CAN, UART,
+ISELED, MDIO}`) to call the shared `evtgroup::evt_row2_kind_of` predicate.
+`evtgroup.rs` itself is unchanged — this release only adds `pwm.rs`'s own
+caller, and only for PWM_IN (`ep_type 0x08`); PWM_OUT (`ep_type 0x07`) is
+not one of Table 33's Row-2 endpoint types (it is grouped with GPIO
+instead) and is untouched by this release.
+
+New, purely additive `pub` items (MINOR bump per `docs/SEMVER.md`):
+
+- `pwm::PwmInByteTransfer` — a raw, unstructured `byte_msg_payload`
+  transfer type (`bytes: Vec<u8>`, with infallible `encode`/`decode`),
+  mirroring `i2c::I2cByteTransfer`'s exact shape.
+- `pwm::PwmInRequest` / `pwm::PwmInRequest::from_evt_sub_opcode` — PWM_IN's
+  own request-decode entry point, mirroring `i2c::I2cRequest`/
+  `adc::AdcRequest`'s exact shape. Unlike `AdcRequest::Plain`, which
+  carries no payload struct at all because TC18 §13.7.9.3 states the ADC
+  request has none, `PwmInRequest::Plain` carries a `PwmInByteTransfer` of
+  the request's raw payload bytes — TC18 §13.7.6.3 states plainly "The
+  PWM_IN request and response contain two 16 bit values in the payload,"
+  so unlike ADC's case a payload genuinely exists. It is carried raw and
+  undecoded rather than as a structured period/active-duration pair,
+  though: `pwm.rs`'s own pre-existing "Provenance note: field widths and
+  units" already flags `PwmDurationPair`'s wire-level width/framing as
+  unconfirmed, and §13.7.6.3 states what the *response's* two values mean
+  without ever stating what the *request's* two values mean — so this
+  release does not bridge those two open questions to invent a decode,
+  mirroring `I2cByteTransfer`'s own "framing not yet confirmed, carry the
+  bytes" discipline. `ConfigWrite` (`111b`) is recognized but not decoded
+  further (TC18 §12.7.1's payload shape is still deferred, not guessed
+  at), and every `Reserved` sub_opcode is rejected with
+  `Err(RcpError::UnsupportedCmd)`, matching Table 33's own stated error
+  code. See `pwm.rs`'s own doc comment "Provenance note: evt[2:0] request
+  validation" for the full citation and reasoning.
+
+Not in this release: wiring `PwmInRequest::from_evt_sub_opcode` into
+`mock::RcServer`'s actual dispatch — `mock::Endpoint`'s trait signature
+still does not carry an `evt` value to any implementation at all, the same
+gap v5.4.0's pilot found and left as-is (confirmed unchanged here). This
+release also does not touch `PwmOutFunctionalConfig`, `PwmDurationPair`, or
+any of `pwm.rs`'s pre-existing PWM_OUT/PWM_IN write-semantics or
+`resolve_pwm_in_read` logic — all additive standalone plumbing alongside
+it. The remaining five Row-2 endpoint types (`LIN`, `CAN`, `UART`,
+`ISELED`, `MDIO`) are expected to add their own `evt_row2_kind_of`-based
+request-decode entry point the same way, in later items.
+
 ## v5.5.0 (Table 30/33 Row-2 evt[2:0] validation — ADC, 2nd endpoint type) — closed
 
 Direct follow-up to v5.4.0's pilot: `adc.rs` becomes the second of the eight
