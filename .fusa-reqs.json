@@ -3703,7 +3703,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.2 Table 5 (\"Different types of conditional requests\"), TC18.txt L1260-1267",
+      "tc18_master_id": "TC18-11.2.2-002"
     },
     {
       "id": "REQ-CMP-002",
@@ -3721,7 +3723,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.2.2 Table 7 (\"Usage of GBB message for compound requests\"), TC18.txt L1434-1438",
+      "tc18_master_id": "TC18-11.2.2.2-007"
     },
     {
       "id": "REQ-CMP-004",
@@ -3730,7 +3734,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.10 (\"An RC Server implementation may support only a lower number of sequencers.\"), TC18.txt L3870-3871",
+      "tc18_master_id": "TC18-12.10-004"
     },
     {
       "id": "REQ-CMP-005",
@@ -3739,7 +3745,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.2.2 Table 7 (\"cmp_start_state Defines the state the addressed sequencer has to reach to start this request\"), TC18.txt L1434-1435",
+      "tc18_master_id": "TC18-11.2.2.2-007"
     },
     {
       "id": "REQ-CMP-006",
@@ -3748,7 +3756,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.2.2 Table 7 (\"cmp_exec_delay delay time between the sequencer reaching the state defined in start_state and the start of the execution of the request\"), TC18.txt L1439-1442",
+      "tc18_master_id": "TC18-11.2.2.2-007"
     },
     {
       "id": "REQ-CMP-007",
@@ -3757,7 +3767,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.9.3 Table 29 (\"In RF state the state of sequencer cmp_sequencer is set to cmp_next_state if the sequencer state still equals the cmp_start_state, else the sequencer state is not changed.\"), TC18.txt L3698-3705",
+      "tc18_master_id": "TC18-12.9.3-002"
     },
     {
       "id": "REQ-CMP-008",
@@ -3766,7 +3778,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.2 (\"The first byte in the message_timestamp field is used to indicate the type of condition.\"), TC18.txt L1254-1259",
+      "tc18_master_id": "TC18-11.2.2-002"
     },
     {
       "id": "REQ-TRIG-001",
@@ -3776,7 +3790,8 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test",
-      "tc18": "§11.2.2.3 (\"Each endpoint may be configured to start a request upon receiving a selected trigger signal\"), TC18.txt L1413"
+      "tc18": "§11.2.2 Table 5 (\"Different types of conditional requests\"), TC18.txt L1260-1267",
+      "tc18_master_id": "TC18-11.2.2-002"
     },
     {
       "id": "REQ-TRIG-002",
@@ -3785,7 +3800,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.2.5 Table 10 (\"trigger_exec_delay In multiples of ep_delay_time ... for the request execution after the trigger occurred the as many times as specified by trigger_threshold\"), TC18.txt L1719-1723",
+      "tc18_master_id": "TC18-11.2.2.5-006"
     },
     {
       "id": "REQ-TRIG-003",
@@ -3794,7 +3811,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.2.5 Table 10 (\"trigger_repetitions ... If set to 0xFFFF it indicates infinite repetition and no decrease is done at end of execution.\"), TC18.txt L1724-1728",
+      "tc18_master_id": "TC18-11.2.2.5-006"
     },
     {
       "id": "REQ-TRIG-004",
@@ -3803,7 +3822,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.2.5 Table 10 (\"trigger_repetitions ... If the field has a zero at the end of the execution, the request will be removed from the EP request storage, otherwise decreased by one.\"), TC18.txt L1724-1728",
+      "tc18_master_id": "TC18-11.2.2.5-006"
     },
     {
       "id": "REQ-TRIG-005",
@@ -3812,7 +3833,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.9.3 (\"for trigger requests the fulfillment of the trigger condition and start of the trigger delay time shall be independent of the idle state of the endpoint.\"), TC18.txt L3743-3744",
+      "tc18_master_id": "TC18-12.9.3-003"
     },
     {
       "id": "REQ-CHAIN-001",
@@ -3821,7 +3844,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.2 Table 5 (\"Different types of conditional requests\"), TC18.txt L1260-1267",
+      "tc18_master_id": "TC18-11.2.2-002"
     },
     {
       "id": "REQ-CHAIN-002",
@@ -3830,7 +3855,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.2.6 Table 11 (\"cs Conditional start ... 1b: request will not be executed in case the previous request returned an error ... error response with error code = CHAIN_ABORTED.\"), TC18.txt L1833-1837",
+      "tc18_master_id": "TC18-11.2.2.6-011"
     },
     {
       "id": "REQ-CHAIN-003",
@@ -3839,7 +3866,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.9.6 Table 30 (\"Error codes in responses\"), TC18.txt L3839-3844",
+      "tc18_master_id": "TC18-12.9.6-004"
     },
     {
       "id": "REQ-TIME-001",
@@ -3848,7 +3877,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.2 Table 5 (\"Different types of conditional requests\"), TC18.txt L1260-1267",
+      "tc18_master_id": "TC18-11.2.2-002"
     },
     {
       "id": "REQ-TIME-002",
@@ -3857,7 +3888,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.2.7 (\"In any case the presentation_time is the earliest point in time, when the request shall be executed.\"), TC18.txt L1951-1952",
+      "tc18_master_id": "TC18-11.2.2.7-007"
     },
     {
       "id": "REQ-TIME-003",
@@ -3866,7 +3899,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.2.7 (\"In any case the presentation_time is the earliest point in time, when the request shall be executed.\"), TC18.txt L1951-1952",
+      "tc18_master_id": "TC18-11.2.2.7-007"
     },
     {
       "id": "REQ-CANCEL-001",
@@ -3884,7 +3919,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.3.1 (\"Clear all requests (mandatory) ... the request type (first byte in the message_timestamp field) is 0x05.\"), TC18.txt L1983-1985",
+      "tc18_master_id": "TC18-11.2.3.1-001"
     },
     {
       "id": "REQ-CANCEL-003",
@@ -3893,7 +3930,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.3.2 (\"Clear all non-safestate requests (optional feature) ... the request type ... is 0x06.\"), TC18.txt L2054-2056",
+      "tc18_master_id": "TC18-11.2.3.2-001"
     },
     {
       "id": "REQ-CANCEL-004",
@@ -3902,7 +3941,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.3.3 (\"Clear one single request (optional feature) ... the request type ... is 0x07 followed by the transaction_num of the request to be cancelled.\"), TC18.txt L2140-2144",
+      "tc18_master_id": "TC18-11.2.3.3-001"
     },
     {
       "id": "REQ-SEQ-001",
@@ -3912,7 +3953,8 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test",
-      "tc18": "§13.2 (\"[an implementation] may support only a lower number of sequencers\"), TC18.txt L3473"
+      "tc18": "§12.10 (\"After power-on/reset all sequencers are in state 1.\"), TC18.txt L3866",
+      "tc18_master_id": "TC18-12.10-001"
     },
     {
       "id": "REQ-SEQ-002",
@@ -3921,7 +3963,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.10 (\"An RC Server implementation may support only a lower number of sequencers.\"), TC18.txt L3870-3871",
+      "tc18_master_id": "TC18-12.10-004"
     },
     {
       "id": "REQ-SEQ-003",
@@ -3930,7 +3974,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.9.3 Table 29 (\"In RF state the state of sequencer cmp_sequencer is set to cmp_next_state if the sequencer state still equals the cmp_start_state, else the sequencer state is not changed.\"), TC18.txt L3698-3705",
+      "tc18_master_id": "TC18-12.9.3-002"
     },
     {
       "id": "REQ-SEQ-004",
@@ -3939,7 +3985,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.2.2 Table 7 (\"cmp_start_state Defines the state the addressed sequencer has to reach to start this request\"), TC18.txt L1434-1435",
+      "tc18_master_id": "TC18-11.2.2.2-007"
     },
     {
       "id": "REQ-PRIO-001",
@@ -3966,7 +4014,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.9.2 (\"In case two or more requests are due for execution then the priorities are as follows: 1. cancellation 2. triggered 3. timed 4. compound 5. compound wait 6. chained 7. standard\"), TC18.txt L3652-3659",
+      "tc18_master_id": "TC18-12.9.2-003"
     },
     {
       "id": "REQ-PRIO-004",
@@ -3975,7 +4025,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.9.2 (\"When two or more requests with the same priority are due then starting the execution shall happen in the order with which the requests arrived in the EP request storage.\"), TC18.txt L3663-3664",
+      "tc18_master_id": "TC18-12.9.2-004"
     },
     {
       "id": "REQ-RLC-001",
@@ -3984,7 +4036,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.9.3 (\"Once a request has been filed into an EP request storage, it is in the state 'request pending' ... enters the state 'request started' (RS) ... advances to 'request under execution' (RE) ... and then to 'request finalized' (RF)\"), TC18.txt L3677-3682",
+      "tc18_master_id": "TC18-12.9.3-001"
     },
     {
       "id": "REQ-RLC-002",
@@ -4002,7 +4056,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.9.3 Table 29 (\"Execution procedure\"), TC18.txt L3687-3739",
+      "tc18_master_id": "TC18-12.9.3-002"
     },
     {
       "id": "REQ-RLC-004",
@@ -4011,7 +4067,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.9.3 Table 29 (\"Execution procedure\"), TC18.txt L3687-3739",
+      "tc18_master_id": "TC18-12.9.3-002"
     },
     {
       "id": "REQ-RLC-005",
@@ -4020,7 +4078,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.9.3 Table 29 (\"Execution procedure\"), TC18.txt L3687-3739",
+      "tc18_master_id": "TC18-12.9.3-002"
     },
     {
       "id": "REQ-RLC-006",
@@ -4029,7 +4089,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.3 (\"A request can be cancelled while it is pending and after it has been started until it is under execution. Requests under execution will not be aborted.\"), TC18.txt L1976-1978",
+      "tc18_master_id": "TC18-11.2.3-001"
     },
     {
       "id": "REQ-RMAP-030",
@@ -4056,7 +4118,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.2 (\"Optional support of compound requests comes as bundle of: Support of compound requests ... Implementation of at least four sequencers ... Clear all non-safestate requests from an EP request storage\"), TC18.txt L2408-2413",
+      "tc18_master_id": "TC18-12.2-004"
     },
     {
       "id": "REQ-BUNDLE-002",
@@ -4065,7 +4129,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.2 (\"Optional support of compound requests comes as bundle of: Support of compound requests ... Implementation of at least four sequencers ... Clear all non-safestate requests from an EP request storage\"), TC18.txt L2408-2413",
+      "tc18_master_id": "TC18-12.2-004"
     },
     {
       "id": "REQ-CRC-001",
@@ -4164,7 +4230,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.2 (\"If the MSB of the identifier (0x8x) is set the request is treated as a safety request and will not be deleted when the EP needs to go to safe state.\"), TC18.txt L1257-1259",
+      "tc18_master_id": "TC18-11.2.2-001"
     },
     {
       "id": "REQ-SAFETY-002",
@@ -4173,7 +4241,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.2 (\"If the MSB of the identifier (0x8x) is set the request is treated as a safety request and will not be deleted when the EP needs to go to safe state.\"), TC18.txt L1257-1259",
+      "tc18_master_id": "TC18-11.2.2-001"
     },
     {
       "id": "REQ-SAFETY-003",
@@ -4191,7 +4261,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.2 (\"If the MSB of the identifier (0x8x) is set the request is treated as a safety request and will not be deleted when the EP needs to go to safe state.\"), TC18.txt L1257-1259",
+      "tc18_master_id": "TC18-11.2.2-001"
     },
     {
       "id": "REQ-SAFETY-005",
@@ -4200,7 +4272,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.2 (\"If the MSB of the identifier (0x8x) is set the request is treated as a safety request and will not be deleted when the EP needs to go to safe state.\"), TC18.txt L1257-1259",
+      "tc18_master_id": "TC18-11.2.2-001"
     },
     {
       "id": "REQ-WDG-001",
@@ -4388,7 +4462,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.7 Table 24 (\"rx_enforce_sequence ... 0b: stream is not blocked upon out of order reception 1b: stream is blocked upon out of order reception and Safe state will be entered\"), TC18.txt L3244-3248",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-SEQENF-002",
@@ -4397,7 +4473,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.7 Table 24 (\"rx_enforce_sequence ... 0b: stream is not blocked upon out of order reception 1b: stream is blocked upon out of order reception and Safe state will be entered\"), TC18.txt L3244-3248",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-SEQENF-003",
@@ -4406,7 +4484,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.7 Table 24 (\"rx_enforce_sequence ... 0b: stream is not blocked upon out of order reception 1b: stream is blocked upon out of order reception and Safe state will be entered\"), TC18.txt L3244-3248",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-SAFEACT-001",
@@ -5406,7 +5486,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.5 (\"event bits evt[2:0] are used to control the usage of the byte_msg_payload.\"), TC18.txt L4069-4071",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-EVT-002",
@@ -5415,7 +5497,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.5 (\"evt[3] is used to request an acknowledge. I.e. evt[3] = 1 requests acknowledge.\"), TC18.txt L4072",
+      "tc18_master_id": "TC18-13.5-002"
     },
     {
       "id": "REQ-GPIO-017",
@@ -5579,7 +5663,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.3.4 (\"With evt[3:0] < 0x9 and err = 1 the response is an error-response indicating that the execution of the request failed.\"), TC18.txt L2299-2301",
+      "tc18_master_id": "TC18-11.3.4-001"
     },
     {
       "id": "REQ-RESP-003",
@@ -5644,7 +5730,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.3 Table 17 (\"Usage of ABB/GBB message for responses\"), TC18.txt L2242-2266",
+      "tc18_master_id": "TC18-11.3-003"
     }
   ]
 }
