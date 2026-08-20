@@ -5056,6 +5056,26 @@
       "verificationMethod": "test"
     },
     {
+      "id": "REQ-MDIO-007",
+      "title": "MdioRequest enumerates the decoded shape of a Row-2 MDIO request after evt[2:0] validation, wrapping an already-decoded MdioTransfer",
+      "text": "MdioRequest's two variants (Plain(MdioTransfer), ConfigWrite) give an incoming MDIO request's decoded shape after its evt.sub_opcode has been validated against evt_row2_kind_of's Table 33 Row-2 rule; MdioRequest::from_evt_sub_opcode is the request-decode entry point that performs that validation and dispatch. Unlike I2cRequest::from_evt_sub_opcode/LinRequest::from_evt_sub_opcode/AdcRequest::from_evt_sub_opcode/PwmInRequest::from_evt_sub_opcode/UartRequest::from_evt_sub_opcode (each of which take raw byte_msg_payload bytes and decode them internally), MdioRequest::from_evt_sub_opcode takes an already-decoded MdioTransfer, matching CanRequest::from_evt_sub_opcode's/IseledRequest::from_evt_sub_opcode's own shape rather than those five siblings' -- MdioTransfer already has its own dedicated decode entry point (MdioTransfer::decode, pre-existing this item and unchanged by it), so this evt[2:0]-classification entry point does not re-derive that byte-layout logic a second time internally",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.5 Table 33's Row-2 row (MDIO is one of its eight endpoint types), TC18.txt L4085-4092, and §13.7.13.3 MDIO request handling, TC18.txt L6065-6066"
+    },
+    {
+      "id": "REQ-MDIO-008",
+      "title": "MdioRequest::from_evt_sub_opcode accepts Plain and ConfigWrite, rejects Reserved sub_opcodes with UnsupportedCmd, and keeps the Ok(Self::ConfigWrite) precedent rather than CanRequest/IseledRequest's ConfigWriteNotImplemented departure, never panicking",
+      "text": "MdioRequest::from_evt_sub_opcode wraps the caller-supplied MdioTransfer unchanged in MdioRequest::Plain for a Plain (sub_opcode 0) request, and returns Ok(MdioRequest::ConfigWrite) without interpreting the supplied MdioTransfer for a ConfigWrite (sub_opcode 7) request -- deliberately keeping the Ok(Self::ConfigWrite) precedent I2cRequest/LinRequest/AdcRequest/PwmInRequest/UartRequest each follow rather than following CanRequest::from_evt_sub_opcode's/IseledRequest::from_evt_sub_opcode's own Err(RcpError::ConfigWriteNotImplemented) departure, because MdioTransfer::decode is infallible and interprets no structure at all (every byte slice is a valid MdioTransfer, matching I2cByteTransfer's own raw pass-through discipline), so unlike CanDataFrame/IseledFrame a caller can honestly construct an MdioTransfer from a genuine TC18 §12.7.1 config-write payload with zero misrepresentation -- the 'no caller can honestly construct one' pressure that drove CAN's/ISELED's own departure does not apply to MDIO. Every Reserved sub_opcode value (evt[2:0] in 001b..=110b, or any value outside the 3-bit field's representable range) returns Err(RcpError::UnsupportedCmd), matching TC18 Table 33's Row-2 error-code requirement and every prior Row-2 endpoint-type module's identical refusal of their own table's reserved code. Never panics for any sub_opcode/transfer combination",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.5 Table 33 (\"000b to 110b reserved – request to be rejected with error code = UNSUPPORTED_CMD\" / \"111b: ... used to change the configuration of the endpoint (see 12.7.1)\"), TC18.txt L4085-4092"
+    },
+    {
       "id": "REQ-WAKE-001",
       "title": "SleepCmdRequest's fixed 0xA5 discriminant round-trips through encode/decode",
       "text": "wakeup::SleepCmdRequest::encode always produces the single byte 0xA5 (wakeup::SleepCmdRequest::DISCRIMINANT), and wakeup::SleepCmdRequest::decode reproduces the original value from that byte",

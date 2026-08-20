@@ -2163,6 +2163,26 @@ impl core::marker::Unpin for rcp::mdio::MdioAddressingMode
 impl core::marker::UnsafeUnpin for rcp::mdio::MdioAddressingMode
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::mdio::MdioAddressingMode
 impl core::panic::unwind_safe::UnwindSafe for rcp::mdio::MdioAddressingMode
+pub enum rcp::mdio::MdioRequest
+pub rcp::mdio::MdioRequest::ConfigWrite
+pub rcp::mdio::MdioRequest::Plain(rcp::mdio::MdioTransfer)
+impl rcp::mdio::MdioRequest
+pub fn rcp::mdio::MdioRequest::from_evt_sub_opcode(u8, rcp::mdio::MdioTransfer) -> core::result::Result<Self, rcp::RcpError>
+impl core::clone::Clone for rcp::mdio::MdioRequest
+pub fn rcp::mdio::MdioRequest::clone(&self) -> rcp::mdio::MdioRequest
+impl core::cmp::Eq for rcp::mdio::MdioRequest
+impl core::cmp::PartialEq for rcp::mdio::MdioRequest
+pub fn rcp::mdio::MdioRequest::eq(&self, &rcp::mdio::MdioRequest) -> bool
+impl core::fmt::Debug for rcp::mdio::MdioRequest
+pub fn rcp::mdio::MdioRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::mdio::MdioRequest
+impl core::marker::Freeze for rcp::mdio::MdioRequest
+impl core::marker::Send for rcp::mdio::MdioRequest
+impl core::marker::Sync for rcp::mdio::MdioRequest
+impl core::marker::Unpin for rcp::mdio::MdioRequest
+impl core::marker::UnsafeUnpin for rcp::mdio::MdioRequest
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::mdio::MdioRequest
+impl core::panic::unwind_safe::UnwindSafe for rcp::mdio::MdioRequest
 pub struct rcp::mdio::MdioFunctionalConfig
 pub rcp::mdio::MdioFunctionalConfig::addressing_mode: rcp::mdio::MdioAddressingMode
 impl rcp::mdio::MdioFunctionalConfig
