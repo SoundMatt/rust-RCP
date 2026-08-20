@@ -7,6 +7,91 @@ OPEN Alliance TC18 core replacement; from `v1.0.0` on, each entry is a real
 release. See `docs/SEMVER.md` for the versioning scheme, including why a
 wire-format change is a MAJOR bump even when it is a fix.
 
+## v5.11.0 (Table 30/33 Row-2 evt[2:0] validation — MDIO, 8th and last endpoint type) — closed
+
+Direct follow-up to v5.10.0: `mdio.rs` becomes the eighth and last of the
+TC18 §13.5 Table 33 Row-2 endpoint types (`{ADC, PWM_IN, I2C, LIN, CAN,
+UART, ISELED, MDIO}`) to call the shared `evtgroup::evt_row2_kind_of`
+predicate. `evtgroup.rs` itself is unchanged — this release only adds
+`mdio.rs`'s own caller. This item touches only `evt[2:0]` request
+classification; `MdioAddressingMode`'s own (already spec-divergent — see
+`mdio.rs`'s pre-existing "Divergence note") `mdio_mode` mapping,
+`MdioFunctionalConfig`, and `MdioTransfer`/`MdioTransferResult`'s own
+field layout are all unchanged.
+
+New, purely additive `pub` items (MINOR bump per `docs/SEMVER.md`):
+
+- `mdio::MdioRequest` / `mdio::MdioRequest::from_evt_sub_opcode` — MDIO's
+  own request-decode entry point, structurally mirroring `can::CanRequest`/
+  `iseled::IseledRequest` in one way and `i2c::I2cRequest`/
+  `lin::LinRequest`/`adc::AdcRequest`/`pwm::PwmInRequest`/
+  `uart::UartRequest` in another:
+  - Like `can.rs`/`iseled.rs`, `from_evt_sub_opcode` takes an
+    already-decoded `MdioTransfer`, not raw `byte_msg_payload` bytes.
+    `MdioTransfer` already has its own dedicated decode entry point
+    (`MdioTransfer::decode`, pre-existing this item and unchanged by it),
+    so this evt[2:0]-classification entry point does not re-derive that
+    (trivial) byte-layout logic a second time internally.
+  - Unlike `can.rs`/`iseled.rs`, `evt[2:0] == 111b` still returns
+    `Ok(MdioRequest::ConfigWrite)` — the majority precedent
+    `i2c::I2cRequest`/`lin::LinRequest`/`adc::AdcRequest`/
+    `pwm::PwmInRequest`/`uart::UartRequest` each already follow — rather
+    than `Err(RcpError::ConfigWriteNotImplemented)`. This is a deliberate,
+    independently-reasoned judgment call, not a mechanical copy of either
+    prior precedent: `can.rs`'s/`iseled.rs`'s own departure rests on their
+    frame types (`CanDataFrame`, `IseledFrame`) making a real, specific
+    structural claim about their bytes (a parsed `FrameFormat`/`id`/`data`
+    or `chain_address`/`command`/`data` shape, either of which can fail to
+    decode or silently misinterpret unrelated bytes) that a genuine TC18
+    §12.7.1 config-write payload cannot honestly satisfy. `MdioTransfer`
+    makes no such claim: `MdioTransfer::decode` is infallible and totally
+    uninterpreted — every byte slice, including an empty one, is a valid
+    `MdioTransfer`, matching `i2c::I2cByteTransfer`'s own raw pass-through
+    discipline. A caller can therefore decode a genuine config-write
+    payload through `MdioTransfer::decode` with zero information loss or
+    misrepresentation, so the "no caller can honestly construct one"
+    pressure that drove `can.rs`'s/`iseled.rs`'s own departure does not
+    apply here.
+  See `mdio.rs`'s own doc comment "Provenance note: evt[2:0] request
+  validation" for the full citation and reasoning behind both choices.
+
+Every `Reserved` sub_opcode value is rejected with
+`Err(RcpError::UnsupportedCmd)`, unchanged from every prior Row-2
+endpoint-type module — this part of the rule is identical for MDIO.
+
+Also in this release: while independently re-verifying the TC18.txt
+citations this item adds (Table 33 Row-2, §13.7.13.3, Figure 43), a
+pre-existing citation drift was found in `mdio.rs`'s own "Divergence note"
+and "Provenance note: register-access framing is carried opaque" sections
+— the same class of drift `iseled.rs`'s own v5.10.0 item found and flagged
+for ISELED. `mdio.rs` cites "Table 57"/"TC18.txt line 5676" and "Figure
+42"/"TC18.txt line 5664" for MDIO's own request-format/`mdio_mode` field
+table, and "Table 56"/"TC18.txt line 5639" for MDIO's functional-config
+register layout; against the current `TC18.txt`, those are actually
+**Table 60**/line 6088, **Figure 43**/line 6077, and **Table 59**/line
+6061 respectively — both the line numbers and the table/figure numbers
+have drifted, by roughly the same ~400-line/3-number offset already found
+for ISELED. This item deliberately does **not** correct those pre-existing
+citations (that is separate, later work, out of scope for this
+evt[2:0]-classification item) — it only flags the drift, documented in
+`mdio.rs`'s own new "Editorial note: pre-existing §13.7.13 citation drift"
+section. The citations newly added by this item were independently
+re-verified against `TC18.txt` rather than copied from `mdio.rs`'s own
+pre-existing, now-known-stale citations.
+
+Not in this release: wiring `MdioRequest::from_evt_sub_opcode` into
+`mock::RcServer`'s actual dispatch — `mock::Endpoint`'s trait signature
+still does not carry an `evt` value to any implementation at all, the same
+gap v5.4.0's pilot found and left as-is (confirmed unchanged here). This
+release also does not touch `MdioAddressingMode`, `MdioFunctionalConfig`,
+or any of `mdio.rs`'s own pre-existing "Divergence note"/"Provenance
+note" content beyond the new "Editorial note" flagging citation drift
+described above — all pre-existing, additive standalone plumbing left
+untouched. This closes out the full Table 30/33 Row-2 `evt[2:0]`
+validation rollout: all eight Row-2 endpoint types
+(`{ADC, PWM_IN, I2C, LIN, CAN, UART, ISELED, MDIO}`) now call
+`evtgroup::evt_row2_kind_of`.
+
 ## v5.10.0 (Table 30/33 Row-2 evt[2:0] validation — ISELED, 7th endpoint type) — closed
 
 Direct follow-up to v5.9.0: `iseled.rs` becomes the seventh of the eight
