@@ -179,8 +179,8 @@
 //!
 //! ## TC18 reconciliation note (§13.7.10)
 //!
-//! TC18 §13.7.10.3 (TC18.txt line 5304) states only that "the Byte Msg
-//! Payload is the payload to be used on the Lin bus", and Figure 38 shows
+//! TC18 §13.7.10.3 (TC18.txt line 5720) states only that "the Byte Msg
+//! Payload is the payload to be used on the Lin bus", and Figure 39 shows
 //! that payload as one undifferentiated "Lin payload" field followed by
 //! padding — it defines no PID sub-field, no checksum sub-field, and no
 //! per-frame length ceiling of its own. This module's split of the leading
@@ -194,13 +194,13 @@
 //! recorded as explicit not-implemented requirement entries rather than
 //! silently omitted: matching each received LIN message against the pending
 //! read request's `byte_msg_payload` under the conditions given by
-//! `evt[2:0]` and replying when `op = 0` (TC18.txt lines 5276-5277); issuing
+//! `evt[2:0]` and replying when `op = 0` (TC18.txt lines 5692-5693); issuing
 //! a trigger once a transmission has been finalized and the configured
-//! trailing time has expired (line 5278); and the cyclic-transmission
+//! trailing time has expired (line 5694); and the cyclic-transmission
 //! pattern built from a repeated trigger request on the endpoint's own
-//! trigger (line 5279). All three are RC-Server run-time endpoint behaviors,
-//! outside this module's codec-only scope. TC18 Table 52's own
-//! functional-config register layout (§13.7.10.2, lines 5287-5298) is
+//! trigger (line 5695). All three are RC-Server run-time endpoint behaviors,
+//! outside this module's codec-only scope. TC18 Table 55's own
+//! functional-config register layout (§13.7.10.2, lines 5697-5714) is
 //! likewise unimplemented — see [`LinFunctionalConfig`].
 //!
 //! ## Relationship to [`crate::regmap`]
@@ -288,7 +288,7 @@ impl LinFrameTransfer {
     /// Encode this transfer to its raw wire representation: the PID byte
     /// followed by `data`, unmodified and unframed.
     ///
-    /// This is the `byte_msg_payload` TC18 §13.7.10.3 (TC18.txt line 5304)
+    /// This is the `byte_msg_payload` TC18 §13.7.10.3 (TC18.txt line 5720)
     /// calls "the payload to be used on the Lin bus": the bytes are emitted
     /// verbatim, in supplied order, with nothing inserted, removed, or
     /// reordered — see this module's doc comment "TC18 reconciliation note".
@@ -479,9 +479,9 @@ mod tests {
     #[test]
     //fusa:test REQ-LIN-007
     fn lin_byte_msg_payload_is_carried_verbatim_onto_the_bus() {
-        // TC18 §13.7.10.3 (TC18.txt line 5304): "The Byte Msg Payload is the
-        // payload to be used on the Lin bus." Figure 38's own on-wire example
-        // (line 5305) carries three payload bytes with no PID/checksum
+        // TC18 §13.7.10.3 (TC18.txt line 5720): "The Byte Msg Payload is the
+        // payload to be used on the Lin bus." Figure 39's own on-wire example
+        // (line 5721) carries three payload bytes with no PID/checksum
         // sub-structure and no length/format byte of its own, so the encoded
         // form must be byte-for-byte identical to the supplied payload.
         //
