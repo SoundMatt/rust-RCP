@@ -7,6 +7,50 @@ OPEN Alliance TC18 core replacement; from `v1.0.0` on, each entry is a real
 release. See `docs/SEMVER.md` for the versioning scheme, including why a
 wire-format change is a MAJOR bump even when it is a fix.
 
+## v5.4.0 (Table 30/33 Row-2 evt[2:0] validation — pilot: shared predicate + I2C dispatch wiring) — closed
+
+TC18 §13.5 Table 33 groups the 13 RCP endpoint types into 3 rows for
+request-side `evt[2:0]` semantics. `evtgroup.rs`'s `classify_evt_sub_opcode`
+(the still-unresolved "Groups A/B/C" roadmap classification) is unchanged
+and untouched — it answers a different, broader question this crate has
+not yet resolved. This release adds a *narrower*, already-unambiguous
+predicate alongside it: Row 2 — `{ADC, PWM_IN, I2C, LIN, CAN, UART, ISELED,
+MDIO}` — has a simple three-way rule (`000b` plain, `001b`-`110b` reserved
+=`UNSUPPORTED_CMD`, `111b` config-write per §12.7.1), and none of this
+crate's eight Row-2 endpoint-type modules read `evt` at all before this
+release.
+
+New, purely additive `pub` items (MINOR bump per `docs/SEMVER.md`):
+
+- `evtgroup::EvtRow2Kind` / `evtgroup::evt_row2_kind_of(sub_opcode: u8)` —
+  the shared Row-2 classifier every Row-2 endpoint-type module is expected
+  to call, mirroring `gpio::GpioWriteSemantics::from_sub_opcode`/
+  `spi::SpiChannelSelect::from_sub_opcode`'s own per-endpoint-type
+  `sub_opcode` readers. Notably, this does **not** implement Table 33's
+  own literal Row-2 cell text ("000b to 110b reserved", `000b` included) —
+  that literal reading is resolved as a drafting defect against TC18
+  §12.9.1's general `evt[2:0] != 0` rule, §13.7.7.3's I2C request-handling
+  description, and the cross-repo resolution c-RCP centralizes as
+  `rcp_acf_evt_row2_is_plain()` (recorded in RELAY's
+  `docs/RCP-ARCHITECTURE.md`). See `evtgroup.rs`'s own doc comment for the
+  full citation and reasoning.
+- `i2c::I2cRequest` / `i2c::I2cRequest::from_evt_sub_opcode` — I2C's own
+  request-decode entry point (this crate's pilot Row-2 endpoint type): a
+  `Plain` request decodes its payload as an `I2cByteTransfer`, a
+  `ConfigWrite` request is recognized but not yet decoded further (TC18
+  §12.7.1's payload shape is deferred, not guessed at), and every
+  `Reserved` sub_opcode is rejected with `Err(RcpError::UnsupportedCmd)`.
+
+Not in this release: wiring either into `mock::RcServer`'s actual dispatch
+— `mock::Endpoint`'s trait signature does not carry an `evt` value to any
+implementation at all yet, a gap that applies identically to GPIO/SPI's
+own `sub_opcode` readers (neither is wired into `mock` dispatch either).
+`I2cRequest` is built to that same "additive standalone plumbing" level.
+The other seven Row-2 endpoint types (`ADC`, `PWM_IN`, `LIN`, `CAN`,
+`UART`, `ISELED`, `MDIO`) are expected to add their own
+`evt_row2_kind_of`-based request-decode entry point the same way, in
+later items.
+
 ## v5.3.0 (response-kind surfaced in adapt.rs) — closed
 
 `ByteMessageInfo::response_kind()` (TC18 §11.3 Table 15/§11.3.1-§11.3.4)
