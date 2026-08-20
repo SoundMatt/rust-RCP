@@ -292,7 +292,7 @@ impl RcServerState {
     /// spec fact) given `HW_UNCONFIGURED`'s name and `0x00` encoding both
     /// suggest a power-on/reset default.
     ///
-    /// TC18 §12.3 (TC18.txt line 2059) settles the surrounding rule this
+    /// TC18 §12.3 (TC18.txt line 2434) settles the surrounding rule this
     /// default serves: "After a power cycle or restart ... the RC Server
     /// shall start in the life-cycle state it is actually configured in",
     /// where a device with no NVM "may incorporate default settings which
@@ -529,7 +529,7 @@ pub fn check_register_writable(
 ///
 /// One of the excluded pairs is excluded by TC18 itself, not merely by
 /// this crate's reading of `ROADMAP.md`: TC18 §12.3.1.1 (TC18.txt line
-/// 2168) states that, from `HW_UNCONFIGURED`, "a request to advance the
+/// 2544) states that, from `HW_UNCONFIGURED`, "a request to advance the
 /// state directly to RCP_CONFIGURED will be rejected with an error
 /// response" — the two-hop route through `HW_CONFIGURED` is the only way
 /// up.
@@ -665,7 +665,7 @@ mod tests {
 
     // ── TC18 §12.3: start state after a power cycle or restart ───────────
 
-    /// TC18 §12.3 (TC18.txt line 2059): "After a power cycle or restart,
+    /// TC18 §12.3 (TC18.txt line 2434): "After a power cycle or restart,
     /// depending on the RC Server's implementation, the RC Server shall
     /// start in the life-cycle state it is actually configured in.
     /// Depending on the devices physical implementation it may have either
@@ -676,7 +676,7 @@ mod tests {
     ///
     /// Both halves are asserted against literal values: the no-stored-
     /// configuration default is `HW_UNCONFIGURED`/`0x00`, and each of the
-    /// three state names TC18 §12.3 lists (TC18.txt lines 2065-2067) can be
+    /// three state names TC18 §12.3 lists (TC18.txt lines 2440-2442) can be
     /// restored by name as a configured start state.
     #[test]
     //fusa:test REQ-LIFE-015
@@ -702,7 +702,7 @@ mod tests {
 
     // ── TC18 §12.3.1.1: no direct advance to RCP_CONFIGURED ──────────────
 
-    /// TC18 §12.3.1.1 (TC18.txt line 2168): from `HW_UNCONFIGURED`, "per
+    /// TC18 §12.3.1.1 (TC18.txt lines 2543-2544): from `HW_UNCONFIGURED`, "per
     /// write request to the server functional configuration entry
     /// svr_lifecycle_state the life-cycle state can be advanced to
     /// HW_CONFIGURED. A request to advance the state directly to

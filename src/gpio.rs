@@ -195,7 +195,7 @@ impl GpioBitmask {
     ///
     /// Big-endian places IO0 in the last byte's least-significant bit and
     /// IO31 in the first byte's most-significant bit, so IO `n` is bit `n`
-    /// of the `byte_msg_payload` exactly as TC18 §13.7.4.1's Figure 24 lays
+    /// of the `byte_msg_payload` exactly as TC18 §13.7.4.1's Figure 25 lays
     /// the payload out (msb on the left, IO23..IO0 in the low positions for
     /// that figure's own 24-pin example endpoint).
     //fusa:req REQ-GPIO-001
@@ -245,12 +245,12 @@ pub enum GpioWriteSemantics {
     /// Bitwise AND the operand into the current value.
     ///
     /// TC18 §13.7.4.1's prose words the value-changing operations as
-    /// "(NAND, OR, XOR)", but TC18 §13.5's Table 30 — the normative
+    /// "(NAND, OR, XOR)", but TC18 §13.5's Table 33 — the normative
     /// per-endpoint `evt[2:0]` table — defines code `010b` as the
     /// *byte_msg_payload bitwise AND current interface status*, with the
     /// worked example "with a byte_msg_payload of 0xFFFF FFFE the first IO
     /// pin will be reset, while other IO pins remain unchanged". This crate
-    /// follows Table 30's AND; §13.7.4.1's "NAND" wording contradicts it and
+    /// follows Table 33's AND; §13.7.4.1's "NAND" wording contradicts it and
     /// is recorded as a TC18-internal inconsistency, not implemented as
     /// written.
     //fusa:req REQ-GPIO-021
@@ -852,7 +852,7 @@ mod tests {
 
     // ── TC18 §13.7.4 spec-literal conformance checks ────────────────────────
 
-    /// TC18 §13.7.4.1 (TC18.txt line 4381): "Each GPIO endpoint can handle
+    /// TC18 §13.7.4.1 (TC18.txt line 4789): "Each GPIO endpoint can handle
     /// up to 32 IOs." The 4-byte bitmask is exactly 32 bit positions wide,
     /// so IO0..IO31 are all representable and there is no IO32.
     #[test]
@@ -876,7 +876,7 @@ mod tests {
         );
     }
 
-    /// TC18 §13.7.4.1 / Figure 24 (TC18.txt lines 4389-4398): "Each GPIO pin
+    /// TC18 §13.7.4.1 / Figure 25 (TC18.txt lines 4797-4808): "Each GPIO pin
     /// can be assigned to a bit position of the byte_msg_payload", laid out
     /// msb-first with IO23..IO0 in the low bit positions for that figure's
     /// own 24-pin example endpoint. IO `n` is therefore bit `n`, and the
@@ -890,16 +890,16 @@ mod tests {
         assert_eq!(GpioBitmask(1u32 << 7).encode(), [0x00, 0x00, 0x00, 0x80]);
         // IO8 opens the next byte up.
         assert_eq!(GpioBitmask(1u32 << 8).encode(), [0x00, 0x00, 0x01, 0x00]);
-        // IO23 — the highest IO drawn in Figure 24's 24-pin example.
+        // IO23 — the highest IO drawn in Figure 25's 24-pin example.
         assert_eq!(GpioBitmask(1u32 << 23).encode(), [0x00, 0x80, 0x00, 0x00]);
-        // Figure 24's whole 24-pin example EP: IO0..IO23 asserted, the
+        // Figure 25's whole 24-pin example EP: IO0..IO23 asserted, the
         // "don't care" positions above IO23 clear.
         assert_eq!(GpioBitmask(0x00FF_FFFF).encode(), [0x00, 0xFF, 0xFF, 0xFF]);
         // IO31 tops out the 32-IO range.
         assert_eq!(GpioBitmask(1u32 << 31).encode(), [0x80, 0x00, 0x00, 0x00]);
     }
 
-    /// TC18 §13.7.4.3 (TC18.txt line 4480): "A request with data
+    /// TC18 §13.7.4.3 (TC18.txt line 4889): "A request with data
     /// '0x0000 0000' and evt[2:0] = 0x001 (OR) results in 'no change'."
     #[test]
     //fusa:test REQ-GPIO-019
@@ -923,16 +923,16 @@ mod tests {
         }
     }
 
-    /// TC18 §13.7.4.1 (TC18.txt lines 4403-4404): "Generating a pulse for a
+    /// TC18 §13.7.4.1 (TC18.txt lines 4811-4812): "Generating a pulse for a
     /// defined time is NOT a function of the GPIO endpoint. This either
     /// needs to be managed by the Client ... by a compound or a trigger
     /// operation." The endpoint's whole write surface is therefore exactly
-    /// TC18 §13.5 Table 30's eight `evt[2:0]` value-level codes, with no
+    /// TC18 §13.5 Table 33's eight `evt[2:0]` value-level codes, with no
     /// ninth, duration-carrying operation.
     #[test]
     //fusa:test REQ-GPIO-020
     fn gpio_write_surface_is_tc18_eight_codes_with_no_pulse_operation() {
-        // TC18 §13.5 Table 30's GPIO/PWM_OUT rows, code by code.
+        // TC18 §13.5 Table 33's GPIO/PWM_OUT rows, code by code.
         let table_30: [(u8, GpioWriteSemantics); 8] = [
             (0b000, GpioWriteSemantics::Replace),
             (0b001, GpioWriteSemantics::Or),
@@ -957,13 +957,13 @@ mod tests {
         }
     }
 
-    /// TC18 §13.7.4.1 (TC18.txt line 4402) words the value-changing
-    /// operations as "(NAND, OR, XOR)", but TC18 §13.5 Table 30 (TC18.txt
-    /// lines 3699-3702) defines `evt[2:0] = 010b` as the byte_msg_payload
+    /// TC18 §13.7.4.1 (TC18.txt line 4810) words the value-changing
+    /// operations as "(NAND, OR, XOR)", but TC18 §13.5 Table 33 (TC18.txt
+    /// lines 4098-4101) defines `evt[2:0] = 010b` as the byte_msg_payload
     /// *bitwise AND* the current interface status, with the worked example
     /// "with a byte_msg_payload of 0xFFFF FFFE the first IO pin will be
     /// reset, while other IO pins remain unchanged". This crate follows
-    /// Table 30's AND.
+    /// Table 33's AND.
     #[test]
     //fusa:test REQ-GPIO-021
     fn gpio_evt_010b_is_bitwise_and_per_tc18_table_30_worked_example() {
@@ -971,7 +971,7 @@ mod tests {
             GpioWriteSemantics::from_sub_opcode(0b010),
             Ok(GpioWriteSemantics::And)
         );
-        // Table 30's own worked example: every IO currently set, payload
+        // Table 33's own worked example: every IO currently set, payload
         // 0xFFFF_FFFE -> IO0 reset, IO1..IO31 unchanged.
         let current = GpioBitmask(0xFFFF_FFFF);
         let payload = GpioBitmask(0xFFFF_FFFE);

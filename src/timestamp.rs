@@ -126,7 +126,7 @@ impl AvtpTimestamp {
     /// This type's rollover period, in raw ticks: the field's full 32-bit
     /// width.
     ///
-    /// TC18 §11.4.1 (TC18.txt lines 1952-1953) confirms both the tick unit
+    /// TC18 §11.4.1 (TC18.txt lines 2328-2329) confirms both the tick unit
     /// and the period: "avtp_timestamp = (AS_sec × 10^9 + AS_ns) mod 2^32
     /// where AS_sec is the gPTP seconds field and AS_ns is the gPTP
     /// nanoseconds field (thus rolls over every 4 seconds)" — i.e. the
@@ -221,7 +221,7 @@ impl MessageTimestamp {
     /// This type's rollover period, in raw ticks: the field's full 64-bit
     /// width — 2^32 times longer than [`AvtpTimestamp::ROLLOVER_PERIOD`].
     ///
-    /// TC18 §11.4.1 (TC18.txt lines 1954-1955) confirms both the tick unit
+    /// TC18 §11.4.1 (TC18.txt lines 2331-2332) confirms both the tick unit
     /// and the period: "message_timestamp = (AS_sec × 10^9 + AS_ns) mod
     /// 2^64 where AS_sec is the gPTP seconds field and AS_ns is the gPTP
     /// nanoseconds field (thus rolls over every 584,9 years)" — i.e. the
@@ -609,7 +609,7 @@ mod tests {
     #[test]
     //fusa:test REQ-TS-007
     fn rollover_periods_match_tc18_11_4_1_nanosecond_derivation() {
-        // TC18 §11.4.1 (TC18.txt lines 1952-1955) states both moduli and
+        // TC18 §11.4.1 (TC18.txt lines 2328-2332) states both moduli and
         // both resulting real-world periods, with the tick unit fixed at
         // nanoseconds by the `AS_sec × 10^9 + AS_ns` construction:
         //

@@ -446,12 +446,12 @@ mod tests {
         assert!(!mode.is_ambiguous_high_speed_row());
     }
 
-    // ── TC18 Table 46: i2c_mode preset wire values ──────────────────────────
+    // ── TC18 Table 49: i2c_mode preset wire values ──────────────────────────
 
     #[test]
     //fusa:test REQ-I2C-009
     fn i2c_mode_wire_values_match_tc18_table_46_unambiguous_rows() {
-        // TC18 §13.7.7.2 Table 46 (TC18.txt lines 4815-4817), i2c_mode
+        // TC18 §13.7.7.2 Table 49 (TC18.txt lines 5226-5228), i2c_mode
         // (relative address 0x0007, 8 bit R/W):
         //   0: Standard Mode 100kbit/s
         //   1: Fast Mode 400kbit/s
@@ -462,7 +462,7 @@ mod tests {
         assert_eq!(I2cSpeedMode::Standard.to_u8(), 0);
         assert_eq!(I2cSpeedMode::Fast.to_u8(), 1);
         assert_eq!(I2cSpeedMode::FastPlus.to_u8(), 2);
-        // None of these three rows is one of Table 46's duplicated
+        // None of these three rows is one of Table 49's duplicated
         // high-speed rows, so none may be reported as unresolved.
         for mode in [
             I2cSpeedMode::Standard,
@@ -476,14 +476,14 @@ mod tests {
     #[test]
     //fusa:test REQ-I2C-010
     fn i2c_mode_value_three_is_not_resolved_to_a_single_high_speed_rate() {
-        // TC18 §13.7.7.2 Table 46 (TC18.txt lines 4818-4819) lists two
+        // TC18 §13.7.7.2 Table 49 (TC18.txt lines 5229-5230) lists two
         // adjacent High-speed rows that both carry the same i2c_mode wire
         // value 3:
         //   3: High-speed mode 1.7Mbit/s
         //   3: High-speed mode 3.4Mbit/s
         // Decoding value 3 must therefore be flagged as unresolved rather
         // than silently picking either bit rate.
-        let decoded = I2cSpeedMode::from_u8(3).expect("3 is an enumerated Table 46 i2c_mode value");
+        let decoded = I2cSpeedMode::from_u8(3).expect("3 is an enumerated Table 49 i2c_mode value");
         assert!(decoded.is_ambiguous_high_speed_row());
         assert_eq!(decoded.to_u8(), 3);
     }
@@ -493,11 +493,11 @@ mod tests {
     #[test]
     //fusa:test REQ-I2C-011
     fn i2c_byte_transfer_is_transparent_to_seven_and_ten_bit_addressing() {
-        // TC18 §13.7.7.3 (TC18.txt line 4830): "The byte msg payload is the
-        // I2C payload including the address. The I2C endpoint does not know
-        // whether there is a 7- or 10-bit address, since the endpoint is just
-        // transparent." The worked example there (Figure 29) is an I²C
-        // transfer with a 10-bit address and 5 bytes of data — 2 address
+        // TC18 §13.7.7.3 (TC18.txt lines 5241-5242): "The byte msg payload is
+        // the I2C payload including the address. The I2C endpoint does not
+        // know whether there is a 7- or 10-bit address, since the endpoint
+        // is just transparent." The worked example there (Figure 30) is an
+        // I²C transfer with a 10-bit address and 5 bytes of data — 2 address
         // bytes + 5 data bytes = a 7-byte byte_msg_payload.
         let ten_bit_addressed = vec![0xF2, 0x34, 0x11, 0x22, 0x33, 0x44, 0x55];
         assert_eq!(ten_bit_addressed.len(), 7);

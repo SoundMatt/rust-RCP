@@ -634,16 +634,16 @@ mod tests {
     #[test]
     //fusa:test REQ-PWMI-003
     fn resolve_pwm_in_read_invalidates_measurement_once_max_period_is_exceeded() {
-        // TC18 §13.7.6.2 Table 45, pwmi_err_on_max_period = 0b (TC18.txt
-        // line 4721): "if MAX PERIOD is exceeded, invalidate measurement and
-        // wait for new active phase of signal". pwmi_max_period (Table 45,
-        // relative address 0x000A, TC18.txt line 4735) is a 16-bit register,
-        // so 0xFFFF is the largest MAX PERIOD a conforming RC Server can be
-        // configured with.
+        // TC18 §13.7.6.2 Table 48, pwmi_err_on_max_period = 0b (TC18.txt
+        // lines 5129-5131): "if MAX PERIOD is exceeded, invalidate
+        // measurement and wait for new active phase of signal".
+        // pwmi_max_period (Table 48, relative address 0x000A, TC18.txt line
+        // 5146) is a 16-bit register, so 0xFFFF is the largest MAX PERIOD a
+        // conforming RC Server can be configured with.
         let config = PwmInFunctionalConfig {
             no_signal_timeout: 0xFFFF,
         };
-        // TC18 §13.7.6.3 (TC18.txt line 4758): both measured values are
+        // TC18 §13.7.6.3 (TC18.txt line 5169): both measured values are
         // 16-bit, so a valid measurement fits 0x0000..=0xFFFF.
         let measured = PwmDurationPair {
             period: 0x8000,
