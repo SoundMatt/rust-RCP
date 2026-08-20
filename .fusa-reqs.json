@@ -4759,6 +4759,26 @@
       "verificationMethod": "test"
     },
     {
+      "id": "REQ-LIN-008",
+      "title": "LinRequest enumerates the decoded shape of a Row-2 LIN request after evt[2:0] validation",
+      "text": "LinRequest's two variants (Plain(LinFrameTransfer), ConfigWrite) give an incoming LIN request's decoded shape after its evt.sub_opcode has been validated against evt_row2_kind_of's Table 33 Row-2 rule; LinRequest::from_evt_sub_opcode is the request-decode entry point that performs that validation and dispatch. Unlike AdcRequest::Plain (no payload struct at all) and PwmInRequest::Plain (a raw, uninterpreted byte transfer, since PWM_IN's own request-payload framing is unconfirmed), LinRequest::Plain reuses this module's own pre-existing, already-confirmed LinFrameTransfer::decode, since TC18 §13.7.10.1 states the LIN EP sends the bytes provided by the RC Client in byte_msg_payload on the bus and this module's own TC18 reconciliation note already established that payload's pid+data byte layout with nothing left to bridge",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.5 Table 33's Row-2 row (LIN is one of its eight endpoint types), TC18.txt L4085-4092, and §13.7.10.1 LIN EP request handling (\"It sends the bytes provided by the RC Client in the byte_msg_payload on the bus as response to a pending read request.\")"
+    },
+    {
+      "id": "REQ-LIN-009",
+      "title": "LinRequest::from_evt_sub_opcode accepts Plain/ConfigWrite, propagates LinFrameTransfer::decode's own ShortFrame/PayloadTooLarge errors on a Plain request, and rejects Reserved sub_opcodes with UnsupportedCmd, never panicking",
+      "text": "LinRequest::from_evt_sub_opcode decodes a Plain (sub_opcode 0) request's payload bytes as a LinFrameTransfer via LinFrameTransfer::decode, propagating that function's own Result rather than inventing a second validation of the same bytes -- Err(RcpError::ShortFrame) for an empty payload (no PID byte present) and Err(RcpError::PayloadTooLarge) for data beyond LIN_MAX_DATA bytes. A ConfigWrite (sub_opcode 7) request is recognized without attempting to interpret its payload (full TC18 §12.7.1 config-write payload decoding is deferred, not silently guessed at). Every Reserved sub_opcode value returns Err(RcpError::UnsupportedCmd), matching TC18 Table 33's Row-2 error-code requirement and crate::i2c::I2cRequest::from_evt_sub_opcode's/crate::adc::AdcRequest::from_evt_sub_opcode's/crate::pwm::PwmInRequest::from_evt_sub_opcode's identical refusal of their own table's reserved code; never panics for any sub_opcode/payload combination",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.5 Table 33 (\"000b to 110b reserved – request to be rejected with error code = UNSUPPORTED_CMD\" / \"111b: ... used to change the configuration of the endpoint (see 12.7.1)\"), TC18.txt L4085-4092"
+    },
+    {
       "id": "REQ-CAN-001",
       "title": "FrameFormat round-trips through to_u8/from_u8 and its classification helpers partition all six variants",
       "text": "FrameFormat::to_u8/FrameFormat::from_u8 round-trip each of the six CBFF/CEFF/FBFF/FEFF/XL-classical/XL-new variants, and exactly one of is_classical/is_fd/is_xl is true for each variant",
