@@ -573,6 +573,26 @@ pub fn rcp::avtp::encode_tscf_header(&rcp::avtp::TscfHeader) -> core::result::Re
 pub fn rcp::avtp::parse_stream_id(u64) -> ([u8; 6], u16)
 pub fn rcp::avtp::select_header_variant(&[u8], rcp::avtp::TimeSyncCapability) -> core::result::Result<rcp::avtp::HeaderVariant, rcp::RcpError>
 pub mod rcp::can
+pub enum rcp::can::CanRequest
+pub rcp::can::CanRequest::ConfigWrite
+pub rcp::can::CanRequest::Plain(rcp::can::CanDataFrame)
+impl rcp::can::CanRequest
+pub fn rcp::can::CanRequest::from_evt_sub_opcode(u8, rcp::can::CanDataFrame) -> core::result::Result<Self, rcp::RcpError>
+impl core::clone::Clone for rcp::can::CanRequest
+pub fn rcp::can::CanRequest::clone(&self) -> rcp::can::CanRequest
+impl core::cmp::Eq for rcp::can::CanRequest
+impl core::cmp::PartialEq for rcp::can::CanRequest
+pub fn rcp::can::CanRequest::eq(&self, &rcp::can::CanRequest) -> bool
+impl core::fmt::Debug for rcp::can::CanRequest
+pub fn rcp::can::CanRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::can::CanRequest
+impl core::marker::Freeze for rcp::can::CanRequest
+impl core::marker::Send for rcp::can::CanRequest
+impl core::marker::Sync for rcp::can::CanRequest
+impl core::marker::Unpin for rcp::can::CanRequest
+impl core::marker::UnsafeUnpin for rcp::can::CanRequest
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::can::CanRequest
+impl core::panic::unwind_safe::UnwindSafe for rcp::can::CanRequest
 #[repr(u8)] pub enum rcp::can::FrameFormat
 pub rcp::can::FrameFormat::Cbff = 0
 pub rcp::can::FrameFormat::Ceff = 1
@@ -721,6 +741,7 @@ pub mod rcp::capi
 pub rcp::capi::CError::ChainAborted = 21
 pub rcp::capi::CError::ChainError = 22
 pub rcp::capi::CError::Closed = 1
+pub rcp::capi::CError::ConfigWriteNotImplemented = 29
 pub rcp::capi::CError::CrcError = 23
 pub rcp::capi::CError::EpError = 16
 pub rcp::capi::CError::EpNotFound = 17
@@ -4464,6 +4485,7 @@ pub rcp::RcpError::Busy
 pub rcp::RcpError::ChainAborted
 pub rcp::RcpError::ChainError
 pub rcp::RcpError::Closed
+pub rcp::RcpError::ConfigWriteNotImplemented
 pub rcp::RcpError::CrcError
 pub rcp::RcpError::EpError
 pub rcp::RcpError::EpNotFound

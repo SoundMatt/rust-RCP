@@ -7,6 +7,73 @@ OPEN Alliance TC18 core replacement; from `v1.0.0` on, each entry is a real
 release. See `docs/SEMVER.md` for the versioning scheme, including why a
 wire-format change is a MAJOR bump even when it is a fix.
 
+## v5.8.0 (Table 30/33 Row-2 evt[2:0] validation — CAN, 5th endpoint type) — closed
+
+Direct follow-up to v5.7.0: `can.rs` becomes the fifth of the eight TC18
+§13.5 Table 33 Row-2 endpoint types (`{ADC, PWM_IN, I2C, LIN, CAN, UART,
+ISELED, MDIO}`) to call the shared `evtgroup::evt_row2_kind_of` predicate.
+`evtgroup.rs` itself is unchanged — this release only adds `can.rs`'s own
+caller, plus one new `RcpError` variant that caller needs.
+
+New, purely additive `pub` items (MINOR bump per `docs/SEMVER.md`):
+
+- `can::CanRequest` / `can::CanRequest::from_evt_sub_opcode` — CAN's own
+  request-decode entry point, structurally mirroring
+  `i2c::I2cRequest`/`lin::LinRequest`/`adc::AdcRequest`/`pwm::PwmInRequest`,
+  but differing from all four of them in two deliberate ways:
+  - `from_evt_sub_opcode` takes an already-decoded `CanDataFrame`, not raw
+    `byte_msg_payload` bytes. CAN's own request payload is either a
+    `CanDataFrame` (Classical/FD) or a `CanXlFrame` (XL), selected by the
+    payload's own `FrameFormat` tag byte — a question `can.rs`'s own TC18
+    reconciliation note already flags as not fully reconciled against TC18
+    Figure 40's real wire word layout. Rather than this evt[2:0]-dispatch
+    function guessing which decoder to invoke by peeking at raw bytes
+    (conflating Table 33's endpoint-type-independent `evt[2:0]`
+    classification with CAN's own, entirely separate `FrameFormat`
+    frame-shape selection), the caller supplies an already-decoded
+    `CanDataFrame` directly. A `CanXlFrame` counterpart is left for a later
+    item.
+  - `evt[2:0] == 111b` returns `Err(RcpError::ConfigWriteNotImplemented)`
+    (new variant, below) rather than `Ok(CanRequest::ConfigWrite)` the way
+    `i2c::I2cRequest`/`lin::LinRequest`/`adc::AdcRequest`/`pwm::PwmInRequest`
+    each do for their own identical case. This follows from the signature
+    difference above: those four sibling functions accept cheaply-ignorable
+    raw bytes for this branch, but `CanRequest::from_evt_sub_opcode`
+    requires a real, already-decoded `CanDataFrame` — and a genuine TC18
+    §12.7.1 config-write payload is definitionally not a CAN data frame at
+    all, so no caller can honestly construct one to pass in. Silently
+    accepting whatever `CanDataFrame` was supplied and returning
+    `Ok(CanRequest::ConfigWrite)` regardless was judged less honest than
+    surfacing a dedicated error. `CanRequest::ConfigWrite` remains a real,
+    declared variant — reserved, unconstructed, for whichever future item
+    implements a real §12.7.1 CAN config-write payload decode, the same way
+    this crate already leaves `RcpError::SequencerNotKnown`/
+    `RequestCanceled`/`RequestNotFound`/`EpNotFound`/`ReqStorageOvfl`
+    declared-but-not-yet-constructed for their own later call sites.
+  See `can.rs`'s own doc comment "Provenance note: evt[2:0] request
+  validation" for the full citation and reasoning behind both differences.
+- `RcpError::ConfigWriteNotImplemented` — a new, crate-synthesized error
+  variant (not a TC18-numbered Table 27 code, matching `ChainAborted`/
+  `ChainError`/`CrcError`'s own precedent), kept out of `is_tc18_error_code`
+  and `tc18_wire_code`'s Table 27 mapping. `capi::CError` gains a matching
+  `ConfigWriteNotImplemented = 29` discriminant and `From<&RcpError> for
+  CError` arm.
+
+Every `Reserved` sub_opcode value is rejected with
+`Err(RcpError::UnsupportedCmd)`, unchanged from every prior Row-2
+endpoint-type module — this part of the rule is identical for CAN.
+
+Not in this release: wiring `CanRequest::from_evt_sub_opcode` into
+`mock::RcServer`'s actual dispatch — `mock::Endpoint`'s trait signature
+still does not carry an `evt` value to any implementation at all, the same
+gap v5.4.0's pilot found and left as-is (confirmed unchanged here). This
+release also does not touch `FrameFormat`, `CanXlSubHeader`, `CanXlFrame`,
+`CanXlCombinedPayload`, or `CanFunctionalConfig` — all additive standalone
+plumbing alongside it, and none of it is a Table 33 `evt[2:0]` concern. The
+remaining three Row-2 endpoint types (`UART`, `ISELED`, `MDIO`) are expected
+to add their own `evt_row2_kind_of`-based request-decode entry point the
+same way, in later items.
+
 ## v5.7.0 (Table 30/33 Row-2 evt[2:0] validation — LIN, 4th endpoint type) — closed
 
 Direct follow-up to v5.6.0: `lin.rs` becomes the fourth of the eight TC18
