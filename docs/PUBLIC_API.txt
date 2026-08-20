@@ -324,6 +324,27 @@ impl core::panic::unwind_safe::UnwindSafe for rcp::adc::AdcSampleValue
 pub fn rcp::adc::resolve_adc_averaged_value(&[u16], &rcp::adc::AdcAveragingConfig) -> core::result::Result<u32, rcp::RcpError>
 pub fn rcp::adc::resolve_adc_sample_window_ticks(&rcp::adc::AdcAveragingConfig) -> core::option::Option<u64>
 pub fn rcp::adc::validate_adc_sample_request(rcp::adc::AdcSamplingMode) -> core::result::Result<(), rcp::RcpError>
+pub enum rcp::adc::AdcRequest
+pub rcp::adc::AdcRequest::ConfigWrite
+pub rcp::adc::AdcRequest::Plain
+impl rcp::adc::AdcRequest
+pub fn rcp::adc::AdcRequest::from_evt_sub_opcode(u8, &[u8]) -> core::result::Result<Self, rcp::RcpError>
+impl core::clone::Clone for rcp::adc::AdcRequest
+pub fn rcp::adc::AdcRequest::clone(&self) -> rcp::adc::AdcRequest
+impl core::cmp::Eq for rcp::adc::AdcRequest
+impl core::cmp::PartialEq for rcp::adc::AdcRequest
+pub fn rcp::adc::AdcRequest::eq(&self, &rcp::adc::AdcRequest) -> bool
+impl core::fmt::Debug for rcp::adc::AdcRequest
+pub fn rcp::adc::AdcRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::adc::AdcRequest
+impl core::marker::StructuralPartialEq for rcp::adc::AdcRequest
+impl core::marker::Freeze for rcp::adc::AdcRequest
+impl core::marker::Send for rcp::adc::AdcRequest
+impl core::marker::Sync for rcp::adc::AdcRequest
+impl core::marker::Unpin for rcp::adc::AdcRequest
+impl core::marker::UnsafeUnpin for rcp::adc::AdcRequest
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::adc::AdcRequest
+impl core::panic::unwind_safe::UnwindSafe for rcp::adc::AdcRequest
 pub mod rcp::addressing
 pub struct rcp::addressing::EndpointId(pub u32)
 impl core::clone::Clone for rcp::addressing::EndpointId
