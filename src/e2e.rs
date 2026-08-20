@@ -49,17 +49,37 @@
 //! ### Which length field gets the one-quadlet pre-adjustment
 //! (working interpretation, since reconciled against TC18 §13.6)
 //!
-//! **Reconciled.** TC18 §13.6 (TC18.txt line 3798) names the field
-//! outright: "Before CRC calculation it is essential to adapt the
-//! acf_message_length by plus 1 quadlet for the CRC32 addition to the
-//! payload and in the AVTPD to increase the ntscf_data_length or in an TSCF
-//! header the stream_data_length by 4 octets per ACF type in the ACF
-//! payload being E-2-E protected." The `acf_msg_length + 1 quadlet` half of
-//! that clause is what [`build_crc32_coverage_buffer`] implements, and the
-//! working interpretation recorded below turned out to be correct. The
-//! **second** half — increasing the AVTPDU-level `ntscf_data_length` /
-//! `stream_data_length` by 4 octets per E-2-E-protected ACF type — is *not*
-//! implemented anywhere in this crate; see requirement `REQ-CRC-016`.
+//! **Reconciled — citation relocated, but see the unresolved flag below.**
+//! TC18 §13.6 (TC18.txt line 4272) states: "When calculating the CRC, it
+//! needs to be considered that adding the CRC to the byte_msg_payload
+//! increases the acf_msg_length by 1." This is the RC4/RC5-reworded
+//! descendant of what this note used to cite at the old TC18.txt line 3798
+//! ("Before CRC calculation it is essential to adapt the acf_message_length
+//! by plus 1 quadlet for the CRC32 addition to the payload and in the AVTPD
+//! to increase the ntscf_data_length or in an TSCF header the
+//! stream_data_length by 4 octets per ACF type in the ACF payload being
+//! E-2-E protected.") — the old sentence does not appear anywhere in the
+//! current TC18.txt; TC18.txt's own `Commented [BE37]: 051RC4: updated
+//! text` marker sits on this paragraph, confirming the wording (not just
+//! the line number) changed. The `acf_msg_length + 1 quadlet` fact survives
+//! this reword and is what [`build_crc32_coverage_buffer`] implements — the
+//! working interpretation recorded below turned out to be correct.
+//!
+//! **Flag, deliberately not resolved here:** the old citation's **second**
+//! clause — increasing the AVTPDU-level `ntscf_data_length` /
+//! `stream_data_length` by 4 octets per E-2-E-protected ACF type — has no
+//! surviving textual counterpart anywhere in the current TC18.txt (checked
+//! by full-text search for `ntscf_data_length`, `stream_data_length`, and
+//! `4 octets`; the only remaining hits are the two header-diagram field
+//! labels themselves — Figure 20/21 — not an adjustment rule). This
+//! module's comment has cited that now-vanished clause as the reason
+//! requirement `REQ-CRC-016` ("not implemented anywhere in this crate")
+//! exists. Whether the RC4/RC5 revision dropped that requirement outright
+//! (so `REQ-CRC-016` may now be moot) or merely relocated/consolidated it
+//! somewhere this search did not recognize is a real open question this
+//! citation fix does not answer — it needs engineering judgment against the
+//! current spec text, not a citation swap. See issue #164 batch 4's PR
+//! description for this flag.
 //!
 //! The original reasoning, kept for the record: the Milestone 6 checklist
 //! stated a length field is pre-adjusted by one quadlet (4 octets) before
@@ -126,6 +146,34 @@
 //! doc comments and this module's "CRC trailer wire placement:
 //! encode/decode" section below.
 //!
+//! **TC18.txt citation-drift note (issue #164 batch 4):** the current
+//! TC18.txt revision renumbers and re-paginates these two worked examples
+//! as Figure 20 ("ACF_ABB under TSCF header (example)", caption at TC18.txt
+//! line 4231) and Figure 21 ("ACF_GBB under NTSCF header (example)",
+//! caption at line 4264) — "Figure 19" now names a wholly unrelated figure
+//! ("Configuration request", TC18.txt line 2860). The ACF_ABB example's
+//! byte counts this section and its tests depend on (6 payload + 2 pad +
+//! 4-byte CRC = 20 bytes = 5 quadlets) are confirmed unchanged under the
+//! new Figure 20 label. The ACF_GBB example is confirmed **not** just
+//! renumbered, though: TC18.txt carries a `Commented [BE39]: 051RC4 - text
+//! and figure updated` marker immediately after it, and its new Figure 21
+//! layout shows a different payload/pad split of the same
+//! 28-byte/7-quadlet total than this section assumes — see `src/acf.rs`'s
+//! own equivalent note (fixed in issue #164 batch 1) for the specific byte
+//! counts it found. This module's own
+//! `finalize_crc_trailer_matches_figure_19_worked_example`/
+//! `_figure_20_worked_example` test names, and their internal comments/
+//! assert messages, deliberately still say "Figure 19"/"Figure 20" and
+//! still encode the OLD ACF_GBB split (7 payload + 1 pad) — left unchanged
+//! here because (a) renaming a test or re-deriving its golden-vector byte
+//! layout is a code/test-logic change, out of scope for a citation-only
+//! fix, and (b) whether the ACF_GBB test's 7+1 split needs to become
+//! something else to match the new Figure 21, or is unaffected because
+//! `acf_msg_length = 0x07`/28 bytes total is what this crate's logic
+//! actually depends on (as `src/acf.rs`'s note argues for its own,
+//! analogous case), is an open question this pass deliberately does not
+//! answer — see issue #164 batch 4's PR description for this flag.
+//!
 //! ## Fragmentation interaction (`ROADMAP.md` Milestone 6, "Fragmentation
 //! interaction" bullet)
 //!
@@ -184,21 +232,40 @@
 //! by the train's combined payload — rather than inventing a multi-
 //! fragment header-combination rule the roadmap text does not state.
 //!
-//! **Reconciled against TC18 §13.6 — and this working interpretation turned
-//! out to be WRONG.** TC18 §13.6 (TC18.txt line 3801) states: "For
-//! fragmented requests or responses going through CRC calculation only the
-//! *first* AVTPDU and ACF header data will be used and the payload of all
-//! segments." rust-RCP uses the *final* fragment's AVTPDU/ACF header
-//! instead. This is a real, known divergence from TC18. It is recorded
-//! honestly as requirement `REQ-CRC-015` rather than papered over, and is
-//! deliberately left unfixed here: correcting it changes what
-//! [`build_crc32_coverage_buffer_for_fragment_train`]/
-//! [`crc32_tc18_for_fragment_train`]/
-//! [`crate::fragment::verify_reassembled_train_crc`] take as their header
-//! argument, so it belongs in its own change rather than in a
-//! requirements-coverage pass. Interop with a conformant TC18 peer will
-//! fail for any multi-fragment E-2-E-protected message whose first and last
-//! fragments' AVTPDU/ACF header fields differ.
+//! **Flag, not cleanly resolved here — the old TC18.txt line 3801 sentence
+//! this note used to cite is genuinely gone, not just moved.** A full-text
+//! search of the current TC18.txt for "first AVTPDU", "first ACF header",
+//! and "payload of all segments" finds nothing. TC18 §13.6's
+//! fragmentation-vs-CRC rule now reads, in its entirety (TC18.txt lines
+//! 4274-4275): "Fragmentation, if applied to a message, happens after CRC
+//! calculation. So, the CRC is only calculated once and will be
+//! transmitted in the last segment." That sentence still supports this
+//! module's "only the final fragment carries the CRC" placement rule (see
+//! [`fragment_crc_expectation`]/[`check_fragment_crc_placement`]), but,
+//! unlike the old text, it no longer states — in either direction — which
+//! fragment's AVTPDU/ACF header fields the CRC coverage is computed over.
+//! Read literally, "happens after CRC calculation" suggests the CRC may now
+//! be computed once, before the message is even split into fragments, over
+//! a single not-yet-fragmented header — which would sidestep the old
+//! first-vs-final distinction rather than settle it either way.
+//!
+//! This module still uses the *final* fragment's AVTPDU/ACF header (see
+//! [`build_crc32_coverage_buffer_for_fragment_train`]'s doc comment), a
+//! choice this note used to record as a **known divergence** (`REQ-CRC-015`)
+//! from the old "*first* AVTPDU and ACF header data" wording. With that
+//! wording gone under the RC4/RC5 revision, it is genuinely unclear whether
+//! `REQ-CRC-015` still describes a real conformance gap, describes a now-
+//! moot one, or needs restating against a pre-fragmentation single-header
+//! model this crate does not implement (this crate always evaluates the
+//! coverage rule against one already-identified fragment's header — see
+//! this module's own "Fragmentation interaction" section above, which takes
+//! fragment order/identity as a caller-supplied fact). Deliberately left as
+//! an honest flag rather than a guessed citation or an asserted-correct
+//! claim: this backs a REQ-CRC frame-integrity requirement, and a wrong
+//! citation here is worse than an admitted gap. This looks like a real
+//! spec-conformance question worth its own follow-up issue, not just an
+//! unresolvable citation-text search — see issue #164 batch 4's PR
+//! description.
 
 use crate::acf::{self, AcfAbbMessage, AcfGbbMessage};
 use crate::avtp::HeaderVariant;
@@ -215,10 +282,14 @@ use crate::RcpError;
 /// reappears in `tests::crc32_tc18_reference`, the independent
 /// cross-check.
 ///
-/// TC18 §13.6 Table 31 "CRC32 Polynomial" (TC18.txt line 3792) names this
+/// TC18 §13.6 Table 34 "CRC32 Polynomial" (TC18.txt line 4193) names this
 /// CRC "CRC32P4" and fixes its six parameters: Polynomial `0xF4ACFB13`,
 /// Width 32 bit, Initial Value `0xFFFFFFFF`, Final XOR `0xFFFFFFFF`, Input
-/// reflection TRUE, Output reflection TRUE.
+/// reflection TRUE, Output reflection TRUE. (Renumbered from the old
+/// "Table 31" under the current TC18.txt revision — that number now names
+/// an unrelated table, "ep_generic_config register map"; the table's own
+/// content is otherwise confirmed unchanged: same six parameters, same
+/// values, at TC18.txt lines 4193-4208.)
 //fusa:req REQ-CRC-014
 const CRC32_TC18_POLY_REFLECTED: u32 = 0xC8DF_352F;
 
@@ -322,18 +393,22 @@ pub enum AcfCoverageMessage<'a> {
 /// Two further TC18 §13.6 properties fall out of this function's shape
 /// rather than needing code of their own:
 ///
-/// - **The CRC is ACF-specific** (TC18.txt line 3789: "the CRC32 is ACF
-///   specific, which means it is calculated for multiple ACF types in one
-///   AVTPDU for each ACF type individually"). This function takes exactly
-///   one [`AcfCoverageMessage`], so an AVTPDU carrying N E-2-E-protected
-///   ACF messages needs N independent calls and produces N independent
-///   CRCs; there is no way to fold two ACF messages into one coverage
-///   buffer.
+/// - **The CRC is ACF-specific** (TC18.txt line 4191, reworded under the
+///   current RC4/RC5 revision from what this note used to cite at old line
+///   3789 — the fact survives, the exact sentence does not: "In Safe
+///   command mode a CRC32 is calculated per ACF type across specific
+///   fields of an AVTPDU header, ACF header, and the entire payload
+///   (except padding)"). This function takes exactly one
+///   [`AcfCoverageMessage`], so an AVTPDU carrying N E-2-E-protected ACF
+///   messages needs N independent calls and produces N independent CRCs;
+///   there is no way to fold two ACF messages into one coverage buffer.
 /// - **Requests and responses use the identical scheme** (TC18.txt line
-///   3808: "The CRC calculation for request and response follows the
-///   identical scheme"). Neither this function nor [`crc32_tc18`] has a
-///   direction parameter; a response differs from a request only by the
-///   `rsp`/`err`/`evt` bits already inside the covered `byte_message_info`.
+///   4276: "The CRC calculation for requests and responses follows the
+///   identical scheme" — near-verbatim relocation; only "request and
+///   response" → "requests and responses" changed). Neither this function
+///   nor [`crc32_tc18`] has a direction parameter; a response differs from
+///   a request only by the `rsp`/`err`/`evt` bits already inside the
+///   covered `byte_message_info`.
 //fusa:req REQ-CRC-004
 //fusa:req REQ-CRC-005
 //fusa:req REQ-CRC-006
@@ -411,6 +486,12 @@ pub fn build_crc32_coverage_buffer(
 // bytes themselves — matching the two-step "encode the pre-CRC frame, then
 // append the trailer" pattern `cpp-RCP`'s `rcp::e2e::append_crc` and
 // `c-RCP`'s equivalent already use.
+//
+// TC18.txt citation-drift note (issue #164 batch 4): these worked examples
+// are Figure 20 (ACF_ABB) / Figure 21 (ACF_GBB) under the current TC18.txt
+// revision, and the ACF_GBB one's content changed too, not just its number
+// — see this module's own "CRC trailer wire placement" doc comment above
+// for the full citation-drift flag and why it is left unresolved here.
 
 /// Number of quadlets (equivalently, [`QUADLET_LEN`]-byte octets) TC18's
 /// trailing CRC32 always occupies on the wire — exactly one quadlet, never
@@ -436,10 +517,12 @@ pub const CRC_TRAILER_LEN: usize = acf::QUADLET_LEN;
 /// own automatic `pad` octets already sit immediately after the real
 /// payload; this function only ever appends bytes after that point, so the
 /// result is always header (+ `message_timestamp`), real payload, `pad`
-/// zero octets, CRC — TC18's real order (Figure 19 / Figure 20) — never
-/// the reversed payload/CRC/pad order a caller gets by concatenating CRC
-/// bytes into the payload before calling `encode_acf_abb`/`encode_acf_gbb`
-/// (see this section's doc comment).
+/// zero octets, CRC — TC18's real order (Figure 19 / Figure 20; Figure 20 /
+/// Figure 21 under the current TC18.txt revision — see this module's top
+/// doc comment for the renumber/content-change flag) — never the reversed
+/// payload/CRC/pad order a caller gets by concatenating CRC bytes into the
+/// payload before calling `encode_acf_abb`/`encode_acf_gbb` (see this
+/// section's doc comment).
 ///
 /// Returns `Err(RcpError::ShortFrame)` if `frame` is shorter than
 /// [`acf::BYTE_MESSAGE_INFO_LEN`], and `Err(RcpError::InvalidSize)` if
@@ -793,13 +876,18 @@ mod tests {
         }
     }
 
-    // ── TC18 §13.6 Table 31 / ACF-specific / request-response symmetry ─────
+    // ── TC18 §13.6 Table 34 / ACF-specific / request-response symmetry ─────
+    // (Table 34, not 31 — see this module's doc comment for the renumber.)
 
     #[test]
     //fusa:test REQ-CRC-014
     fn poly_constant_is_the_bit_reversal_of_table_31_polynomial() {
-        // TC18 §13.6 Table 31 "CRC32 Polynomial" (TC18.txt line 3792), read
-        // row by row:
+        // TC18 §13.6 Table 34 "CRC32 Polynomial" (TC18.txt line 4193), read
+        // row by row. Renumbered from "Table 31" under the current
+        // TC18.txt revision — see this module's doc comment for the
+        // renumber note. (This test's own name still says "table_31";
+        // left alone since renaming a test function is a code change, not
+        // a citation fix.)
         //   Polynomial        0xF4ACFB13
         //   Width             32 bit
         //   Initial Value     0xFFFFFFFF
@@ -809,7 +897,7 @@ mod tests {
         //
         // `crc32_tc18` runs a reflected (LSB-first) shift register, which
         // is only equivalent to that definition if the constant it shifts
-        // against is the exact bit reversal of Table 31's polynomial.
+        // against is the exact bit reversal of Table 34's polynomial.
         const TABLE_31_POLYNOMIAL: u32 = 0xF4AC_FB13;
         const TABLE_31_INITIAL_VALUE: u32 = 0xFFFF_FFFF;
         const TABLE_31_FINAL_XOR: u32 = 0xFFFF_FFFF;
@@ -828,9 +916,12 @@ mod tests {
     #[test]
     //fusa:test REQ-CRC-017
     fn crc32_is_computed_per_acf_type_individually() {
-        // TC18 §13.6 (TC18.txt line 3789): "the CRC32 is ACF specific,
-        // which means it is calculated for multiple ACF types in one AVTPDU
-        // for each ACF type individually."
+        // TC18 §13.6 (TC18.txt line 4191), reworded under the current
+        // RC4/RC5 revision from the old TC18.txt line 3789 sentence this
+        // comment used to quote — the underlying fact (per-ACF-type CRC)
+        // survives, the wording does not: "In Safe command mode a CRC32 is
+        // calculated per ACF type across specific fields of an AVTPDU
+        // header, ACF header, and the entire payload (except padding)."
         //
         // Two ACF messages riding under one and the same AVTPDU header must
         // therefore yield two independent coverage buffers and two
@@ -866,8 +957,10 @@ mod tests {
     #[test]
     //fusa:test REQ-CRC-019
     fn crc_scheme_is_identical_for_request_and_response() {
-        // TC18 §13.6 (TC18.txt line 3808): "The CRC calculation for request
-        // and response follows the identical scheme."
+        // TC18 §13.6 (TC18.txt line 4276): "The CRC calculation for
+        // requests and responses follows the identical scheme." (Near-
+        // verbatim relocation; only "request and response" → "requests and
+        // responses" changed under the current revision.)
         //
         // TC18 §11.2.1 Table 4 gives a request rsp = 0b and §11.3 Table 15
         // gives a response rsp = 1b; that single covered header bit is the
@@ -1077,6 +1170,14 @@ mod tests {
     // sequence — not just total length/quadlet-count/pad-count, which
     // stayed correct even under the old, reversed `payload, CRC, pad` byte
     // order and so never caught that bug.
+    //
+    // TC18.txt citation-drift note (issue #164 batch 4): these are Figure
+    // 20 (ACF_ABB) / Figure 21 (ACF_GBB) under the current TC18.txt
+    // revision, and the ACF_GBB example's own content changed too — see
+    // this module's top-of-file doc comment for the full flag. The test
+    // names/comments below deliberately still say "Figure 19"/"Figure 20"
+    // and the ACF_GBB test still uses the OLD 7-payload/1-pad split; left
+    // as-is since neither is a citation-text fix (see the flag above).
 
     #[test]
     //fusa:test REQ-CRC-012
