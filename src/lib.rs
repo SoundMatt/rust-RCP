@@ -267,14 +267,53 @@ pub const RELAY_SPEC_VERSION: &str = SPEC_VERSION;
 /// [`CrcError`](Self::CrcError) is kept out of the eleven-member
 /// [`is_tc18_error_code`](Self::is_tc18_error_code) group.
 ///
+/// ## `ConfigWriteNotImplemented` error code (`crate::can`, Table 30/33
+/// Row-2 `evt[2:0]` validation, 5th endpoint type)
+///
+/// [`ConfigWriteNotImplemented`](Self::ConfigWriteNotImplemented) is
+/// [`crate::can::CanRequest::from_evt_sub_opcode`]'s own response to an
+/// `evt[2:0] == 111b` request (TC18 §13.5 Table 33's Row-2
+/// [`crate::evtgroup::EvtRow2Kind::ConfigWrite`] classification, shared
+/// across all eight Row-2 endpoint types — see
+/// [`crate::evtgroup`]'s own doc comment). This is a deliberate departure
+/// from [`crate::i2c::I2cRequest::from_evt_sub_opcode`]/
+/// [`crate::lin::LinRequest::from_evt_sub_opcode`]/
+/// [`crate::adc::AdcRequest::from_evt_sub_opcode`]/
+/// [`crate::pwm::PwmInRequest::from_evt_sub_opcode`]'s own identical
+/// `evt[2:0] == 111b` case, each of which returns
+/// `Ok(Self::ConfigWrite)` rather than an error — see
+/// [`crate::can`]'s own doc comment "Provenance note: evt[2:0] request
+/// validation" for the full reasoning behind why CAN's own
+/// [`crate::can::CanRequest::from_evt_sub_opcode`] cannot honestly follow
+/// that same precedent, given its different, `CanDataFrame`-accepting
+/// signature. Kept distinct from
+/// [`UnsupportedCmd`](Self::UnsupportedCmd) — Table 33's own Row-2 error
+/// code is scoped to the *Reserved* `evt[2:0]` range (`001b`-`110b`), a
+/// materially different classification than `111b`'s `ConfigWrite`, so
+/// reusing `UnsupportedCmd` here would blur two classifications Table 33
+/// itself keeps distinct. Not a TC18-numbered Table 27 code (TC18 defines
+/// no dedicated violation code for "this RC Server recognizes the request
+/// as a config-write but cannot decode its payload yet" — it is this
+/// crate's own honest gap marker, the same way
+/// [`ChainAborted`](Self::ChainAborted)/[`ChainError`](Self::ChainError)/
+/// [`CrcError`](Self::CrcError) above are each a crate-synthesized
+/// addition, not a restated spec code), so
+/// [`tc18_wire_code`](Self::tc18_wire_code) returns `None` for it and it is
+/// kept out of the eleven-member
+/// [`is_tc18_error_code`](Self::is_tc18_error_code) group, matching that
+/// trio's own precedent.
+///
 /// ## Stability (`ROADMAP.md` Milestone 10, "Public API stability
 /// guarantees")
 ///
 /// `#[non_exhaustive]`: every one of this milestone's predecessors added
 /// new variants here (`ChainAborted`/`ChainError` in Milestone 5,
-/// `CrcError` in Milestone 6), and several named-but-unconstructed
-/// variants (`SequencerNotKnown`, `RequestCanceled`, `RequestNotFound`,
-/// `EpNotFound`, `ReqStorageOvfl`) are already reserved for later call
+/// `CrcError` in Milestone 6, `ConfigWriteNotImplemented` alongside
+/// `crate::can`'s Table 30/33 Row-2 `evt[2:0]` validation item), and
+/// several named-but-unconstructed variants (`SequencerNotKnown`,
+/// `RequestCanceled`, `RequestNotFound`, `EpNotFound`, `ReqStorageOvfl`,
+/// and now [`crate::can::CanRequest::ConfigWrite`] itself — see
+/// `crate::can`'s own doc comment) are already reserved for later call
 /// sites — this enum is a live growth surface, not a closed set. Matching
 /// on it from outside this crate MUST include a wildcard arm; see
 /// `docs/SEMVER.md`.
@@ -412,6 +451,21 @@ pub enum RcpError {
     //fusa:req REQ-CRC-011
     #[error("rcp/error: CRC_ERROR — end-to-end CRC-32 safe-point verification failed")]
     CrcError,
+
+    // ── ConfigWriteNotImplemented error code (crate::can, Table 30/33
+    //    Row-2 evt[2:0] validation, 5th endpoint type) ───────────────────
+    // See this enum's own doc comment "ConfigWriteNotImplemented error
+    // code" section and crate::can's own doc comment "Provenance note:
+    // evt[2:0] request validation" for the full provenance note behind
+    // adding this as a new variant rather than reusing UnsupportedCmd (TC18
+    // Table 33's own Row-2 code, but scoped to the *Reserved* evt[2:0]
+    // range, not the distinct ConfigWrite one) or returning
+    // `Ok(CanRequest::ConfigWrite)` the way crate::i2c/crate::lin/
+    // crate::adc/crate::pwm's own from_evt_sub_opcode precedent does for
+    // their identical evt[2:0]==111b classification.
+    //fusa:req REQ-CAN-019
+    #[error("rcp/can: functional-config write (evt[2:0] = 111b, TC18 §12.7.1) is not yet decoded by this crate")]
+    ConfigWriteNotImplemented,
 
     // ── Remaining TC18 Table 27 error codes (rust-RCP-W05) ──────────────────
     // TC18 Table 27 names 17 wire error codes in total; only 13 had an
@@ -820,6 +874,11 @@ mod tests {
         assert!(!RcpError::ShortFrame.is_tc18_error_code());
         assert!(!RcpError::InvalidSize.is_tc18_error_code());
         assert!(!RcpError::Other("x".into()).is_tc18_error_code());
+        // Nor is ConfigWriteNotImplemented — it has no TC18-numbered Table
+        // 27 counterpart, matching ChainAborted/ChainError/CrcError's own
+        // precedent (see this enum's own doc comment).
+        //fusa:test REQ-CAN-019
+        assert!(!RcpError::ConfigWriteNotImplemented.is_tc18_error_code());
     }
 
     #[test]
@@ -870,11 +929,25 @@ mod tests {
             RcpError::Busy,
             RcpError::ShortFrame,
             RcpError::CrcError,
+            RcpError::ConfigWriteNotImplemented,
             RcpError::InvalidSize,
             RcpError::Other("x".into()),
         ] {
             assert_eq!(error.tc18_wire_code(), None, "for {error:?}");
         }
+    }
+
+    #[test]
+    //fusa:test REQ-CAN-019
+    fn config_write_not_implemented_message_names_evt_111b_and_tc18_12_7_1() {
+        let message = RcpError::ConfigWriteNotImplemented.to_string();
+        assert!(message.contains("111b"));
+        assert!(message.contains("12.7.1"));
+        assert_ne!(
+            RcpError::ConfigWriteNotImplemented,
+            RcpError::UnsupportedCmd,
+            "ConfigWriteNotImplemented must stay distinct from Table 33's Reserved-range code"
+        );
     }
 
     #[test]

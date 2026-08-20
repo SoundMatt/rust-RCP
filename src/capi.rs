@@ -301,6 +301,11 @@ pub enum CError {
     PresentationTimeTooFar = 27,
     GptpFail = 28,
 
+    // ── ConfigWriteNotImplemented (crate::can, Table 30/33 Row-2 evt[2:0]
+    //    validation, 5th endpoint type) — not a TC18-numbered code, see
+    //    RcpError::ConfigWriteNotImplemented's own doc comment ────────────
+    ConfigWriteNotImplemented = 29,
+
     /// Catch-all: the legacy `NotFound`/`AlreadyExists`/`Busy`
     /// Zone/Controller/Registry sentinels (no TC18 analog — see this
     /// module's doc comment) and `RcpError::Other(String)` (whose message
@@ -337,6 +342,7 @@ impl From<&RcpError> for CError {
             RcpError::PociFailure => CError::PociFailure,
             RcpError::PresentationTimeTooFar => CError::PresentationTimeTooFar,
             RcpError::GptpFail => CError::GptpFail,
+            RcpError::ConfigWriteNotImplemented => CError::ConfigWriteNotImplemented,
             RcpError::NotFound | RcpError::AlreadyExists | RcpError::Busy | RcpError::Other(_) => {
                 CError::Other
             }
@@ -534,6 +540,12 @@ mod tests {
         assert_eq!(CError::from(&RcpError::ChainError), CError::ChainError);
         assert_eq!(CError::from(&RcpError::CrcError), CError::CrcError);
         assert_eq!(CError::from(&RcpError::InvalidSize), CError::InvalidSize);
+        // crate::can's Table 30/33 Row-2 evt[2:0] validation item.
+        //fusa:test REQ-CAN-019
+        assert_eq!(
+            CError::from(&RcpError::ConfigWriteNotImplemented),
+            CError::ConfigWriteNotImplemented
+        );
     }
 
     #[test]

@@ -9,6 +9,9 @@
 //fusa:req REQ-CAN-009
 //fusa:req REQ-CAN-010
 //fusa:req REQ-CAN-011
+//fusa:req REQ-CAN-017
+//fusa:req REQ-CAN-018
+//fusa:req REQ-CAN-019
 
 //! The CAN controller endpoint type (`ep_type 0x0B`) — `ROADMAP.md`
 //! Milestone 7 ("Remaining Endpoint Types"), second checklist bullet:
@@ -22,8 +25,10 @@
 //! This follows directly on [`crate::lin`] (this milestone's first entry):
 //! same milestone, same "additive standalone plumbing only" discipline, same
 //! doc-comment provenance-note style for anything this crate has not yet
-//! reconciled against confirmed wire behavior. Four named pieces are in
-//! scope, all implemented here:
+//! reconciled against confirmed wire behavior. Four named pieces were
+//! originally in scope, all implemented here; a fifth,
+//! [`CanRequest`]/[`CanRequest::from_evt_sub_opcode`], was added afterward
+//! (see "Provenance note: evt[2:0] request validation" below):
 //!
 //! - [`FrameFormat`] — the six named Classical/FD/XL frame-format variants
 //!   this checklist bullet lists by name. See "Provenance note: `FrameFormat`
@@ -40,6 +45,19 @@
 //! - [`CanFunctionalConfig`] — this endpoint type's functional-config
 //!   content, carrying the selected [`FrameFormat`]. See "Relationship to
 //!   `crate::regmap`" below.
+//! - [`CanRequest`]/[`CanRequest::from_evt_sub_opcode`] — CAN's own
+//!   request-decode entry point, validating an incoming request's
+//!   `evt.sub_opcode` against [`crate::evtgroup::evt_row2_kind_of`]'s TC18
+//!   §13.5 Table 33 Row-2 rule. See "Provenance note: evt[2:0] request
+//!   validation" below — this piece was added after this module's own
+//!   original scope note (still accurate for why no `sub_opcode` reading
+//!   existed here originally) as this crate's fifth Row-2 endpoint-type
+//!   module, following
+//!   [`crate::i2c::I2cRequest`]/[`crate::lin::LinRequest`]/
+//!   [`crate::adc::AdcRequest`]/[`crate::pwm::PwmInRequest`]'s own prior
+//!   applications of the same shared predicate. The remaining three Row-2
+//!   endpoint types (`UART, ISELED, MDIO`) are expected to follow the same
+//!   pattern in their own later items.
 //!
 //! Deliberately out of scope, for the same reasons every prior Milestone 4/7
 //! entry's own doc comment already gives:
@@ -48,7 +66,9 @@
 //!   controller checklist bullet states "data frames only, no remote-frame
 //!   support", so unlike some CAN controller hardware, no type in this
 //!   module has an RTR field, an RTR enum variant, or any other way to
-//!   represent a remote frame.
+//!   represent a remote frame. [`CanRequest`] carries this forward: its
+//!   [`Plain`](CanRequest::Plain) variant wraps a [`CanDataFrame`], which
+//!   itself has no RTR representation.
 //! - The CAN trigger-signal table. `ROADMAP.md`'s checklist bullet states
 //!   this table is unpopulated in the current spec revision and directs
 //!   that this be tracked as a spec gap rather than guessed at — see
@@ -58,11 +78,134 @@
 //! - Real multi-AVTPDU reassembly of a CAN XL payload that spans more than
 //!   one AVTPDU. `ROADMAP.md`'s checklist bullet itself defers this to
 //!   Milestone 8 — see "CAN XL fragmentation interaction" below.
+//! - A CAN XL counterpart to [`CanRequest`]. [`CanRequest::Plain`] wraps a
+//!   [`CanDataFrame`] (Classical/FD) only — see "Provenance note: evt[2:0]
+//!   request validation" below for why an XL-carrying variant is left for a
+//!   later item rather than guessed at here.
+//! - The "Groups A/B/C" `evt[2:0]` sub-opcode convention
+//!   ([`crate::evtgroup::EvtGroup`]) as a general, cross-endpoint-type
+//!   classification scheme — [`crate::evtgroup`]'s own doc comment already
+//!   flags that broader scheme as unresolved, independent of the narrower,
+//!   unambiguous Table 33 Row-2 rule this module's [`CanRequest`] now
+//!   implements (see "Provenance note: evt[2:0] request validation" below).
+//! - Decoding [`CanRequest::ConfigWrite`]'s own TC18 §12.7.1 payload shape —
+//!   and, unlike every prior Row-2 endpoint-type module,
+//!   [`CanRequest::from_evt_sub_opcode`] does not even construct
+//!   [`CanRequest::ConfigWrite`] yet; see "Provenance note: evt[2:0] request
+//!   validation" below for why.
 //! - [`crate::regmap::CommonFunctionalConfig`]'s fields — unchanged here, as
 //!   in every prior Milestone 1-4/7 entry.
-//! - Wiring any of the below into an actual decoder, dispatch loop, or
+//! - Wiring [`CanRequest::from_evt_sub_opcode`] into an actual decoder,
+//!   dispatch loop, or [`crate::mock::Endpoint`] implementation.
+//!   [`crate::mock::Endpoint`]'s own trait signature still does not carry an
+//!   `evt` value to any implementation at all — that gap is not specific to
+//!   CAN, it applies identically to
+//!   [`crate::i2c::I2cRequest::from_evt_sub_opcode`]/
+//!   [`crate::lin::LinRequest::from_evt_sub_opcode`]/
+//!   [`crate::adc::AdcRequest::from_evt_sub_opcode`]/
+//!   [`crate::pwm::PwmInRequest::from_evt_sub_opcode`] (each confirmed
+//!   still unwired against [`crate::mock::Endpoint`]'s own doc comment).
+//!   [`CanRequest`] is built to that same "additive standalone plumbing
+//!   only" level. Wiring any of this module's other, original four pieces
+//!   into an actual decoder, dispatch loop, or
 //!   [`crate::avtp`]/[`crate::acf`]/[`crate::addressing`] caller — matching
 //!   the discipline every prior Milestone 1-4/7 entry already established.
+//!
+//! ## Provenance note: evt[2:0] request validation
+//!
+//! CAN is one of the eight endpoint types TC18 §13.5 Table 33 groups into
+//! one shared "Row 2" `evt[2:0]` rule — see [`crate::evtgroup`]'s own doc
+//! comment "Provenance note: TC18 §13.5 Table 33's Row-2 rule
+//! (`evt_row2_kind_of`)" for the full citation, including the literal-text
+//! discrepancy that module's doc comment flags and resolves (Table 33's own
+//! printed Row-2 cell reads "000b to 110b reserved", including 000b, which
+//! this crate does not implement literally). [`CanRequest::from_evt_sub_opcode`]
+//! is this module's own caller of that shared
+//! [`crate::evtgroup::evt_row2_kind_of`] predicate — CAN's own request
+//! format (TC18 §13.7.11.3 Figure 40, TC18.txt lines 5842-5856) carries the
+//! same `evt` field in its Message Info header every other endpoint type's
+//! request does, and TC18 names no CAN-specific override of Table 33's
+//! generic rule anywhere in §13.7.11.
+//!
+//! **`CanRequest::from_evt_sub_opcode` takes an already-decoded
+//! [`CanDataFrame`], not raw `byte_msg_payload` bytes — unlike every prior
+//! Row-2 endpoint-type module.** [`crate::i2c::I2cRequest::from_evt_sub_opcode`]/
+//! [`crate::lin::LinRequest::from_evt_sub_opcode`]/
+//! [`crate::adc::AdcRequest::from_evt_sub_opcode`]/
+//! [`crate::pwm::PwmInRequest::from_evt_sub_opcode`] each take `&[u8]` and
+//! decode it themselves through their own endpoint type's one confirmed
+//! payload shape. CAN has no single such shape: its own request payload is
+//! either a [`CanDataFrame`] (the four Classical/FD [`FrameFormat`]
+//! variants) or a [`CanXlFrame`] (the two XL variants), selected by the
+//! payload's own leading `FrameFormat` tag byte — a question this module's
+//! own doc comment "TC18 reconciliation note (§13.7.11)" already flags as
+//! not fully reconciled against TC18 Figure 40's real wire word layout
+//! ([`CanDataFrame::encode`]'s 5-byte form is explicitly **not**
+//! byte-compatible with Figure 40's own 32-bit-word framing). Choosing
+//! which decoder to call by peeking at raw bytes inside
+//! `evt[2:0]`-classification logic would conflate two separate TC18
+//! concerns this module's own doc comment already keeps apart: Table 33's
+//! `evt[2:0]` classification (which endpoint type gets no say in — it is
+//! identical across all eight Row-2 types) and CAN's own `FrameFormat`
+//! frame-shape selection (entirely CAN-specific, decided by the payload
+//! itself, and orthogonal to `evt[2:0]`). Rather than inventing an
+//! unconfirmed byte-sniffing rule to bridge the two, this function instead
+//! requires its caller to have already decided and performed that decode —
+//! via [`CanDataFrame::decode`] for the four non-XL formats, the only path
+//! [`CanRequest::Plain`] represents today. A [`CanXlFrame`] counterpart is
+//! deliberately left for a later item (see this module's doc comment
+//! "Deliberately out of scope") rather than this one guessing at an
+//! `enum Frame { Data(CanDataFrame), Xl(CanXlFrame) }`-shaped payload this
+//! crate's own spec-extraction pass has not confirmed.
+//!
+//! **`CanRequest::from_evt_sub_opcode` returns
+//! `Err(`[`RcpError::ConfigWriteNotImplemented`]`)` for `evt[2:0] == 111b`,
+//! rather than `Ok(`[`CanRequest::ConfigWrite`]`)` the way
+//! [`crate::i2c::I2cRequest::from_evt_sub_opcode`]/
+//! [`crate::lin::LinRequest::from_evt_sub_opcode`]/
+//! [`crate::adc::AdcRequest::from_evt_sub_opcode`]/
+//! [`crate::pwm::PwmInRequest::from_evt_sub_opcode`] each do for their own
+//! identical `evt[2:0] == 111b` case.** This is a deliberate departure from
+//! that precedent, not an oversight, and follows directly from the
+//! `CanDataFrame`-accepting signature above: each of those four sibling
+//! functions accepts raw, cheaply-ignorable `&[u8]` payload bytes, so their
+//! own `ConfigWrite` arm can harmlessly decline to interpret bytes it was
+//! never obligated to decode in the first place. `CanRequest::from_evt_sub_opcode`
+//! instead requires its caller to already hold a real, decoded
+//! [`CanDataFrame`] value *before* this function is even called — and a
+//! genuine TC18 §12.7.1 config-write payload is definitionally not a CAN
+//! data frame at all, so no caller can honestly construct one to pass in
+//! for this branch. Accepting whatever `CanDataFrame` value happened to be
+//! supplied and returning `Ok(`[`CanRequest::ConfigWrite`]`)` regardless —
+//! silently discarding a value the caller was structurally required to
+//! provide but that has no relationship to the real config-write request —
+//! is judged less honest here than surfacing a dedicated error, matching
+//! this crate's "flag rather than guess" discipline (Guiding Principle 5).
+//! [`RcpError::ConfigWriteNotImplemented`] names the real, crate-wide gap
+//! precisely: TC18 §12.7.1 functional-config-write payload decoding is not
+//! implemented anywhere in this crate yet — I²C's/LIN's/ADC's/PWM_IN's own
+//! `ConfigWrite` variants are equally undecoded, they are simply
+//! *recognized* rather than rejected, since their own signatures can afford
+//! to be lenient about it. [`CanRequest::ConfigWrite`] itself remains a
+//! real, declared variant of this enum — reserved for whichever future item
+//! does implement a real §12.7.1 CAN config-write payload decode and can
+//! therefore construct it honestly, the same way this crate already leaves
+//! [`crate::RcpError::SequencerNotKnown`]/
+//! [`crate::RcpError::RequestCanceled`]/[`crate::RcpError::RequestNotFound`]/
+//! [`crate::RcpError::EpNotFound`]/[`crate::RcpError::ReqStorageOvfl`]
+//! declared-but-not-yet-constructed for their own later call sites (see
+//! [`crate::RcpError`]'s own doc comment).
+//!
+//! Every `Reserved` sub_opcode value (`evt[2:0]` in `001b..=110b`, or any
+//! value outside the 3-bit field's representable range) is rejected with
+//! `Err(`[`RcpError::UnsupportedCmd`]`)`, matching Table 33's own stated
+//! error code and
+//! [`crate::i2c::I2cRequest::from_evt_sub_opcode`]'s/
+//! [`crate::lin::LinRequest::from_evt_sub_opcode`]'s/
+//! [`crate::adc::AdcRequest::from_evt_sub_opcode`]'s/
+//! [`crate::pwm::PwmInRequest::from_evt_sub_opcode`]'s identical refusal of
+//! their own table's reserved code — this part is unchanged from every
+//! prior Row-2 endpoint-type module.
 //!
 //! ## Validation against `canbr.rs` (historical — see below for its outcome)
 //!
@@ -247,6 +390,7 @@
 //! need to extend this module's shape rather than merely set an existing
 //! flag, by design.
 
+use crate::evtgroup::{evt_row2_kind_of, EvtRow2Kind};
 use crate::RcpError;
 
 // ── Physical-fact constants ─────────────────────────────────────────────────
@@ -660,6 +804,77 @@ impl CanFunctionalConfig {
     //fusa:req REQ-CAN-011
     pub fn layer_tag(&self) -> crate::regmap::PerEpTypeFunctionalConfig {
         crate::regmap::PerEpTypeFunctionalConfig::new(crate::regmap::EndpointType::Can)
+    }
+}
+
+// ── CanRequest: evt[2:0] request validation ─────────────────────────────────
+
+/// The decoded shape of an incoming CAN controller request, after validating
+/// its `evt[2:0]` sub-opcode against TC18 §13.5 Table 33's Row-2 rule (CAN
+/// is one of that row's eight endpoint types —
+/// `{ADC, PWM_IN, I²C, LIN, CAN, UART, ISELED, MDIO}`).
+///
+/// See this module's doc comment "Provenance note: evt[2:0] request
+/// validation" for the full citation, why
+/// [`CanRequest::from_evt_sub_opcode`] takes an already-decoded
+/// [`CanDataFrame`] rather than raw `byte_msg_payload` bytes (unlike every
+/// prior Row-2 endpoint-type module), why it returns
+/// `Err(`[`RcpError::ConfigWriteNotImplemented`]`)` instead of
+/// `Ok(`[`CanRequest::ConfigWrite`]`)` for `evt[2:0] == 111b`, and
+/// [`crate::evtgroup`]'s own doc comment for the literal-text discrepancy
+/// this crate resolves `evt[2:0] == 000b` against.
+#[derive(Debug, Clone, PartialEq, Eq)]
+//fusa:req REQ-CAN-017
+pub enum CanRequest {
+    /// `evt[2:0] == 000b`: an ordinary CAN controller request — the
+    /// caller-decoded [`CanDataFrame`] this endpoint is to send, or the
+    /// payload to wait for, per TC18 §13.7.11.1's "receiving requests to
+    /// either send a CAN ... frame or wait for a specific payload".
+    Plain(CanDataFrame),
+    /// `evt[2:0] == 111b`: a functional-config write (TC18 §12.7.1) rather
+    /// than an ordinary request. Unlike every other Row-2 endpoint-type
+    /// module's own `ConfigWrite` variant, [`CanRequest::from_evt_sub_opcode`]
+    /// does not yet construct this variant at all — see this module's doc
+    /// comment "Provenance note: evt[2:0] request validation" for why. It
+    /// remains a real, declared variant, reserved for whichever future item
+    /// implements a real TC18 §12.7.1 CAN config-write payload decode.
+    ConfigWrite,
+}
+
+impl CanRequest {
+    /// Decode an incoming CAN request from its `evt.sub_opcode`
+    /// ([`crate::acf::Evt::sub_opcode`]) and an already-decoded
+    /// [`CanDataFrame`] (see this module's doc comment "Provenance note:
+    /// evt[2:0] request validation" for why this takes a decoded
+    /// [`CanDataFrame`] rather than raw bytes, unlike
+    /// [`crate::i2c::I2cRequest::from_evt_sub_opcode`]/
+    /// [`crate::lin::LinRequest::from_evt_sub_opcode`]/
+    /// [`crate::adc::AdcRequest::from_evt_sub_opcode`]/
+    /// [`crate::pwm::PwmInRequest::from_evt_sub_opcode`]).
+    ///
+    /// Returns `Err(`[`RcpError::UnsupportedCmd`]`)` for every
+    /// [`EvtRow2Kind::Reserved`] sub_opcode value — TC18 §13.5 Table 33's
+    /// Row-2 rule requires the request be rejected with error code
+    /// `UNSUPPORTED_CMD`, matching
+    /// [`crate::i2c::I2cRequest::from_evt_sub_opcode`]'s/
+    /// [`crate::lin::LinRequest::from_evt_sub_opcode`]'s/
+    /// [`crate::adc::AdcRequest::from_evt_sub_opcode`]'s/
+    /// [`crate::pwm::PwmInRequest::from_evt_sub_opcode`]'s identical refusal
+    /// of their own table's reserved code. Returns
+    /// `Err(`[`RcpError::ConfigWriteNotImplemented`]`)` — not
+    /// `Ok(`[`CanRequest::ConfigWrite`]`)` — for every
+    /// [`EvtRow2Kind::ConfigWrite`] sub_opcode value; see this module's doc
+    /// comment for why. Never panics for any `sub_opcode`/`frame`
+    /// combination.
+    //fusa:req REQ-CAN-017
+    //fusa:req REQ-CAN-018
+    //fusa:req REQ-CAN-019
+    pub fn from_evt_sub_opcode(sub_opcode: u8, frame: CanDataFrame) -> Result<Self, RcpError> {
+        match evt_row2_kind_of(sub_opcode) {
+            EvtRow2Kind::Plain => Ok(Self::Plain(frame)),
+            EvtRow2Kind::ConfigWrite => Err(RcpError::ConfigWriteNotImplemented),
+            EvtRow2Kind::Reserved => Err(RcpError::UnsupportedCmd),
+        }
     }
 }
 
@@ -1110,5 +1325,107 @@ mod tests {
         assert!(!crate::regmap::functional_config_matches_ep_type(
             &generic, &tag
         ));
+    }
+
+    // ── CanRequest::from_evt_sub_opcode ──────────────────────────────────────
+
+    fn sample_frame() -> CanDataFrame {
+        CanDataFrame {
+            format: FrameFormat::Cbff,
+            id: 0x123,
+            data: vec![0xDE, 0xAD, 0xBE, 0xEF],
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-CAN-017
+    //fusa:test REQ-CAN-018
+    fn can_request_plain_evt_wraps_the_given_frame_unchanged() {
+        // Unlike I2cRequest::Plain/LinRequest::Plain/AdcRequest::Plain/
+        // PwmInRequest::Plain, CanRequest::Plain does not decode raw bytes
+        // itself — it threads the caller's already-decoded CanDataFrame
+        // through unchanged. See this module's doc comment "Provenance
+        // note: evt[2:0] request validation".
+        let frame = sample_frame();
+        let request = CanRequest::from_evt_sub_opcode(0b000, frame.clone()).unwrap();
+        assert_eq!(request, CanRequest::Plain(frame));
+    }
+
+    #[test]
+    //fusa:test REQ-CAN-017
+    //fusa:test REQ-CAN-018
+    fn can_request_plain_evt_accepts_an_empty_data_frame() {
+        let frame = CanDataFrame {
+            format: FrameFormat::Fbff,
+            id: 0,
+            data: vec![],
+        };
+        let request = CanRequest::from_evt_sub_opcode(0b000, frame.clone()).unwrap();
+        assert_eq!(request, CanRequest::Plain(frame));
+    }
+
+    #[test]
+    //fusa:test REQ-CAN-017
+    //fusa:test REQ-CAN-018
+    //fusa:test REQ-CAN-019
+    fn can_request_config_write_evt_is_rejected_with_config_write_not_implemented() {
+        // Deliberate departure from I2cRequest/LinRequest/AdcRequest/
+        // PwmInRequest's own precedent (each returns
+        // Ok(Self::ConfigWrite) for evt[2:0] == 111b) — see this module's
+        // doc comment "Provenance note: evt[2:0] request validation" for
+        // why CAN's own from_evt_sub_opcode cannot honestly follow that
+        // same precedent, given its CanDataFrame-accepting signature. The
+        // given frame is not a real config-write payload — it is passed
+        // only because the signature requires *some* CanDataFrame — and is
+        // not echoed back or otherwise used.
+        assert_eq!(
+            CanRequest::from_evt_sub_opcode(0b111, sample_frame()),
+            Err(RcpError::ConfigWriteNotImplemented)
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-CAN-018
+    fn can_request_reserved_evt_values_are_rejected_with_unsupported_cmd() {
+        for sub_opcode in 0b001..=0b110u8 {
+            assert_eq!(
+                CanRequest::from_evt_sub_opcode(sub_opcode, sample_frame()),
+                Err(RcpError::UnsupportedCmd)
+            );
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-CAN-018
+    fn can_request_values_above_the_3_bit_field_are_also_rejected_with_unsupported_cmd() {
+        for sub_opcode in (crate::acf::EVT_SUB_OPCODE_MAX + 1)..=u8::MAX {
+            assert_eq!(
+                CanRequest::from_evt_sub_opcode(sub_opcode, sample_frame()),
+                Err(RcpError::UnsupportedCmd)
+            );
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-CAN-018
+    fn can_request_from_evt_sub_opcode_never_panics_for_any_sampled_input() {
+        let frames = [
+            CanDataFrame {
+                format: FrameFormat::Cbff,
+                id: 0,
+                data: vec![],
+            },
+            sample_frame(),
+            CanDataFrame {
+                format: FrameFormat::Feff,
+                id: CAN_EXTENDED_ID_MAX,
+                data: vec![0xAAu8; CAN_FD_MAX_PAYLOAD],
+            },
+        ];
+        for sub_opcode in 0..=u8::MAX {
+            for frame in &frames {
+                let _ = CanRequest::from_evt_sub_opcode(sub_opcode, frame.clone());
+            }
+        }
     }
 }
