@@ -8,6 +8,8 @@
 //fusa:req REQ-UART-008
 //fusa:req REQ-UART-009
 //fusa:req REQ-UART-010
+//fusa:req REQ-UART-011
+//fusa:req REQ-UART-012
 
 //! The UART endpoint type (`ep_type 0x05`) — `ROADMAP.md` Milestone 4
 //! ("Basic Endpoint Types"), fourth checklist bullet: "independent TX/RX
@@ -19,8 +21,10 @@
 //! `ep_type 0x05`'s immediate predecessor `ep_type 0x04`): same milestone,
 //! same "additive standalone plumbing only" discipline, same doc-comment
 //! provenance-note style for anything this crate has not yet reconciled
-//! against confirmed wire behavior. Three named pieces are in scope, all
-//! implemented here:
+//! against confirmed wire behavior. Three named pieces were originally in
+//! scope, all implemented here; a fourth,
+//! [`UartRequest`]/[`UartRequest::from_evt_sub_opcode`], was added
+//! afterward (see "Provenance note: evt[2:0] request validation" below):
 //!
 //! - [`UartTxQueue`] / [`UartRxQueue`] — the independent transmit and
 //!   receive byte queues, each modeled as an unstructured byte stream this
@@ -42,16 +46,39 @@
 //!   `RcpError::UnsupportedCmd`" below for why this crate reads the
 //!   checklist's literal `UNKNOWN_CMD` text as this already-defined variant
 //!   rather than adding a new one.
+//! - [`UartRequest`]/[`UartRequest::from_evt_sub_opcode`] — UART's own
+//!   request-decode entry point, validating an incoming request's
+//!   `evt.sub_opcode` against [`crate::evtgroup::evt_row2_kind_of`]'s TC18
+//!   §13.5 Table 33 Row-2 rule. See "Provenance note: evt[2:0] request
+//!   validation" below — this piece was added after this module's own
+//!   original scope note (still accurate for why no `sub_opcode` reading
+//!   existed here originally) as this crate's sixth Row-2 endpoint-type
+//!   module, following
+//!   [`crate::i2c::I2cRequest`]/[`crate::lin::LinRequest`]/
+//!   [`crate::adc::AdcRequest`]/[`crate::pwm::PwmInRequest`]'s own prior
+//!   applications of the same shared predicate and
+//!   [`crate::can::CanRequest`]'s own deliberate departure from their
+//!   shared `Ok(Self::ConfigWrite)` precedent for `evt[2:0] == 111b`. This
+//!   module does **not** depart the same way CAN did — see "Provenance
+//!   note: evt[2:0] request validation" below for why UART's own situation
+//!   does not force the same choice. The remaining two Row-2 endpoint types
+//!   (`ISELED, MDIO`) are expected to follow the same pattern in their own
+//!   later items.
 //!
 //! Deliberately out of scope, for the same reasons
 //! [`crate::gpio`]'s/[`crate::spi`]'s/[`crate::i2c`]'s own doc comments
 //! already give:
 //!
-//! - The "Groups A/B/C" `evt[2:0]` sub-opcode convention as a general,
-//!   cross-endpoint-type classification scheme, and any use of
-//!   `evt.sub_opcode` at all. `ROADMAP.md`'s UART checklist bullet names no
-//!   `sub_opcode`-keyed selection mechanism, so this module reads
-//!   `sub_opcode` nowhere.
+//! - The "Groups A/B/C" `evt[2:0]` sub-opcode convention
+//!   ([`crate::evtgroup::EvtGroup`]) as a general, cross-endpoint-type
+//!   classification scheme — [`crate::evtgroup`]'s own doc comment already
+//!   flags that broader scheme as unresolved, independent of the narrower,
+//!   unambiguous Table 33 Row-2 rule this module's [`UartRequest`] now
+//!   implements (see "Provenance note: evt[2:0] request validation" below).
+//!   `ROADMAP.md`'s UART checklist bullet itself names no
+//!   `sub_opcode`-keyed selection mechanism of its own — the Row-2 rule
+//!   [`UartRequest`] implements comes from TC18 §13.5 Table 33, a separate,
+//!   later-discovered item, not from this checklist bullet.
 //! - [`crate::regmap::CommonFunctionalConfig`]'s fields — unchanged here, as
 //!   in every prior Milestone 1-4 entry.
 //! - The content of a UART frame's per-byte framing (baud rate, parity, stop
@@ -59,8 +86,35 @@
 //!   side) role. `ROADMAP.md`'s UART checklist bullet names only the queue
 //!   split, the read-completion race, and the payload-less-read rule — no
 //!   line-framing parameters or role-selection mechanism — so none of that
-//!   is modeled here.
-//! - Wiring any of the below into an actual decoder, dispatch loop, or
+//!   is modeled here. [`UartRequest`] carries this forward: its
+//!   [`Write`](UartRequest::Write) variant wraps a raw, unframed
+//!   [`UartTxQueue`].
+//! - Decoding [`UartRequest::ConfigWrite`]'s own TC18 §12.7.1 payload shape.
+//!   [`UartRequest::from_evt_sub_opcode`] recognizes a config-write request
+//!   as distinct from a [`Write`](UartRequest::Write)/[`Read`](UartRequest::Read)
+//!   one, but does not itself interpret what the config-write payload
+//!   contains — that is separate, later work, same as every Row-2
+//!   endpoint-type module this predicate lands in except
+//!   [`crate::can::CanRequest`], whose own `CanDataFrame`-accepting
+//!   signature could not honestly afford the same leniency (see
+//!   "Provenance note: evt[2:0] request validation" below).
+//! - Wiring [`UartRequest::from_evt_sub_opcode`] into an actual decoder,
+//!   dispatch loop, or [`crate::mock::Endpoint`] implementation.
+//!   [`crate::mock::Endpoint`]'s own trait signature already has separate
+//!   `read`/`write` methods (unlike every other Row-2 endpoint-type
+//!   module's own single-request-storage shape), but neither method
+//!   carries an `evt` value through to any implementation yet — that gap
+//!   is not specific to UART, it applies identically to
+//!   [`crate::i2c::I2cRequest::from_evt_sub_opcode`]/
+//!   [`crate::lin::LinRequest::from_evt_sub_opcode`]/
+//!   [`crate::adc::AdcRequest::from_evt_sub_opcode`]/
+//!   [`crate::pwm::PwmInRequest::from_evt_sub_opcode`]/
+//!   [`crate::can::CanRequest::from_evt_sub_opcode`] (each confirmed still
+//!   unwired against [`crate::mock::Endpoint`]'s own doc comment).
+//!   [`UartRequest`] is built to that same "additive standalone plumbing
+//!   only" level.
+//! - Wiring any of this module's other, original three pieces into an
+//!   actual decoder, dispatch loop, or
 //!   [`crate::avtp`]/[`crate::acf`]/[`crate::addressing`] caller. This
 //!   module remains additive standalone plumbing only, matching the
 //!   discipline every prior Milestone 1-4 entry already established.
@@ -167,8 +221,131 @@
 //! a twelfth spec-named error code Milestone 2 missed —
 //! [`validate_uart_read_request`] therefore returns
 //! [`crate::RcpError::UnsupportedCmd`].
+//!
+//! ## Provenance note: evt[2:0] request validation
+//!
+//! UART is one of the eight endpoint types TC18 §13.5 Table 33 groups into
+//! one shared "Row 2" `evt[2:0]` rule (TC18.txt lines 4085-4092, `UART`
+//! itself named at line 4090) — see [`crate::evtgroup`]'s own doc comment
+//! "Provenance note: TC18 §13.5 Table 33's Row-2 rule (`evt_row2_kind_of`)"
+//! for the full citation, including the literal-text discrepancy that
+//! module's doc comment flags and resolves (Table 33's own printed Row-2
+//! cell reads "000b to 110b reserved", including 000b, which this crate
+//! does not implement literally). [`UartRequest::from_evt_sub_opcode`] is
+//! this module's own caller of that shared
+//! [`crate::evtgroup::evt_row2_kind_of`] predicate — UART's own request
+//! format (TC18 §13.7.8.3, TC18.txt lines 5391-5406) carries the same `evt`
+//! field in its Message Info header every other endpoint type's request
+//! does, and TC18 names no UART-specific override of Table 33's generic
+//! rule anywhere in §13.7.8.
+//!
+//! **UART's own read/write queue split (TC18 §13.7.8.1) is a genuinely
+//! separate, orthogonal concern from `evt[2:0]` classification, confirmed
+//! independently against TC18.txt rather than assumed.** §13.7.8.1
+//! (TC18.txt lines 5292-5293) states the TX/RX split as "these two
+//! processes are independent from each other, thus the UART EP has two EP
+//! request storages" — a statement about which of two request storages a
+//! request targets, with no reference to `evt` anywhere in that section.
+//! Table 33's Row-2 rule (§13.5) is, symmetrically, stated once for all
+//! eight Row-2 endpoint types with no per-type carve-out for UART's own
+//! two-queue structure — `evt[2:0]` classifies a request's payload handling
+//! (ordinary/reserved/config-write) the same way regardless of which queue
+//! it targets. Neither section cites the other. Because of that, this
+//! module's own [`UartTxQueue`]/[`UartRxQueue`] split (already established
+//! before this item) and [`crate::evtgroup::evt_row2_kind_of`]'s Row-2
+//! classification are two independent axes a real UART request sits on at
+//! once, not one derived from the other.
+//!
+//! **`UartRequest::from_evt_sub_opcode` therefore takes an explicit
+//! `is_write: bool` direction argument, rather than inventing a
+//! UART-private direction type or guessing direction from the payload's
+//! shape.** This reuses this crate's own existing, already-confirmed
+//! direction convention: [`crate::acf::ByteMessageInfo::op`] is the generic
+//! ACF-level flag every endpoint type's request header already carries to
+//! select between read and write handling (TC18 §11.2.1 Table 4, TC18.txt
+//! line 1235: "if op = 0 this is read_size, else segment_num"; see
+//! [`crate::acf::ByteMessageInfo::read_size`]/
+//! [`crate::acf::ByteMessageInfo::segment_num`]/
+//! [`crate::acf::ByteMessageInfo::response_kind`]'s own `op`-gated
+//! Read/Write reading), and [`crate::authz::Policy`]'s own doc comment
+//! already names the exact convention this module reuses verbatim:
+//! "`is_write` mirrors [`crate::acf::ByteMessageInfo::op`]'s own
+//! true-is-write convention." `UartRequest::from_evt_sub_opcode` follows
+//! that same naming and polarity rather than inventing a new
+//! `UartRequestDirection`-shaped enum for a distinction this crate has
+//! already named once. [`crate::mock::Endpoint`]'s own separate `read`/
+//! `write` methods (see "Deliberately out of scope" above) are this same
+//! direction split's other existing expression in this crate, one layer
+//! further from the wire.
+//!
+//! Given `is_write`, [`UartRequest::from_evt_sub_opcode`]'s
+//! [`EvtRow2Kind::Plain`] arm dispatches to one of two structurally
+//! different outcomes rather than one shared payload type, honestly
+//! reflecting the two-queue split above: `is_write == true` decodes
+//! `payload` as a [`UartTxQueue`] (TC18 §13.7.8.3: "The byte_msg_payload in
+//! the request is the UART payload"), exactly the payload TC18 §13.7.8.1
+//! says "leads to a transmission of data to an external connected device";
+//! `is_write == false` instead re-enforces this module's own pre-existing
+//! [`validate_uart_read_request`] payload-less-read-only rule (TC18
+//! §13.7.8.1, TC18.txt line 5303: "A read request having a byte_msg_payload
+//! will be rejected with error code = UNKNOWN_CMD") and, on success,
+//! constructs [`UartRequest::Read`] with no payload at all — there is
+//! nothing UART-specific to decode on a valid read request's request side;
+//! its `byte_msg_payload` arrives later, in the *response*.
+//! [`UartTxQueue::decode`] is itself infallible over every byte slice, so
+//! the only way [`Write`](UartRequest::Write) fails is through
+//! [`EvtRow2Kind::Reserved`]'s own rejection below; the only way
+//! [`Read`](UartRequest::Read) fails is [`validate_uart_read_request`]'s
+//! own pre-existing `Err(`[`RcpError::UnsupportedCmd`]`)` for a non-empty
+//! payload, propagated unchanged rather than re-derived.
+//!
+//! **Unlike [`crate::can::CanRequest::from_evt_sub_opcode`],
+//! `UartRequest::from_evt_sub_opcode` returns `Ok(`[`UartRequest::ConfigWrite`]`)`
+//! for `evt[2:0] == 111b`, following
+//! [`crate::i2c::I2cRequest::from_evt_sub_opcode`]'s/
+//! [`crate::lin::LinRequest::from_evt_sub_opcode`]'s/
+//! [`crate::adc::AdcRequest::from_evt_sub_opcode`]'s/
+//! [`crate::pwm::PwmInRequest::from_evt_sub_opcode`]'s original precedent
+//! rather than CAN's own departure from it.** [`crate::can`]'s own doc
+//! comment "Provenance note: evt[2:0] request validation" explains CAN's
+//! departure as following directly from its signature: CAN's
+//! `from_evt_sub_opcode` requires its caller to supply an already-decoded
+//! [`crate::can::CanDataFrame`] *before* the function is even called, and a
+//! genuine TC18 §12.7.1 config-write payload is definitionally not a CAN
+//! data frame at all, so silently accepting whatever frame was supplied
+//! and returning `Ok(CanRequest::ConfigWrite)` regardless was judged
+//! dishonest. `UartRequest::from_evt_sub_opcode` is not under that same
+//! pressure: its `evt[2:0] == 111b` arm does not need to construct
+//! [`UartTxQueue`] (or anything else derived from `payload`) at all to
+//! produce [`UartRequest::ConfigWrite`] — exactly like
+//! [`crate::i2c::I2cRequest`]'s/[`crate::lin::LinRequest`]'s/
+//! [`crate::adc::AdcRequest`]'s/[`crate::pwm::PwmInRequest`]'s own
+//! `ConfigWrite` arms, it can harmlessly decline to interpret `payload`
+//! (and, here, `is_write` too — a config-write is an EP-level functional-
+//! config operation per §12.7.1, not a per-queue one, so which queue would
+//! have been targeted is not itself meaningful for this arm) rather than
+//! being structurally forced to either misuse a required value or reject
+//! it. There is no CAN-style "no caller can honestly construct one to pass
+//! in" problem here, since nothing UART-specific is constructed on this
+//! arm at all. [`UartRequest::ConfigWrite`] therefore behaves exactly like
+//! its four non-CAN siblings: recognized, not yet decoded — TC18 §12.7.1's
+//! config-write payload shape remains deferred crate-wide (see
+//! "Deliberately out of scope" above).
+//!
+//! Every `Reserved` sub_opcode value (`evt[2:0]` in `001b..=110b`, or any
+//! value outside the 3-bit field's representable range) is rejected with
+//! `Err(`[`RcpError::UnsupportedCmd`]`)`, matching Table 33's own stated
+//! error code and
+//! [`crate::i2c::I2cRequest::from_evt_sub_opcode`]'s/
+//! [`crate::lin::LinRequest::from_evt_sub_opcode`]'s/
+//! [`crate::adc::AdcRequest::from_evt_sub_opcode`]'s/
+//! [`crate::pwm::PwmInRequest::from_evt_sub_opcode`]'s/
+//! [`crate::can::CanRequest::from_evt_sub_opcode`]'s identical refusal of
+//! their own table's reserved code — this part is unchanged from every
+//! prior Row-2 endpoint-type module, CAN included.
 
 use crate::acf::ReadSizeOrSegment;
+use crate::evtgroup::{evt_row2_kind_of, EvtRow2Kind};
 use crate::RcpError;
 
 // ── UartTxQueue / UartRxQueue ────────────────────────────────────────────────
@@ -374,6 +551,116 @@ pub fn validate_uart_read_request(payload: &[u8]) -> Result<(), RcpError> {
     }
 }
 
+// ── UartRequest: evt[2:0] request validation ─────────────────────────────────
+
+/// The decoded shape of an incoming UART request, after validating its
+/// `evt[2:0]` sub-opcode against TC18 §13.5 Table 33's Row-2 rule (UART is
+/// one of that row's eight endpoint types —
+/// `{ADC, PWM_IN, I²C, LIN, CAN, UART, ISELED, MDIO}`).
+///
+/// Unlike [`crate::i2c::I2cRequest`]/[`crate::lin::LinRequest`]/
+/// [`crate::adc::AdcRequest`]/[`crate::pwm::PwmInRequest`]/
+/// [`crate::can::CanRequest`], each of which model one unified request
+/// shape for their endpoint type's single EP request storage,
+/// [`UartRequest`]'s `evt[2:0] == 000b` case splits into two structurally
+/// distinct variants — [`Write`](UartRequest::Write)/[`Read`](UartRequest::Read)
+/// — honestly reflecting this module's own pre-existing
+/// [`UartTxQueue`]/[`UartRxQueue`] two-EP-request-storage split (TC18
+/// §13.7.8.1). See this module's doc comment "Provenance note: evt[2:0]
+/// request validation" for the full citation, why
+/// [`UartRequest::from_evt_sub_opcode`] takes an explicit `is_write: bool`
+/// argument rather than guessing direction from `payload`, why it follows
+/// [`crate::i2c::I2cRequest`]'s/[`crate::lin::LinRequest`]'s/
+/// [`crate::adc::AdcRequest`]'s/[`crate::pwm::PwmInRequest`]'s own
+/// `Ok(Self::ConfigWrite)` precedent rather than
+/// [`crate::can::CanRequest`]'s departure from it, and
+/// [`crate::evtgroup`]'s own doc comment for the literal-text discrepancy
+/// this crate resolves `evt[2:0] == 000b` against.
+#[derive(Debug, Clone, PartialEq, Eq)]
+//fusa:req REQ-UART-011
+pub enum UartRequest {
+    /// `evt[2:0] == 000b`, `is_write == true`: an ordinary write request
+    /// targeting the TX queue — `byte_msg_payload` is the bytes to
+    /// transmit, decoded as a [`UartTxQueue`] per [`UartTxQueue::decode`].
+    /// TC18 §13.7.8.1: "A write request leads to a transmission of data to
+    /// an external connected device."
+    Write(UartTxQueue),
+    /// `evt[2:0] == 000b`, `is_write == false`: an ordinary read request
+    /// targeting the RX queue. Carries no payload —
+    /// [`UartRequest::from_evt_sub_opcode`] already enforces this module's
+    /// own pre-existing [`validate_uart_read_request`] payload-less-read-only
+    /// rule (TC18 §13.7.8.1: "A read request having a byte_msg_payload will
+    /// be rejected with error code = UNKNOWN_CMD") before constructing this
+    /// variant.
+    Read,
+    /// `evt[2:0] == 111b`: a functional-config write (TC18 §12.7.1) rather
+    /// than an ordinary request on either queue. This crate does not yet
+    /// decode the config-write payload shape itself — see this module's
+    /// doc comment "Deliberately out of scope" — so a caller receiving this
+    /// variant knows only that the request *is* a config-write, not its
+    /// content. Unlike [`crate::can::CanRequest::ConfigWrite`], this
+    /// variant *is* constructed by [`UartRequest::from_evt_sub_opcode`] —
+    /// see this module's doc comment "Provenance note: evt[2:0] request
+    /// validation" for why UART's own situation does not force CAN's same
+    /// departure.
+    ConfigWrite,
+}
+
+impl UartRequest {
+    /// Decode an incoming UART request from its `evt.sub_opcode`
+    /// ([`crate::acf::Evt::sub_opcode`]), which of UART's two independent
+    /// EP request storages it targets (`is_write` — `true` for the TX
+    /// queue/a write request, `false` for the RX queue/a read request,
+    /// reusing [`crate::acf::ByteMessageInfo::op`]'s own true-is-write
+    /// polarity per [`crate::authz::Policy`]'s identically-named
+    /// convention), and its raw `byte_msg_payload` bytes.
+    ///
+    /// Returns `Err(`[`RcpError::UnsupportedCmd`]`)` for every
+    /// [`EvtRow2Kind::Reserved`] sub_opcode value — TC18 §13.5 Table 33's
+    /// Row-2 rule requires the request be rejected with error code
+    /// `UNSUPPORTED_CMD`, matching
+    /// [`crate::i2c::I2cRequest::from_evt_sub_opcode`]'s/
+    /// [`crate::lin::LinRequest::from_evt_sub_opcode`]'s/
+    /// [`crate::adc::AdcRequest::from_evt_sub_opcode`]'s/
+    /// [`crate::pwm::PwmInRequest::from_evt_sub_opcode`]'s/
+    /// [`crate::can::CanRequest::from_evt_sub_opcode`]'s identical refusal
+    /// of their own table's reserved code. For an
+    /// [`EvtRow2Kind::Plain`] sub_opcode, `is_write` selects between
+    /// [`Write`](UartRequest::Write) (`payload` decoded as a
+    /// [`UartTxQueue`], infallibly) and [`Read`](UartRequest::Read)
+    /// (`payload` validated via [`validate_uart_read_request`], whose own
+    /// `Err(`[`RcpError::UnsupportedCmd`]`)` for a non-empty payload is
+    /// propagated unchanged). Returns `Ok(`[`UartRequest::ConfigWrite`]`)`
+    /// for every [`EvtRow2Kind::ConfigWrite`] sub_opcode value, ignoring
+    /// both `is_write` and `payload` — see this module's doc comment
+    /// "Provenance note: evt[2:0] request validation" for why this follows
+    /// [`crate::i2c::I2cRequest`]'s/[`crate::lin::LinRequest`]'s/
+    /// [`crate::adc::AdcRequest`]'s/[`crate::pwm::PwmInRequest`]'s own
+    /// precedent rather than [`crate::can::CanRequest`]'s departure from
+    /// it. Never panics for any `sub_opcode`/`is_write`/`payload`
+    /// combination.
+    //fusa:req REQ-UART-011
+    //fusa:req REQ-UART-012
+    pub fn from_evt_sub_opcode(
+        sub_opcode: u8,
+        is_write: bool,
+        payload: &[u8],
+    ) -> Result<Self, RcpError> {
+        match evt_row2_kind_of(sub_opcode) {
+            EvtRow2Kind::Plain => {
+                if is_write {
+                    Ok(Self::Write(UartTxQueue::decode(payload)))
+                } else {
+                    validate_uart_read_request(payload)?;
+                    Ok(Self::Read)
+                }
+            }
+            EvtRow2Kind::ConfigWrite => Ok(Self::ConfigWrite),
+            EvtRow2Kind::Reserved => Err(RcpError::UnsupportedCmd),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -574,6 +861,120 @@ mod tests {
         for len in [0usize, 1, 2, 8, 64] {
             let buf = vec![0x5Au8; len];
             let _ = validate_uart_read_request(&buf);
+        }
+    }
+
+    // ── UartRequest::from_evt_sub_opcode ─────────────────────────────────────
+
+    #[test]
+    //fusa:test REQ-UART-011
+    //fusa:test REQ-UART-012
+    fn uart_request_plain_write_decodes_payload_as_tx_queue() {
+        // TC18 §13.7.8.3: "The byte_msg_payload in the request is the UART
+        // payload."
+        let payload = [0x01, 0x02, 0x03, 0x04];
+        let request = UartRequest::from_evt_sub_opcode(0b000, true, &payload).unwrap();
+        assert_eq!(
+            request,
+            UartRequest::Write(UartTxQueue {
+                bytes: payload.to_vec()
+            })
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-UART-011
+    //fusa:test REQ-UART-012
+    fn uart_request_plain_write_accepts_an_empty_payload() {
+        let request = UartRequest::from_evt_sub_opcode(0b000, true, &[]).unwrap();
+        assert_eq!(request, UartRequest::Write(UartTxQueue::default()));
+    }
+
+    #[test]
+    //fusa:test REQ-UART-011
+    //fusa:test REQ-UART-012
+    fn uart_request_plain_read_accepts_an_empty_payload() {
+        let request = UartRequest::from_evt_sub_opcode(0b000, false, &[]).unwrap();
+        assert_eq!(request, UartRequest::Read);
+    }
+
+    #[test]
+    //fusa:test REQ-UART-011
+    //fusa:test REQ-UART-012
+    fn uart_request_plain_read_rejects_a_non_empty_payload() {
+        // TC18 §13.7.8.1: "A read request having a byte_msg_payload will be
+        // rejected with error code = UNKNOWN_CMD" -- UartRequest re-enforces
+        // validate_uart_read_request's own pre-existing rule rather than
+        // silently accepting a payload on the RX-queue side.
+        for payload in [&[0x00][..], &[0x01, 0x02], &[0xFF; 16]] {
+            assert_eq!(
+                UartRequest::from_evt_sub_opcode(0b000, false, payload),
+                Err(RcpError::UnsupportedCmd)
+            );
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-UART-011
+    //fusa:test REQ-UART-012
+    fn uart_request_config_write_evt_is_recognized_without_interpreting_payload_or_direction() {
+        // Unlike CanRequest::ConfigWrite (which UartRequest::ConfigWrite
+        // deliberately does not mirror -- see this module's doc comment
+        // "Provenance note: evt[2:0] request validation"), UartRequest's own
+        // ConfigWrite arm is constructed regardless of is_write, and the
+        // payload is not decoded as a UartTxQueue at all -- the variant
+        // carries no payload, so garbage bytes here cannot be silently
+        // misread as a transfer.
+        for is_write in [true, false] {
+            let request =
+                UartRequest::from_evt_sub_opcode(0b111, is_write, &[0xDE, 0xAD, 0xBE, 0xEF])
+                    .unwrap();
+            assert_eq!(request, UartRequest::ConfigWrite);
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-UART-012
+    fn uart_request_reserved_evt_values_are_rejected_with_unsupported_cmd() {
+        for sub_opcode in 0b001..=0b110u8 {
+            for is_write in [true, false] {
+                assert_eq!(
+                    UartRequest::from_evt_sub_opcode(sub_opcode, is_write, &[]),
+                    Err(RcpError::UnsupportedCmd)
+                );
+                assert_eq!(
+                    UartRequest::from_evt_sub_opcode(sub_opcode, is_write, &[1, 2, 3]),
+                    Err(RcpError::UnsupportedCmd)
+                );
+            }
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-UART-012
+    fn uart_request_values_above_the_3_bit_field_are_also_rejected_with_unsupported_cmd() {
+        for sub_opcode in (crate::acf::EVT_SUB_OPCODE_MAX + 1)..=u8::MAX {
+            assert_eq!(
+                UartRequest::from_evt_sub_opcode(sub_opcode, true, &[]),
+                Err(RcpError::UnsupportedCmd)
+            );
+            assert_eq!(
+                UartRequest::from_evt_sub_opcode(sub_opcode, false, &[]),
+                Err(RcpError::UnsupportedCmd)
+            );
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-UART-012
+    fn uart_request_from_evt_sub_opcode_never_panics_for_any_sampled_input() {
+        let payloads: [&[u8]; 3] = [&[], &[0x00], &[0xAA; 32]];
+        for sub_opcode in 0..=u8::MAX {
+            for is_write in [true, false] {
+                for payload in payloads {
+                    let _ = UartRequest::from_evt_sub_opcode(sub_opcode, is_write, payload);
+                }
+            }
         }
     }
 }

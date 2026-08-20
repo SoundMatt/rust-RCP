@@ -7,6 +7,75 @@ OPEN Alliance TC18 core replacement; from `v1.0.0` on, each entry is a real
 release. See `docs/SEMVER.md` for the versioning scheme, including why a
 wire-format change is a MAJOR bump even when it is a fix.
 
+## v5.9.0 (Table 30/33 Row-2 evt[2:0] validation — UART, 6th endpoint type) — closed
+
+Direct follow-up to v5.8.0: `uart.rs` becomes the sixth of the eight TC18
+§13.5 Table 33 Row-2 endpoint types (`{ADC, PWM_IN, I2C, LIN, CAN, UART,
+ISELED, MDIO}`) to call the shared `evtgroup::evt_row2_kind_of` predicate.
+`evtgroup.rs` itself is unchanged — this release only adds `uart.rs`'s own
+caller.
+
+New, purely additive `pub` items (MINOR bump per `docs/SEMVER.md`):
+
+- `uart::UartRequest` / `uart::UartRequest::from_evt_sub_opcode` — UART's
+  own request-decode entry point, structurally mirroring
+  `i2c::I2cRequest`/`lin::LinRequest`/`adc::AdcRequest`/`pwm::PwmInRequest`/
+  `can::CanRequest`, but differing from all five of them in one deliberate
+  way and matching four of them (not `can::CanRequest`) in another:
+  - `evt[2:0] == 000b` (`EvtRow2Kind::Plain`) splits into two structurally
+    distinct variants, `UartRequest::Write(UartTxQueue)` and
+    `UartRequest::Read`, rather than one unified `Plain(...)` shape.
+    Unlike I2C/LIN/ADC/PWM_IN/CAN, each of which has exactly one EP request
+    storage, `uart.rs`'s own pre-existing `UartTxQueue`/`UartRxQueue` split
+    already models UART's two *independent* EP request storages (TC18
+    §13.7.8.1). This item confirms directly against TC18.txt that the
+    TX/RX split and Table 33's `evt[2:0]` classification are genuinely
+    orthogonal — neither §13.5 nor §13.7.8.1 cites the other — so
+    `UartRequest::from_evt_sub_opcode` takes an explicit `is_write: bool`
+    direction argument (reusing `crate::acf::ByteMessageInfo::op`'s own
+    true-is-write convention, exactly as `crate::authz::Policy`'s own
+    identically-named `is_write` field already does) rather than
+    inventing a new UART-private direction type or guessing direction from
+    the payload's shape. `is_write == true` decodes `payload` as a
+    `UartTxQueue` (infallible); `is_write == false` re-enforces this
+    module's own pre-existing `validate_uart_read_request` payload-less-
+    read-only rule and propagates its `Err(RcpError::UnsupportedCmd)`
+    unchanged for a non-empty payload.
+  - `evt[2:0] == 111b` returns `Ok(UartRequest::ConfigWrite)`, following
+    `i2c::I2cRequest`'s/`lin::LinRequest`'s/`adc::AdcRequest`'s/
+    `pwm::PwmInRequest`'s original precedent — **not**
+    `can::CanRequest`'s v5.8.0 departure from it
+    (`Err(RcpError::ConfigWriteNotImplemented)`). CAN's departure followed
+    from its own signature: `CanRequest::from_evt_sub_opcode` requires an
+    already-decoded `CanDataFrame` the caller must supply before the
+    function is even called, and a genuine config-write payload is
+    definitionally not a CAN data frame, so silently accepting whatever
+    frame was supplied was judged dishonest.
+    `UartRequest::from_evt_sub_opcode`'s own `ConfigWrite` arm is under no
+    equivalent pressure: it constructs no UART-specific value at all
+    (ignoring both `is_write` and `payload`, exactly as the four
+    non-CAN siblings' own `ConfigWrite` arms ignore their raw payload
+    bytes), so there is nothing to construct dishonestly. See `uart.rs`'s
+    own doc comment "Provenance note: evt[2:0] request validation" for the
+    full citation and reasoning behind both differences.
+
+Every `Reserved` sub_opcode value is rejected with
+`Err(RcpError::UnsupportedCmd)`, unchanged from every prior Row-2
+endpoint-type module — this part of the rule is identical for UART.
+
+Not in this release: wiring `UartRequest::from_evt_sub_opcode` into
+`mock::RcServer`'s actual dispatch — `mock::Endpoint`'s trait signature
+already has separate `read`/`write` methods (unlike every other Row-2
+endpoint-type module's own single-request-storage shape), but neither
+carries an `evt` value through to any implementation yet, the same gap
+v5.4.0's pilot found and left as-is (confirmed unchanged here). This
+release also does not touch `UartTxQueue`, `UartRxQueue`,
+`UartFunctionalConfig`, or `resolve_uart_read_completion` — all additive
+standalone plumbing alongside it. The remaining two Row-2 endpoint types
+(`ISELED`, `MDIO`) are expected to add their own
+`evt_row2_kind_of`-based request-decode entry point the same way, in later
+items.
+
 ## v5.8.0 (Table 30/33 Row-2 evt[2:0] validation — CAN, 5th endpoint type) — closed
 
 Direct follow-up to v5.7.0: `can.rs` becomes the fifth of the eight TC18

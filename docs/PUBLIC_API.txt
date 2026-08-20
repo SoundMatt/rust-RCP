@@ -4111,6 +4111,27 @@ impl core::marker::Unpin for rcp::uart::UartReadCompletionReason
 impl core::marker::UnsafeUnpin for rcp::uart::UartReadCompletionReason
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::uart::UartReadCompletionReason
 impl core::panic::unwind_safe::UnwindSafe for rcp::uart::UartReadCompletionReason
+pub enum rcp::uart::UartRequest
+pub rcp::uart::UartRequest::ConfigWrite
+pub rcp::uart::UartRequest::Read
+pub rcp::uart::UartRequest::Write(rcp::uart::UartTxQueue)
+impl rcp::uart::UartRequest
+pub fn rcp::uart::UartRequest::from_evt_sub_opcode(u8, bool, &[u8]) -> core::result::Result<Self, rcp::RcpError>
+impl core::clone::Clone for rcp::uart::UartRequest
+pub fn rcp::uart::UartRequest::clone(&self) -> rcp::uart::UartRequest
+impl core::cmp::Eq for rcp::uart::UartRequest
+impl core::cmp::PartialEq for rcp::uart::UartRequest
+pub fn rcp::uart::UartRequest::eq(&self, &rcp::uart::UartRequest) -> bool
+impl core::fmt::Debug for rcp::uart::UartRequest
+pub fn rcp::uart::UartRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::uart::UartRequest
+impl core::marker::Freeze for rcp::uart::UartRequest
+impl core::marker::Send for rcp::uart::UartRequest
+impl core::marker::Sync for rcp::uart::UartRequest
+impl core::marker::Unpin for rcp::uart::UartRequest
+impl core::marker::UnsafeUnpin for rcp::uart::UartRequest
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::uart::UartRequest
+impl core::panic::unwind_safe::UnwindSafe for rcp::uart::UartRequest
 pub struct rcp::uart::UartFunctionalConfig
 pub rcp::uart::UartFunctionalConfig::rx: rcp::uart::UartRxQueueConfig
 pub rcp::uart::UartFunctionalConfig::tx: rcp::uart::UartTxQueueConfig
