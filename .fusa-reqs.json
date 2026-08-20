@@ -1474,7 +1474,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a712.9.1 (\"Response(s) and acknowledge(s) are associated to the requests by the byte_bus_id and transaction number.\"), TC18.txt L3610",
+      "tc18_master_id": "TC18-12.9.1-010"
     },
     {
       "id": "REQ-UDP-005",
@@ -1966,7 +1968,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a711.1 Figure 6 (\"NTSCF-Header Version 0\"), TC18.txt L1130-1138",
+      "tc18_master_id": "TC18-11.1-004"
     },
     {
       "id": "REQ-NTSCF-005",
@@ -2026,7 +2030,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a711.1 Figure 5 (\"TSCF-Header Version 0\"), TC18.txt L1121-1128",
+      "tc18_master_id": "TC18-11.1-002"
     },
     {
       "id": "REQ-TSCF-005",
@@ -2453,7 +2459,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.1.2 Table 36 (\"svr_lifecycle_state: 0x00 HW_UNCONFIGURED / 0x55 HW_CONFIGURED / 0xAA RCP_CONFIGURED\"), TC18.txt L4388-4390",
+      "tc18_master_id": "TC18-13.7.1.2-001"
     },
     {
       "id": "REQ-LIFE-003",
@@ -4501,7 +4509,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.7 Table 24 (\"0x000D.0 rx_enforce_crc: 0b stream is not blocked when CRC check at EP fails / 1b stream is blocked until released, when CRC check at EP fails and Safe state will be entered\"), TC18.txt L3239-3243, cross-referenced by §13.6 (TC18.txt L4189-4190)",
+      "tc18_master_id": "TC18-13.6-001"
     },
     {
       "id": "REQ-E2EENF-002",
@@ -4510,7 +4520,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.6 (\"If a request is received by an endpoint that is in \\\"Safe command mode\\\" and the CRC does not match, the request is not executed, and an error response is generated with error code: CRC_ERROR. Depending on configuration safety measures might be taken (see parameter rx_enforce_crc in 12.7.7 Request stream configuration).\"), TC18.txt L4188-4190",
+      "tc18_master_id": "TC18-13.6-001"
     },
     {
       "id": "REQ-CRC-011",
@@ -4530,8 +4542,7 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test",
-      "tc18": "§12.7.7 (\"a safe state may be enforced. The safe state to enter can be chosen via the Safety_Measure parameter\"), TC18.txt L2935"
+      "verificationMethod": "test"
     },
     {
       "id": "REQ-SAFEMEAS-002",
@@ -5217,7 +5228,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.6 (\"An RC Server may receive a \\\"discovery request\\\" in any state of the life-cycle and shall send a \\\"discovery response\\\" in return.\"), TC18.txt L2731",
+      "tc18_master_id": "TC18-12.6-002"
     },
     {
       "id": "REQ-UDP-010",
@@ -5253,7 +5266,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a711.1 Figure 6 (\"NTSCF-Header Version 0\"), TC18.txt L1130-1138",
+      "tc18_master_id": "TC18-11.1-004"
     },
     {
       "id": "REQ-CONF-002",
@@ -5262,7 +5277,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a711.1 Figure 5 (\"TSCF-Header Version 0\"), TC18.txt L1121-1128",
+      "tc18_master_id": "TC18-11.1-002"
     },
     {
       "id": "REQ-CONF-003",
@@ -5788,7 +5805,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.8.2 (\"If neither a gPTP nor an IEEE1722 frame is found the received frame shall be discarded.\"), TC18.txt L3567",
+      "tc18_master_id": "TC18-12.8.2-001"
     },
     {
       "id": "REQ-NTSCF-007",
@@ -5830,7 +5849,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.4.2 (\"When timestamping was not requested, then the ACF_ABB type format without time stamp shall be default for any data transmitted by the RC Server.\"), TC18.txt L2340",
+      "tc18_master_id": "TC18-11.4.2-003"
     },
     {
       "id": "REQ-RMAP-032",
@@ -5861,7 +5882,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.10 Table 28 (\"Seq_state: 8bit, current state\"), TC18.txt L3473-3493",
+      "tc18_master_id": "TC18-12.7.10-004"
     },
     {
       "id": "REQ-TS-007",
