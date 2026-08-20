@@ -2410,7 +2410,8 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test",
-      "tc18": "§12.3 (\"The three lifecycle states the device may be in are...\"), TC18.txt L2063"
+      "tc18": "§13.7.1.2 Table 36 (\"RC Server functional configuration\"), TC18.txt L4388-4390",
+      "tc18_master_id": "TC18-13.7.1.2-001"
     },
     {
       "id": "REQ-LIFE-002",
@@ -4216,7 +4217,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.6 Table 34 (\"CRC32 Polynomial\"), TC18.txt L4193-4208",
+      "tc18_master_id": "TC18-13.6-003"
     },
     {
       "id": "REQ-CRC-002",
@@ -4243,7 +4246,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.6 (\"In Safe command mode a CRC32 is calculated per ACF type across specific fields of an AVTPDU header, ACF header, and the entire payload (except padding).\"), TC18.txt L4191-4192",
+      "tc18_master_id": "TC18-13.6-002"
     },
     {
       "id": "REQ-CRC-005",
@@ -4261,7 +4266,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.6 (\"adding the CRC to the byte_msg_payload increases the acf_msg_length by 1\"), TC18.txt L4272-4273",
+      "tc18_master_id": "TC18-13.6-006"
     },
     {
       "id": "REQ-CRC-007",
@@ -4279,7 +4286,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.6 (\"Fragmentation, if applied to a message, happens after CRC calculation. So, the CRC is only calculated once and will be transmitted in the last segment.\"), TC18.txt L4274-4275",
+      "tc18_master_id": "TC18-13.6-007"
     },
     {
       "id": "REQ-CRC-009",
@@ -4297,7 +4306,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.6 (\"Fragmentation, if applied to a message, happens after CRC calculation. So, the CRC is only calculated once and will be transmitted in the last segment.\"), TC18.txt L4274-4275",
+      "tc18_master_id": "TC18-13.6-007"
     },
     {
       "id": "REQ-SAFETY-001",
@@ -4465,7 +4476,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.6 (\"the request is not executed, and an error response is generated with error code: CRC_ERROR\"), TC18.txt L4188-4189",
+      "tc18_master_id": "TC18-13.6-001"
     },
     {
       "id": "REQ-SAFEMEAS-001",
@@ -5481,7 +5494,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a713.6 Table 34 (\"CRC32 Polynomial\"), TC18.txt L4193-4208",
+      "tc18_master_id": "TC18-13.6-003"
     },
     {
       "id": "REQ-CRC-017",
@@ -5490,7 +5505,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a713.6 (\"The CRC calculation for requests and responses follows the identical scheme.\"), TC18.txt L4276",
+      "tc18_master_id": "TC18-13.6-008"
     },
     {
       "id": "REQ-CRC-019",
@@ -5499,7 +5516,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a713.6 (\"The CRC calculation for requests and responses follows the identical scheme.\"), TC18.txt L4276",
+      "tc18_master_id": "TC18-13.6-008"
     },
     {
       "id": "REQ-DISC-025",
@@ -5683,7 +5702,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a712.3 (\"After a power cycle or restart ... the RC Server shall start in the life-cycle state it is actually configured in\"), TC18.txt L2434-2437",
+      "tc18_master_id": "TC18-12.3-001"
     },
     {
       "id": "REQ-LIFE-019",
@@ -5692,7 +5713,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a712.3.1.1 (\"A request to advance the state directly to RCP_CONFIGURED will be rejected with an error response.\"), TC18.txt L2544",
+      "tc18_master_id": "TC18-12.3.1.1-006"
     },
     {
       "id": "REQ-LIN-007",
