@@ -3602,6 +3602,26 @@
       "tc18_master_id": "TC18-13.7.8.1-005"
     },
     {
+      "id": "REQ-UART-011",
+      "title": "UartRequest enumerates the decoded shape of a Row-2 UART request after evt[2:0] validation, honestly split across UART's own independent TX/RX queues",
+      "text": "UartRequest's three variants (Write(UartTxQueue), Read, ConfigWrite) give an incoming UART request's decoded shape after its evt.sub_opcode has been validated against evt_row2_kind_of's Table 33 Row-2 rule; UartRequest::from_evt_sub_opcode is the request-decode entry point that performs that validation and dispatch. Unlike I2cRequest/LinRequest/AdcRequest/PwmInRequest/CanRequest, each of which model one unified request shape for their endpoint type's single EP request storage, UartRequest's evt[2:0]==000b case splits into two structurally distinct variants (Write/Read) reflecting this module's own pre-existing UartTxQueue/UartRxQueue two-EP-request-storage split (TC18 13.7.8.1), which this crate confirms is a genuinely separate, orthogonal concern from evt[2:0] classification -- neither TC18 section cites the other. from_evt_sub_opcode therefore takes an explicit is_write: bool direction argument rather than guessing direction from the payload, reusing crate::acf::ByteMessageInfo::op's own true-is-write convention exactly as crate::authz::Policy's own is_write field already names it, rather than inventing a new UART-private direction type",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.5 Table 33's Row-2 row (UART is one of its eight endpoint types), TC18.txt L4085-4092, and §13.7.8.1/§13.7.8.3 UART EP request handling (\"thus the UART EP has two EP request storages, one for transmitting data and one for receiving data\" / \"The byte_msg_payload in the request is the UART payload\"), TC18.txt L5292-5293, L5392"
+    },
+    {
+      "id": "REQ-UART-012",
+      "title": "UartRequest::from_evt_sub_opcode accepts Write/Read/ConfigWrite, rejects Reserved sub_opcodes with UnsupportedCmd, propagates validate_uart_read_request's own rejection on a non-empty Read payload, and follows I2C/LIN/ADC/PWM_IN's Ok(ConfigWrite) precedent rather than CAN's ConfigWriteNotImplemented departure, never panicking",
+      "text": "UartRequest::from_evt_sub_opcode decodes a Plain (sub_opcode 0), is_write==true request's payload bytes as a UartTxQueue via UartTxQueue::decode (infallible), decodes a Plain, is_write==false request by re-enforcing validate_uart_read_request's own pre-existing payload-less-read-only rule and propagating its Err(RcpError::UnsupportedCmd) unchanged for a non-empty payload, recognizes a ConfigWrite (sub_opcode 7) request without attempting to interpret its payload or consult is_write (full TC18 12.7.1 config-write payload decoding is deferred, not silently guessed at), and returns Err(RcpError::UnsupportedCmd) for every Reserved sub_opcode value, matching TC18 Table 33's Row-2 error-code requirement and every prior Row-2 endpoint-type module's identical refusal of its own table's reserved code. Unlike crate::can::CanRequest::from_evt_sub_opcode (which returns Err(RcpError::ConfigWriteNotImplemented) for evt[2:0]==111b because its own CanDataFrame-accepting signature cannot honestly construct a ConfigWrite variant from a caller-supplied value that is definitionally not a config-write payload), UartRequest::from_evt_sub_opcode's ConfigWrite arm constructs no UART-specific value at all and so is under no such pressure -- it follows crate::i2c::I2cRequest's/crate::lin::LinRequest's/crate::adc::AdcRequest's/crate::pwm::PwmInRequest's original Ok(Self::ConfigWrite) precedent instead. Never panics for any sub_opcode/is_write/payload combination",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.5 Table 33 (\"000b to 110b reserved – request to be rejected with error code = UNSUPPORTED_CMD\" / \"111b: ... used to change the configuration of the endpoint (see 12.7.1)\"), TC18.txt L4085-4092, and §13.7.8.1 (\"A read request having a byte_msg_payload will be rejected with error code = UNKNOWN_CMD.\"), TC18.txt L5303"
+    },
+    {
       "id": "REQ-ADC-001",
       "title": "AdcResolutionBits round-trips through new/to_u8 for the full 1..=16 bit-width range",
       "text": "AdcResolutionBits::new/AdcResolutionBits::to_u8 round-trip every bit-width value from 1 to 16, modeling the roadmap's <=16-bit resolution upper bound as an explicit validated range rather than a fixed 16-bit width",
