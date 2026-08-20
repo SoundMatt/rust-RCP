@@ -5894,7 +5894,7 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test",
-      "tc18": "\u00a713.5 Table 33's Row-2 row (ISELED is one of its eight endpoint types), TC18.txt L4085-4092, and \u00a713.7.12.3 ISELED EP request handling, TC18.txt L5578-5588"
+      "tc18": "\u00a713.5 Table 33's Row-2 row (ISELED is one of its eight endpoint types), TC18.txt L4085-4092, and \u00a713.7.12.3 ISELED EP request handling, TC18.txt L5981-5995"
     },
     {
       "id": "REQ-ISELED-013",

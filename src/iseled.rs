@@ -268,7 +268,7 @@
 //! not implement literally). [`IseledRequest::from_evt_sub_opcode`] is this
 //! module's own caller of that shared [`crate::evtgroup::evt_row2_kind_of`]
 //! predicate — ISELED's own request format (TC18 §13.7.12.3 Figure 41,
-//! TC18.txt line 5588) carries the same `evt` field in its Message Info
+//! TC18.txt line 5989) carries the same `evt` field in its Message Info
 //! header every other endpoint type's request does, and TC18 names no
 //! ISELED-specific override of Table 33's generic rule anywhere in
 //! §13.7.12.
@@ -313,7 +313,7 @@
 //! even called (see above) — and a genuine TC18 §12.7.1 config-write payload
 //! is definitionally not the "plain data ... that is to be presented or has
 //! been received on the ISELED bus" [`IseledFrame`] represents (TC18
-//! §13.7.12.3, TC18.txt line 5578; see this module's own doc comment "TC18
+//! §13.7.12.3, TC18.txt line 5982; see this module's own doc comment "TC18
 //! reconciliation note (§13.7.12)"). §12.7.1's functional-config-write
 //! payload is an EP-level register-map operation (TC18 Table 58,
 //! §13.7.12.2), not `chain_address`/`command`/`data` content, so no caller
@@ -688,7 +688,7 @@ pub enum IseledRequest {
     /// [`IseledFrame`] this endpoint is to send onto, or has received from,
     /// the daisy chain, per TC18 §13.7.12.3's "plain data in the
     /// `byte_msg_payload` that is to be presented or has been received on
-    /// the ISELED bus" (TC18.txt line 5578).
+    /// the ISELED bus" (TC18.txt line 5982).
     Plain(IseledFrame),
     /// `evt[2:0] == 111b`: a functional-config write (TC18 §12.7.1) rather
     /// than an ordinary request. Unlike every non-CAN Row-2 endpoint-type
