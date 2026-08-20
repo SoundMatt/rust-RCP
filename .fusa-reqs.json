@@ -3378,7 +3378,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.8.1 (\"A write request leads to a transmission of data to an external connected device.\"), TC18.txt L5296",
+      "tc18_master_id": "TC18-13.7.8.1-003"
     },
     {
       "id": "REQ-UART-002",
@@ -3387,7 +3389,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.8.1 (\"the UART EP shifts the received data into a fifo-rx-buffer that has a length of uart_rx_fifo_size. The buffer is emptied by read requests. Overflow is flagged in the UART EP status register.\"), TC18.txt L5294-5295",
+      "tc18_master_id": "TC18-13.7.8.1-002"
     },
     {
       "id": "REQ-UART-003",
@@ -3396,7 +3400,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.8.2 Table 51 (\"uart functional configuration\"), TC18.txt L5324-5371",
+      "tc18_master_id": "TC18-13.7.8.2-001"
     },
     {
       "id": "REQ-UART-004",
@@ -3414,7 +3420,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.8.1 (\"A read request will be started as soon as the fifo-rx-buffer is filled with as many bytes as requested in the read_size or when the uart_timeout has expired\"), TC18.txt L5297-5299",
+      "tc18_master_id": "TC18-13.7.8.1-004"
     },
     {
       "id": "REQ-UART-006",
@@ -3423,7 +3431,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.8.1 (\"A read request will be started as soon as the fifo-rx-buffer is filled with as many bytes as requested in the read_size or when the uart_timeout has expired\"), TC18.txt L5297-5299",
+      "tc18_master_id": "TC18-13.7.8.1-004"
     },
     {
       "id": "REQ-UART-007",
@@ -3432,7 +3442,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.8.1 (\"A read request will be started as soon as the fifo-rx-buffer is filled with as many bytes as requested in the read_size or when the uart_timeout has expired\"), TC18.txt L5297-5299",
+      "tc18_master_id": "TC18-13.7.8.1-004"
     },
     {
       "id": "REQ-UART-008",
@@ -3441,7 +3453,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.8.1 (\"A read request will be started as soon as the fifo-rx-buffer is filled with as many bytes as requested in the read_size or when the uart_timeout has expired\"), TC18.txt L5297-5299",
+      "tc18_master_id": "TC18-13.7.8.1-004"
     },
     {
       "id": "REQ-UART-009",
@@ -3450,7 +3464,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.8.1 (\"A read request having a byte_msg_payload will be rejected with error code = UNKNOWN_CMD.\"), TC18.txt L5303",
+      "tc18_master_id": "TC18-13.7.8.1-005"
     },
     {
       "id": "REQ-UART-010",
@@ -3459,7 +3475,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.8.1 (\"A read request having a byte_msg_payload will be rejected with error code = UNKNOWN_CMD.\"), TC18.txt L5303",
+      "tc18_master_id": "TC18-13.7.8.1-005"
     },
     {
       "id": "REQ-ADC-001",
@@ -3475,7 +3493,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.5.3 Figure 27 (\"pwmo request format\"), TC18.txt L5031-5038",
+      "tc18_master_id": "TC18-13.7.5.3-001"
     },
     {
       "id": "REQ-ADC-002",
@@ -3491,7 +3511,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.5.3 (\"To stop PWM signal generation a request with PWM_Period of '0' shall be issued.\"), TC18.txt L5050-5052",
+      "tc18_master_id": "TC18-13.7.5.3-004"
     },
     {
       "id": "REQ-ADC-003",
@@ -3523,7 +3545,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.6.2 Table 48 (\"pwmi functional configuration\"), TC18.txt L5104-5149",
+      "tc18_master_id": "TC18-13.7.6.2-001"
     },
     {
       "id": "REQ-ADC-005",
@@ -3551,7 +3575,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.6.3 (\"The PWM_IN request and response contain two 16 bit values in the payload. Responses include the measured active time of the PWM signal as well as the period\"), TC18.txt L5169-5170",
+      "tc18_master_id": "TC18-13.7.6.3-001"
     },
     {
       "id": "REQ-ADC-007",
@@ -3567,7 +3593,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.6.2 Table 48 (\"0b: if MAX PERIOD is exceeded, invalidate measurement and wait for new active phase of signal\"), TC18.txt L5129-5135",
+      "tc18_master_id": "TC18-13.7.6.2-001"
     },
     {
       "id": "REQ-ADC-008",
@@ -3583,7 +3611,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.6.2 Table 48 (\"0b: pwmi measures once after request received (a response is delayed until the next measurement is finalized)\"), TC18.txt L5136-5142",
+      "tc18_master_id": "TC18-13.7.6.2-001"
     },
     {
       "id": "REQ-ADC-009",
@@ -3608,7 +3638,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.6.2 Table 48 (\"pwmi functional configuration\"), TC18.txt L5104-5149",
+      "tc18_master_id": "TC18-13.7.6.2-001"
     },
     {
       "id": "REQ-EVTGRP-001",
@@ -4177,7 +4209,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.7 Table 24 (\"WatchDog time out for this Stream in clock tics ... 0dec: WD is disabled\"), TC18.txt L3232-3235",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-WDG-002",
@@ -4186,7 +4220,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.7 (\"the watchdog is reset with each request received from this RC Client\"), TC18.txt L3301-3302",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-WDG-003",
@@ -4195,7 +4231,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.7 Table 24 (\"WatchDog time out for this Stream in clock tics ... 0dec: WD is disabled\"), TC18.txt L3232-3235",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-WDG-004",
@@ -4204,7 +4242,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.7 Table 24 (\"WatchDog time out for this Stream in clock tics ... 0dec: WD is disabled\"), TC18.txt L3232-3235",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-WDG-005",
@@ -4213,7 +4253,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.7 (\"If a sequence error occurs a safe state may be enforced ... A similar mechanism can be additionally configured for the watchdog to ensure a continuous uninterrupted connection\"), TC18.txt L3298-3302",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-WDG-006",
@@ -4222,7 +4264,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.7 (\"If a sequence error occurs a safe state may be enforced ... A similar mechanism can be additionally configured for the watchdog to ensure a continuous uninterrupted connection\"), TC18.txt L3298-3302",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-WDG-007",
@@ -4231,7 +4275,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.7 (\"If a sequence error occurs a safe state may be enforced ... A similar mechanism can be additionally configured for the watchdog to ensure a continuous uninterrupted connection\"), TC18.txt L3298-3302",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-WDG-008",
@@ -4240,7 +4286,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.7 Table 24 (\"Request stream configuration\"), TC18.txt L3222-3293",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-E2EENF-001",
@@ -4700,7 +4748,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.2.3 (\"SleepCMD is coded as 0xA5.\"), TC18.txt L4565",
+      "tc18_master_id": "TC18-13.7.2.3-004"
     },
     {
       "id": "REQ-WAKE-002",
@@ -4709,7 +4759,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.2.3 (\"SleepCMD is coded as 0xA5.\"), TC18.txt L4565",
+      "tc18_master_id": "TC18-13.7.2.3-004"
     },
     {
       "id": "REQ-WAKE-003",
@@ -4718,7 +4770,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.2.2 Table 39 (\"wake-up control - functional configuration\"), TC18.txt L4497-4515",
+      "tc18_master_id": "TC18-13.7.2.2-002"
     },
     {
       "id": "REQ-WAKE-004",
@@ -4727,7 +4781,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.2.2 Table 39 (\"wake-up control - functional configuration\"), TC18.txt L4497-4515",
+      "tc18_master_id": "TC18-13.7.2.2-002"
     },
     {
       "id": "REQ-WAKE-005",
@@ -4736,7 +4792,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.2.1 (\"the endpoint listens to configurable IO signals for activity as well as the network interface as wake-up source ... it wakes up the RC Server\"), TC18.txt L4484-4488",
+      "tc18_master_id": "TC18-13.7.2.1-001"
     },
     {
       "id": "REQ-WAKE-006",
@@ -4754,7 +4812,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.2.3 (\"To bring the RC Server implementation into sleep mode the RC Client has to send a specific request to the WakeUp endpoint.\"), TC18.txt L4546-4547",
+      "tc18_master_id": "TC18-13.7.2.3-001"
     },
     {
       "id": "REQ-WAKE-008",
@@ -4763,7 +4823,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.2.1 (\"the endpoint listens to configurable IO signals for activity as well as the network interface as wake-up source ... it wakes up the RC Server\"), TC18.txt L4484-4488",
+      "tc18_master_id": "TC18-13.7.2.1-001"
     },
     {
       "id": "REQ-FRAG-001",
@@ -5510,7 +5572,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.6.2 Table 48 (\"0b: if MAX PERIOD is exceeded, invalidate measurement and wait for new active phase of signal\"), TC18.txt L5129-5135",
+      "tc18_master_id": "TC18-13.7.6.2-001"
     },
     {
       "id": "REQ-RESP-002",
@@ -5573,7 +5637,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a713.7.2.3 (\"3. as soon as all EPs are idle and the responder queues are empty (all responses sent): send an acknowledge to sleep request; bring the RC Server implementation to sleep mode.\"), TC18.txt L4548-4555",
+      "tc18_master_id": "TC18-13.7.2.3-002"
     },
     {
       "id": "REQ-RESP-004",
