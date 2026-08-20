@@ -61,6 +61,12 @@
 //!   `"rcp.read_size"` meta key (decimal `u16`), defaulting to `u16::MAX` —
 //!   "return everything held" — matching [`crate::mock::MockEndpoint::read`]'s
 //!   own already-established "cap to whatever is actually held" behavior.
+//! - **Response classification.** [`to_message`]/[`response_to_message`]
+//!   also surface [`crate::acf::ByteMessageInfo::response_kind`]'s TC18
+//!   §11.3 Table 15 classification (`Acknowledge`/`Write`/`Read`/`Error`) as
+//!   an `"rcp.response_kind"` meta key, mirroring cpp-RCP's
+//!   `response_to_message` (`include/rcp/adapt.hpp`), which sets the
+//!   analogous `meta["rcp.response_kind"]`.
 //! - **Subscribe.** [`crate::mock::RcServer`]'s own doc comment states it
 //!   deliberately does not model live asynchronous notification — no TC18
 //!   analog has been identified for one in this crate to date — so unlike
@@ -278,13 +284,24 @@ pub fn from_message(msg: &Message) -> Result<(StreamId, AcfAbbMessage), RcpError
 /// `resp.info.op` is surfaced back as the `"rcp.op"` meta key
 /// (`"write"`/`"read"`), mirroring [`from_message`]'s own request-side key,
 /// so a caller can confirm which operation the RC Server actually
-/// performed.
+/// performed. `resp.info` is additionally classified via
+/// [`ByteMessageInfo::response_kind`] (TC18 §11.3 Table 15) and surfaced as
+/// the `"rcp.response_kind"` meta key (one of
+/// [`crate::acf::ResponseKind::as_str`]'s
+/// `"acknowledge"`/`"write"`/`"read"`/`"error"` values), mirroring cpp-RCP's
+/// `response_to_message` (`include/rcp/adapt.hpp`), which sets the analogous
+/// `meta["rcp.response_kind"]`.
 //fusa:req REQ-ADAPT-006
+//fusa:req REQ-RESP-004
 pub fn to_message(stream_id: StreamId, resp: &AcfAbbMessage) -> Message {
     let mut meta = std::collections::BTreeMap::new();
     meta.insert(
         "rcp.op".to_string(),
         if resp.info.op { "write" } else { "read" }.to_string(),
+    );
+    meta.insert(
+        "rcp.response_kind".to_string(),
+        resp.info.response_kind().as_str().to_string(),
     );
     Message {
         protocol: Protocol::Rcp,
@@ -589,6 +606,63 @@ mod tests {
         assert_eq!(msg.id, format_endpoint_id(sid, 9));
         assert_eq!(msg.payload, vec![0xAA]);
         assert_eq!(msg.meta.get("rcp.op"), Some(&"write".to_string()));
+        // Default `ByteMessageInfo::evt`/`err` (op=true) classifies as
+        // ResponseKind::Write per TC18 §11.3 Table 15/§11.3.2.
+        assert_eq!(
+            msg.meta.get("rcp.response_kind"),
+            Some(&"write".to_string())
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-ADAPT-006
+    //fusa:test REQ-RESP-004
+    fn to_message_surfaces_response_kind_for_acknowledge_and_error() {
+        use crate::acf::{Evt, EVT_RESPONSE_ACKNOWLEDGE};
+
+        let sid = stream(21);
+        let ack_resp = AcfAbbMessage {
+            info: ByteMessageInfo {
+                byte_bus_id: 1,
+                evt: Evt {
+                    ack: (EVT_RESPONSE_ACKNOWLEDGE >> 3) != 0,
+                    sub_opcode: EVT_RESPONSE_ACKNOWLEDGE & 0x7,
+                },
+                ..Default::default()
+            },
+            payload: vec![],
+        };
+        assert_eq!(
+            to_message(sid, &ack_resp).meta.get("rcp.response_kind"),
+            Some(&"acknowledge".to_string())
+        );
+
+        let err_resp = AcfAbbMessage {
+            info: ByteMessageInfo {
+                byte_bus_id: 1,
+                err: true,
+                ..Default::default()
+            },
+            payload: vec![],
+        };
+        assert_eq!(
+            to_message(sid, &err_resp).meta.get("rcp.response_kind"),
+            Some(&"error".to_string())
+        );
+
+        let read_resp = AcfAbbMessage {
+            info: ByteMessageInfo {
+                byte_bus_id: 1,
+                op: false,
+                err: false,
+                ..Default::default()
+            },
+            payload: vec![0x01],
+        };
+        assert_eq!(
+            to_message(sid, &read_resp).meta.get("rcp.response_kind"),
+            Some(&"read".to_string())
+        );
     }
 
     #[test]
@@ -668,6 +742,10 @@ mod tests {
         assert_eq!(write_reply.id, format_endpoint_id(sid, 4));
         assert!(write_reply.payload.is_empty());
         assert_eq!(write_reply.meta.get("rcp.op"), Some(&"write".to_string()));
+        assert_eq!(
+            write_reply.meta.get("rcp.response_kind"),
+            Some(&"write".to_string())
+        );
 
         let mut read_req = Message::new(Protocol::Rcp, format_endpoint_id(sid, 4), vec![]);
         read_req
@@ -676,6 +754,10 @@ mod tests {
         let read_reply = node.call(Context::background(), read_req).await.unwrap();
         assert_eq!(read_reply.payload, vec![1, 2, 3]);
         assert_eq!(read_reply.meta.get("rcp.op"), Some(&"read".to_string()));
+        assert_eq!(
+            read_reply.meta.get("rcp.response_kind"),
+            Some(&"read".to_string())
+        );
     }
 
     #[tokio::test]
