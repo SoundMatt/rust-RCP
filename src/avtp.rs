@@ -122,6 +122,21 @@
 //! no extractable text layer; the bit-boundary tick marks were read
 //! directly from a 600 dpi render of pages 22 and 79.
 //!
+//! TC18.txt citation-drift note (issue #164 batch 1): the current TC18.txt
+//! revision's own (text) figure captions renumber these two worked
+//! examples as Figure 20 ("ACF_ABB under TSCF header (example)", TC18.txt
+//! line 4231) and Figure 21 ("ACF_GBB under NTSCF header (example)",
+//! TC18.txt line ~4256) rather than Figure 19/Figure 20 — see
+//! `crate::acf`'s own "acf_msg_length quadlet semantics" doc section for
+//! the same finding and a content-change caveat on the ACF_GBB example.
+//! This module's own doc comments and its
+//! `ntscf_header_matches_figure_20_worked_example`/
+//! `tscf_header_matches_figure_19_worked_example` test names deliberately
+//! still say "Figure 19"/"Figure 20" throughout, matching each other and
+//! `crate::acf`/`crate::e2e`'s own still-unrenamed test names — renumbering
+//! is left for a follow-up that renames those test functions together,
+//! rather than mixing old and new figure numbers across files.
+//!
 //! Note the asymmetry, which is real and not a transcription slip:
 //! NTSCF's `ntscf_data_length` is an **11-bit** field packed into the
 //! first quadlet, while TSCF's `stream_data_length` is a **16-bit** field
@@ -131,9 +146,11 @@
 //! [`StreamId`]'s split — sender MAC in the upper 48 bits, locally-assigned
 //! unique-id suffix in the lower 16 bits — follows the widely used IEEE
 //! 1722 AVTP convention of that name (talker MAC high, per-talker stream
-//! discriminant low), and is confirmed by TC18 v0.5.1_RC §12.6.1 Table 16
-//! ("Discovery request") and §12.6.2 Table 17 ("Discovery response"),
-//! page 48, which both spell the field out as
+//! discriminant low), and is confirmed by TC18 v0.5.1_RC §12.6.1 Table 18
+//! ("Discovery request") and §12.6.2 Table 19 ("Discovery response")
+//! (TC18.txt lines 2758/2805 — table renumbered from Table 16/Table 17
+//! since this note was written; see issue #164), page 48, which both
+//! spell the field out as
 //! `stream_id = streamMAC + unique_id` with `streamMAC: 6bytes` and
 //! `unique_id = 0x0000` (2 bytes) — MAC first, suffix second, in a 64-bit
 //! field. This was previously flagged under Guiding Principle 5 as an
@@ -468,7 +485,7 @@ pub enum HeaderVariant {
 /// a subtype that is neither [`NTSCF_SUBTYPE`] nor [`TSCF_SUBTYPE`]. All
 /// other decode-rejection paths (short frame past the subtype byte, sv bit,
 /// ...) are delegated to [`decode_ntscf_header`]/[`decode_tscf_header`].
-/// TC18 §12.8.2 "Reception of frames" (TC18.txt line 3170) states the
+/// TC18 §12.8.2 "Reception of frames" (TC18.txt line 3567) states the
 /// discard rule this function's `other =>` arm implements: "If neither a
 /// gPTP nor an IEEE1722 frame is found the received frame shall be
 /// discarded." Only the two subtypes RCP itself defines — NTSCF
@@ -614,10 +631,10 @@ pub fn parse_stream_id(raw: u64) -> ([u8; 6], u16) {
 /// [`encode_ntscf_header`] itself enforces).
 /// This is also the only whole-frame composition entry point this crate
 /// has, and it always emits an NTSCF header — matching TC18 §11.1
-/// (TC18.txt line 1062: the NTSCF header "shall be used for RCP requests
+/// (TC18.txt lines 1130-1131: the NTSCF header "shall be used for RCP requests
 /// which shall be executed as soon as possible or under request specific
 /// conditions as well as for responses and acknowledge") and §11.4.3
-/// (TC18.txt line 1988: "The RC Server always uses NTSCF header"). There is
+/// (TC18.txt line 2354: "The RC Server always uses NTSCF header"). There is
 /// deliberately no `encode_tscf_frame` counterpart: [`encode_tscf_header`]
 /// exists for a client's own use and for round-trip testing, but nothing in
 /// this crate assembles a TSCF-headed frame.
@@ -1442,7 +1459,7 @@ mod tests {
     #[test]
     //fusa:test REQ-NET-002
     fn select_header_variant_discards_every_subtype_but_the_two_rcp_ones() {
-        // TC18 §12.8.2 (TC18.txt line 3170): "If neither a gPTP nor an
+        // TC18 §12.8.2 (TC18.txt line 3567): "If neither a gPTP nor an
         // IEEE1722 frame is found the received frame shall be discarded."
         // The only two AVTPDU subtypes RCP defines are TC18 §11.1
         // Figure 5's TSCF `subtype(0x05)` and Figure 6's NTSCF
@@ -1472,7 +1489,7 @@ mod tests {
     #[test]
     //fusa:test REQ-NTSCF-007
     fn frame_composition_always_emits_the_server_side_ntscf_header() {
-        // TC18 §11.1 (TC18.txt line 1062) and §11.4.3 (line 1988): the RC
+        // TC18 §11.1 (TC18.txt line 1130) and §11.4.3 (line 2354): the RC
         // Server always uses the NTSCF header, and responses/acknowledges
         // are always carried under it. `encode_ntscf_frame` is this
         // crate's only whole-frame composition entry point, and its first

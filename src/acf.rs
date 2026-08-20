@@ -202,12 +202,12 @@ pub const BYTE_MESSAGE_INFO_LEN: usize = 8;
 /// row 2's 4-bit `evt` nibble (octet 4 bits 7:4).
 ///
 /// The split into `ack` + `sub_opcode` is exactly TC18 §13.5's own split of
-/// the `evt` nibble for **requests** (TC18.txt lines 3672-3673): "event bits
+/// the `evt` nibble for **requests** (TC18.txt lines 4071-4072): "event bits
 /// evt[2:0] are used to control the usage of the byte_msg_payload"
 /// ([`Evt::sub_opcode`]) and "evt[3] is used to request an acknowledge. I.e.
 /// evt[3]=1 requests acknowledge" ([`Evt::ack`]).
 ///
-/// Note that TC18 §11.3 Table 15 gives the *response* direction a different,
+/// Note that TC18 §11.3 Table 17 gives the *response* direction a different,
 /// whole-nibble reading of the same four bits (0x0 simple/data/error, 0x1…0x8
 /// a further-responses counter, 0x9…0xE reserved, 0xF acknowledge) which this
 /// two-field split does not model — see requirement `REQ-RESP-004`.
@@ -217,11 +217,11 @@ pub const BYTE_MESSAGE_INFO_LEN: usize = 8;
 //fusa:req REQ-EVT-002
 pub struct Evt {
     /// The ack-flag bit of `evt` — TC18 §13.5's `evt[3]`, which a request
-    /// sets to 1 to request an acknowledge (TC18.txt line 3673).
+    /// sets to 1 to request an acknowledge (TC18.txt line 4072).
     pub ack: bool,
     /// The 3-bit sub-opcode of `evt` — TC18 §13.5's `evt[2:0]`, which
     /// controls the endpoint-specific usage of the `byte_msg_payload`
-    /// (TC18.txt line 3672). Valid range is `0..=EVT_SUB_OPCODE_MAX`.
+    /// (TC18.txt line 4071). Valid range is `0..=EVT_SUB_OPCODE_MAX`.
     pub sub_opcode: u8,
 }
 
@@ -230,7 +230,7 @@ impl Evt {
     /// (`ack << 3 | sub_opcode`), the same arithmetic
     /// [`encode_byte_message_info`] uses. Needed by
     /// [`ByteMessageInfo::response_kind`], which reads `evt` under TC18
-    /// §11.3 Table 15's whole-nibble response encoding rather than this
+    /// §11.3 Table 17's whole-nibble response encoding rather than this
     /// type's own request-side ack+sub_opcode split — see this struct's
     /// doc comment.
     pub fn raw_nibble(&self) -> u8 {
@@ -343,10 +343,10 @@ impl ByteMessageInfo {
     /// unconditional view of the raw field, this method refuses to hand
     /// back a value under the interpretation `op` says does not apply.
     ///
-    /// The polarity is TC18 §11.2.1 Table 4's own (TC18.txt line 1163): "if
+    /// The polarity is TC18 §11.2.1 Table 4's own (TC18.txt line 1235): "if
     /// op = 0 this is read_size, else segment_num", with `op = 0b`
     /// meaning "the sender of this request expects a response with data"
-    /// and `op = 1b` meaning it does not (TC18.txt lines 1160-1161).
+    /// and `op = 1b` meaning it does not (TC18.txt lines 1229-1230).
     //fusa:req REQ-BMI-005
     //fusa:req REQ-ABB-009
     pub fn read_size(&self) -> Option<u16> {
@@ -375,7 +375,7 @@ impl ByteMessageInfo {
         }
     }
 
-    /// Classify this header under TC18 §11.3 Table 15/§11.3.1-§11.3.4's
+    /// Classify this header under TC18 §11.3 Table 17/§11.3.1-§11.3.4's
     /// response-direction reading of `evt` — the whole-nibble split
     /// [`Evt`]'s own doc comment says its `ack`+`sub_opcode` fields do
     /// *not* model. Meaningless for a request header, whose `evt` carries
@@ -401,11 +401,11 @@ impl ByteMessageInfo {
     }
 }
 
-/// TC18 §11.3 Table 15's `evt[3:0] == 0xF` response-kind marker
-/// (TC18.txt line 1876: "evt[3:0] = 0xF - acknowledge").
+/// TC18 §11.3 Table 17's `evt[3:0] == 0xF` response-kind marker
+/// (TC18.txt line 2255: "evt[3:0] = 0xF - acknowledge").
 pub const EVT_RESPONSE_ACKNOWLEDGE: u8 = 0x0F;
 
-/// The four response semantics TC18 §11.3 Table 15/§11.3.1-§11.3.4 define
+/// The four response semantics TC18 §11.3 Table 17/§11.3.1-§11.3.4 define
 /// for a decoded [`ByteMessageInfo`] whose `rsp` bit is set. See
 /// [`ByteMessageInfo::response_kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -452,8 +452,8 @@ impl ResponseKind {
 /// 12 bits).
 ///
 /// Both `rsv` bit-pairs are always transmitted as zero, per TC18 §11.2.1
-/// Table 4 (TC18.txt line 1153, "rsv 00b") and TC18 §11.3 Table 15
-/// (TC18.txt line 1867, "rsv 00b"). They are not modeled as
+/// Table 4 (TC18.txt line 1223, "rsv 00b") and TC18 §11.3 Table 17
+/// (TC18.txt line 2248, "rsv 00b"). They are not modeled as
 /// [`ByteMessageInfo`] fields at all, so there is no way for a caller to
 /// set them to anything else.
 //fusa:req REQ-BMI-002
@@ -564,9 +564,9 @@ pub fn decode_byte_message_info(b: &[u8]) -> Result<ByteMessageInfo, RcpError> {
 
 /// `acf_msg_type` discriminant identifying an ACF_ABB message.
 ///
-/// TC18 §11.2.1 Table 4 (TC18.txt line 1149) fixes this at `0x0E` for a
+/// TC18 §11.2.1 Table 4 (TC18.txt line 1219) fixes this at `0x0E` for a
 /// standard request ("acf_msg_type 0x0E (ABB message)"), and TC18 §11.3
-/// Table 15 (TC18.txt line 1863) repeats it for responses, spelling out
+/// Table 17 (TC18.txt line 2242) repeats it for responses, spelling out
 /// what the value means: "0x0E - ABB message without message_timestamp".
 //fusa:req REQ-ABB-006
 //fusa:req REQ-GBB-007
@@ -574,7 +574,7 @@ pub const ACF_ABB_MSG_TYPE: u8 = 0x0E;
 
 /// `acf_msg_type` discriminant identifying an ACF_GBB message.
 ///
-/// TC18 §11.3 Table 15 (TC18.txt line 1863): "0x0D - GBB message, with
+/// TC18 §11.3 Table 17 (TC18.txt line 2243): "0x0D - GBB message, with
 /// message_timestamp". The one structural difference the two discriminants
 /// name is exactly the 8-octet `message_timestamp`, which is why
 /// [`ACF_GBB_HEADER_LEN`] - [`ACF_ABB_HEADER_LEN`] is 8.
@@ -610,6 +610,26 @@ pub const ACF_GBB_HEADER_LEN: usize = BYTE_MESSAGE_INFO_LEN + 8;
 // (as both worked examples do), it supplies those trailer bytes as part of
 // `payload` itself — this module has no separate CRC-trailer field of its
 // own (CRC computation itself lives in `crate::e2e`).
+//
+// TC18.txt citation-drift note (issue #164 batch 1): the current TC18.txt
+// revision renumbers and re-paginates these two worked examples as Figure
+// 20 ("ACF_ABB under TSCF header (example)", caption at TC18.txt line
+// 4231) and Figure 21 ("ACF_GBB under NTSCF header (example)", caption at
+// line ~4256) rather than Figure 19/Figure 20. The ACF_ABB example's own
+// numbers (6 payload + 2 pad + 4-byte CRC32 = 20 bytes = 5 quadlets) are
+// confirmed unchanged under its new Figure 20 label. The ACF_GBB example
+// now shows a *different* split of the same 28-byte/7-quadlet total (5
+// payload + 3 pad, CRC32 still 4 bytes split 3+1 across quadlets, vs. the
+// 7 payload + 1 pad this comment states) — TC18.txt carries a `Commented
+// [BE39]: 051RC4 - text and figure updated` marker immediately after it,
+// so this is a genuine content revision, not just a renumbering. The
+// `acf_msg_length = 0x07` total this crate's logic actually depends on is
+// unaffected either way. This module's own doc comments and
+// `crate::e2e`'s `finalize_crc_trailer_matches_figure_19_worked_example`/
+// `_figure_20_worked_example` test names deliberately still say "Figure
+// 19"/"Figure 20" throughout — renumbering them is left for a follow-up
+// that also renames those `crate::e2e` test functions, rather than mixing
+// old and new figure numbers across the two files.
 
 /// Number of bytes in one quadlet — the unit `acf_msg_length` counts in.
 pub const QUADLET_LEN: usize = 4;
@@ -992,7 +1012,7 @@ pub fn verify_echo_back(
 /// number of the request. The error response shall contain a
 /// byte_msg_payload with an error code."
 ///
-/// Returns `None` if `error` has no TC18 Table 27 wire code
+/// Returns `None` if `error` has no TC18 Table 30 wire code
 /// ([`RcpError::tc18_wire_code`]) — there is no meaningful `err=1` response
 /// to build for an error TC18 itself does not name (e.g. a transport-level
 /// [`RcpError::Timeout`] or [`RcpError::ShortFrame`] from a frame this
@@ -1006,7 +1026,7 @@ pub fn verify_echo_back(
 /// `byte_bus_id`/`transaction_num` are echoed from `request` (via
 /// [`build_response_info`], the same echo-back rule every other response
 /// in this crate uses), `rsp`/`err` are forced to `true`/`true`, and the
-/// response payload is the single Table 27 error-code octet. TC18 does not
+/// response payload is the single Table 30 error-code octet. TC18 does not
 /// spell out `byte_msg_payload`'s exact byte layout for an error response
 /// beyond "contains an error code" — this one-octet encoding is this
 /// crate's own working interpretation (Guiding Principle 5), matching the
@@ -1015,19 +1035,19 @@ pub fn verify_echo_back(
 ///
 /// The returned message is always an [`AcfAbbMessage`] — i.e. the
 /// timestamp-free ACF_ABB format. That matches TC18 §11.3 (TC18.txt line
-/// 1859: "In case responses include a timestamp, they are in ACF_GBB
-/// format, else in ACF_ABB format") and §11.4.2 (TC18.txt line 1963: "When
-/// timestamping was not requested, then the ACF_ABB type format without
+/// 2239: "In case responses include a timestamp, they are in ACF_GBB
+/// format, else in ACF_ABB format") and §11.4.2 (TC18.txt lines 2340-2341:
+/// "When timestamping was not requested, then the ACF_ABB type format without
 /// time stamp shall be default for any data transmitted by the RC Server"),
 /// since this crate has no capture-timestamp source to put in a
 /// `message_timestamp` in the first place.
 ///
-/// **Known gap.** TC18 §11.3.4 (TC18.txt line 1904) additionally requires an
+/// **Known gap.** TC18 §11.3.4 (TC18.txt line 2300) additionally requires an
 /// error response to carry `evt[3:0] < 0x9`. This function copies
 /// `request`'s `evt` verbatim (via [`build_response_info`]), including
 /// `evt[3]` — TC18 §13.5's acknowledge-request bit — so an error response to
 /// a request that asked for an acknowledge can carry an `evt` nibble in
-/// TC18 Table 15's reserved `0x9…0xE` range, or even `0xF`, which Table 15
+/// TC18 Table 17's reserved `0x9…0xE` range, or even `0xF`, which Table 17
 /// defines as *acknowledge*. See requirement `REQ-RESP-007`.
 //fusa:req REQ-RESP-002
 //fusa:req REQ-RESP-003
@@ -1246,7 +1266,7 @@ mod tests {
         }
     }
 
-    // ── response_kind (TC18 §11.3 Table 15) ─────────────────────────────────
+    // ── response_kind (TC18 §11.3 Table 17) ─────────────────────────────────
 
     #[test]
     //fusa:test REQ-RESP-004
@@ -2037,17 +2057,17 @@ mod tests {
     #[test]
     //fusa:test REQ-RESP-002
     fn build_error_response_is_always_the_timestamp_free_abb_format() {
-        // TC18 §11.3 (TC18.txt line 1859): "In case responses include a
+        // TC18 §11.3 (TC18.txt line 2239): "In case responses include a
         // timestamp, they are in ACF_GBB format, else in ACF_ABB format."
-        // TC18 §11.4.2 (line 1963): "When timestamping was not requested,
+        // TC18 §11.4.2 (lines 2340-2341): "When timestamping was not requested,
         // then the ACF_ABB type format without time stamp shall be default
         // for any data transmitted by the RC Server."
         //
-        // The encoded response's `acf_msg_type` must therefore be Table 15's
+        // The encoded response's `acf_msg_type` must therefore be Table 17's
         // literal 0x0E ("ABB message without message_timestamp"), never
         // 0x0D ("GBB message, with message_timestamp"), and the encoded
         // message must be exactly 8 octets shorter than the same payload
-        // would occupy in GBB form (Table 15's only structural difference).
+        // would occupy in GBB form (Table 17's only structural difference).
         let request = sample_info();
         for error in [
             RcpError::UnsupportedCmd,
@@ -2057,7 +2077,7 @@ mod tests {
             let response = build_error_response(&request, &error).unwrap();
             let frame = encode_acf_abb(&response).unwrap();
             let info = decode_byte_message_info(&frame[..BYTE_MESSAGE_INFO_LEN]).unwrap();
-            assert_eq!(info.acf_msg_type, 0x0E, "Table 15 ABB discriminant");
+            assert_eq!(info.acf_msg_type, 0x0E, "Table 17 ABB discriminant");
             assert_ne!(info.acf_msg_type, 0x0D, "must not be the GBB form");
 
             let gbb_equivalent = encode_acf_gbb(&AcfGbbMessage {
@@ -2074,12 +2094,12 @@ mod tests {
         }
     }
 
-    // ── TC18 §11.2.1 Table 4 / §11.3 Table 15 literal field values ─────────
+    // ── TC18 §11.2.1 Table 4 / §11.3 Table 17 literal field values ─────────
 
     #[test]
     //fusa:test REQ-ABB-006
     fn abb_standard_request_msg_type_matches_table_4_literal_and_bit_position() {
-        // TC18 §11.2.1 Table 4 (TC18.txt line 1149): "acf_msg_type
+        // TC18 §11.2.1 Table 4 (TC18.txt line 1219): "acf_msg_type
         // 0x0E (ABB message)". Per this module's canonical wire layout,
         // acf_msg_type occupies octet 0 bits 7:1, with acf_msg_length's MSB
         // in bit 0 — so for any message whose acf_msg_length fits in 8 bits,
@@ -2103,10 +2123,12 @@ mod tests {
     #[test]
     //fusa:test REQ-GBB-007
     fn table_15_discriminants_differ_by_exactly_the_message_timestamp() {
-        // TC18 §11.3 Table 15 (TC18.txt line 1863):
+        // TC18 §11.3 Table 17 (TC18.txt lines 2242-2243) [function name
+        // retained from this table's earlier "Table 15" numbering — see
+        // this file's citation-drift fix notes]:
         //   acf_msg_type  0x0E - ABB message without message_timestamp
         //                 0x0D - GBB message, with message_timestamp
-        // The message_timestamp is a 64-bit field (TC18 §11.4.1, line 1955:
+        // The message_timestamp is a 64-bit field (TC18 §11.4.1, line 2331:
         // "message_timestamp = ... mod 2^64"), i.e. 8 octets.
         assert_eq!(ACF_ABB_MSG_TYPE, 0x0E);
         assert_eq!(ACF_GBB_MSG_TYPE, 0x0D);
@@ -2137,8 +2159,8 @@ mod tests {
     #[test]
     //fusa:test REQ-ABB-007
     fn both_reserved_bit_pairs_are_always_transmitted_as_zero() {
-        // TC18 §11.2.1 Table 4 (TC18.txt line 1153) and §11.3 Table 15
-        // (line 1867) both fix `rsv` at 00b. Per this module's canonical
+        // TC18 §11.2.1 Table 4 (TC18.txt line 1223) and §11.3 Table 17
+        // (line 2248) both fix `rsv` at 00b. Per this module's canonical
         // wire layout the two rsv pairs are octet 2 bits 4:3 (mask 0x18)
         // and octet 4 bits 3:2 (mask 0x0C). Encoding every other field at
         // its own maximum must still leave both masks clear.
@@ -2169,9 +2191,9 @@ mod tests {
     #[test]
     //fusa:test REQ-ABB-009
     fn table_4_op_polarity_selects_read_size_at_zero_and_segment_num_at_one() {
-        // TC18 §11.2.1 Table 4 (TC18.txt line 1163): "read_size/segment_num
+        // TC18 §11.2.1 Table 4 (TC18.txt line 1235): "read_size/segment_num
         // — if op = 0 this is read_size, else segment_num", with op = 0b
-        // meaning the sender expects a response with data (line 1160).
+        // meaning the sender expects a response with data (line 1229).
         let read_request = ByteMessageInfo {
             op: false,
             read_size_segment: ReadSizeOrSegment(0x123),
@@ -2194,7 +2216,7 @@ mod tests {
     #[test]
     //fusa:test REQ-EVT-001
     fn evt_bit_3_is_the_acknowledge_request_bit() {
-        // TC18 §13.5 (TC18.txt line 3673): "evt[3] is used to request an
+        // TC18 §13.5 (TC18.txt line 4072): "evt[3] is used to request an
         // acknowledge. I.e. evt[3]=1 requests acknowledge."
         // The evt nibble occupies octet 4 bits 7:4, so evt[3] is octet 4
         // bit 7 — mask 0x80.
@@ -2226,9 +2248,12 @@ mod tests {
     #[test]
     //fusa:test REQ-EVT-002
     fn evt_bits_2_to_0_are_the_three_bit_payload_usage_sub_opcode() {
-        // TC18 §13.5 (TC18.txt line 3672): "event bits evt[2:0] are used to
-        // control the usage of the byte_msg_payload." Table 30's own rows
-        // range over 000b..=111b, i.e. exactly three bits.
+        // TC18 §13.5 (TC18.txt line 4071): "event bits evt[2:0] are used to
+        // control the usage of the byte_msg_payload." Table 33's own rows
+        // (the endpoint-specific evt-field table, TC18.txt line 4116) range
+        // over 000b..=111b, i.e. exactly three bits. (An earlier revision of
+        // this comment miscited this as "Table 30" — that number belongs to
+        // TC18's unrelated "Error codes in responses" table.)
         assert_eq!(EVT_SUB_OPCODE_MAX, 0x07);
 
         // evt[2:0] occupies octet 4 bits 6:4, so a sub_opcode of `n` with
