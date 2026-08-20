@@ -7,6 +7,52 @@ OPEN Alliance TC18 core replacement; from `v1.0.0` on, each entry is a real
 release. See `docs/SEMVER.md` for the versioning scheme, including why a
 wire-format change is a MAJOR bump even when it is a fix.
 
+## v5.7.0 (Table 30/33 Row-2 evt[2:0] validation — LIN, 4th endpoint type) — closed
+
+Direct follow-up to v5.6.0: `lin.rs` becomes the fourth of the eight TC18
+§13.5 Table 33 Row-2 endpoint types (`{ADC, PWM_IN, I2C, LIN, CAN, UART,
+ISELED, MDIO}`) to call the shared `evtgroup::evt_row2_kind_of` predicate.
+`evtgroup.rs` itself is unchanged — this release only adds `lin.rs`'s own
+caller.
+
+New, purely additive `pub` items (MINOR bump per `docs/SEMVER.md`):
+
+- `lin::LinRequest` / `lin::LinRequest::from_evt_sub_opcode` — LIN's own
+  request-decode entry point, mirroring `i2c::I2cRequest`/`adc::AdcRequest`/
+  `pwm::PwmInRequest`'s exact shape. Unlike `AdcRequest::Plain` (no payload
+  struct at all) and `PwmInRequest::Plain` (a raw, uninterpreted byte
+  transfer, since PWM_IN's own request-payload framing is unconfirmed),
+  `LinRequest::Plain` reuses this module's own pre-existing, already-
+  confirmed `LinFrameTransfer::decode`: TC18 §13.7.10.1 states the LIN EP
+  "sends the bytes provided by the RC Client in the byte_msg_payload on the
+  bus", and `lin.rs`'s own pre-existing "TC18 reconciliation note
+  (§13.7.10)" already established that payload's byte layout (`pid`
+  followed by `data`, byte-for-byte identical to TC18 §13.7.10.3's own
+  Figure 39 wire example) with nothing left to bridge — unlike PWM_IN's
+  still-open request-payload question. One consequence: because
+  `LinFrameTransfer::decode` is fallible (unlike
+  `I2cByteTransfer::decode`/`PwmInByteTransfer::decode`),
+  `LinRequest::from_evt_sub_opcode` can itself fail on a `Plain` request —
+  `Err(RcpError::ShortFrame)` for an empty payload (no PID byte present),
+  `Err(RcpError::PayloadTooLarge)` for data beyond `LIN_MAX_DATA` bytes —
+  propagating `LinFrameTransfer::decode`'s own pre-existing behavior rather
+  than inventing a new validation of the same bytes. `ConfigWrite` (`111b`)
+  is recognized but not decoded further (TC18 §12.7.1's payload shape is
+  still deferred, not guessed at), and every `Reserved` sub_opcode is
+  rejected with `Err(RcpError::UnsupportedCmd)`, matching Table 33's own
+  stated error code. See `lin.rs`'s own doc comment "Provenance note:
+  evt[2:0] request validation" for the full citation and reasoning.
+
+Not in this release: wiring `LinRequest::from_evt_sub_opcode` into
+`mock::RcServer`'s actual dispatch — `mock::Endpoint`'s trait signature
+still does not carry an `evt` value to any implementation at all, the same
+gap v5.4.0's pilot found and left as-is (confirmed unchanged here). This
+release also does not touch `LinFrameTransfer`, `LinFrameTransferResult`,
+or `LinFunctionalConfig` — all additive standalone plumbing alongside it.
+The remaining four Row-2 endpoint types (`CAN`, `UART`, `ISELED`, `MDIO`)
+are expected to add their own `evt_row2_kind_of`-based request-decode entry
+point the same way, in later items.
+
 ## v5.6.0 (Table 30/33 Row-2 evt[2:0] validation — PWM_IN, 3rd endpoint type) — closed
 
 Direct follow-up to v5.5.0: `pwm.rs` becomes the third of the eight TC18

@@ -1976,6 +1976,26 @@ pub fn rcp::lifecycle::is_register_writable(rcp::lifecycle::RcServerState, rcp::
 pub fn rcp::lifecycle::is_transition_defined(rcp::lifecycle::RcServerState, rcp::lifecycle::RcServerState) -> bool
 pub fn rcp::lifecycle::lock_policy(rcp::lifecycle::RegisterCategory) -> core::option::Option<rcp::lifecycle::LockPolicy>
 pub mod rcp::lin
+pub enum rcp::lin::LinRequest
+pub rcp::lin::LinRequest::ConfigWrite
+pub rcp::lin::LinRequest::Plain(rcp::lin::LinFrameTransfer)
+impl rcp::lin::LinRequest
+pub fn rcp::lin::LinRequest::from_evt_sub_opcode(u8, &[u8]) -> core::result::Result<Self, rcp::RcpError>
+impl core::clone::Clone for rcp::lin::LinRequest
+pub fn rcp::lin::LinRequest::clone(&self) -> rcp::lin::LinRequest
+impl core::cmp::Eq for rcp::lin::LinRequest
+impl core::cmp::PartialEq for rcp::lin::LinRequest
+pub fn rcp::lin::LinRequest::eq(&self, &rcp::lin::LinRequest) -> bool
+impl core::fmt::Debug for rcp::lin::LinRequest
+pub fn rcp::lin::LinRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::lin::LinRequest
+impl core::marker::Freeze for rcp::lin::LinRequest
+impl core::marker::Send for rcp::lin::LinRequest
+impl core::marker::Sync for rcp::lin::LinRequest
+impl core::marker::Unpin for rcp::lin::LinRequest
+impl core::marker::UnsafeUnpin for rcp::lin::LinRequest
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::lin::LinRequest
+impl core::panic::unwind_safe::UnwindSafe for rcp::lin::LinRequest
 pub struct rcp::lin::LinFrameTransfer
 pub rcp::lin::LinFrameTransfer::data: alloc::vec::Vec<u8>
 pub rcp::lin::LinFrameTransfer::pid: u8

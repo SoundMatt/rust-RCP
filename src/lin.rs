@@ -4,6 +4,8 @@
 //fusa:req REQ-LIN-004
 //fusa:req REQ-LIN-005
 //fusa:req REQ-LIN-006
+//fusa:req REQ-LIN-008
+//fusa:req REQ-LIN-009
 
 //! The LIN commander endpoint type (`ep_type 0x06`) — `ROADMAP.md`
 //! Milestone 7 ("Remaining Endpoint Types"), opening checklist bullet: raw
@@ -14,8 +16,8 @@
 //! This is this crate's first Milestone 7 entry, following the same
 //! "additive standalone plumbing only" discipline Milestone 4's six
 //! endpoint-type modules ([`crate::gpio`], [`crate::spi`], [`crate::i2c`],
-//! [`crate::uart`], [`crate::adc`], [`crate::pwm`]) already established. Two
-//! named pieces are in scope, both implemented here:
+//! [`crate::uart`], [`crate::adc`], [`crate::pwm`]) already established.
+//! Three named pieces are in scope, all implemented here:
 //!
 //! - [`LinFrameTransfer`] / [`LinFrameTransferResult`] — the raw PID+data
 //!   bytes a LIN commander request sends onto the bus, and the raw data
@@ -27,6 +29,22 @@
 //!   module computes neither.
 //! - [`LinFunctionalConfig`] — this endpoint type's functional-config
 //!   content. See "Relationship to `crate::regmap`" below.
+//! - [`LinRequest`]/[`LinRequest::from_evt_sub_opcode`] — LIN's own
+//!   request-decode entry point, validating an incoming request's
+//!   `evt.sub_opcode` against [`crate::evtgroup::evt_row2_kind_of`]'s TC18
+//!   §13.5 Table 33 Row-2 rule. See "Provenance note: evt[2:0] request
+//!   validation" below — this piece was added after this module's own
+//!   original scope note above and below (which still accurately describe
+//!   why no `sub_opcode` reading existed here originally, before this
+//!   addition) as this crate's fourth Row-2 endpoint-type module, following
+//!   [`crate::i2c::I2cRequest`]/[`crate::i2c::I2cRequest::from_evt_sub_opcode`]'s
+//!   pilot pattern,
+//!   [`crate::adc::AdcRequest`]/[`crate::adc::AdcRequest::from_evt_sub_opcode`]'s
+//!   second application of it, and
+//!   [`crate::pwm::PwmInRequest`]/[`crate::pwm::PwmInRequest::from_evt_sub_opcode`]'s
+//!   third. The remaining four Row-2 endpoint types (`CAN, UART, ISELED,
+//!   MDIO`) are expected to follow the same pattern in their own later
+//!   items.
 //!
 //! Deliberately out of scope, for the same reasons every prior Milestone 4
 //! entry's own doc comment already gives:
@@ -35,13 +53,37 @@
 //!   management. `ROADMAP.md`'s LIN commander checklist bullet states the
 //!   spec itself defines none of this at the protocol level, so this module
 //!   builds none of it — see "Validation against `linbr.rs`" below.
-//! - The "Groups A/B/C" `evt[2:0]` sub-opcode convention. Unlike
+//! - The "Groups A/B/C" `evt[2:0]` sub-opcode convention
+//!   ([`crate::evtgroup::EvtGroup`]) as a general, cross-endpoint-type
+//!   classification scheme — [`crate::evtgroup`]'s own doc comment already
+//!   flags that broader scheme as unresolved, independent of the narrower,
+//!   unambiguous Table 33 Row-2 rule this module's [`LinRequest`] now
+//!   implements (see "Provenance note: evt[2:0] request validation" below).
+//!   `ROADMAP.md`'s LIN commander checklist bullet itself names no
+//!   `sub_opcode`-keyed selection mechanism of its own (unlike
 //!   [`crate::gpio`]'s write-semantics selection or [`crate::spi`]'s
-//!   up-to-6 channel selection, `ROADMAP.md`'s LIN commander checklist
-//!   bullet names no `sub_opcode`-keyed selection mechanism, so this module
-//!   reads `sub_opcode` nowhere.
+//!   up-to-6 channel selection) — the Row-2 rule [`LinRequest`] implements
+//!   comes from TC18 §13.5 Table 33, a separate, later-discovered item, not
+//!   from this checklist bullet.
 //! - [`crate::regmap::CommonFunctionalConfig`]'s fields — unchanged here, as
 //!   in every prior Milestone 1-4 entry.
+//! - Decoding [`LinRequest::ConfigWrite`]'s own TC18 §12.7.1 payload shape.
+//!   [`LinRequest::from_evt_sub_opcode`] recognizes a config-write request
+//!   as distinct from a [`Plain`](LinRequest::Plain) one, but does not
+//!   itself interpret what the config-write payload contains — that is
+//!   separate, later work, same as every Row-2 endpoint-type module this
+//!   predicate lands in.
+//! - Wiring [`LinRequest::from_evt_sub_opcode`] into an actual decoder,
+//!   dispatch loop, or [`crate::mock::Endpoint`] implementation.
+//!   [`crate::mock::Endpoint`]'s own trait signature still does not carry
+//!   an `evt` value to any implementation at all — that gap is not
+//!   specific to LIN, it applies identically to
+//!   [`crate::i2c::I2cRequest::from_evt_sub_opcode`]/
+//!   [`crate::adc::AdcRequest::from_evt_sub_opcode`]/
+//!   [`crate::pwm::PwmInRequest::from_evt_sub_opcode`] (each confirmed
+//!   still unwired against [`crate::mock::Endpoint`]'s own doc comment).
+//!   [`LinRequest`] is built to that same "additive standalone plumbing
+//!   only" level.
 //! - Wiring any of the below into an actual decoder, dispatch loop, or
 //!   [`crate::avtp`]/[`crate::acf`]/[`crate::addressing`] caller, and —
 //!   distinct from every Milestone 4 entry — touching the legacy `linbr.rs`
@@ -49,6 +91,59 @@
 //!   (deletion/rebuild against the new core) was `ROADMAP.md` Milestone 9's
 //!   job, not this module's; see "Validation against `linbr.rs`
 //!   (historical — see below for its outcome)" below.
+//!
+//! ## Provenance note: evt[2:0] request validation
+//!
+//! LIN is one of the eight endpoint types TC18 §13.5 Table 33 groups into
+//! one shared "Row 2" `evt[2:0]` rule — see [`crate::evtgroup`]'s own doc
+//! comment "Provenance note: TC18 §13.5 Table 33's Row-2 rule
+//! (`evt_row2_kind_of`)" for the full citation, including the literal-text
+//! discrepancy that module's doc comment flags and resolves (Table 33's own
+//! printed Row-2 cell reads "000b to 110b reserved", including 000b, which
+//! this crate does not implement literally).
+//! [`LinRequest::from_evt_sub_opcode`] is this module's own caller of that
+//! shared [`crate::evtgroup::evt_row2_kind_of`] predicate.
+//!
+//! Unlike [`crate::adc::AdcRequest::Plain`] (no payload struct at all,
+//! since TC18 §13.7.9.3 states the ADC request itself has none) and
+//! [`crate::pwm::PwmInRequest::Plain`] (a raw, uninterpreted byte transfer,
+//! since PWM_IN's own request-side payload framing is unconfirmed —
+//! `pwm.rs`'s own "Provenance note: field widths and units" flags this),
+//! [`LinRequest::Plain`] (`evt[2:0] == 000b`) decodes its payload through
+//! this module's own pre-existing, already-confirmed
+//! [`LinFrameTransfer::decode`]: TC18 §13.7.10.1 states the LIN EP "sends
+//! the bytes provided by the RC Client in the byte_msg_payload on the bus"
+//! — an ordinary request genuinely carries a payload — and this module's
+//! own "TC18 reconciliation note (§13.7.10)" below already established that
+//! payload's byte layout without any open question left to bridge: `pid`
+//! followed by `data`, byte-for-byte identical to TC18 §13.7.10.3's own
+//! Figure 39 wire example. There is nothing left to guess by reusing that
+//! existing decode here, unlike PWM_IN's still-open request-payload
+//! question — this is a difference in what was already confirmed before
+//! this item, not a new per-endpoint-type rule invented for it.
+//!
+//! One consequence of reusing [`LinFrameTransfer::decode`] rather than an
+//! infallible byte-transfer decode (as
+//! [`crate::i2c::I2cByteTransfer::decode`]/
+//! [`crate::pwm::PwmInByteTransfer::decode`] both are) is that
+//! [`LinRequest::from_evt_sub_opcode`] can itself fail on a
+//! [`Plain`](LinRequest::Plain) request: an empty payload returns
+//! `Err(`[`RcpError::ShortFrame`]`)` (no PID byte present — TC18 §13.7.10.1's
+//! "sends the bytes provided ... in the byte_msg_payload" wording describes
+//! an ordinary request as genuinely carrying bytes, so this module does not
+//! treat an empty payload as a degenerate but valid zero-byte transfer the
+//! way [`crate::i2c::I2cByteTransfer::decode`] treats an empty I²C
+//! payload), and a payload whose data portion exceeds [`LIN_MAX_DATA`]
+//! bytes returns `Err(`[`RcpError::PayloadTooLarge`]`)`. Both outcomes
+//! match [`LinFrameTransfer::decode`]'s own pre-existing, already-tested
+//! behavior rather than this item inventing a new failure mode for the same
+//! bytes. Every `Reserved` sub_opcode is rejected with
+//! `Err(`[`RcpError::UnsupportedCmd`]`)`, matching Table 33's own stated
+//! error code and
+//! [`crate::i2c::I2cRequest::from_evt_sub_opcode`]'s/
+//! [`crate::adc::AdcRequest::from_evt_sub_opcode`]'s/
+//! [`crate::pwm::PwmInRequest::from_evt_sub_opcode`]'s identical refusal of
+//! their own table's reserved code.
 //!
 //! ## Validation against `linbr.rs` (historical — see below for its outcome)
 //!
@@ -154,6 +249,7 @@
 //! `linbr::LinBridge::send` already enforced, stated here as this module's
 //! own fact about the bus rather than re-derived.
 
+use crate::evtgroup::{evt_row2_kind_of, EvtRow2Kind};
 use crate::RcpError;
 
 // ── LIN_MAX_DATA ──────────────────────────────────────────────────────────────
@@ -286,6 +382,64 @@ impl LinFunctionalConfig {
     //fusa:req REQ-LIN-006
     pub fn layer_tag(&self) -> crate::regmap::PerEpTypeFunctionalConfig {
         crate::regmap::PerEpTypeFunctionalConfig::new(crate::regmap::EndpointType::Lin)
+    }
+}
+
+// ── LinRequest: evt[2:0] request validation ─────────────────────────────────
+
+/// The decoded shape of an incoming LIN commander request, after validating
+/// its `evt[2:0]` sub-opcode against TC18 §13.5 Table 33's Row-2 rule (LIN
+/// is one of that row's eight endpoint types —
+/// `{ADC, PWM_IN, I²C, LIN, CAN, UART, ISELED, MDIO}`).
+///
+/// See this module's doc comment "Provenance note: evt[2:0] request
+/// validation" for the full citation, why [`LinRequest::Plain`] reuses
+/// [`LinFrameTransfer::decode`] rather than either an infallible raw byte
+/// transfer or no payload at all, and [`crate::evtgroup`]'s own doc comment
+/// for the literal-text discrepancy this crate resolves `evt[2:0] == 000b`
+/// against.
+#[derive(Debug, Clone, PartialEq, Eq)]
+//fusa:req REQ-LIN-008
+pub enum LinRequest {
+    /// `evt[2:0] == 000b`: an ordinary LIN commander request —
+    /// `byte_msg_payload` is this frame's PID+data bytes, decoded as a
+    /// [`LinFrameTransfer`] per [`LinFrameTransfer::decode`].
+    Plain(LinFrameTransfer),
+    /// `evt[2:0] == 111b`: a functional-config write (TC18 §12.7.1) rather
+    /// than an ordinary request. This crate does not yet decode the
+    /// config-write payload shape itself — see this module's doc comment
+    /// "Deliberately out of scope" — so a caller receiving this variant
+    /// knows only that the request *is* a config-write, not its content.
+    ConfigWrite,
+}
+
+impl LinRequest {
+    /// Decode an incoming LIN request from its `evt.sub_opcode`
+    /// ([`crate::acf::Evt::sub_opcode`]) and raw `byte_msg_payload` bytes.
+    ///
+    /// Returns `Err(`[`RcpError::UnsupportedCmd`]`)` for every
+    /// [`EvtRow2Kind::Reserved`] sub_opcode value — TC18 §13.5 Table 33's
+    /// Row-2 rule requires the request be rejected with error code
+    /// `UNSUPPORTED_CMD`, matching
+    /// [`crate::i2c::I2cRequest::from_evt_sub_opcode`]'s/
+    /// [`crate::adc::AdcRequest::from_evt_sub_opcode`]'s/
+    /// [`crate::pwm::PwmInRequest::from_evt_sub_opcode`]'s identical refusal
+    /// of their own table's reserved code. A [`Plain`](LinRequest::Plain)
+    /// request additionally propagates [`LinFrameTransfer::decode`]'s own
+    /// `Result` — `Err(`[`RcpError::ShortFrame`]`)` for an empty payload,
+    /// `Err(`[`RcpError::PayloadTooLarge`]`)` for data beyond
+    /// [`LIN_MAX_DATA`] bytes — rather than this function inventing a
+    /// second, different validation of the same bytes; see this module's
+    /// doc comment "Provenance note: evt[2:0] request validation" for why.
+    /// Never panics for any `sub_opcode`/`payload` combination.
+    //fusa:req REQ-LIN-008
+    //fusa:req REQ-LIN-009
+    pub fn from_evt_sub_opcode(sub_opcode: u8, payload: &[u8]) -> Result<Self, RcpError> {
+        match evt_row2_kind_of(sub_opcode) {
+            EvtRow2Kind::Plain => Ok(Self::Plain(LinFrameTransfer::decode(payload)?)),
+            EvtRow2Kind::ConfigWrite => Ok(Self::ConfigWrite),
+            EvtRow2Kind::Reserved => Err(RcpError::UnsupportedCmd),
+        }
     }
 }
 
@@ -462,5 +616,115 @@ mod tests {
         assert!(!crate::regmap::functional_config_matches_ep_type(
             &generic, &tag
         ));
+    }
+
+    // ── LinRequest::from_evt_sub_opcode ──────────────────────────────────────
+
+    #[test]
+    //fusa:test REQ-LIN-008
+    //fusa:test REQ-LIN-009
+    fn lin_request_plain_evt_decodes_payload_as_frame_transfer() {
+        // TC18 §13.7.10.3 Figure 39's own worked example: a 3-byte LIN
+        // payload (PID byte followed by two data bytes).
+        let payload = [0x3C, 0x01, 0x02];
+        let request = LinRequest::from_evt_sub_opcode(0b000, &payload).unwrap();
+        assert_eq!(
+            request,
+            LinRequest::Plain(LinFrameTransfer {
+                pid: 0x3C,
+                data: vec![0x01, 0x02],
+            })
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-LIN-008
+    //fusa:test REQ-LIN-009
+    fn lin_request_plain_evt_rejects_an_empty_payload() {
+        // Unlike I2cRequest::Plain/AdcRequest::Plain/PwmInRequest::Plain,
+        // LinRequest::Plain propagates LinFrameTransfer::decode's own
+        // Result rather than an infallible decode — an empty payload has no
+        // PID byte, matching lin_frame_transfer_decode_rejects_empty_input
+        // above.
+        assert_eq!(
+            LinRequest::from_evt_sub_opcode(0b000, &[]),
+            Err(RcpError::ShortFrame)
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-LIN-008
+    //fusa:test REQ-LIN-009
+    fn lin_request_plain_evt_rejects_data_longer_than_lin_max_data() {
+        let mut payload = vec![0x3Cu8];
+        payload.extend(vec![0xAAu8; LIN_MAX_DATA + 1]);
+        assert_eq!(
+            LinRequest::from_evt_sub_opcode(0b000, &payload),
+            Err(RcpError::PayloadTooLarge)
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-LIN-008
+    //fusa:test REQ-LIN-009
+    fn lin_request_plain_evt_accepts_data_at_exactly_lin_max_data() {
+        let mut payload = vec![0x3Cu8];
+        payload.extend(vec![0xAAu8; LIN_MAX_DATA]);
+        let request = LinRequest::from_evt_sub_opcode(0b000, &payload).unwrap();
+        assert_eq!(
+            request,
+            LinRequest::Plain(LinFrameTransfer {
+                pid: 0x3C,
+                data: vec![0xAAu8; LIN_MAX_DATA],
+            })
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-LIN-008
+    //fusa:test REQ-LIN-009
+    fn lin_request_config_write_evt_is_recognized_without_interpreting_payload() {
+        // The payload is not decoded as a LinFrameTransfer for a
+        // config-write request — the variant carries no payload at all, so
+        // garbage bytes here cannot be silently misread as a frame.
+        let request = LinRequest::from_evt_sub_opcode(0b111, &[0xDE, 0xAD, 0xBE, 0xEF]).unwrap();
+        assert_eq!(request, LinRequest::ConfigWrite);
+    }
+
+    #[test]
+    //fusa:test REQ-LIN-009
+    fn lin_request_reserved_evt_values_are_rejected_with_unsupported_cmd() {
+        for sub_opcode in 0b001..=0b110u8 {
+            assert_eq!(
+                LinRequest::from_evt_sub_opcode(sub_opcode, &[]),
+                Err(RcpError::UnsupportedCmd)
+            );
+            assert_eq!(
+                LinRequest::from_evt_sub_opcode(sub_opcode, &[1, 2, 3]),
+                Err(RcpError::UnsupportedCmd)
+            );
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-LIN-009
+    fn lin_request_values_above_the_3_bit_field_are_also_rejected_with_unsupported_cmd() {
+        for sub_opcode in (crate::acf::EVT_SUB_OPCODE_MAX + 1)..=u8::MAX {
+            assert_eq!(
+                LinRequest::from_evt_sub_opcode(sub_opcode, &[]),
+                Err(RcpError::UnsupportedCmd)
+            );
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-LIN-009
+    fn lin_request_from_evt_sub_opcode_never_panics_for_any_sampled_input() {
+        let payloads: [&[u8]; 4] = [&[], &[0x00], &[0x3C, 0x01, 0x02], &[0xAA; 32]];
+        for sub_opcode in 0..=u8::MAX {
+            for payload in payloads {
+                let _ = LinRequest::from_evt_sub_opcode(sub_opcode, payload);
+            }
+        }
     }
 }
