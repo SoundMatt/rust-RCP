@@ -5887,6 +5887,26 @@
       "tc18_master_id": "TC18-13.7.12.3-003"
     },
     {
+      "id": "REQ-ISELED-012",
+      "title": "IseledRequest enumerates the decoded shape of a Row-2 ISELED request after evt[2:0] validation, wrapping an already-decoded IseledFrame",
+      "text": "IseledRequest's two variants (Plain(IseledFrame), ConfigWrite) give an incoming ISELED request's decoded shape after its evt.sub_opcode has been validated against evt_row2_kind_of's Table 33 Row-2 rule; IseledRequest::from_evt_sub_opcode is the request-decode entry point that performs that validation and dispatch. Unlike I2cRequest::from_evt_sub_opcode/LinRequest::from_evt_sub_opcode/AdcRequest::from_evt_sub_opcode/PwmInRequest::from_evt_sub_opcode/UartRequest::from_evt_sub_opcode (each of which take raw byte_msg_payload bytes and decode them internally), IseledRequest::from_evt_sub_opcode takes an already-decoded IseledFrame, matching CanRequest::from_evt_sub_opcode's own shape rather than those five siblings' -- IseledFrame already has its own dedicated decode entry point (IseledFrame::decode / IseledFrame::decode_line, both pre-existing this item and unchanged by it), so this evt[2:0]-classification entry point does not re-derive that byte-layout logic a second time internally",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "\u00a713.5 Table 33's Row-2 row (ISELED is one of its eight endpoint types), TC18.txt L4085-4092, and \u00a713.7.12.3 ISELED EP request handling, TC18.txt L5981-5995"
+    },
+    {
+      "id": "REQ-ISELED-013",
+      "title": "IseledRequest::from_evt_sub_opcode accepts Plain, rejects Reserved sub_opcodes with UnsupportedCmd, and rejects ConfigWrite with ConfigWriteNotImplemented, never panicking",
+      "text": "IseledRequest::from_evt_sub_opcode wraps the caller-supplied IseledFrame unchanged in IseledRequest::Plain for a Plain (sub_opcode 0) request. Every Reserved sub_opcode value (evt[2:0] in 001b..=110b, or any value outside the 3-bit field's representable range) returns Err(RcpError::UnsupportedCmd), matching TC18 Table 33's Row-2 error-code requirement and every prior Row-2 endpoint-type module's identical refusal of their own table's reserved code. A ConfigWrite (sub_opcode 7) request returns Err(RcpError::ConfigWriteNotImplemented) rather than Ok(IseledRequest::ConfigWrite) -- following crate::can::CanRequest::from_evt_sub_opcode's own v5.8.0 departure from the Ok(Self::ConfigWrite) precedent I2C/LIN/ADC/PWM_IN/UART otherwise share, for the identical structural reason: from_evt_sub_opcode requires its caller to supply an already-decoded IseledFrame before this function is even called, and a genuine TC18 \u00a712.7.1 config-write payload cannot be honestly decoded into one via IseledFrame::decode. See REQ-ISELED-012 and crate::iseled's own doc comment 'Provenance note: evt[2:0] request validation' for the full reasoning. Never panics for any sub_opcode/frame combination",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "\u00a713.5 Table 33 (\"000b to 110b reserved \u2013 request to be rejected with error code = UNSUPPORTED_CMD\" / \"111b: ... used to change the configuration of the endpoint (see 12.7.1)\"), TC18.txt L4085-4092"
+    },
+    {
       "id": "REQ-LIFE-015",
       "title": "RcServerState::INITIAL defaults to HwUnconfigured absent stored configuration",
       "text": "RcServerState::INITIAL is HwUnconfigured, the no-stored-configuration fallback TC18 \u00a712.3 (TC18.txt:2059) describes: \"After a power cycle or restart ... the RC Server shall start in the life-cycle state it is actually configured in\", with a device having no NVM permitted to \"incorporate default settings which allow it to be also starting in an advanced state\".",

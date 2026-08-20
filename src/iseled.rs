@@ -8,6 +8,8 @@
 //fusa:req REQ-ISELED-008
 //fusa:req REQ-ISELED-009
 //fusa:req REQ-ISELED-010
+//fusa:req REQ-ISELED-012
+//fusa:req REQ-ISELED-013
 
 //! The ISELED endpoint type (`ep_type 0x0C`) — `ROADMAP.md` Milestone 7
 //! ("Remaining Endpoint Types"), third checklist bullet: native
@@ -44,6 +46,23 @@
 //!   aggregation" below.
 //! - [`IseledFunctionalConfig`] — this endpoint type's functional-config
 //!   content. See "Relationship to `crate::regmap`" below.
+//! - [`IseledRequest`]/[`IseledRequest::from_evt_sub_opcode`] — ISELED's own
+//!   request-decode entry point, validating an incoming request's
+//!   `evt.sub_opcode` against [`crate::evtgroup::evt_row2_kind_of`]'s TC18
+//!   §13.5 Table 33 Row-2 rule. See "Provenance note: evt[2:0] request
+//!   validation" below — this piece was added after this module's own
+//!   original four-piece scope note above (still accurate for why no
+//!   `sub_opcode` reading existed here originally) as this crate's seventh
+//!   Row-2 endpoint-type module, following
+//!   [`crate::i2c::I2cRequest`]/[`crate::lin::LinRequest`]/
+//!   [`crate::adc::AdcRequest`]/[`crate::pwm::PwmInRequest`]/
+//!   [`crate::uart::UartRequest`]'s own prior applications of the same
+//!   shared predicate and [`crate::can::CanRequest`]'s own deliberate
+//!   departure from their shared `Ok(Self::ConfigWrite)` precedent for
+//!   `evt[2:0] == 111b`. This module follows CAN's departure rather than
+//!   the other four's precedent — see "Provenance note: evt[2:0] request
+//!   validation" below for why. The remaining Row-2 endpoint type (`MDIO`)
+//!   is expected to follow the same pattern in its own later item.
 //!
 //! Deliberately out of scope, for the same reasons every prior Milestone
 //! 4/7 entry's own doc comment already gives:
@@ -55,9 +74,37 @@
 //!   [`IseledFrame::command`]/[`IseledFrame::data`] as opaque bytes it does
 //!   not interpret, matching [`crate::spi::SpiByteTransfer`]'s own raw
 //!   pass-through discipline.
+//! - The "Groups A/B/C" `evt[2:0]` sub-opcode convention
+//!   ([`crate::evtgroup::EvtGroup`]) as a general, cross-endpoint-type
+//!   classification scheme — [`crate::evtgroup`]'s own doc comment already
+//!   flags that broader scheme as unresolved, independent of the narrower,
+//!   unambiguous Table 33 Row-2 rule this module's [`IseledRequest`] now
+//!   implements (see "Provenance note: evt[2:0] request validation" below).
+//! - Decoding [`IseledRequest::ConfigWrite`]'s own TC18 §12.7.1 payload
+//!   shape — and, like [`crate::can::CanRequest`] and unlike
+//!   [`crate::i2c::I2cRequest`]/[`crate::lin::LinRequest`]/
+//!   [`crate::adc::AdcRequest`]/[`crate::pwm::PwmInRequest`]/
+//!   [`crate::uart::UartRequest`], [`IseledRequest::from_evt_sub_opcode`]
+//!   does not even construct [`IseledRequest::ConfigWrite`] yet; see
+//!   "Provenance note: evt[2:0] request validation" below for why.
 //! - [`crate::regmap::CommonFunctionalConfig`]'s fields — unchanged here, as
 //!   in every prior Milestone 1-4/7 entry.
-//! - Wiring any of the below into an actual decoder, dispatch loop, or
+//! - Wiring [`IseledRequest::from_evt_sub_opcode`] into an actual decoder,
+//!   dispatch loop, or [`crate::mock::Endpoint`] implementation.
+//!   [`crate::mock::Endpoint`]'s own trait signature still does not carry an
+//!   `evt` value to any implementation at all — that gap is not specific to
+//!   ISELED, it applies identically to
+//!   [`crate::i2c::I2cRequest::from_evt_sub_opcode`]/
+//!   [`crate::lin::LinRequest::from_evt_sub_opcode`]/
+//!   [`crate::adc::AdcRequest::from_evt_sub_opcode`]/
+//!   [`crate::pwm::PwmInRequest::from_evt_sub_opcode`]/
+//!   [`crate::can::CanRequest::from_evt_sub_opcode`]/
+//!   [`crate::uart::UartRequest::from_evt_sub_opcode`] (each confirmed
+//!   still unwired against [`crate::mock::Endpoint`]'s own doc comment).
+//!   [`IseledRequest`] is built to that same "additive standalone plumbing
+//!   only" level.
+//! - Wiring any of this module's other, original four pieces into an
+//!   actual decoder, dispatch loop, or
 //!   [`crate::avtp`]/[`crate::acf`]/[`crate::addressing`] caller — matching
 //!   the discipline every prior Milestone 1-4/7 entry already established.
 //! - Physical bit-serial transmission timing (bit ordering onto the wire,
@@ -209,6 +256,99 @@
 //! contributing device's own [`IseledDeviceResponse::chain_address`] rather
 //! than flattening every device's bytes into one undifferentiated buffer.
 //!
+//! ## Provenance note: evt[2:0] request validation
+//!
+//! ISELED is one of the eight endpoint types TC18 §13.5 Table 33 groups into
+//! one shared "Row 2" `evt[2:0]` rule (TC18.txt lines 4085-4092, `ISELED`
+//! itself named at line 4091) — see [`crate::evtgroup`]'s own doc comment
+//! "Provenance note: TC18 §13.5 Table 33's Row-2 rule (`evt_row2_kind_of`)"
+//! for the full citation, including the literal-text discrepancy that
+//! module's doc comment flags and resolves (Table 33's own printed Row-2
+//! cell reads "000b to 110b reserved", including 000b, which this crate does
+//! not implement literally). [`IseledRequest::from_evt_sub_opcode`] is this
+//! module's own caller of that shared [`crate::evtgroup::evt_row2_kind_of`]
+//! predicate — ISELED's own request format (TC18 §13.7.12.3 Figure 41,
+//! TC18.txt line 5989) carries the same `evt` field in its Message Info
+//! header every other endpoint type's request does, and TC18 names no
+//! ISELED-specific override of Table 33's generic rule anywhere in
+//! §13.7.12.
+//!
+//! **`IseledRequest::from_evt_sub_opcode` takes an already-decoded
+//! [`IseledFrame`], not raw `byte_msg_payload` bytes — matching
+//! [`crate::can::CanRequest::from_evt_sub_opcode`]'s own shape, not
+//! [`crate::i2c::I2cRequest::from_evt_sub_opcode`]'s/
+//! [`crate::lin::LinRequest::from_evt_sub_opcode`]'s/
+//! [`crate::adc::AdcRequest::from_evt_sub_opcode`]'s/
+//! [`crate::pwm::PwmInRequest::from_evt_sub_opcode`]'s/
+//! [`crate::uart::UartRequest::from_evt_sub_opcode`]'s own raw-bytes
+//! shape.** [`IseledFrame`] already has its own dedicated decode entry
+//! point, [`IseledFrame::decode`] (and [`IseledFrame::decode_line`] for the
+//! native 4b/5b line-coded form) — both pre-existing this item and unchanged
+//! by it. Rather than [`IseledRequest::from_evt_sub_opcode`] re-deriving
+//! that byte-layout logic a second time internally (the way
+//! [`crate::i2c::I2cRequest::from_evt_sub_opcode`]/
+//! [`crate::lin::LinRequest::from_evt_sub_opcode`]/
+//! [`crate::adc::AdcRequest::from_evt_sub_opcode`]/
+//! [`crate::pwm::PwmInRequest::from_evt_sub_opcode`]/
+//! [`crate::uart::UartRequest::from_evt_sub_opcode`] each call their own
+//! endpoint type's one confirmed payload decoder internally), this function
+//! instead requires its caller to have already called [`IseledFrame::decode`]
+//! (or [`IseledFrame::decode_line`]) and supply the resulting [`IseledFrame`]
+//! directly — mirroring [`crate::can::CanRequest::from_evt_sub_opcode`]'s
+//! own identical choice for [`crate::can::CanDataFrame`].
+//!
+//! **Unlike [`crate::i2c::I2cRequest::from_evt_sub_opcode`]/
+//! [`crate::lin::LinRequest::from_evt_sub_opcode`]/
+//! [`crate::adc::AdcRequest::from_evt_sub_opcode`]/
+//! [`crate::pwm::PwmInRequest::from_evt_sub_opcode`]/
+//! [`crate::uart::UartRequest::from_evt_sub_opcode`],
+//! `IseledRequest::from_evt_sub_opcode` returns
+//! `Err(`[`RcpError::ConfigWriteNotImplemented`]`)` for `evt[2:0] == 111b`,
+//! following [`crate::can::CanRequest::from_evt_sub_opcode`]'s own v5.8.0
+//! departure rather than those five siblings' `Ok(Self::ConfigWrite)`
+//! precedent.** This follows for the identical structural reason
+//! [`crate::can`]'s own doc comment gives, not a new one invented for
+//! ISELED: `IseledRequest::from_evt_sub_opcode` requires its caller to
+//! supply an already-decoded [`IseledFrame`] value *before* this function is
+//! even called (see above) — and a genuine TC18 §12.7.1 config-write payload
+//! is definitionally not the "plain data ... that is to be presented or has
+//! been received on the ISELED bus" [`IseledFrame`] represents (TC18
+//! §13.7.12.3, TC18.txt line 5982; see this module's own doc comment "TC18
+//! reconciliation note (§13.7.12)"). §12.7.1's functional-config-write
+//! payload is an EP-level register-map operation (TC18 Table 58,
+//! §13.7.12.2), not `chain_address`/`command`/`data` content, so no caller
+//! can honestly decode a genuine config-write payload through
+//! [`IseledFrame::decode`] and pass the result in for this branch.
+//! Accepting whatever [`IseledFrame`] the caller supplied regardless and
+//! returning `Ok(`[`IseledRequest::ConfigWrite`]`)` would silently discard a
+//! value the caller was structurally required to construct but that bears
+//! no relationship to the real config-write request — exactly the
+//! dishonesty [`crate::can`]'s own doc comment already flags and declines
+//! for [`crate::can::CanRequest`]. This is a materially different position
+//! from [`crate::uart::UartRequest`]'s own `ConfigWrite` arm, which stays
+//! `Ok(Self::ConfigWrite)`: `UartRequest::from_evt_sub_opcode` accepts
+//! cheaply-ignorable raw `payload: &[u8]`/`is_write: bool` arguments that
+//! never required a decode step from its caller, so declining to interpret
+//! them costs nothing. `IseledRequest::from_evt_sub_opcode`'s caller, by
+//! contrast, has already paid [`IseledFrame::decode`]'s own up-front decode
+//! cost (which can itself fail with [`RcpError::ShortFrame`] for input
+//! shorter than 2 bytes) before this function is even reached, exactly as
+//! [`crate::can::CanRequest::from_evt_sub_opcode`]'s own caller has already
+//! paid [`crate::can::CanDataFrame::decode`]'s. [`IseledRequest::ConfigWrite`]
+//! itself remains a real, declared variant of this enum — reserved for
+//! whichever future item does implement a real §12.7.1 ISELED config-write
+//! payload decode and can therefore construct it honestly, the same way
+//! [`crate::can::CanRequest::ConfigWrite`] is reserved (see
+//! [`crate::RcpError`]'s own doc comment for this crate's broader
+//! declared-but-not-yet-constructed precedent).
+//!
+//! Every `Reserved` sub_opcode value (`evt[2:0]` in `001b..=110b`, or any
+//! value outside the 3-bit field's representable range) is rejected with
+//! `Err(`[`RcpError::UnsupportedCmd`]`)`, matching Table 33's own stated
+//! error code and every prior Row-2 endpoint-type module's identical
+//! refusal of their own table's reserved code — this part is unchanged
+//! across all seven Row-2 endpoint-type modules so far, ISELED included.
+//!
 //! ## Relationship to [`crate::regmap`]
 //!
 //! As with every Milestone 4/7 endpoint-type module, ISELED's real
@@ -225,6 +365,7 @@
 //! `native_crc_enabled` field that selection needs, rather than being left
 //! an empty placeholder like [`crate::lin::LinFunctionalConfig`].
 
+use crate::evtgroup::{evt_row2_kind_of, EvtRow2Kind};
 use crate::RcpError;
 
 // ── 4b/5b line coding ────────────────────────────────────────────────────────
@@ -520,6 +661,79 @@ impl IseledFunctionalConfig {
     }
 }
 
+// ── IseledRequest: evt[2:0] request validation ───────────────────────────────
+
+/// The decoded shape of an incoming ISELED request, after validating its
+/// `evt[2:0]` sub-opcode against TC18 §13.5 Table 33's Row-2 rule (ISELED is
+/// one of that row's eight endpoint types —
+/// `{ADC, PWM_IN, I²C, LIN, CAN, UART, ISELED, MDIO}`).
+///
+/// See this module's doc comment "Provenance note: evt[2:0] request
+/// validation" for the full citation, why
+/// [`IseledRequest::from_evt_sub_opcode`] takes an already-decoded
+/// [`IseledFrame`] rather than raw `byte_msg_payload` bytes (matching
+/// [`crate::can::CanRequest`]'s own shape, not
+/// [`crate::i2c::I2cRequest`]'s/[`crate::lin::LinRequest`]'s/
+/// [`crate::adc::AdcRequest`]'s/[`crate::pwm::PwmInRequest`]'s/
+/// [`crate::uart::UartRequest`]'s raw-bytes shape), why it follows
+/// [`crate::can::CanRequest`]'s own
+/// `Err(`[`RcpError::ConfigWriteNotImplemented`]`)` departure rather than
+/// those five siblings' `Ok(Self::ConfigWrite)` precedent, and
+/// [`crate::evtgroup`]'s own doc comment for the literal-text discrepancy
+/// this crate resolves `evt[2:0] == 000b` against.
+#[derive(Debug, Clone, PartialEq, Eq)]
+//fusa:req REQ-ISELED-012
+pub enum IseledRequest {
+    /// `evt[2:0] == 000b`: an ordinary ISELED request — the caller-decoded
+    /// [`IseledFrame`] this endpoint is to send onto, or has received from,
+    /// the daisy chain, per TC18 §13.7.12.3's "plain data in the
+    /// `byte_msg_payload` that is to be presented or has been received on
+    /// the ISELED bus" (TC18.txt line 5982).
+    Plain(IseledFrame),
+    /// `evt[2:0] == 111b`: a functional-config write (TC18 §12.7.1) rather
+    /// than an ordinary request. Unlike every non-CAN Row-2 endpoint-type
+    /// module's own `ConfigWrite` variant, [`IseledRequest::from_evt_sub_opcode`]
+    /// does not yet construct this variant at all — see this module's doc
+    /// comment "Provenance note: evt[2:0] request validation" for why. It
+    /// remains a real, declared variant, reserved for whichever future item
+    /// implements a real TC18 §12.7.1 ISELED config-write payload decode.
+    ConfigWrite,
+}
+
+impl IseledRequest {
+    /// Decode an incoming ISELED request from its `evt.sub_opcode`
+    /// ([`crate::acf::Evt::sub_opcode`]) and an already-decoded
+    /// [`IseledFrame`] (see this module's doc comment "Provenance note:
+    /// evt[2:0] request validation" for why this takes a decoded
+    /// [`IseledFrame`] rather than raw bytes, matching
+    /// [`crate::can::CanRequest::from_evt_sub_opcode`] rather than
+    /// [`crate::i2c::I2cRequest::from_evt_sub_opcode`]/
+    /// [`crate::lin::LinRequest::from_evt_sub_opcode`]/
+    /// [`crate::adc::AdcRequest::from_evt_sub_opcode`]/
+    /// [`crate::pwm::PwmInRequest::from_evt_sub_opcode`]/
+    /// [`crate::uart::UartRequest::from_evt_sub_opcode`]).
+    ///
+    /// Returns `Err(`[`RcpError::UnsupportedCmd`]`)` for every
+    /// [`EvtRow2Kind::Reserved`] sub_opcode value — TC18 §13.5 Table 33's
+    /// Row-2 rule requires the request be rejected with error code
+    /// `UNSUPPORTED_CMD`, matching every prior Row-2 endpoint-type module's
+    /// identical refusal of their own table's reserved code. Returns
+    /// `Err(`[`RcpError::ConfigWriteNotImplemented`]`)` — not
+    /// `Ok(`[`IseledRequest::ConfigWrite`]`)` — for every
+    /// [`EvtRow2Kind::ConfigWrite`] sub_opcode value; see this module's doc
+    /// comment for why. Never panics for any `sub_opcode`/`frame`
+    /// combination.
+    //fusa:req REQ-ISELED-012
+    //fusa:req REQ-ISELED-013
+    pub fn from_evt_sub_opcode(sub_opcode: u8, frame: IseledFrame) -> Result<Self, RcpError> {
+        match evt_row2_kind_of(sub_opcode) {
+            EvtRow2Kind::Plain => Ok(Self::Plain(frame)),
+            EvtRow2Kind::ConfigWrite => Err(RcpError::ConfigWriteNotImplemented),
+            EvtRow2Kind::Reserved => Err(RcpError::UnsupportedCmd),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -784,5 +998,105 @@ mod tests {
         assert!(!crate::regmap::functional_config_matches_ep_type(
             &generic, &tag
         ));
+    }
+
+    // ── IseledRequest::from_evt_sub_opcode ───────────────────────────────────
+
+    fn sample_frame() -> IseledFrame {
+        IseledFrame {
+            chain_address: 0x03,
+            command: 0x10,
+            data: vec![0xDE, 0xAD, 0xBE, 0xEF],
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-ISELED-012
+    //fusa:test REQ-ISELED-013
+    fn iseled_request_plain_evt_wraps_the_given_frame_unchanged() {
+        // Unlike I2cRequest::Plain/LinRequest::Plain/AdcRequest::Plain/
+        // PwmInRequest::Plain/UartRequest::Write, IseledRequest::Plain does
+        // not decode raw bytes itself — it threads the caller's
+        // already-decoded IseledFrame through unchanged. See this module's
+        // doc comment "Provenance note: evt[2:0] request validation".
+        let frame = sample_frame();
+        let request = IseledRequest::from_evt_sub_opcode(0b000, frame.clone()).unwrap();
+        assert_eq!(request, IseledRequest::Plain(frame));
+    }
+
+    #[test]
+    //fusa:test REQ-ISELED-012
+    //fusa:test REQ-ISELED-013
+    fn iseled_request_plain_evt_accepts_an_empty_data_frame() {
+        let frame = IseledFrame {
+            chain_address: 0,
+            command: 0,
+            data: vec![],
+        };
+        let request = IseledRequest::from_evt_sub_opcode(0b000, frame.clone()).unwrap();
+        assert_eq!(request, IseledRequest::Plain(frame));
+    }
+
+    #[test]
+    //fusa:test REQ-ISELED-012
+    //fusa:test REQ-ISELED-013
+    fn iseled_request_config_write_evt_is_rejected_with_config_write_not_implemented() {
+        // Deliberate departure from I2cRequest/LinRequest/AdcRequest/
+        // PwmInRequest/UartRequest's own precedent (each returns
+        // Ok(Self::ConfigWrite) for evt[2:0] == 111b), following
+        // crate::can::CanRequest's own v5.8.0 departure instead — see this
+        // module's doc comment "Provenance note: evt[2:0] request
+        // validation" for why. The given frame is not a real config-write
+        // payload — it is passed only because the signature requires *some*
+        // IseledFrame — and is not echoed back or otherwise used.
+        assert_eq!(
+            IseledRequest::from_evt_sub_opcode(0b111, sample_frame()),
+            Err(RcpError::ConfigWriteNotImplemented)
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-ISELED-013
+    fn iseled_request_reserved_evt_values_are_rejected_with_unsupported_cmd() {
+        for sub_opcode in 0b001..=0b110u8 {
+            assert_eq!(
+                IseledRequest::from_evt_sub_opcode(sub_opcode, sample_frame()),
+                Err(RcpError::UnsupportedCmd)
+            );
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-ISELED-013
+    fn iseled_request_values_above_the_3_bit_field_are_also_rejected_with_unsupported_cmd() {
+        for sub_opcode in (crate::acf::EVT_SUB_OPCODE_MAX + 1)..=u8::MAX {
+            assert_eq!(
+                IseledRequest::from_evt_sub_opcode(sub_opcode, sample_frame()),
+                Err(RcpError::UnsupportedCmd)
+            );
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-ISELED-013
+    fn iseled_request_from_evt_sub_opcode_never_panics_for_any_sampled_input() {
+        let frames = [
+            IseledFrame {
+                chain_address: 0,
+                command: 0,
+                data: vec![],
+            },
+            sample_frame(),
+            IseledFrame {
+                chain_address: 0xFF,
+                command: 0xFF,
+                data: vec![0xAAu8; 64],
+            },
+        ];
+        for sub_opcode in 0..=u8::MAX {
+            for frame in &frames {
+                let _ = IseledRequest::from_evt_sub_opcode(sub_opcode, frame.clone());
+            }
+        }
     }
 }

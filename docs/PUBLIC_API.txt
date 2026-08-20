@@ -1690,6 +1690,26 @@ impl core::marker::UnsafeUnpin for rcp::i2c::I2cFunctionalConfig
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::i2c::I2cFunctionalConfig
 impl core::panic::unwind_safe::UnwindSafe for rcp::i2c::I2cFunctionalConfig
 pub mod rcp::iseled
+pub enum rcp::iseled::IseledRequest
+pub rcp::iseled::IseledRequest::ConfigWrite
+pub rcp::iseled::IseledRequest::Plain(rcp::iseled::IseledFrame)
+impl rcp::iseled::IseledRequest
+pub fn rcp::iseled::IseledRequest::from_evt_sub_opcode(u8, rcp::iseled::IseledFrame) -> core::result::Result<Self, rcp::RcpError>
+impl core::clone::Clone for rcp::iseled::IseledRequest
+pub fn rcp::iseled::IseledRequest::clone(&self) -> rcp::iseled::IseledRequest
+impl core::cmp::Eq for rcp::iseled::IseledRequest
+impl core::cmp::PartialEq for rcp::iseled::IseledRequest
+pub fn rcp::iseled::IseledRequest::eq(&self, &rcp::iseled::IseledRequest) -> bool
+impl core::fmt::Debug for rcp::iseled::IseledRequest
+pub fn rcp::iseled::IseledRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::iseled::IseledRequest
+impl core::marker::Freeze for rcp::iseled::IseledRequest
+impl core::marker::Send for rcp::iseled::IseledRequest
+impl core::marker::Sync for rcp::iseled::IseledRequest
+impl core::marker::Unpin for rcp::iseled::IseledRequest
+impl core::marker::UnsafeUnpin for rcp::iseled::IseledRequest
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::iseled::IseledRequest
+impl core::panic::unwind_safe::UnwindSafe for rcp::iseled::IseledRequest
 pub struct rcp::iseled::IseledCollectedResponse(pub alloc::vec::Vec<rcp::iseled::IseledDeviceResponse>)
 impl core::clone::Clone for rcp::iseled::IseledCollectedResponse
 pub fn rcp::iseled::IseledCollectedResponse::clone(&self) -> rcp::iseled::IseledCollectedResponse

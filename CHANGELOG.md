@@ -7,6 +7,74 @@ OPEN Alliance TC18 core replacement; from `v1.0.0` on, each entry is a real
 release. See `docs/SEMVER.md` for the versioning scheme, including why a
 wire-format change is a MAJOR bump even when it is a fix.
 
+## v5.10.0 (Table 30/33 Row-2 evt[2:0] validation — ISELED, 7th endpoint type) — closed
+
+Direct follow-up to v5.9.0: `iseled.rs` becomes the seventh of the eight
+TC18 §13.5 Table 33 Row-2 endpoint types (`{ADC, PWM_IN, I2C, LIN, CAN,
+UART, ISELED, MDIO}`) to call the shared `evtgroup::evt_row2_kind_of`
+predicate. `evtgroup.rs` itself is unchanged — this release only adds
+`iseled.rs`'s own caller. This item touches only `evt[2:0]` request
+classification; `IseledFrame`'s own field layout, its 4b/5b line coding
+(`encode_4b5b`/`decode_4b5b`), and the `iseled-unconfirmed-crc`-gated native
+ISELED CRC are all unchanged.
+
+New, purely additive `pub` items (MINOR bump per `docs/SEMVER.md`):
+
+- `iseled::IseledRequest` / `iseled::IseledRequest::from_evt_sub_opcode` —
+  ISELED's own request-decode entry point, structurally mirroring
+  `can::CanRequest` rather than
+  `i2c::I2cRequest`/`lin::LinRequest`/`adc::AdcRequest`/`pwm::PwmInRequest`/
+  `uart::UartRequest`, in both of the same two deliberate ways `can.rs`
+  departed for:
+  - `from_evt_sub_opcode` takes an already-decoded `IseledFrame`, not raw
+    `byte_msg_payload` bytes. `IseledFrame` already has its own dedicated
+    decode entry point (`IseledFrame::decode`/`IseledFrame::decode_line`,
+    both pre-existing this item and unchanged by it), so this
+    evt[2:0]-classification entry point does not re-derive that byte-layout
+    logic a second time internally — the caller is expected to have already
+    called `IseledFrame::decode` (or `decode_line`) and supply the result.
+  - `evt[2:0] == 111b` returns `Err(RcpError::ConfigWriteNotImplemented)`
+    (the same variant `can.rs`'s v5.8.0 item added — no new `RcpError`
+    variant is added here) rather than `Ok(IseledRequest::ConfigWrite)` the
+    way `i2c::I2cRequest`/`lin::LinRequest`/`adc::AdcRequest`/
+    `pwm::PwmInRequest`/`uart::UartRequest` each do for their own identical
+    case. This follows the same structural reasoning `can.rs`'s own doc
+    comment gives: `from_evt_sub_opcode` requires its caller to supply an
+    already-decoded `IseledFrame` *before* this function is even called, and
+    a genuine TC18 §12.7.1 config-write payload is definitionally not the
+    "plain data ... presented or ... received on the ISELED bus"
+    `IseledFrame` represents (TC18 §13.7.12.3, TC18.txt line 5578) — no
+    caller can honestly decode a real config-write payload through
+    `IseledFrame::decode` and pass the result in for this branch. Unlike
+    `uart::UartRequest`'s own `ConfigWrite` arm (which ignores cheaply
+    ignorable raw `payload`/`is_write` arguments its caller never had to
+    decode), `IseledRequest::from_evt_sub_opcode`'s caller has already paid
+    `IseledFrame::decode`'s own up-front decode cost, so accepting whatever
+    frame was supplied and returning `Ok(IseledRequest::ConfigWrite)`
+    regardless was judged less honest than surfacing the same dedicated
+    error `can.rs` already introduced. `IseledRequest::ConfigWrite` remains
+    a real, declared variant — reserved for whichever future item
+    implements a real §12.7.1 ISELED config-write payload decode, the same
+    way `can::CanRequest::ConfigWrite` is reserved.
+  See `iseled.rs`'s own doc comment "Provenance note: evt[2:0] request
+  validation" for the full citation and reasoning behind both differences.
+
+Every `Reserved` sub_opcode value is rejected with
+`Err(RcpError::UnsupportedCmd)`, unchanged from every prior Row-2
+endpoint-type module — this part of the rule is identical for ISELED.
+
+Not in this release: wiring `IseledRequest::from_evt_sub_opcode` into
+`mock::RcServer`'s actual dispatch — `mock::Endpoint`'s trait signature
+still does not carry an `evt` value to any implementation at all, the same
+gap v5.4.0's pilot found and left as-is (confirmed unchanged here). This
+release also does not touch `IseledFrame`, `encode_4b5b`/`decode_4b5b`,
+`iseled_frame_crc8`/`IseledFrameCrc` (the `iseled-unconfirmed-crc`-gated
+native CRC layer), `iseled_collect_resp`, or `IseledFunctionalConfig` — all
+pre-existing, additive standalone plumbing left untouched. The remaining
+Row-2 endpoint type (`MDIO`) is expected to add its own
+`evt_row2_kind_of`-based request-decode entry point the same way, in a
+later item.
+
 ## v5.9.0 (Table 30/33 Row-2 evt[2:0] validation — UART, 6th endpoint type) — closed
 
 Direct follow-up to v5.8.0: `uart.rs` becomes the sixth of the eight TC18
