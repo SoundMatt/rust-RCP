@@ -378,17 +378,19 @@ fn decode_register_address(payload: &[u8]) -> Option<u16> {
 /// concern. The result always satisfies [`is_discovery_request`]. Never
 /// panics for any input.
 ///
-/// The header fields this builds match TC18 §12.6.1 Table 16 "Discovery
-/// request" (TC18.txt lines 2370-2381): `acf_msg_type` = `ACF_ABB`,
-/// `byte_bus_id` = `00000000000b`, `evt` = `0000b`, and a read-direction
-/// `op` — §12.6.1's own opening sentence (TC18.txt line 2365) is "A
-/// discovery request is a read request", and TC18 encodes a read as
-/// `op = 0` (the request-header tables' "if op = 0 this is read_size, else
-/// segment_num", TC18.txt line 1169, and §12.9's "op=0 (read request)",
-/// TC18.txt line 3207). Table 16's own `op` row reads "1b (read request)",
-/// which contradicts both and is treated here as a specification typo.
+/// The header fields this builds match TC18 §12.6.1 Table 18 "Discovery
+/// request" (TC18.txt lines 2746-2757; table renumbered from Table 16
+/// since this note was written — see issue #164): `acf_msg_type` =
+/// `ACF_ABB`, `byte_bus_id` = `00000000000b`, `evt` = `0000b`, and a
+/// read-direction `op` — §12.6.1's own opening sentence (TC18.txt line
+/// 2741) is "A discovery request is a read request", and TC18 encodes a
+/// read as `op = 0` (the request-header tables' "if op = 0 this is
+/// read_size, else segment_num", TC18.txt line 1235, and §12.9's "op=0
+/// (read request)", TC18.txt line 3604). Table 18's own `op` row reads
+/// "1b (read request)", which contradicts both and is treated here as a
+/// specification typo.
 ///
-/// One Table 16 row this deliberately does **not** match:
+/// One Table 18 row this deliberately does **not** match:
 /// `byte_msg_payload` is specified as "none", whereas this builder emits
 /// the [`DISCOVERY_REGISTER_ADDRESS_LEN`]-byte register-address prefix this
 /// module's Provenance note describes. See requirement `REQ-DISC-027` in
@@ -485,19 +487,21 @@ pub fn is_discovery_configure_request(msg: &AcfAbbMessage) -> bool {
 /// performs no register I/O either — see that module's own doc comment for
 /// why. Never panics for any input.
 ///
-/// The header fields this builds match TC18 §12.6.2 Table 17 "Discovery
-/// response" (TC18.txt lines 2414-2428): `acf_msg_type` = `ACF_ABB`,
-/// `byte_bus_id` = `00000000000b` (here by echo-back of the request's own
-/// EP0 `byte_bus_id`), `evt` = `0000b`, a read-direction `op` (see
-/// [`build_discovery_request`] for why a read is `op = 0` despite Table
-/// 17's "1b (read request)" row), and a `byte_msg_payload` that "contains
-/// RC Server's register map content starting from address 0x00000".
+/// The header fields this builds match TC18 §12.6.2 Table 19 "Discovery
+/// response" (TC18.txt lines 2790-2804; table renumbered from Table 17
+/// since this note was written — see issue #164): `acf_msg_type` =
+/// `ACF_ABB`, `byte_bus_id` = `00000000000b` (here by echo-back of the
+/// request's own EP0 `byte_bus_id`), `evt` = `0000b`, a read-direction
+/// `op` (see [`build_discovery_request`] for why a read is `op = 0`
+/// despite Table 19's "1b (read request)" row), and a `byte_msg_payload`
+/// that "contains RC Server's register map content starting from address
+/// 0x00000".
 ///
-/// Two Table 17 rows this deliberately does **not** implement: the
+/// Two Table 19 rows this deliberately does **not** implement: the
 /// response length is *not* clamped to the discovery request's `read_size`
-/// (`acf_msg_length ≤ read_size of discovery request`, TC18.txt line
-/// 2422), and this function builds no `stream_id` at all, so Table 17's
-/// `stream_id = localMAC + unique_id 0x0000` row is a transport-level
+/// (`acf_msg_length ≤ read_size of discovery request`, TC18.txt lines
+/// 2798-2799), and this function builds no `stream_id` at all, so Table
+/// 19's `stream_id = localMAC + unique_id 0x0000` row is a transport-level
 /// concern here. See requirements `REQ-DISC-029`/`REQ-DISC-030` in
 /// `.fusa-reqs.json`, which record both gaps.
 //fusa:req REQ-DISC-004
@@ -1028,14 +1032,16 @@ mod tests {
         assert!(is_discovery_request(&request));
     }
 
-    // ── TC18 §12.6.1 Table 16 / §12.6.2 Table 17 field conformance ──────────
+    // ── TC18 §12.6.1 Table 18 / §12.6.2 Table 19 field conformance ──────────
 
-    /// TC18 §12.6.1 Table 16 "Discovery request" (TC18.txt lines
-    /// 2370-2381), asserted against the *encoded* frame rather than the
-    /// in-memory struct, so the bit positions are exercised too. Expected
-    /// values are written out as literals taken from Table 16:
+    /// TC18 §12.6.1 Table 18 "Discovery request" (TC18.txt lines
+    /// 2746-2757; table renumbered from Table 16 since this note was
+    /// written — see issue #164), asserted against the *encoded* frame
+    /// rather than the in-memory struct, so the bit positions are
+    /// exercised too. Expected values are written out as literals taken
+    /// from Table 18:
     ///
-    /// | Table 16 field | Required value |
+    /// | Table 18 field | Required value |
     /// |----------------|----------------|
     /// | `acf_msg_type` | `ACF_ABB` (`0x0E`) |
     /// | `Byte_bus_id`  | `00000000000b` |
@@ -1043,10 +1049,10 @@ mod tests {
     /// | `op`           | read request |
     ///
     /// `op` is asserted as `0`: §12.6.1's opening sentence (TC18.txt line
-    /// 2365) says "A discovery request is a read request", and TC18 encodes
+    /// 2741) says "A discovery request is a read request", and TC18 encodes
     /// a read as `op = 0` ("if op = 0 this is read_size, else segment_num",
-    /// TC18.txt line 1169; "op=0 (read request)", TC18.txt line 3207).
-    /// Table 16's own "1b (read request)" row contradicts both.
+    /// TC18.txt line 1235; "op=0 (read request)", TC18.txt line 3604).
+    /// Table 18's own "1b (read request)" row contradicts both.
     #[test]
     //fusa:test REQ-DISC-025
     fn tc18_table_16_discovery_request_header_fields_match_the_required_values() {
@@ -1065,11 +1071,13 @@ mod tests {
         assert_eq!(frame[5], 0x42);
     }
 
-    /// TC18 §12.6.2 Table 17 "Discovery response" (TC18.txt lines
-    /// 2414-2428), asserted against the encoded frame with literal expected
-    /// values taken from Table 17: `acf_msg_type` = `ACF_ABB` (`0x0E`),
-    /// `Byte_bus_id` = `00000000000b`, `evt` = `0000b`, `op` = read (see
-    /// the Table 16 test above for the op-bit polarity), and
+    /// TC18 §12.6.2 Table 19 "Discovery response" (TC18.txt lines
+    /// 2790-2804; table renumbered from Table 17 since this note was
+    /// written — see issue #164), asserted against the encoded frame with
+    /// literal expected values taken from Table 19: `acf_msg_type` =
+    /// `ACF_ABB` (`0x0E`), `Byte_bus_id` = `00000000000b`, `evt` = `0000b`,
+    /// `op` = read (see the Table 18 test above for the op-bit polarity),
+    /// and
     /// `byte_msg_payload` = "RC Server's register map content starting from
     /// address 0x00000".
     #[test]

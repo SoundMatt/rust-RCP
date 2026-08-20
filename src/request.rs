@@ -5307,9 +5307,9 @@ mod tests {
     //fusa:test REQ-CMP-009
     fn request_kind_discriminants_match_tc18_table_5_condition_type_bytes() {
         // TC18 §11.2.2, Table 5 "Different types of conditional requests"
-        // (TC18.txt line 1186): "The first byte in the message_timestamp
-        // field is used to indicate the type of condition." Table 5's own
-        // rows, transcribed as literals:
+        // (TC18.txt lines 1256-1257): "The first byte in the
+        // message_timestamp field is used to indicate the type of
+        // condition." Table 5's own rows, transcribed as literals:
         //   0x0F, 0x8F -> Compound
         //   0x0B, 0x8B -> Compound wait
         //   0x0E, 0x8E -> Triggered
@@ -5324,14 +5324,16 @@ mod tests {
         assert_eq!(RequestKind::Chained.to_u8(), 0x01);
         assert_eq!(RequestKind::Timed.to_u8(), 0x0A);
 
-        // TC18 §11.2.3.1 Table 11 (line 1679) "request_type 0x05",
-        // §11.2.3.2 Table 12 (line 1733) "request_type 0x06", and
-        // §11.2.3.3 Table 13 (line 1792) "request_type 0x07".
+        // TC18 §11.2.3.1 Table 13 (line 1985) "request_type 0x05",
+        // §11.2.3.2 Table 14 (line 2056) "request_type 0x06", and
+        // §11.2.3.3 Table 15 (line 2142) "request_type 0x07". (Tables
+        // renumbered from 11/12/13 since this note was written — see
+        // issue #164.)
         assert_eq!(RequestKind::ClearAll.to_u8(), 0x05);
         assert_eq!(RequestKind::ClearNonSafestate.to_u8(), 0x06);
         assert_eq!(RequestKind::ClearSingle.to_u8(), 0x07);
 
-        // TC18 §11.2.2 (line 1186): "If the MSB of the identifier (0x8x) is
+        // TC18 §11.2.2 (line 1258): "If the MSB of the identifier (0x8x) is
         // set the request is treated as a safety request".
         for (safety, base) in [
             (RequestKind::SafetyCompound, RequestKind::Compound),
@@ -5371,7 +5373,7 @@ mod tests {
     #[test]
     //fusa:test REQ-SEQ-005
     fn sequencer_bank_and_state_stay_within_tc18_256_sequencer_and_state_ceiling() {
-        // TC18 §12.10 "Sequencers" (TC18.txt line 3463): "The number of
+        // TC18 §12.10 "Sequencers" (TC18.txt lines 3870-3871): "The number of
         // sequencers and states per sequencer are limited to 256 by this
         // definition. An RC Server implementation may support only a lower
         // number of sequencers."
@@ -5405,13 +5407,14 @@ mod tests {
     #[test]
     //fusa:test REQ-ERRH-001
     fn request_module_error_outcomes_carry_their_tc18_table_27_wire_codes() {
-        // TC18 §12.9.6 Table 27 "Error codes in responses" (TC18.txt line
-        // 3413), transcribed as literals: SEQUENCER_NOT_KNOWN = 2,
-        // REQUEST_CANCELED = 5, REQUEST_REJECTED = 11,
-        // INVALID_PARAMETER = 15, CHAIN_ABORTED = 16.
+        // TC18 §12.9.6 Table 30 "Error codes in responses" (TC18.txt lines
+        // 3812-3844; table renumbered from Table 27 since this note was
+        // written — see issue #164), transcribed as literals:
+        // SEQUENCER_NOT_KNOWN = 2, REQUEST_CANCELED = 5,
+        // REQUEST_REJECTED = 11, INVALID_PARAMETER = 15, CHAIN_ABORTED = 16.
 
-        // TC18 §11.2.2.1 (line 1203): a compound request naming a sequencer
-        // the RC Server does not have.
+        // TC18 §11.2.2.2 (TC18.txt lines 1384-1385): a compound request
+        // naming a sequencer the RC Server does not have.
         let unknown_sequencer = CompoundGateConfig {
             sequencer_num: 4,
             start_state: SequencerState(1),
@@ -5423,8 +5426,9 @@ mod tests {
             Some(2)
         );
 
-        // TC18 §11.2.2.1 (line 1203): the sequencer is known but is not in
-        // the request's cmp_start_state, so the request is not due.
+        // TC18 §11.2.2.2 (TC18.txt lines 1384-1385): the sequencer is known
+        // but is not in the request's cmp_start_state, so the request is
+        // not due.
         let unmet_gate = CompoundGateConfig {
             sequencer_num: 0,
             start_state: SequencerState(3),
@@ -5436,8 +5440,9 @@ mod tests {
             Some(11)
         );
 
-        // TC18 §11.2.3 (line 1672): "Each request that is cancelled will send
-        // an error response with the error code = REQUEST_CANCELED."
+        // TC18 §11.2.3 (TC18.txt lines 1979-1980): "Each request that is
+        // cancelled will send an error response with the error code =
+        // REQUEST_CANCELED."
         assert_eq!(
             check_clear_all_cancellation().unwrap_err().tc18_wire_code(),
             Some(5)
@@ -5454,9 +5459,9 @@ mod tests {
                 .tc18_wire_code(),
             Some(5)
         );
-        // TC18 §11.2.2.1 (line 1203) / §11.2.2.4 Table 9 (line 1586): the
-        // watchdog-overflow purge of non-safety-tagged requests is likewise a
-        // cancellation.
+        // TC18 §11.2.2.2 (TC18.txt lines 1384-1385) / §11.2.2.6 Table 11
+        // (TC18.txt line 1847): the watchdog-overflow purge of
+        // non-safety-tagged requests is likewise a cancellation.
         assert_eq!(
             check_watchdog_overflow_purge(RequestKind::Compound, true)
                 .unwrap_err()
@@ -5464,8 +5469,12 @@ mod tests {
             Some(5)
         );
 
-        // TC18 §11.2.2.4 Table 9 (line 1586): cs = 1 and "error occurred in
-        // one of the preceding requests" -> CHAIN_ABORTED.
+        // TC18 §12.9.6 Table 30 (TC18.txt lines 3839-3840): cs = 1 and
+        // "error occurred in one of the preceding requests" -> CHAIN_ABORTED.
+        // (Not Table 9/§11.2.2.4 as previously cited — that table's own
+        // `cs` field is unrelated; this exact phrase is the Table 30
+        // CHAIN_ABORTED row's own description text. See §11.2.2.6 Table 11,
+        // TC18.txt lines 1833-1838, for the `cs`-bit definition itself.)
         assert_eq!(
             check_chain_continuation(true, true)
                 .unwrap_err()
@@ -5473,8 +5482,9 @@ mod tests {
             Some(16)
         );
 
-        // TC18 §11.2.2 Table 5 (line 1186) names no 0x02 condition type, so
-        // decoding one is a parameter out of range -> INVALID_PARAMETER.
+        // TC18 §11.2.2 Table 5 (TC18.txt lines 1262-1266) names no 0x02
+        // condition type, so decoding one is a parameter out of range ->
+        // INVALID_PARAMETER.
         assert_eq!(
             RequestKind::from_u8(0x02).unwrap_err().tc18_wire_code(),
             Some(15)

@@ -126,23 +126,25 @@
 //! ## Divergence note: `mdio_mode` does **not** select Clause 22 vs Clause 45
 //!
 //! **This module's [`MdioAddressingMode`] contradicts TC18 and must not be
-//! relied on for wire conformance.** TC18 §13.7.13.3 Table 57 "Usage of ABB
-//! message for mdio requests" (TC18.txt line 5676) defines `mdio_mode` as an
-//! MMD-vs-MMS access-kind and access-width selector, not an IEEE 802.3
-//! clause selector:
+//! relied on for wire conformance.** TC18 §13.7.13.3 Table 60 "Usage of ABB
+//! message for mdio requests" (TC18.txt line 6088; corrected from the
+//! stale "Table 57"/"line 5676" citation this note previously carried — see
+//! the "Editorial note: pre-existing §13.7.13 citation drift" section below
+//! and issue #164) defines `mdio_mode` as an MMD-vs-MMS access-kind and
+//! access-width selector, not an IEEE 802.3 clause selector:
 //!
-//! | `mdio_mode` | meaning (TC18 Table 57) |
+//! | `mdio_mode` | meaning (TC18 Table 60) |
 //! |-------------|-------------------------|
 //! | `01b`       | MMD, single word access |
 //! | `01b` *(as printed — see below)* | MMD, multiple byte access |
 //! | `10b`       | MMS, single word access |
 //! | `11b`       | MMS, multiple (double) word access |
 //!
-//! Table 57 as printed lists `01b` twice and never lists `00b`, so one of
+//! Table 60 as printed lists `01b` twice and never lists `00b`, so one of
 //! the two MMD rows is a spec typo whose intended code point (`00b` for one
 //! of them) this crate cannot resolve from the text alone. Either way, the
 //! `Clause22 = 0` / `Clause45 = 1` / `Spare2` / `Spare3` mapping below is
-//! **wrong** against Table 57: TC18 assigns no `mdio_mode` value to a
+//! **wrong** against Table 60: TC18 assigns no `mdio_mode` value to a
 //! Clause-22-vs-Clause-45 choice at all, and it leaves at most one code
 //! point unallocated rather than two. Correcting this is a behavior change
 //! deliberately not made in the requirements-completeness pass that
@@ -150,7 +152,7 @@
 //! as not-implemented, and the surrounding provenance note is retained below
 //! only as the historical record of how the wrong mapping arose (it was
 //! derived from `ROADMAP.md`'s restatement, never from TC18 itself).
-//! Table 57 also fixes the payload widths this module does not model:
+//! Table 60 also fixes the payload widths this module does not model:
 //! `mdio_address` "as per IEEE & OA SPI spec", and `mdio_payload` data
 //! fields of 16 bits for MMD, 32 bits for MMS0 and MMS1, and 16 bits for
 //! every other MMS.
