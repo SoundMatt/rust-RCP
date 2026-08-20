@@ -7,6 +7,41 @@ OPEN Alliance TC18 core replacement; from `v1.0.0` on, each entry is a real
 release. See `docs/SEMVER.md` for the versioning scheme, including why a
 wire-format change is a MAJOR bump even when it is a fix.
 
+## v5.5.0 (Table 30/33 Row-2 evt[2:0] validation — ADC, 2nd endpoint type) — closed
+
+Direct follow-up to v5.4.0's pilot: `adc.rs` becomes the second of the eight
+TC18 §13.5 Table 33 Row-2 endpoint types (`{ADC, PWM_IN, I2C, LIN, CAN,
+UART, ISELED, MDIO}`) to call the shared `evtgroup::evt_row2_kind_of`
+predicate. `evtgroup.rs` itself is unchanged — this release only adds
+`adc.rs`'s own caller.
+
+New, purely additive `pub` items (MINOR bump per `docs/SEMVER.md`):
+
+- `adc::AdcRequest` / `adc::AdcRequest::from_evt_sub_opcode` — ADC's own
+  request-decode entry point, mirroring `i2c::I2cRequest`/
+  `i2c::I2cRequest::from_evt_sub_opcode`'s exact shape. Unlike
+  `I2cRequest::Plain`, which decodes its payload as an `I2cByteTransfer`,
+  `AdcRequest::Plain` carries no decoded payload struct at all — TC18
+  §13.7.9.3 states plainly "The ADC request has no byte_msg_payload, while
+  a wait-request needs a byte_msg_payload." `from_evt_sub_opcode` enforces
+  that: a `Plain` (`000b`) request requires an empty payload (a non-empty
+  one returns `Err(RcpError::InvalidParameter)`, since TC18 names no
+  dedicated violation code for that specific case), a `ConfigWrite`
+  (`111b`) request is recognized but not decoded further (TC18 §12.7.1's
+  payload shape is still deferred, not guessed at), and every `Reserved`
+  sub_opcode is rejected with `Err(RcpError::UnsupportedCmd)`, matching
+  Table 33's own stated error code. See `adc.rs`'s own doc comment
+  "Provenance note: evt[2:0] request validation" for the full citation and
+  reasoning.
+
+Not in this release: wiring `AdcRequest::from_evt_sub_opcode` into
+`mock::RcServer`'s actual dispatch — `mock::Endpoint`'s trait signature
+still does not carry an `evt` value to any implementation at all, the same
+gap v5.4.0's pilot found and left as-is (confirmed unchanged here). The
+remaining six Row-2 endpoint types (`PWM_IN`, `LIN`, `CAN`, `UART`,
+`ISELED`, `MDIO`) are expected to add their own `evt_row2_kind_of`-based
+request-decode entry point the same way, in later items.
+
 ## v5.4.0 (Table 30/33 Row-2 evt[2:0] validation — pilot: shared predicate + I2C dispatch wiring) — closed
 
 TC18 §13.5 Table 33 groups the 13 RCP endpoint types into 3 rows for
