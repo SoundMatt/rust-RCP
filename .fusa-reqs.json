@@ -2062,7 +2062,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.1 (\"In case time-synchronization is not supported, AVTPDUs having a TSCF header are dropped, and no response send.\"), TC18.txt L1140",
+      "tc18_master_id": "TC18-11.1-005"
     },
     {
       "id": "REQ-HVSEL-003",
@@ -2071,7 +2073,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.1 (\"In case time-synchronization is not supported, AVTPDUs having a TSCF header are dropped, and no response send.\"), TC18.txt L1140",
+      "tc18_master_id": "TC18-11.1-005"
     },
     {
       "id": "REQ-HVSEL-004",
@@ -2253,7 +2257,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.6.1 Table 18 (\"stream_id = streamMAC + unique_id\", streamMAC: 6 bytes, unique_id: 2 bytes), TC18.txt L2750 -- note: this crate's own doc comment (src/avtp.rs) cites this as \"Table 16\", a stale table number: in the current TC18.txt (RC5), this discovery-request field table is Table 18 (and the paired discovery-response table it also cites as \"Table 17\" is actually Table 19); the discovery tables state the streamMAC/unique_id split for the discovery-specific don't-care/fixed values, which this crate's own doc comment already treats as the reconciliation source for the general stream_id encoding convention",
+      "tc18_master_id": "TC18-12.6.1-001"
     },
     {
       "id": "REQ-SID-002",
@@ -2271,7 +2277,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.6.1 Table 18 (\"stream_id = streamMAC + unique_id\", streamMAC: 6 bytes, unique_id: 2 bytes), TC18.txt L2750 -- note: this crate's own doc comment (src/avtp.rs) cites this as \"Table 16\", a stale table number: in the current TC18.txt (RC5), this discovery-request field table is Table 18",
+      "tc18_master_id": "TC18-12.6.1-001"
     },
     {
       "id": "REQ-SID-004",
@@ -2298,7 +2306,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.1 (\"The byte_bus_id is only unique in the context of a STREAM_ID and requests are only passed to the endpoint if both match.\"), TC18.txt L3898-3899",
+      "tc18_master_id": "TC18-13.1-001"
     },
     {
       "id": "REQ-EPLK-002",
@@ -2316,7 +2326,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.1 (\"The byte_bus_id is only unique in the context of a STREAM_ID and requests are only passed to the endpoint if both match.\"), TC18.txt L3898-3899",
+      "tc18_master_id": "TC18-13.1-001"
     },
     {
       "id": "REQ-EPLK-004",
@@ -2334,7 +2346,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.9.1 (\"Response(s) and acknowledge(s) are associated to the requests by the byte_bus_id and transaction number.\"), TC18.txt L3610",
+      "tc18_master_id": "TC18-12.9.1-010"
     },
     {
       "id": "REQ-ECHO-002",
@@ -2343,7 +2357,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.9.1 (\"Response(s) and acknowledge(s) are associated to the requests by the byte_bus_id and transaction number.\"), TC18.txt L3610",
+      "tc18_master_id": "TC18-12.9.1-010"
     },
     {
       "id": "REQ-ECHO-003",
@@ -2352,7 +2368,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.9.1 (\"Response(s) and acknowledge(s) are associated to the requests by the byte_bus_id and transaction number.\"), TC18.txt L3610",
+      "tc18_master_id": "TC18-12.9.1-010"
     },
     {
       "id": "REQ-ECHO-004",
@@ -5578,7 +5596,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a713.2 Table 32 (\"ep_type values\": 0x00 Server(EP0), 0x01 WakeUp, 0x02 GPIO, 0x03 SPI, 0x04 I2C, 0x05 UART, 0x06 LIN, 0x07 PWM_OUT, 0x08 PWM_IN, 0x09 ADC, 0x0A DAC, 0x0B CAN, 0x0C ISELED, 0x0D MDIO), TC18.txt L4000-4017 -- note: this requirement's own text cites this as \"Table 29\" at p.73, a stale table/page number: in the current TC18.txt (RC5), Table 29 is \"Execution procedure\" (a different table); the actual ep_type enumeration is Table 32 at p.83",
+      "tc18_master_id": "TC18-13.2-002"
     },
     {
       "id": "REQ-ERR-021",
@@ -5587,7 +5607,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a712.9.6 Table 30 (\"Error codes in responses\": UNSUPPORTED_CMD=1, SEQUENCER_NOT_KNOWN=2, UNAUTHORIZED_ACCESS=3, LOCKED_MEM_ACCESS=4, REQUEST_CANCELED=5, REQUEST_NOT_FOUND=6, EP_ERROR=7, EP_NOT_FOUND=8, PWM_IN_NO_SIGNAL=9, REQ_storage_OVFL=10, REQUEST_REJECTED=11, POCI_FAILURE=12, PRESENTATION_TIME_TOO_FAR=13, GPTP_FAIL=14, INVALID_PARAMETER=15, CHAIN_ABORTED=16, CHAIN_ERROR=17), TC18.txt L3812-3842 -- note: this requirement's own text cites this as \"Table 27\", a stale table number: in the current TC18.txt (RC5), Table 27 is \"Responder QUEUE_config\" (a different table); the actual error-codes table is Table 30",
+      "tc18_master_id": "TC18-12.9.6-004"
     },
     {
       "id": "REQ-ERR-022",
@@ -5596,7 +5618,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a712.9.6 Table 30 (\"Error codes in responses\": UNSUPPORTED_CMD=1, SEQUENCER_NOT_KNOWN=2, UNAUTHORIZED_ACCESS=3, LOCKED_MEM_ACCESS=4, REQUEST_CANCELED=5, REQUEST_NOT_FOUND=6, EP_ERROR=7, EP_NOT_FOUND=8, PWM_IN_NO_SIGNAL=9, REQ_storage_OVFL=10, REQUEST_REJECTED=11, POCI_FAILURE=12, PRESENTATION_TIME_TOO_FAR=13, GPTP_FAIL=14, INVALID_PARAMETER=15, CHAIN_ABORTED=16, CHAIN_ERROR=17), TC18.txt L3812-3842 -- note: this requirement's own text cites this as \"Table 27\", a stale table number: in the current TC18.txt (RC5), Table 27 is \"Responder QUEUE_config\" (a different table); the actual error-codes table is Table 30, and all seventeen codes are confirmed present",
+      "tc18_master_id": "TC18-12.9.6-004"
     },
     {
       "id": "REQ-ERRH-001",
@@ -5846,7 +5870,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a711.4.1 (\"avtp_timestamp = (AS_sec \u00d7 10^9 + AS_ns) mod 2^32 where AS_sec is the gPTP seconds field and AS_ns is the gPTP nanoseconds field (thus rolls over every 4 seconds)\") -- note: this requirement's own text and src/timestamp.rs's doc comment both cite this exact clause at a stale TC18.txt line number (L1952-1953); the correct location in the current TC18.txt (RC5) is TC18.txt L2328-2329",
+      "tc18_master_id": "TC18-11.4.1-001"
     },
     {
       "id": "REQ-WAKE-009",
