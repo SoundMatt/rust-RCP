@@ -2617,7 +2617,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.2 Table 32 (\"ep_type values\"), TC18.txt L3998-4017",
+      "tc18_master_id": "TC18-13.2-002"
     },
     {
       "id": "REQ-RMAP-002",
@@ -2626,7 +2628,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.2 Table 32 (\"ep_type values\"), TC18.txt L3998-4017",
+      "tc18_master_id": "TC18-13.2-002"
     },
     {
       "id": "REQ-RMAP-003",
@@ -2671,7 +2675,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.5 Table 20 (\"RC Server configuration static part\"), TC18.txt L2900-3050",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-008",
@@ -2680,7 +2686,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.5 Table 20 (\"RC Server configuration static part\"), TC18.txt L2900-3050",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-009",
@@ -2689,7 +2697,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.5 Table 20 (\"RC Server configuration static part\"), TC18.txt L2900-3050",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-010",
@@ -2698,7 +2708,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.5 Table 20 (\"RC Server configuration static part\"), TC18.txt L2900-3050",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-011",
@@ -2707,7 +2719,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.5 Table 20 (\"RC Server configuration static part\"), TC18.txt L2900-3050",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-012",
@@ -2716,7 +2730,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.6 Table 21 (\"HW_config\"), TC18.txt L3088-3108",
+      "tc18_master_id": "TC18-12.7.6-003"
     },
     {
       "id": "REQ-RMAP-013",
@@ -2725,7 +2741,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.6 Table 21 (\"HW_config\"), TC18.txt L3088-3108",
+      "tc18_master_id": "TC18-12.7.6-003"
     },
     {
       "id": "REQ-RMAP-014",
@@ -2734,7 +2752,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.6 Table 21 (\"HW_config\"), TC18.txt L3088-3108",
+      "tc18_master_id": "TC18-12.7.6-003"
     },
     {
       "id": "REQ-RMAP-015",
@@ -2743,7 +2763,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.7 Table 24 (\"Request stream configuration\"), TC18.txt L3222-3293",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-RMAP-016",
@@ -2752,7 +2774,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.7 Table 24 (\"Request stream configuration\"), TC18.txt L3222-3293",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-RMAP-017",
@@ -2761,7 +2785,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.7 Table 24 (\"Request stream configuration\"), TC18.txt L3222-3293",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-RMAP-018",
@@ -2770,7 +2796,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.8 Table 25 (\"EP_ID_config (Request_stream & byte_bus_id mapping to Endpoints and their channels)\"), TC18.txt L3327-3341",
+      "tc18_master_id": "TC18-12.7.8-001"
     },
     {
       "id": "REQ-RMAP-019",
@@ -2779,7 +2807,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.8 Table 25 (\"EP_ID_config (Request_stream & byte_bus_id mapping to Endpoints and their channels)\"), TC18.txt L3327-3341",
+      "tc18_master_id": "TC18-12.7.8-001"
     },
     {
       "id": "REQ-RMAP-020",
@@ -2788,7 +2818,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.8 Table 25 (\"EP_ID_config (Request_stream & byte_bus_id mapping to Endpoints and their channels)\"), TC18.txt L3327-3341",
+      "tc18_master_id": "TC18-12.7.8-001"
     },
     {
       "id": "REQ-RMAP-021",
@@ -2797,7 +2829,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.9 Table 27 (\"Responder QUEUE_config\"), TC18.txt L3421-3444",
+      "tc18_master_id": "TC18-12.7.9-007"
     },
     {
       "id": "REQ-RMAP-022",
@@ -2806,7 +2840,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.9 Table 27 (\"Responder QUEUE_config\"), TC18.txt L3421-3444",
+      "tc18_master_id": "TC18-12.7.9-007"
     },
     {
       "id": "REQ-RMAP-023",
@@ -2815,7 +2851,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.9 Table 27 (\"Responder QUEUE_config\"), TC18.txt L3421-3444",
+      "tc18_master_id": "TC18-12.7.9-007"
     },
     {
       "id": "REQ-RMAP-024",
@@ -2824,7 +2862,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.10 Table 28 (\"SEQUENCER_config\"), TC18.txt L3473-3493",
+      "tc18_master_id": "TC18-12.7.10-004"
     },
     {
       "id": "REQ-RMAP-025",
@@ -2833,7 +2873,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.10 Table 28 (\"SEQUENCER_config\"), TC18.txt L3473-3493",
+      "tc18_master_id": "TC18-12.7.10-004"
     },
     {
       "id": "REQ-RMAP-026",
@@ -2842,7 +2884,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.10 Table 28 (\"SEQUENCER_config\"), TC18.txt L3473-3493",
+      "tc18_master_id": "TC18-12.7.10-004"
     },
     {
       "id": "REQ-RMAP-027",
@@ -2860,7 +2904,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.6.1 (\"stream_id = streamMAC + unique_id ... unique_id = 0x0000\"), TC18.txt L2750-2751",
+      "tc18_master_id": "TC18-12.6.1-001"
     },
     {
       "id": "REQ-DISC-002",
@@ -2869,7 +2915,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.6.1 Table 18 (\"Discovery request\"), TC18.txt L2746-2758",
+      "tc18_master_id": "TC18-12.6.1-001"
     },
     {
       "id": "REQ-DISC-003",
@@ -2878,7 +2926,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.6.1 Table 18 (\"Discovery request\"), TC18.txt L2746-2758",
+      "tc18_master_id": "TC18-12.6.1-001"
     },
     {
       "id": "REQ-DISC-004",
@@ -2887,7 +2937,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.6 (\"An RC Server may receive a \"discovery request\" in any state of the life-cycle and shall send a \"discovery response\" in return\"), TC18.txt L2731-2732",
+      "tc18_master_id": "TC18-12.6-002"
     },
     {
       "id": "REQ-DISC-005",
@@ -2905,7 +2957,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.6 (\"If the RC Server does not receive configuration requests on the stream for a certain time (Discovery_TimeOut) it will drop the discovery stream and is open for a new discovery\"), TC18.txt L2733-2735",
+      "tc18_master_id": "TC18-12.6-003"
     },
     {
       "id": "REQ-DISC-007",
@@ -2914,7 +2968,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.6 (\"The first discovery request the RC server receives in HW_UNCONFIGURED or HW_CONFIGURED state is used to set the discovery stream ... If the RC Server does not receive configuration requests on the stream for a certain time (Discovery_TimeOut) it will drop the discovery stream and is open for a new discovery\"), TC18.txt L2731-2735",
+      "tc18_master_id": "TC18-12.6-003"
     },
     {
       "id": "REQ-DISC-008",
@@ -2923,7 +2979,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.6 (\"only the first one will be allowed as configuration stream. If others send configuration requests they will be rejected and get an error response\"), TC18.txt L2735-2737",
+      "tc18_master_id": "TC18-12.6-003"
     },
     {
       "id": "REQ-DISC-009",
@@ -2941,7 +2999,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.6 (\"The first discovery request ... is used to set the discovery stream ... If the RC Server does not receive configuration requests ... for a certain time (Discovery_TimeOut) it will drop the discovery stream ... only the first one will be allowed as configuration stream. If others send configuration requests they will be rejected\"), TC18.txt L2731-2737",
+      "tc18_master_id": "TC18-12.6-003"
     },
     {
       "id": "REQ-DISC-011",
@@ -2950,7 +3010,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.6 (\"If multiple discovery requests are received from different RC Clients all requests are responded with the server_config map\"), TC18.txt L2735-2736",
+      "tc18_master_id": "TC18-12.6-003"
     },
     {
       "id": "REQ-DISC-012",
@@ -2959,7 +3021,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.6 (\"The first discovery request the RC server receives in HW_UNCONFIGURED or HW_CONFIGURED state is used to set the discovery stream from which now on configuration requests will be accepted\"), TC18.txt L2731-2733",
+      "tc18_master_id": "TC18-12.6-003"
     },
     {
       "id": "REQ-DISC-013",
@@ -2968,7 +3032,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.6 (\"only the first one will be allowed as configuration stream. If others send configuration requests they will be rejected and get an error response\"), TC18.txt L2735-2737",
+      "tc18_master_id": "TC18-12.6-003"
     },
     {
       "id": "REQ-DISC-014",
@@ -2986,7 +3052,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.6 (\"The first discovery request ... is used to set the discovery stream ... If the RC Server does not receive configuration requests ... for a certain time (Discovery_TimeOut) it will drop the discovery stream ... only the first one will be allowed as configuration stream. If others send configuration requests they will be rejected\"), TC18.txt L2731-2737",
+      "tc18_master_id": "TC18-12.6-003"
     },
     {
       "id": "REQ-DISC-016",
@@ -2995,7 +3063,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.6.2 (\"the RC Client can read the register map full or partially and maintain a table of relevant discovered RC Servers and their endpoints\"), TC18.txt L2780-2781",
+      "tc18_master_id": "TC18-12.6.2-002"
     },
     {
       "id": "REQ-DISC-017",
@@ -3685,7 +3755,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7 Table 35 (\"EP functional config common entries\"), TC18.txt L4298-4343",
+      "tc18_master_id": "TC18-13.7-001"
     },
     {
       "id": "REQ-RMAP-029",
@@ -3694,7 +3766,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7 Table 35 (\"EP functional config common entries\"), TC18.txt L4298-4343",
+      "tc18_master_id": "TC18-13.7-001"
     },
     {
       "id": "REQ-CMP-001",
@@ -4100,7 +4174,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.5 (\"a: compound & wait requests\"), TC18.txt L2935-2941",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-031",
@@ -5432,7 +5508,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.6.1 (\"op 1b (read request)\"), TC18.txt L2756",
+      "tc18_master_id": "TC18-12.6.1-001"
     },
     {
       "id": "REQ-DISC-026",
@@ -5441,7 +5519,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.6.2 (\"The RC Server will respond with the part of the RC Server’s register map as starting from 0x0000 and its length being determined by the read_size in the discovery request\"), TC18.txt L2778-2779",
+      "tc18_master_id": "TC18-12.6.2-001"
     },
     {
       "id": "REQ-EPGEN-001",
@@ -5683,7 +5763,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.6 Table 21 (\"HW_config\"), TC18.txt L3088-3108",
+      "tc18_master_id": "TC18-12.7.6-003"
     },
     {
       "id": "REQ-RMAP-036",
@@ -5692,7 +5774,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.7.9 Table 27 (\"Responder QUEUE_config\"), TC18.txt L3421-3444",
+      "tc18_master_id": "TC18-12.7.9-007"
     },
     {
       "id": "REQ-SEQ-005",
