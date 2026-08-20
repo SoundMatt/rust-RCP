@@ -5,6 +5,8 @@ pub rcp::acf::ResponseKind::Acknowledge
 pub rcp::acf::ResponseKind::Error
 pub rcp::acf::ResponseKind::Read
 pub rcp::acf::ResponseKind::Write
+impl rcp::acf::ResponseKind
+pub fn rcp::acf::ResponseKind::as_str(self) -> &'static str
 impl core::clone::Clone for rcp::acf::ResponseKind
 pub fn rcp::acf::ResponseKind::clone(&self) -> rcp::acf::ResponseKind
 impl core::cmp::Eq for rcp::acf::ResponseKind

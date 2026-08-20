@@ -7,6 +7,20 @@ OPEN Alliance TC18 core replacement; from `v1.0.0` on, each entry is a real
 release. See `docs/SEMVER.md` for the versioning scheme, including why a
 wire-format change is a MAJOR bump even when it is a fix.
 
+## v5.3.0 (response-kind surfaced in adapt.rs) — closed
+
+`ByteMessageInfo::response_kind()` (TC18 §11.3 Table 15/§11.3.1-§11.3.4)
+was implemented and tested but never called from any production code
+path — `adapt.rs`'s `to_message`/`response_to_message` (the RELAY-adapter
+conversion of an ACF response into a `relay::Message`) built its `meta`
+map from `op` alone, unlike cpp-RCP's equivalent, which already surfaces
+`meta["rcp.response_kind"]`. `to_message` now classifies via
+`response_kind()` and adds the same `"rcp.response_kind"` meta key
+(`"acknowledge"`/`"write"`/`"read"`/`"error"`, via a new
+`ResponseKind::as_str()` — a new `pub` item, hence the MINOR bump per
+`docs/SEMVER.md`). Purely additive: the existing `"rcp.op"` meta key and
+every other field are unchanged.
+
 ## v5.2.0 (2026-08-02 SHOULD/MAY extraction + references) — closed
 
 Mirrors c-RCP's and cpp-RCP's own identical SHOULD/MAY audits. Grepped

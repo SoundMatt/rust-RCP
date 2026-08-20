@@ -427,6 +427,22 @@ pub enum ResponseKind {
     Error,
 }
 
+impl ResponseKind {
+    /// A stable lowercase name for this response kind, for logging/
+    /// diagnostics and adapter meta values (e.g. `crate::adapt::to_message`'s
+    /// `"rcp.response_kind"` key). Never panics for any input. Mirrors
+    /// [`crate::powerstate::PowerMode::as_str`]'s convention for this crate's
+    /// other diagnostics-facing enums.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ResponseKind::Acknowledge => "acknowledge",
+            ResponseKind::Write => "write",
+            ResponseKind::Read => "read",
+            ResponseKind::Error => "error",
+        }
+    }
+}
+
 /// Encode a [`ByteMessageInfo`] to its 8-byte wire representation, per this
 /// module's "Canonical wire layout" doc section.
 ///
@@ -1342,6 +1358,15 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(info.response_kind(), ResponseKind::Write);
+    }
+
+    #[test]
+    //fusa:test REQ-RESP-004
+    fn response_kind_as_str_gives_a_distinct_lowercase_name_per_kind() {
+        assert_eq!(ResponseKind::Acknowledge.as_str(), "acknowledge");
+        assert_eq!(ResponseKind::Write.as_str(), "write");
+        assert_eq!(ResponseKind::Read.as_str(), "read");
+        assert_eq!(ResponseKind::Error.as_str(), "error");
     }
 
     // ── Canonical layout: bit-position pins ─────────────────────────────────
