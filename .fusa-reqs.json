@@ -3076,7 +3076,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.5 Table 33 (\"000b: The byte_msg_payload is presented at the interface\" / \"001b: ...bitwise OR...\" / \"010b: ...bitwise AND...\" / \"011b: ...bitwise XOR...\"), TC18.txt L4093-4105",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-GPIO-006",
@@ -3094,7 +3096,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.5 (\"neither overflows nor wrap-arounds shall occur. The values are saturated at 0x0000 on the low side and 0xFFFF at the high side\"), TC18.txt L4118-4119",
+      "tc18_master_id": "TC18-13.5-003"
     },
     {
       "id": "REQ-GPIO-008",
@@ -3112,7 +3116,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.5 Table 33 (\"100b reserved –request shall be ignored and an err-response with error code = UNSUPPORTED_CMD shall be sent\"), TC18.txt L4106-4107",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-GPIO-010",
@@ -3148,7 +3154,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.4.1 (\"The GPIO endpoint optionally generates triggers for all its mapped IO-pins on the change, falling and rising edge\"), TC18.txt L4816",
+      "tc18_master_id": "TC18-13.7.4.1-011"
     },
     {
       "id": "REQ-GPIO-014",
@@ -3184,7 +3192,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.5 Table 33 (\"selects channel 0 … 5\" [000b to 101b] / \"110b: reserved – request to be rejected with error code = UNSUPPORTED_CMD\" / \"111b: The byte_msg_payload is not presented to the interface but used to change the configuration of the endpoint\"), TC18.txt L4077-4084",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-SPI-002",
@@ -3202,7 +3212,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.5 Table 33 (\"selects channel 0 … 5\" [000b to 101b] / \"110b: reserved – request to be rejected with error code = UNSUPPORTED_CMD\"), TC18.txt L4077-4081",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-SPI-004",
@@ -3211,7 +3223,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.5 Table 33 (\"selects channel 0 … 5\" [000b to 101b] / \"110b: reserved – request to be rejected with error code = UNSUPPORTED_CMD\" / \"111b: The byte_msg_payload is not presented to the interface but used to change the configuration of the endpoint\"), TC18.txt L4077-4084",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-SPI-005",
@@ -3221,7 +3235,8 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test",
-      "tc18": "§13.7.3.1 (\"the SPI endpoint may support up to 6 pre-configurable sets of SPI configurations\"), TC18.txt L4192"
+      "tc18": "§13.7.3.2 (\"the SPI bus functional configuration supports up to 6 different configurations in parallel\"), TC18.txt L4735-4736",
+      "tc18_master_id": "TC18-13.7.3.2-006"
     },
     {
       "id": "REQ-SPI-006",
@@ -3230,7 +3245,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.3.2 (\"up to 6 CS signals may be handled by the SPI endpoint via its configurations\"), TC18.txt L4730-4731",
+      "tc18_master_id": "TC18-13.7.3.2-006"
     },
     {
       "id": "REQ-SPI-007",
@@ -3248,7 +3265,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.3.3 (\"The byte_msg_payload will be presented on PICO in full, even if the read_size is less than the number of bytes in the byte_msg_payload\"), TC18.txt L4768-4769",
+      "tc18_master_id": "TC18-13.7.3.3-007"
     },
     {
       "id": "REQ-SPI-009",
@@ -3257,7 +3276,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.3.3 (\"The SPI EP shall append zeros in case the read_size is larger than the number of bytes in the byte_msg_payload\"), TC18.txt L4767",
+      "tc18_master_id": "TC18-13.7.3.3-006"
     },
     {
       "id": "REQ-SPI-010",
@@ -3266,7 +3287,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.5.1 (\"For SPI this means that e.g. only the first four out of 20 received bytes will be checked when the byte_msg_payload in the compound wait has only four bytes\"), TC18.txt L4138-4139",
+      "tc18_master_id": "TC18-13.5.1-001"
     },
     {
       "id": "REQ-SPI-011",
@@ -3275,7 +3298,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.5.1 (\"For SPI this means that e.g. only the first four out of 20 received bytes will be checked when the byte_msg_payload in the compound wait has only four bytes\"), TC18.txt L4138-4139",
+      "tc18_master_id": "TC18-13.5.1-001"
     },
     {
       "id": "REQ-SPI-012",
@@ -3284,7 +3309,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.5.1 (\"For SPI this means that e.g. only the first four out of 20 received bytes will be checked when the byte_msg_payload in the compound wait has only four bytes\"), TC18.txt L4138-4139",
+      "tc18_master_id": "TC18-13.5.1-001"
     },
     {
       "id": "REQ-I2C-001",
@@ -3437,7 +3464,9 @@
     {
       "id": "REQ-ADC-001",
       "title": "AdcResolutionBits round-trips through new/to_u8 for the full 1..=16 bit-width range",
-      "text": "AdcResolutionBits::new/AdcResolutionBits::to_u8 round-trip every bit-width value from 1 to 16, modeling the roadmap's <=16-bit resolution upper bound as an explicit validated range rather than a fixed 16-bit width"
+      "text": "AdcResolutionBits::new/AdcResolutionBits::to_u8 round-trip every bit-width value from 1 to 16, modeling the roadmap's <=16-bit resolution upper bound as an explicit validated range rather than a fixed 16-bit width",
+      "tc18": "§13.7.9.2 Table 54 (\"defines the number of bits to be used of the ADC reading value (<=16)\"), TC18.txt L5529-5531",
+      "tc18_master_id": "TC18-13.7.9.2-001"
     },
     {
       "id": "REQ-PWM-001",
@@ -3451,7 +3480,9 @@
     {
       "id": "REQ-ADC-002",
       "title": "AdcResolutionBits::new rejects zero and any bit width above 16, and never panics",
-      "text": "AdcResolutionBits::new returns Err(RcpError::InvalidParameter) for 0 and for any value above 16, and never panics for any sampled u8 input"
+      "text": "AdcResolutionBits::new returns Err(RcpError::InvalidParameter) for 0 and for any value above 16, and never panics for any sampled u8 input",
+      "tc18": "§13.7.9.2 Table 54 (\"defines the number of bits to be used of the ADC reading value (<=16)\"), TC18.txt L5529-5531",
+      "tc18_master_id": "TC18-13.7.9.2-001"
     },
     {
       "id": "REQ-PWM-002",
@@ -3465,7 +3496,9 @@
     {
       "id": "REQ-ADC-003",
       "title": "AdcResolutionBits::max_raw_value computes 2^bits - 1, and default() resolves to 16 bits",
-      "text": "AdcResolutionBits::max_raw_value returns 2^bits - 1 for every valid bit width including the u16::MAX boundary at 16 bits, and AdcResolutionBits::default resolves to the widest modeled resolution, 16 bits, as this crate's own unconfirmed-default placeholder"
+      "text": "AdcResolutionBits::max_raw_value returns 2^bits - 1 for every valid bit width including the u16::MAX boundary at 16 bits, and AdcResolutionBits::default resolves to the widest modeled resolution, 16 bits, as this crate's own unconfirmed-default placeholder",
+      "tc18": "§13.7.9.2 Table 54 (\"defines the number of bits to be used of the ADC reading value (<=16)\"), TC18.txt L5529-5531",
+      "tc18_master_id": "TC18-13.7.9.2-001"
     },
     {
       "id": "REQ-PWM-003",
@@ -3479,7 +3512,9 @@
     {
       "id": "REQ-ADC-004",
       "title": "AdcSampleValue round-trips through encode/decode within its resolution and rejects raw values wider than that resolution, and never panics",
-      "text": "AdcSampleValue::new/AdcSampleValue::decode/AdcSampleValue::encode round-trip any raw value within AdcResolutionBits::max_raw_value as a 2-byte big-endian wire form, reject any raw value exceeding that maximum with RcpError::InvalidParameter, and decode never panics for any sampled input"
+      "text": "AdcSampleValue::new/AdcSampleValue::decode/AdcSampleValue::encode round-trip any raw value within AdcResolutionBits::max_raw_value as a 2-byte big-endian wire form, reject any raw value exceeding that maximum with RcpError::InvalidParameter, and decode never panics for any sampled input",
+      "tc18": "§13.7.9.2 Table 54 (\"defines the number of bits to be used of the ADC reading value (<=16)\"), TC18.txt L5529-5531",
+      "tc18_master_id": "TC18-13.7.9.2-001"
     },
     {
       "id": "REQ-PWM-004",
@@ -3522,7 +3557,8 @@
       "id": "REQ-ADC-007",
       "title": "resolve_adc_sample_window_ticks chains adc_sample_interval, adc_avg_intervals_per_request, and adc_combine_avg_values into a total elapsed tick count, and never panics",
       "text": "resolve_adc_sample_window_ticks multiplies adc_avg_intervals_per_request by adc_combine_avg_values by adc_sample_interval to produce the total elapsed tick count one combined result takes to produce, using checked (never-wrapping, never-panicking) arithmetic throughout including at the all-MAX field-width boundary, and never panics for any sampled AdcAveragingConfig",
-      "tc18": "§13.7.9.2 (\"an implementation may decide to fix\" the samples-per-interval field read-only; this implementation instead makes it writable, the more general of the two spec-permitted choices), TC18.txt L5040"
+      "tc18": "§13.7.9.1 (\"further samples are taken with a timely distance of one 'adc_sample_interval'\"), TC18.txt L5452-5453",
+      "tc18_master_id": "TC18-13.7.9.1-005"
     },
     {
       "id": "REQ-PWM-007",
@@ -3536,7 +3572,9 @@
     {
       "id": "REQ-ADC-008",
       "title": "resolve_adc_averaged_value computes the two-level averaging pipeline over raw samples",
-      "text": "resolve_adc_averaged_value groups raw_samples into adc_avg_intervals_per_request-sized groups, averages each group (level one), then averages the first adc_combine_avg_values group averages into the returned combined result (level two), ignoring any trailing raw samples beyond what the pipeline consumes"
+      "text": "resolve_adc_averaged_value groups raw_samples into adc_avg_intervals_per_request-sized groups, averages each group (level one), then averages the first adc_combine_avg_values group averages into the returned combined result (level two), ignoring any trailing raw samples beyond what the pipeline consumes",
+      "tc18": "§13.7.9.1 (\"the average is calculated. Finally, the COMBINE_NR_VAL defines how many measurement values (i.e. averaging results) will be put in one response frame\"), TC18.txt L5455-5457",
+      "tc18_master_id": "TC18-13.7.9.1-006"
     },
     {
       "id": "REQ-PWM-008",
@@ -3559,7 +3597,9 @@
     {
       "id": "REQ-ADC-010",
       "title": "validate_adc_sample_request accepts AdcSamplingMode::RequestDriven and rejects AdcSamplingMode::Continuous with RcpError::UnsupportedCmd",
-      "text": "validate_adc_sample_request returns Ok(()) for AdcSamplingMode::RequestDriven (also AdcSamplingMode's default) and Err(RcpError::UnsupportedCmd) for AdcSamplingMode::Continuous, enforcing the roadmap's request-driven-sampling-only rule since no free-running/continuous sampling mode is permitted"
+      "text": "validate_adc_sample_request returns Ok(()) for AdcSamplingMode::RequestDriven (also AdcSamplingMode's default) and Err(RcpError::UnsupportedCmd) for AdcSamplingMode::Continuous, enforcing the roadmap's request-driven-sampling-only rule since no free-running/continuous sampling mode is permitted",
+      "tc18": "§13.7.9.1 (\"The ADC only samples the input, when a request is executed. Consequently, no trigger will occur when there is no request to sample\"), TC18.txt L5476-5477",
+      "tc18_master_id": "TC18-13.7.9.1-010"
     },
     {
       "id": "REQ-PWM-009",
@@ -5326,7 +5366,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a713.7.4.1 (\"Each GPIO endpoint can handle up to 32 IOs\"), TC18.txt L4789",
+      "tc18_master_id": "TC18-13.7.4.1-001"
     },
     {
       "id": "REQ-GPIO-018",
@@ -5335,7 +5377,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a713.7.4.1 Figure 25 (\"GPIO request (example for EP with 24 pins)\") -- note: this crate's own text/doc-comments call it \"Figure 24\", a stale figure number from an earlier TC18 revision; the current TC18.txt (RC5) numbers it Figure 25, TC18.txt L4806-4808",
+      "tc18_master_id": "TC18-13.7.4.1-006"
     },
     {
       "id": "REQ-GPIO-019",
@@ -5344,7 +5388,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a713.7.4.3 (\"A request with data \u201c0x0000 0000\u201d and evt[2:0] = 0x001 (OR) results in \u201cno change\u201d\"), TC18.txt L4889",
+      "tc18_master_id": "TC18-13.7.4.3-003"
     },
     {
       "id": "REQ-GPIO-020",
@@ -5353,7 +5399,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a713.7.4.1 (\"Generating a pulse for a defined time is NOT a function of the GPIO endpoint\"), TC18.txt L4811",
+      "tc18_master_id": "TC18-13.7.4.1-008"
     },
     {
       "id": "REQ-GPIO-021",
@@ -5362,7 +5410,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a713.5 Table 33 (\"010b: The 'byte_msg_payload' bitwise AND 'current interface status' is written to the interface (example: with a byte_msg_payload of 0xFFFF FFFE the first IO pin will be reset, while other IO pins remain unchanged)\") -- note: this crate's own text/doc-comments call this \"Table 30\", a stale table number from an earlier TC18 revision; the current TC18.txt (RC5) numbers it Table 33 (Table 30 is now \"Error codes in responses\", \u00a712.9.6), TC18.txt L4098-4101",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-I2C-009",
