@@ -3801,6 +3801,37 @@
       "verificationMethod": "test"
     },
     {
+      "id": "REQ-EVTGRP-005",
+      "title": "EvtRow2Kind enumerates TC18 Table 33's three Row-2 evt[2:0] outcomes",
+      "text": "EvtRow2Kind's three variants (Plain, Reserved, ConfigWrite) give TC18 Table 33's Row-2 endpoint-type group ({ADC, PWM_IN, I2C, LIN, CAN, UART, ISELED, MDIO}) evt[2:0] rule an explicit, round-trippable classification shape, shared across every Row-2 endpoint-type module rather than re-derived per type",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.5 Table 33's Row-2 row ({ADC, PWM_IN, I2C, LIN, CAN, UART, ISELED, MDIO}), TC18.txt L4085-4092"
+    },
+    {
+      "id": "REQ-EVTGRP-006",
+      "title": "evt_row2_kind_of classifies sub_opcode values 1-6 and every value above 7 as Reserved, and never panics",
+      "text": "evt_row2_kind_of returns EvtRow2Kind::Reserved for every sub_opcode value in 1..=6 (matching TC18 Table 33's Row-2 reserved range, which both this crate's resolution and the table's own literal cell text agree on) and for every value above 7 (sub_opcode's u8 type does not itself enforce the 3-bit field width), and never panics for any u8 input across the full 0..=255 range",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.5 Table 33 (\"000b to 110b reserved – request to be rejected with error code = UNSUPPORTED_CMD\"), TC18.txt L4085",
+      "tc18_master_id": "TC18-13.5-001"
+    },
+    {
+      "id": "REQ-EVTGRP-007",
+      "title": "evt_row2_kind_of resolves evt[2:0]=000b as Plain and 111b as ConfigWrite, reconciling Table 33's literal Row-2 cell text",
+      "text": "evt_row2_kind_of returns EvtRow2Kind::Plain for sub_opcode 0 and EvtRow2Kind::ConfigWrite for sub_opcode 7. The Plain classification for 0 does NOT follow TC18 Table 33's own printed Row-2 cell text literally (\"000b to 110b reserved\", which includes 000b) -- this crate resolves that literal text as a drafting defect and instead follows TC18 §12.9.1's general \"evt[2:0] != 0\" rule (implying 0 is every endpoint type's normal case), §13.7.7.3's own I2C request-handling description (which names no reserved evt[2:0] value), and the cross-repo resolution this crate's sibling c-RCP centralizes as rcp_acf_evt_row2_is_plain(), recorded in RELAY's docs/RCP-ARCHITECTURE.md. This entry is deliberately left without a tc18_master_id: docs/tc18-master-catalog.json's own TC18-13.5-001 summary states the literal (000b-included) reading, which is the exact fact this requirement's Plain-for-0 claim does NOT implement",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.5 Table 33's Row-2 cell (TC18.txt L4085, literal text: \"000b to 110b reserved\") reconciled against §12.9.1 (TC18.txt L3611, \"If evt[2:0] ≠ 0 and no byte_msg_payload is present, then an error response shall be sent with the error code = UNSUPPORTED_CMD\") and §13.7.7.3's I2C request-handling description (TC18.txt L5240-5242)"
+    },
+    {
       "id": "REQ-RMAP-028",
       "title": "CommonFunctionalConfig models ep_enable/ep_clear_req_storage/ep_req_crc_enable and encodes each as a full byte",
       "text": "CommonFunctionalConfig carries the three roadmap-named common functional-config fields (ep_enable, ep_clear_req_storage, ep_req_crc_enable) as bool fields, defaults to all-false, and CommonFunctionalConfig::encode produces a fixed 3-byte [0x00/0x01, 0x00/0x01, 0x00/0x01] wire form with no panics for any field combination",
@@ -5918,6 +5949,26 @@
       "verificationMethod": "test",
       "tc18": "§11.3 Table 17 (\"Usage of ABB/GBB message for responses\"), TC18.txt L2242-2266",
       "tc18_master_id": "TC18-11.3-003"
+    },
+    {
+      "id": "REQ-I2C-012",
+      "title": "I2cRequest enumerates the decoded shape of a Row-2 I2C request after evt[2:0] validation",
+      "text": "I2cRequest's two variants (Plain(I2cByteTransfer), ConfigWrite) give an incoming I2C request's decoded shape after its evt.sub_opcode has been validated against evt_row2_kind_of's Table 33 Row-2 rule; I2cRequest::from_evt_sub_opcode is the request-decode entry point that performs that validation and dispatch",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.5 Table 33's Row-2 row (I2C is one of its eight endpoint types), TC18.txt L4085-4092, and §13.7.7.3 I2C EP request handling, TC18.txt L5240-5242"
+    },
+    {
+      "id": "REQ-I2C-013",
+      "title": "I2cRequest::from_evt_sub_opcode accepts Plain/ConfigWrite and rejects Reserved sub_opcodes with UnsupportedCmd, never panicking",
+      "text": "I2cRequest::from_evt_sub_opcode decodes a Plain (sub_opcode 0) request's payload bytes as an I2cByteTransfer via I2cByteTransfer::decode, recognizes a ConfigWrite (sub_opcode 7) request without attempting to interpret its payload (full TC18 §12.7.1 config-write payload decoding is deferred, not silently guessed at), and returns Err(RcpError::UnsupportedCmd) for every Reserved sub_opcode value, matching TC18 Table 33's Row-2 error-code requirement and crate::gpio::apply_gpio_write's identical refusal of its own table's reserved code; never panics for any sub_opcode/payload combination",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.5 Table 33 (\"000b to 110b reserved – request to be rejected with error code = UNSUPPORTED_CMD\" / \"111b: ... used to change the configuration of the endpoint (see 12.7.1)\"), TC18.txt L4085-4092"
     }
   ]
 }

@@ -4,6 +4,8 @@
 //fusa:req REQ-I2C-004
 //fusa:req REQ-I2C-005
 //fusa:req REQ-I2C-006
+//fusa:req REQ-I2C-012
+//fusa:req REQ-I2C-013
 
 //! The I²C endpoint type (`ep_type 0x04`) — `ROADMAP.md` Milestone 4
 //! ("Basic Endpoint Types"), third checklist bullet: "controller-only, raw
@@ -32,6 +34,18 @@
 //!   high-speed rows" below for why two of [`I2cSpeedMode`]'s variants are
 //!   deliberately left unresolved rather than each assigned a specific named
 //!   speed.
+//! - [`I2cRequest`]/[`I2cRequest::from_evt_sub_opcode`] — I²C's own
+//!   request-decode entry point, validating an incoming request's
+//!   `evt.sub_opcode` against [`crate::evtgroup::evt_row2_kind_of`]'s TC18
+//!   §13.5 Table 33 Row-2 rule and dispatching a [`Plain`](I2cRequest::Plain)
+//!   request to [`I2cByteTransfer::decode`]. See "Provenance note: evt[2:0]
+//!   request validation" below — this piece was added after this module's
+//!   own original scope note below (which still accurately describes why no
+//!   `sub_opcode` reading existed here originally) as this crate's pilot
+//!   implementation of TC18 §13.5 Table 33's Row-2 rule, the reference
+//!   pattern the other seven Row-2 endpoint types
+//!   (`{ADC, PWM_IN, LIN, CAN, UART, ISELED, MDIO}`) are expected to follow
+//!   in their own later items.
 //!
 //! Deliberately out of scope, for the same reasons [`crate::gpio`]'s and
 //! [`crate::spi`]'s own doc comments already give:
@@ -41,18 +55,51 @@
 //!   unlike some I²C hardware this module models no role-selection type at
 //!   all (no `I2cRole` enum, no peripheral-address-match config) — there is
 //!   only ever the one, controller, role.
-//! - The "Groups A/B/C" `evt[2:0]` sub-opcode convention as a general,
-//!   cross-endpoint-type classification scheme, and any use of
-//!   `evt.sub_opcode` at all. Unlike [`crate::gpio`]'s write-semantics
-//!   selection or [`crate::spi`]'s up-to-6 channel selection, `ROADMAP.md`'s
-//!   I²C checklist bullet names no `sub_opcode`-keyed selection mechanism,
-//!   so this module reads `sub_opcode` nowhere.
+//! - The "Groups A/B/C" `evt[2:0]` sub-opcode convention
+//!   ([`crate::evtgroup::EvtGroup`]) as a general, cross-endpoint-type
+//!   classification scheme — [`crate::evtgroup`]'s own doc comment already
+//!   flags that broader scheme as unresolved, independent of the narrower,
+//!   unambiguous Table 33 Row-2 rule this module's [`I2cRequest`] now
+//!   implements (see "Provenance note: evt[2:0] request validation" below).
 //! - [`crate::regmap::CommonFunctionalConfig`]'s fields — unchanged here, as
 //!   in every prior Milestone 1-4 entry.
-//! - Wiring any of the below into an actual decoder, dispatch loop, or
-//!   [`crate::avtp`]/[`crate::acf`]/[`crate::addressing`] caller. This
-//!   module remains additive standalone plumbing only, matching the
-//!   discipline every prior Milestone 1-4 entry already established.
+//! - Decoding [`I2cRequest::ConfigWrite`]'s own TC18 §12.7.1 payload shape.
+//!   [`I2cRequest::from_evt_sub_opcode`] recognizes a config-write request
+//!   as distinct from a [`Plain`](I2cRequest::Plain) one, but does not
+//!   itself interpret what the config-write payload contains — that is
+//!   separate, later work, same as every Row-2 endpoint-type module this
+//!   predicate lands in.
+//! - Wiring [`I2cRequest::from_evt_sub_opcode`] into an actual decoder,
+//!   dispatch loop, or [`crate::mock::Endpoint`] implementation.
+//!   [`crate::mock::Endpoint`]'s own trait signature does not carry an
+//!   `evt` value to any implementation at all yet — that gap is not
+//!   specific to I²C, it applies identically to
+//!   [`crate::gpio::GpioWriteSemantics::from_sub_opcode`]/
+//!   [`crate::spi::SpiChannelSelect::from_sub_opcode`], neither of which is
+//!   wired into [`crate::mock`]'s dispatch either (see
+//!   [`crate::mock::Endpoint`]'s own doc comment). [`I2cRequest`] is built
+//!   to the same "additive standalone plumbing only" level GPIO/SPI's own
+//!   `sub_opcode` readers are at today, ready for whichever later item
+//!   first threads a live `evt` value through an actual dispatch loop.
+//!
+//! ## Provenance note: evt[2:0] request validation
+//!
+//! I²C is one of the eight endpoint types TC18 §13.5 Table 33 groups into
+//! one shared "Row 2" `evt[2:0]` rule — see
+//! [`crate::evtgroup`]'s own doc comment "Provenance note: TC18 §13.5 Table
+//! 33's Row-2 rule (`evt_row2_kind_of`)" for the full citation, including
+//! the literal-text discrepancy that module's doc comment flags and
+//! resolves (Table 33's own printed Row-2 cell reads "000b to 110b
+//! reserved", including 000b, which this crate does not implement
+//! literally). [`I2cRequest::from_evt_sub_opcode`] is this module's own
+//! caller of that shared [`crate::evtgroup::evt_row2_kind_of`] predicate: a
+//! [`Plain`](I2cRequest::Plain) request (`evt[2:0] == 000b`) decodes its
+//! payload bytes as an [`I2cByteTransfer`] exactly as TC18 §13.7.7.3
+//! describes ("The byte msg payload is the I2C payload including the
+//! address"); every `Reserved` sub_opcode is rejected with
+//! `Err(`[`RcpError::UnsupportedCmd`]`)`, matching Table 33's own stated
+//! error code and [`crate::gpio::apply_gpio_write`]'s identical refusal of
+//! its own table's reserved code.
 //!
 //! ## Relationship to [`crate::regmap`]
 //!
@@ -112,6 +159,7 @@
 //! placed last and adjacent to each other) is this crate's own working
 //! choice, not a transcription of a confirmed wire encoding.
 
+use crate::evtgroup::{evt_row2_kind_of, EvtRow2Kind};
 use crate::RcpError;
 
 // ── I2cSpeedMode ─────────────────────────────────────────────────────────────
@@ -287,6 +335,55 @@ impl I2cByteTransferResult {
     //fusa:req REQ-I2C-011
     pub fn decode(b: &[u8]) -> Self {
         Self { bytes: b.to_vec() }
+    }
+}
+
+// ── I2cRequest: evt[2:0] request validation ─────────────────────────────────
+
+/// The decoded shape of an incoming I²C request, after validating its
+/// `evt[2:0]` sub-opcode against TC18 §13.5 Table 33's Row-2 rule (I²C is
+/// one of that row's eight endpoint types —
+/// `{ADC, PWM_IN, I²C, LIN, CAN, UART, ISELED, MDIO}`).
+///
+/// See this module's doc comment "Provenance note: evt[2:0] request
+/// validation" for the full citation, and
+/// [`crate::evtgroup`]'s own doc comment for the literal-text discrepancy
+/// this crate resolves `evt[2:0] == 000b` against.
+#[derive(Debug, Clone, PartialEq, Eq)]
+//fusa:req REQ-I2C-012
+pub enum I2cRequest {
+    /// `evt[2:0] == 000b`: an ordinary I²C transfer — `byte_msg_payload` is
+    /// this transaction's raw bytes, decoded as an [`I2cByteTransfer`] per
+    /// [`I2cByteTransfer::decode`].
+    Plain(I2cByteTransfer),
+    /// `evt[2:0] == 111b`: a functional-config write (TC18 §12.7.1) rather
+    /// than an ordinary transfer. This crate does not yet decode the
+    /// config-write payload shape itself — see this module's doc comment
+    /// "Deliberately out of scope" — so a caller receiving this variant
+    /// knows only that the request *is* a config-write, not its content.
+    ConfigWrite,
+}
+
+impl I2cRequest {
+    /// Decode an incoming I²C request from its `evt.sub_opcode`
+    /// ([`crate::acf::Evt::sub_opcode`]) and raw `byte_msg_payload` bytes.
+    ///
+    /// Returns `Err(`[`RcpError::UnsupportedCmd`]`)` for every
+    /// [`EvtRow2Kind::Reserved`] sub_opcode value — TC18 §13.5 Table 33's
+    /// Row-2 rule requires the request be rejected with error code
+    /// `UNSUPPORTED_CMD`, matching
+    /// [`crate::gpio::apply_gpio_write`]'s identical refusal of its own
+    /// table's reserved `100b` code. Never panics for any
+    /// `sub_opcode`/`payload` combination — [`I2cByteTransfer::decode`] is
+    /// itself infallible and total over every byte slice.
+    //fusa:req REQ-I2C-012
+    //fusa:req REQ-I2C-013
+    pub fn from_evt_sub_opcode(sub_opcode: u8, payload: &[u8]) -> Result<Self, RcpError> {
+        match evt_row2_kind_of(sub_opcode) {
+            EvtRow2Kind::Plain => Ok(Self::Plain(I2cByteTransfer::decode(payload))),
+            EvtRow2Kind::ConfigWrite => Ok(Self::ConfigWrite),
+            EvtRow2Kind::Reserved => Err(RcpError::UnsupportedCmd),
+        }
     }
 }
 
@@ -517,6 +614,80 @@ mod tests {
         for len in [0usize, 1, 5, 32] {
             let buf = vec![0xA5u8; len];
             let _ = I2cByteTransferResult::decode(&buf);
+        }
+    }
+
+    // ── I2cRequest::from_evt_sub_opcode ─────────────────────────────────────
+
+    #[test]
+    //fusa:test REQ-I2C-012
+    //fusa:test REQ-I2C-013
+    fn i2c_request_plain_evt_decodes_payload_as_byte_transfer() {
+        // TC18 §13.7.7.3 Figure 30's own worked example: a 10-bit-addressed
+        // transfer, address bytes included verbatim in the payload.
+        let payload = [0xF2, 0x34, 0x11, 0x22, 0x33, 0x44, 0x55];
+        let request = I2cRequest::from_evt_sub_opcode(0b000, &payload).unwrap();
+        assert_eq!(
+            request,
+            I2cRequest::Plain(I2cByteTransfer {
+                bytes: payload.to_vec()
+            })
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-I2C-012
+    //fusa:test REQ-I2C-013
+    fn i2c_request_plain_evt_accepts_an_empty_payload() {
+        let request = I2cRequest::from_evt_sub_opcode(0b000, &[]).unwrap();
+        assert_eq!(request, I2cRequest::Plain(I2cByteTransfer::default()));
+    }
+
+    #[test]
+    //fusa:test REQ-I2C-012
+    //fusa:test REQ-I2C-013
+    fn i2c_request_config_write_evt_is_recognized_without_interpreting_payload() {
+        // The payload is not decoded as an I2cByteTransfer for a
+        // config-write request — the variant carries no payload at all,
+        // so garbage bytes here cannot be silently misread as a transfer.
+        let request = I2cRequest::from_evt_sub_opcode(0b111, &[0xDE, 0xAD, 0xBE, 0xEF]).unwrap();
+        assert_eq!(request, I2cRequest::ConfigWrite);
+    }
+
+    #[test]
+    //fusa:test REQ-I2C-013
+    fn i2c_request_reserved_evt_values_are_rejected_with_unsupported_cmd() {
+        for sub_opcode in 0b001..=0b110u8 {
+            assert_eq!(
+                I2cRequest::from_evt_sub_opcode(sub_opcode, &[]),
+                Err(RcpError::UnsupportedCmd)
+            );
+            assert_eq!(
+                I2cRequest::from_evt_sub_opcode(sub_opcode, &[1, 2, 3]),
+                Err(RcpError::UnsupportedCmd)
+            );
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-I2C-013
+    fn i2c_request_values_above_the_3_bit_field_are_also_rejected_with_unsupported_cmd() {
+        for sub_opcode in (crate::acf::EVT_SUB_OPCODE_MAX + 1)..=u8::MAX {
+            assert_eq!(
+                I2cRequest::from_evt_sub_opcode(sub_opcode, &[]),
+                Err(RcpError::UnsupportedCmd)
+            );
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-I2C-013
+    fn i2c_request_from_evt_sub_opcode_never_panics_for_any_sampled_input() {
+        let payloads: [&[u8]; 3] = [&[], &[0x00], &[0xAA; 32]];
+        for sub_opcode in 0..=u8::MAX {
+            for payload in payloads {
+                let _ = I2cRequest::from_evt_sub_opcode(sub_opcode, payload);
+            }
         }
     }
 }

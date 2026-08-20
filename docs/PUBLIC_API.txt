@@ -1244,7 +1244,28 @@ impl core::marker::Unpin for rcp::evtgroup::EvtGroup
 impl core::marker::UnsafeUnpin for rcp::evtgroup::EvtGroup
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::evtgroup::EvtGroup
 impl core::panic::unwind_safe::UnwindSafe for rcp::evtgroup::EvtGroup
+pub enum rcp::evtgroup::EvtRow2Kind
+pub rcp::evtgroup::EvtRow2Kind::ConfigWrite
+pub rcp::evtgroup::EvtRow2Kind::Plain
+pub rcp::evtgroup::EvtRow2Kind::Reserved
+impl core::clone::Clone for rcp::evtgroup::EvtRow2Kind
+pub fn rcp::evtgroup::EvtRow2Kind::clone(&self) -> rcp::evtgroup::EvtRow2Kind
+impl core::cmp::Eq for rcp::evtgroup::EvtRow2Kind
+impl core::cmp::PartialEq for rcp::evtgroup::EvtRow2Kind
+pub fn rcp::evtgroup::EvtRow2Kind::eq(&self, &rcp::evtgroup::EvtRow2Kind) -> bool
+impl core::fmt::Debug for rcp::evtgroup::EvtRow2Kind
+pub fn rcp::evtgroup::EvtRow2Kind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::evtgroup::EvtRow2Kind
+impl core::marker::StructuralPartialEq for rcp::evtgroup::EvtRow2Kind
+impl core::marker::Freeze for rcp::evtgroup::EvtRow2Kind
+impl core::marker::Send for rcp::evtgroup::EvtRow2Kind
+impl core::marker::Sync for rcp::evtgroup::EvtRow2Kind
+impl core::marker::Unpin for rcp::evtgroup::EvtRow2Kind
+impl core::marker::UnsafeUnpin for rcp::evtgroup::EvtRow2Kind
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::evtgroup::EvtRow2Kind
+impl core::panic::unwind_safe::UnwindSafe for rcp::evtgroup::EvtRow2Kind
 pub fn rcp::evtgroup::classify_evt_sub_opcode(u8) -> core::result::Result<core::option::Option<rcp::evtgroup::EvtGroup>, rcp::RcpError>
+pub fn rcp::evtgroup::evt_row2_kind_of(u8) -> rcp::evtgroup::EvtRow2Kind
 pub mod rcp::faultinject
 pub enum rcp::faultinject::FaultRule
 pub rcp::faultinject::FaultRule::AfterNthCall(u64)
@@ -1512,6 +1533,26 @@ pub const rcp::gpio::GPIO_TRIGGER_CONFIG_LEN: usize
 pub fn rcp::gpio::apply_gpio_write(rcp::gpio::GpioWriteSemantics, rcp::gpio::GpioBitmask, rcp::gpio::GpioBitmask) -> core::result::Result<rcp::gpio::GpioBitmask, rcp::RcpError>
 pub fn rcp::gpio::evaluate_gpio_triggers(&rcp::gpio::GpioTriggerConfig, rcp::gpio::GpioBitmask, rcp::gpio::GpioBitmask) -> rcp::gpio::GpioTriggerSignals
 pub mod rcp::i2c
+pub enum rcp::i2c::I2cRequest
+pub rcp::i2c::I2cRequest::ConfigWrite
+pub rcp::i2c::I2cRequest::Plain(rcp::i2c::I2cByteTransfer)
+impl rcp::i2c::I2cRequest
+pub fn rcp::i2c::I2cRequest::from_evt_sub_opcode(u8, &[u8]) -> core::result::Result<Self, rcp::RcpError>
+impl core::clone::Clone for rcp::i2c::I2cRequest
+pub fn rcp::i2c::I2cRequest::clone(&self) -> rcp::i2c::I2cRequest
+impl core::cmp::Eq for rcp::i2c::I2cRequest
+impl core::cmp::PartialEq for rcp::i2c::I2cRequest
+pub fn rcp::i2c::I2cRequest::eq(&self, &rcp::i2c::I2cRequest) -> bool
+impl core::fmt::Debug for rcp::i2c::I2cRequest
+pub fn rcp::i2c::I2cRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::i2c::I2cRequest
+impl core::marker::Freeze for rcp::i2c::I2cRequest
+impl core::marker::Send for rcp::i2c::I2cRequest
+impl core::marker::Sync for rcp::i2c::I2cRequest
+impl core::marker::Unpin for rcp::i2c::I2cRequest
+impl core::marker::UnsafeUnpin for rcp::i2c::I2cRequest
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::i2c::I2cRequest
+impl core::panic::unwind_safe::UnwindSafe for rcp::i2c::I2cRequest
 #[repr(u8)] pub enum rcp::i2c::I2cSpeedMode
 pub rcp::i2c::I2cSpeedMode::Fast = 1
 pub rcp::i2c::I2cSpeedMode::FastPlus = 2
