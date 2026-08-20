@@ -257,21 +257,23 @@
 //! [`CanFunctionalConfig`] carries one [`FrameFormat`] field rather than
 //! being left empty.
 //!
-//! ## `FrameFormat` wire encoding (confirmed against TC18 Table 54)
+//! ## `FrameFormat` wire encoding (confirmed against TC18 Table 57)
 //!
 //! `ROADMAP.md`'s checklist bullet names the six [`FrameFormat`] variants by
 //! their standard CAN abbreviations but states no numeric byte value for any
 //! of them, so [`FrameFormat::to_u8`]/[`FrameFormat::from_u8`] originally
 //! assigned each variant a stable, sequential byte value (`0`..=`5`,
 //! declaration order) as this crate's own working choice. TC18 §13.7.11.3
-//! Table 54 (TC18.txt line 5447) has since been reconciled against that
+//! Table 57 (TC18.txt lines 5863-5871) has since been reconciled against that
 //! mapping and confirms it exactly: `CBFF = 0`, `CEFF = 1`, `FBFF = 2`,
 //! `FEFF = 3`, `XL (classic physical layer) = 4`, `XL (new physical
 //! layer) = 5`, with `6` and `7` both Reserved. The two XL rows also settle
 //! what `ROADMAP.md`'s "XL-classical"/"XL-new" naming meant: which physical
 //! layer the XL frame uses, not two different XL frame shapes.
-//! [`FrameFormat::from_u8`]'s rejection of `6`/`7` is therefore Table 54's
-//! own Reserved rows, not merely an out-of-enum range check.
+//! [`FrameFormat::from_u8`]'s rejection of `6`/`7` is therefore Table 57's
+//! own Reserved rows, not merely an out-of-enum range check. (This table was
+//! "Table 54" when this module was first written; TC18.txt now numbers it
+//! Table 57 — see issue #164.)
 //!
 //! [`FrameFormat::is_extended_id`] additionally distinguishes the base
 //! (11-bit arbitration ID) vs. extended (29-bit arbitration ID) rows among
@@ -288,12 +290,12 @@
 //! Reconciling this module against TC18 §13.7.11 confirms three further
 //! behaviors and records four gaps.
 //!
-//! Confirmed: TC18 §13.7.11.3 (TC18.txt line 5471) states "Sending remote
+//! Confirmed: TC18 §13.7.11.3 (TC18.txt line 5887) states "Sending remote
 //! frames is not supported", matching this module's own "Data frames only"
 //! section below; the same line states "In case the CAN ID is 11bits, then
 //! it shall be right aligned in the CAN ID field", which
 //! [`CanDataFrame::encode`]'s big-endian [`CanDataFrame::id`] field
-//! satisfies; and line 5443 plus line 5472 together give CAN XL's total
+//! satisfies; and line 5859 plus line 5888 together give CAN XL's total
 //! "CAN data" field size as 2054 bytes — up to 2048 payload bytes plus the
 //! 6 additional ISO 11898-1 bytes (RRS, SDT, VCID, AF) — matching
 //! [`CAN_XL_MAX_PAYLOAD`] + [`CAN_XL_SUB_HEADER_LEN`].
@@ -301,24 +303,31 @@
 //! Not implemented, and recorded as explicit not-implemented requirement
 //! entries rather than silently omitted:
 //!
-//! - The exact request-payload bit layout of TC18 Figure 39 (line 5428),
-//!   which carries `FrameFormat` and the CAN ID together in the payload's
-//!   first 32-bit word. This module instead emits a full format-tag byte
-//!   followed by a 4-byte big-endian CAN ID (5 bytes), so a
+//! - The exact request-payload bit layout of TC18 Figure 40 (TC18.txt line
+//!   5852), which carries `FrameFormat` and the CAN ID together in the
+//!   payload's first 32-bit word. This module instead emits a full
+//!   format-tag byte followed by a 4-byte big-endian CAN ID (5 bytes), so a
 //!   [`CanDataFrame::encode`] buffer is **not** byte-compatible with Figure
-//!   39's own word layout; the figure's column rendering does not survive
+//!   40's own word layout; the figure's column rendering does not survive
 //!   text extraction, so the exact bit positions are not transcribed here.
+//!   (This was cited as "Figure 39" when this module was first written;
+//!   TC18.txt's current Figure 39 is LIN's request format, not CAN's — the
+//!   figure this note actually means is the same Figure 40 already cited
+//!   elsewhere in this module's doc comments. See issue #164.)
 //! - Naming the 6 XL bytes as RRS/SDT/VCID/AF — [`CanXlSubHeader`] keeps
 //!   them opaque.
 //! - Segmentation of an over-long CAN XL payload via the `ms` and
-//!   `segment_num` fields (line 5444); [`CanXlCombinedPayload::assemble`]
-//!   takes caller-ordered segments and reads neither field.
-//! - TC18 Table 53's functional-config register layout (§13.7.11.2, lines
-//!   5363-5419: bit-time registers 1-3, TDCC, EP/FIFO status, acceptance
-//!   filters 1-4, receive filters 1-4) and the six configuration
-//!   capabilities §13.7.11.2 enumerates (lines 5351-5356) — see
-//!   [`CanFunctionalConfig`], which carries a [`FrameFormat`] and nothing
-//!   else.
+//!   `segment_num` fields (TC18.txt line 5860);
+//!   [`CanXlCombinedPayload::assemble`] takes caller-ordered segments and
+//!   reads neither field.
+//! - TC18 Table 56's functional-config register layout (§13.7.11.2,
+//!   TC18.txt lines 5795-5834: bit-time registers 1-3, TDCC, EP/FIFO
+//!   status, acceptance filters 1-4, receive filters 1-4) and the six
+//!   configuration capabilities §13.7.11.2 enumerates (TC18.txt lines
+//!   5767-5772) — see [`CanFunctionalConfig`], which carries a
+//!   [`FrameFormat`] and nothing else. (This table was "Table 53" when
+//!   this module was first written; TC18.txt now numbers it Table 56 —
+//!   see issue #164.)
 //!
 //! ## Provenance note: the CAN XL sub-header is carried opaque
 //!
@@ -414,14 +423,14 @@ pub const CAN_FD_MAX_PAYLOAD: usize = 64;
 
 /// Maximum CAN XL payload in bytes, per `ROADMAP.md`'s own stated ceiling
 /// for this checklist bullet and confirmed by TC18 §13.7.11.3 (TC18.txt
-/// line 5443): "For CAN XL this can be up to 2054 bytes (2048 + 6)".
+/// line 5859): "For CAN XL this can be up to 2054 bytes (2048 + 6)".
 //fusa:req REQ-CAN-006
 //fusa:req REQ-CAN-016
 pub const CAN_XL_MAX_PAYLOAD: usize = 2048;
 
 /// CAN XL's sub-header length in bytes, per `ROADMAP.md`'s own stated
 /// ceiling for this checklist bullet and confirmed by TC18 §13.7.11.3
-/// (TC18.txt line 5472): the "CAN data" field includes 6 additional bytes
+/// (TC18.txt line 5888): the "CAN data" field includes 6 additional bytes
 /// (RRS, SDT, VCID, AF — see ISO 11898-1) for either XL frame format. See
 /// [`CanXlSubHeader`].
 //fusa:req REQ-CAN-006
@@ -475,8 +484,8 @@ pub enum FrameFormat {
 
 impl FrameFormat {
     /// Encode this frame format as its wire byte value, per TC18 §13.7.11.3
-    /// Table 54 (TC18.txt line 5447). See this module's doc comment
-    /// "`FrameFormat` wire encoding (confirmed against TC18 Table 54)".
+    /// Table 57 (TC18.txt lines 5863-5871). See this module's doc comment
+    /// "`FrameFormat` wire encoding (confirmed against TC18 Table 57)".
     //fusa:req REQ-CAN-001
     //fusa:req REQ-CAN-012
     pub fn to_u8(self) -> u8 {
@@ -486,8 +495,8 @@ impl FrameFormat {
     /// Decode a wire byte value into a [`FrameFormat`].
     ///
     /// Returns `Err(RcpError::InvalidParameter)` for any byte outside
-    /// `0..=5` — `6` and `7` are Table 54's own two Reserved rows (TC18
-    /// §13.7.11.3, TC18.txt line 5454), and no `FrameFormat` value wider
+    /// `0..=5` — `6` and `7` are Table 57's own two Reserved rows (TC18
+    /// §13.7.11.3, TC18.txt lines 5870-5871), and no `FrameFormat` value wider
     /// than 3 bits exists. Never panics for any input.
     //fusa:req REQ-CAN-002
     //fusa:req REQ-CAN-013
@@ -584,12 +593,12 @@ impl CanDataFrame {
     /// validation lives. Never panics.
     ///
     /// The big-endian `id` field right-aligns an 11-bit CAN ID within the
-    /// CAN ID field, as TC18 §13.7.11.3 (TC18.txt line 5471) requires: "In
+    /// CAN ID field, as TC18 §13.7.11.3 (TC18.txt line 5887) requires: "In
     /// case the CAN ID is 11bits, then it shall be right aligned in the CAN
     /// ID field." No remote-frame (RTR) indication is emitted anywhere in
     /// this encoding — the same line states remote frames are not supported.
     /// See this module's doc comment "TC18 reconciliation note (§13.7.11)"
-    /// for how this 5-byte form relates to Figure 39's own 32-bit word.
+    /// for how this 5-byte form relates to Figure 40's own 32-bit word.
     //fusa:req REQ-CAN-004
     //fusa:req REQ-CAN-014
     //fusa:req REQ-CAN-015
@@ -921,13 +930,16 @@ mod tests {
         }
     }
 
-    // ── TC18 Table 54: confirmed FrameFormat wire values ────────────────────
+    // ── TC18 Table 57: confirmed FrameFormat wire values ────────────────────
+    // (This table was "Table 54" when this module was first written;
+    // TC18.txt now numbers it Table 57. Function names below still say
+    // "table_54" — see issue #164.)
 
     #[test]
     //fusa:test REQ-CAN-012
     fn frame_format_wire_values_match_tc18_table_54() {
-        // TC18 §13.7.11.3 Table 54 "can frame formats" (TC18.txt line 5447),
-        // transcribed row by row:
+        // TC18 §13.7.11.3 Table 57 "can frame formats" (TC18.txt lines
+        // 5863-5871), transcribed row by row:
         //   CBFF                          -> 0
         //   CEFF                          -> 1
         //   FBFF                          -> 2
@@ -948,7 +960,7 @@ mod tests {
         assert_eq!(FrameFormat::from_u8(4), Ok(FrameFormat::XlClassical));
         assert_eq!(FrameFormat::from_u8(5), Ok(FrameFormat::XlNew));
 
-        // Table 54's rows 4 and 5 are the two physical-layer variants of the
+        // Table 57's rows 4 and 5 are the two physical-layer variants of the
         // same XL frame format, so both classify as XL and neither as FD.
         assert!(FrameFormat::from_u8(4).unwrap().is_xl());
         assert!(FrameFormat::from_u8(5).unwrap().is_xl());
@@ -957,14 +969,14 @@ mod tests {
     #[test]
     //fusa:test REQ-CAN-013
     fn frame_format_from_u8_rejects_table_54_reserved_rows_6_and_7() {
-        // TC18 §13.7.11.3 Table 54 (TC18.txt lines 5454-5455): FrameFormat 6
+        // TC18 §13.7.11.3 Table 57 (TC18.txt lines 5870-5871): FrameFormat 6
         // and 7 are both "Reserved" — the only two of the 3-bit field's eight
         // code points without an assigned frame format.
         for reserved in [6u8, 7] {
             assert_eq!(
                 FrameFormat::from_u8(reserved),
                 Err(RcpError::InvalidParameter),
-                "Table 54 row {reserved} is Reserved"
+                "Table 57 row {reserved} is Reserved"
             );
         }
     }
@@ -1049,7 +1061,7 @@ mod tests {
     #[test]
     //fusa:test REQ-CAN-014
     fn can_data_frame_encode_right_aligns_an_11_bit_can_id() {
-        // TC18 §13.7.11.3 (TC18.txt line 5471): "In case the CAN ID is
+        // TC18 §13.7.11.3 (TC18.txt line 5887): "In case the CAN ID is
         // 11bits, then it shall be right aligned in the CAN ID field."
         //
         // 11-bit ID 0x123 in a 4-byte big-endian CAN ID field is
@@ -1080,8 +1092,8 @@ mod tests {
     #[test]
     //fusa:test REQ-CAN-015
     fn can_data_frame_encoding_carries_no_remote_frame_indication() {
-        // TC18 §13.7.11.3 (TC18.txt line 5471): "Sending remote frames is not
-        // supported." The encoded form is exactly one Table 54 format byte,
+        // TC18 §13.7.11.3 (TC18.txt line 5887): "Sending remote frames is not
+        // supported." The encoded form is exactly one Table 57 format byte,
         // four CAN ID bytes, and the data bytes — there is no RTR bit, byte,
         // or trailing flag anywhere in it, for any of the four data-frame
         // formats.
@@ -1246,8 +1258,8 @@ mod tests {
     #[test]
     //fusa:test REQ-CAN-016
     fn can_xl_can_data_field_totals_2054_bytes() {
-        // TC18 §13.7.11.3 (TC18.txt line 5443): "For CAN XL this can be up to
-        // 2054 bytes (2048 + 6, see below)", and line 5472: the "CAN data"
+        // TC18 §13.7.11.3 (TC18.txt line 5859): "For CAN XL this can be up to
+        // 2054 bytes (2048 + 6, see below)", and line 5888: the "CAN data"
         // field includes 6 additional bytes (RRS, SDT, VCID, AF — see
         // ISO 11898-1) for either XL frame format.
         assert_eq!(CAN_XL_SUB_HEADER_LEN + CAN_XL_MAX_PAYLOAD, 2054);
