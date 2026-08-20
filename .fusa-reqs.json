@@ -297,7 +297,8 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test",
-      "tc18": "§12.4 (\"The RC Server may support different power modes\"), TC18.txt L2268"
+      "tc18": "§12.4 (\"The RC Server may support different power modes\"), TC18.txt L2644",
+      "tc18_master_id": "TC18-12.4-001"
     },
     {
       "id": "REQ-PWR-002",
@@ -306,7 +307,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.4 Figure 18 (\"power and operation modes\") -- note: this crate's own text/doc-comments call it \"Figure 17\", a stale figure number: in the current TC18.txt (RC5), Figure 17 is §12.3's RC-Server-lifecycle-states diagram, while the power/operation-modes diagram is Figure 18. Independently verified against OA_TC18_specification_v_0.5.1_RC_5_3624.pdf p.55, which draws Normal->StandBy labelled \"Go to StandBy\", Normal->Sleep labelled \"Go to Sleep\", and no edge between StandBy and Sleep, TC18.txt L2658",
+      "tc18_master_id": "TC18-12.4-002"
     },
     {
       "id": "REQ-PWR-003",
@@ -315,7 +318,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.5 (\"The RC Server will reject requests to enter sleep or standby mode and send an error message with error code = REQUEST_CANCELED, when - The wake-up event register (wup_status) is not cleared - At least one EP is not idle - In at least one responder queue there is a message pending for transmission.\"), TC18.txt L2703-2708",
+      "tc18_master_id": "TC18-12.5-005"
     },
     {
       "id": "REQ-PWR-004",
@@ -324,7 +329,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.5 (\"The RC Server will reject requests to enter sleep or standby mode and send an error message with error code = REQUEST_CANCELED, when - The wake-up event register (wup_status) is not cleared - At least one EP is not idle - In at least one responder queue there is a message pending for transmission.\"), TC18.txt L2703-2708",
+      "tc18_master_id": "TC18-12.5-005"
     },
     {
       "id": "REQ-PWR-005",
@@ -342,7 +349,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.4.1 (\"the RC Server will send via the responder stream which is configured for the original standby request a repetitive response to the sleep request with a WakeUp message and the WakeUp source. The message will be repeated until a valid AVTPDU from the sleep request Client is received.\"), TC18.txt L2674-2676",
+      "tc18_master_id": "TC18-12.4.1-003"
     },
     {
       "id": "REQ-PWR-007",
@@ -351,7 +360,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.4.1 (\"the RC Server will send via the responder stream which is configured for the original standby request a repetitive response to the sleep request with a WakeUp message and the WakeUp source. The message will be repeated until a valid AVTPDU from the sleep request Client is received.\"), TC18.txt L2674-2676",
+      "tc18_master_id": "TC18-12.4.1-003"
     },
     {
       "id": "REQ-PWR-008",
@@ -369,7 +380,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.4.1 (\"There are two types of start-up: a cold start (after power-on or wake-up from sleep) and a hot start (=wake-up from StandBy)\"), TC18.txt L2663-2664 -- note: this requirement's own text cites this section as \"(p.46)\" and the Cold-start arrows as \"§12.4 Figure 17\"; in the current TC18.txt (RC5) §12.4.1 is on p.55 and the power/operation-modes diagram is Figure 18 (independently confirmed against OA_TC18_specification_v_0.5.1_RC_5_3624.pdf, whose Figure 18 draws both Unpowered->Normal and Sleep->Normal arrows labelled \"Cold start\")",
+      "tc18_master_id": "TC18-12.4-002"
     },
     {
       "id": "REQ-PWRSTART-002",
@@ -378,7 +391,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.4.1 (\"the RC Server will send via the responder stream which is configured for the original standby request a repetitive response to the sleep request with a WakeUp message and the WakeUp source. The message will be repeated until a valid AVTPDU from the sleep request Client is received.\"), TC18.txt L2674-2676 -- note: this requirement's own text cites this section as \"(p.46)\" and the Hot-start arrow as \"§12.4 Figure 17\"; in the current TC18.txt (RC5) §12.4.1 is on p.55 and the power/operation-modes diagram (single StandBy->Normal arrow labelled \"Hot start\") is Figure 18",
+      "tc18_master_id": "TC18-12.4.1-003"
     },
     {
       "id": "REQ-PWRSTART-003",
@@ -2519,7 +2534,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.9.1 (\"For configuration purposes the RC Server itself is also treated as an endpoint. It may have within each configured stream_id an own byte_bus_id, which is zero as a default.\"), TC18.txt L3594-3595",
+      "tc18_master_id": "TC18-12.9.1-002"
     },
     {
       "id": "REQ-EP0-002",
@@ -2528,7 +2545,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.9.1 (\"For configuration purposes the RC Server itself is also treated as an endpoint. It may have within each configured stream_id an own byte_bus_id, which is zero as a default.\"), TC18.txt L3594-3595",
+      "tc18_master_id": "TC18-12.9.1-002"
     },
     {
       "id": "REQ-EP0-003",
@@ -2537,7 +2556,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§12.9.1 (\"A response with pay load data read from the EP is given, if requested by op=0 (read request) after the request has been executed.\"), TC18.txt L3604-3605",
+      "tc18_master_id": "TC18-12.9.1-007"
     },
     {
       "id": "REQ-EP0-004",
@@ -2573,7 +2594,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.7.1.2 (\"The svr_root_client_index is an index that selects the request stream which is in HW_CONFIGURED still allowed to access all registers of the register map.\"), TC18.txt L4400-4401",
+      "tc18_master_id": "TC18-13.7.1.2-002"
     },
     {
       "id": "REQ-EP0-008",
@@ -2600,7 +2623,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.1 (\"If within the RC Server's SERVER_config the ROOT_CLIENT is configured only the ROOT_CLIENT has write access to all RC Server configuration register maps. For other RC Clients than the ROOT_CLIENT write access is only given to EP_functional configuration of endpoints which are allocated to the RC Client within the EP_ID_config register map.\"), TC18.txt L3914-3916",
+      "tc18_master_id": "TC18-13.1-004"
     },
     {
       "id": "REQ-EP0-011",
@@ -5035,7 +5060,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§11.2.1 (\"ms 0b – the fragment sequence is completed with this ABB message / 1b - more data to follow in one or more subsequent ABB messages\"), TC18.txt L1233-1234",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-FRAG-006",
@@ -5053,7 +5080,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.6 (\"Fragmentation, if applied to a message, happens after CRC calculation. So, the CRC is only calculated once and will be transmitted in the last segment.\"), TC18.txt L4274-4275",
+      "tc18_master_id": "TC18-13.6-007"
     },
     {
       "id": "REQ-FRAG-008",
