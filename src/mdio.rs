@@ -783,8 +783,7 @@ mod tests {
         // transfer is not a real config-write payload — it is passed only
         // because the signature requires *some* MdioTransfer — and is not
         // echoed back or otherwise used.
-        let request =
-            MdioRequest::from_evt_sub_opcode(0b111, sample_transfer()).unwrap();
+        let request = MdioRequest::from_evt_sub_opcode(0b111, sample_transfer()).unwrap();
         assert_eq!(request, MdioRequest::ConfigWrite);
     }
 
