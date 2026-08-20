@@ -4792,9 +4792,7 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test",
-      "tc18": "§13.7.2.1 (\"the endpoint listens to configurable IO signals for activity as well as the network interface as wake-up source ... it wakes up the RC Server\"), TC18.txt L4484-4488",
-      "tc18_master_id": "TC18-13.7.2.1-001"
+      "verificationMethod": "test"
     },
     {
       "id": "REQ-WAKE-006",
@@ -4823,9 +4821,7 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test",
-      "tc18": "§13.7.2.1 (\"the endpoint listens to configurable IO signals for activity as well as the network interface as wake-up source ... it wakes up the RC Server\"), TC18.txt L4484-4488",
-      "tc18_master_id": "TC18-13.7.2.1-001"
+      "verificationMethod": "test"
     },
     {
       "id": "REQ-FRAG-001",
