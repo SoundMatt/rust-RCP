@@ -2452,6 +2452,26 @@ impl core::marker::Unpin for rcp::pwm::PwmInReadResolution
 impl core::marker::UnsafeUnpin for rcp::pwm::PwmInReadResolution
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::pwm::PwmInReadResolution
 impl core::panic::unwind_safe::UnwindSafe for rcp::pwm::PwmInReadResolution
+pub enum rcp::pwm::PwmInRequest
+pub rcp::pwm::PwmInRequest::ConfigWrite
+pub rcp::pwm::PwmInRequest::Plain(rcp::pwm::PwmInByteTransfer)
+impl rcp::pwm::PwmInRequest
+pub fn rcp::pwm::PwmInRequest::from_evt_sub_opcode(u8, &[u8]) -> core::result::Result<Self, rcp::RcpError>
+impl core::clone::Clone for rcp::pwm::PwmInRequest
+pub fn rcp::pwm::PwmInRequest::clone(&self) -> rcp::pwm::PwmInRequest
+impl core::cmp::Eq for rcp::pwm::PwmInRequest
+impl core::cmp::PartialEq for rcp::pwm::PwmInRequest
+pub fn rcp::pwm::PwmInRequest::eq(&self, &rcp::pwm::PwmInRequest) -> bool
+impl core::fmt::Debug for rcp::pwm::PwmInRequest
+pub fn rcp::pwm::PwmInRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::pwm::PwmInRequest
+impl core::marker::Freeze for rcp::pwm::PwmInRequest
+impl core::marker::Send for rcp::pwm::PwmInRequest
+impl core::marker::Sync for rcp::pwm::PwmInRequest
+impl core::marker::Unpin for rcp::pwm::PwmInRequest
+impl core::marker::UnsafeUnpin for rcp::pwm::PwmInRequest
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::pwm::PwmInRequest
+impl core::panic::unwind_safe::UnwindSafe for rcp::pwm::PwmInRequest
 pub struct rcp::pwm::PwmDurationPair
 pub rcp::pwm::PwmDurationPair::active_duration: u32
 pub rcp::pwm::PwmDurationPair::period: u32
@@ -2473,6 +2493,28 @@ impl core::marker::Unpin for rcp::pwm::PwmDurationPair
 impl core::marker::UnsafeUnpin for rcp::pwm::PwmDurationPair
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::pwm::PwmDurationPair
 impl core::panic::unwind_safe::UnwindSafe for rcp::pwm::PwmDurationPair
+pub struct rcp::pwm::PwmInByteTransfer
+pub rcp::pwm::PwmInByteTransfer::bytes: alloc::vec::Vec<u8>
+impl rcp::pwm::PwmInByteTransfer
+pub fn rcp::pwm::PwmInByteTransfer::decode(&[u8]) -> Self
+pub fn rcp::pwm::PwmInByteTransfer::encode(&self) -> alloc::vec::Vec<u8>
+impl core::clone::Clone for rcp::pwm::PwmInByteTransfer
+pub fn rcp::pwm::PwmInByteTransfer::clone(&self) -> rcp::pwm::PwmInByteTransfer
+impl core::cmp::Eq for rcp::pwm::PwmInByteTransfer
+impl core::cmp::PartialEq for rcp::pwm::PwmInByteTransfer
+pub fn rcp::pwm::PwmInByteTransfer::eq(&self, &rcp::pwm::PwmInByteTransfer) -> bool
+impl core::default::Default for rcp::pwm::PwmInByteTransfer
+pub fn rcp::pwm::PwmInByteTransfer::default() -> rcp::pwm::PwmInByteTransfer
+impl core::fmt::Debug for rcp::pwm::PwmInByteTransfer
+pub fn rcp::pwm::PwmInByteTransfer::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::pwm::PwmInByteTransfer
+impl core::marker::Freeze for rcp::pwm::PwmInByteTransfer
+impl core::marker::Send for rcp::pwm::PwmInByteTransfer
+impl core::marker::Sync for rcp::pwm::PwmInByteTransfer
+impl core::marker::Unpin for rcp::pwm::PwmInByteTransfer
+impl core::marker::UnsafeUnpin for rcp::pwm::PwmInByteTransfer
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::pwm::PwmInByteTransfer
+impl core::panic::unwind_safe::UnwindSafe for rcp::pwm::PwmInByteTransfer
 pub struct rcp::pwm::PwmInFunctionalConfig
 pub rcp::pwm::PwmInFunctionalConfig::no_signal_timeout: u32
 impl rcp::pwm::PwmInFunctionalConfig
