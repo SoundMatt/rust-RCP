@@ -3921,7 +3921,7 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test",
-      "tc18": "§11.2.2.2 Table 7 (\"Usage of GBB message for compound requests\"), TC18.txt L1434-1438",
+      "tc18": "§11.2.2.2 Table 7 (\"Usage of GBB message for compound requests\"), TC18.txt L1434-1438 (field rows); Table 7's own caption now sits at L1458, ~20-24 lines later after a TC18.txt re-extraction shifted it",
       "tc18_master_id": "TC18-11.2.2.2-007"
     },
     {
@@ -4786,7 +4786,7 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test",
-      "tc18": "§13.5 Table 33's Row-2 row (LIN is one of its eight endpoint types), TC18.txt L4085-4092, and §13.7.10.1 LIN EP request handling (\"It sends the bytes provided by the RC Client in the byte_msg_payload on the bus as response to a pending read request.\")"
+      "tc18": "§13.5 Table 33's Row-2 row (LIN is one of its eight endpoint types), TC18.txt L4085-4092, and §13.7.10.1 LIN EP request handling (\"It sends the bytes provided by the RC Client in the byte_msg_payload on the bus as response to a pending read request.\"), TC18.txt L5691-5692"
     },
     {
       "id": "REQ-LIN-009",
