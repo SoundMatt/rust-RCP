@@ -184,14 +184,15 @@ jobs:
       - name: relay conform --strict
         run: relay conform --strict target/release/rust-rcp
 
-  # ── RELAY conformance (relay interop) ───────────────────────────────────────
+  # ── RELAY CLI conformance (relay interop) ───────────────────────────────────
   # Named "conformance", not "interop": this only checks self-consistency
   # against RELAY's own embedded golden vector, not a third-party reference
   # implementation (SoundMatt/RELAY THEME-K / INTEROP-07 naming convention —
   # docs/INTEROP-ARCHITECTURE.md reserves "interop" for a genuine external
-  # peer this repo did not build).
-  relay-conformance:
-    name: RELAY conformance
+  # peer this repo did not build). "CLI" distinguishes this from the
+  # existing `relay-conformance` job below (RELAY spec v2.0 unit tests).
+  relay-cli-conformance:
+    name: RELAY CLI conformance
     needs: relay-conform
     runs-on: ubuntu-latest
     steps:
