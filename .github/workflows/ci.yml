@@ -184,9 +184,14 @@ jobs:
       - name: relay conform --strict
         run: relay conform --strict target/release/rust-rcp
 
-  # ── RELAY interop ─────────────────────────────────────────────────────────
-  relay-interop:
-    name: RELAY interop
+  # ── RELAY conformance (relay interop) ───────────────────────────────────────
+  # Named "conformance", not "interop": this only checks self-consistency
+  # against RELAY's own embedded golden vector, not a third-party reference
+  # implementation (SoundMatt/RELAY THEME-K / INTEROP-07 naming convention —
+  # docs/INTEROP-ARCHITECTURE.md reserves "interop" for a genuine external
+  # peer this repo did not build).
+  relay-conformance:
+    name: RELAY conformance
     needs: relay-conform
     runs-on: ubuntu-latest
     steps:
@@ -200,42 +205,19 @@ jobs:
         run: go install github.com/SoundMatt/RELAY/v2/cmd/relay@v2.0.4
       - name: build rcp binary
         run: cargo build --bin rust-rcp --release --locked
-      - name: relay interop (rcp-message EQUIVALENT or SKIP)
-        run: |
-          output=$(relay interop target/release/rust-rcp 2>&1) || true
-          echo "$output"
-          if echo "$output" | grep -q "rcp-message"; then
-            # `convert` is rebuilt against the real canonical rcp.Message /
-            # ByteBusID addressing (rust-RCP-FS-01) and is verified
-            # byte-for-byte EQUIVALENT against a genuine RELAY v2.0
-            # reference build. This job previously showed ERROR instead,
-            # because `go install .../relay@latest` (no /v2 suffix)
-            # resolved to a stale pre-v2 release — SoundMatt/RELAY's
-            # go.mod lacked the /v2 suffix its own v2.0.0+ tags require
-            # under Go's semantic import versioning (SoundMatt/RELAY#70).
-            # Resolved as of RELAY v2.0.4, which the step above now
-            # installs by pinned version via the /v2 module path.
-            #
-            # The vector/case name this check greps for is also updated
-            # here, from the retired `rcp-status` to `rcp-message`: RELAY's
-            # own v2.0 canonical-type replacement renamed the embedded
-            # golden vector `rcp-status.json` -> `rcp-message.json` (see
-            # RELAY's spec/CHANGELOG.md v2.0 entry), so a `relay@latest`
-            # pinned to a real v2.0+ build never emits an `rcp-status` case
-            # for this check to find — it would always have silently fallen
-            # through to the "no RCP vectors found" branch below, never
-            # actually exercising the equivalence check, independent of
-            # the go.mod /v2 bug above. SKIP is still accepted as a
-            # defensive allowance for a future state where `convert` isn't
-            # advertised at all; any other outcome still fails this step.
-            rcp_line=$(echo "$output" | grep -A3 "^rcp-message" | grep "rust-rcp")
-            echo "$rcp_line" | grep -qE "EQUIVALENT|SKIP" || {
-              echo "relay interop: unexpected rcp-message result for rust-rcp: $rcp_line" >&2
-              exit 1
-            }
-          else
-            echo "relay interop: no RCP vectors found on runner — skipping equivalence check"
-          fi
+      - name: relay interop --strict --protocol RCP
+        # Was previously `relay interop ... 2>&1) || true` piped through a
+        # brittle grep of stdout instead of the command's real exit code —
+        # that pattern silently tolerated both a genuinely broken run and
+        # any future change to relay interop's output format (SoundMatt/
+        # RELAY THEME-K, INTEROP-04). --protocol RCP restricts the check to
+        # rust-rcp's own protocol (matching go-RCP's equivalent step) and
+        # --strict fails on a missing convert rather than treating it as an
+        # innocuous skip; the command's real exit code now gates this step
+        # directly, verified locally against the pinned relay v2.0.4 build
+        # this job installs (EQUIVALENT/PASS/exit 0 on a real convert
+        # implementation, FAIL/exit 1 on a broken one).
+        run: relay interop --strict --protocol RCP target/release/rust-rcp
 
   # ── RELAY wire+e2e unit tests (spec traceability) ─────────────────────────
   relay-conformance:
