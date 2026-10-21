@@ -1,0 +1,13 @@
+{
+  "metric": "llvm-cov branch coverage (cargo llvm-cov --branch --all-targets), totals.branches.percent",
+  "floor_percent": 90.0,
+  "measured": {
+    "percent": 92.77,
+    "covered": 539,
+    "count": 581,
+    "toolchain": "nightly-2026-10-21",
+    "host": "aarch64-apple-darwin",
+    "date": "2026-10-21"
+  },
+  "provenance": "Issue #221: Rust counterpart of c-RCP's MC/DC ratchet (c-RCP .github/workflows/ci.yml:379, 'MC/DC regression gate (ratchet floor, not 100%)'). rustc removed -Zcoverage-options=mcdc (only block|branch|condition remain on nightly-2026-10-21), so branch coverage is the strongest structural metric llvm-cov reports for Rust today; ISO 26262-6 Table 12 rates branch coverage '++' for ASIL B. Like c-RCP's floor (93% against a measured 95.34%), this is a regression ratchet, not a 100% gate: the floor sits ~2.8 points below the measured value to absorb cross-platform drift (CI runs ubuntu-latest, which additionally compiles the Linux-only src/l2.rs RawEthernetSocket branches whose round-trip test is #[ignore]d outside the l2-veth job). Raise floor_percent when coverage improves; lowering it requires an explicit provenance note here, never deleting or skipping the gate."
+}
