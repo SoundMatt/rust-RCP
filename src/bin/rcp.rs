@@ -61,11 +61,11 @@
 //! state carried between separate `rust-rcp` invocations. This is flagged
 //! here per Guiding Principle 5 rather than left an unstated limitation.
 //!
-//! `serve` (added alongside [`rcp::udp::StdUdpSocket`]) is this binary's
+//! `serve` (added alongside [`rcp::udp::StdUdpSocket`], now over [`rcp::udp::UdpAvtpTransport`]) is this binary's
 //! first command backed by a real OS socket rather than an in-process
 //! `RcServer` invoked directly: it runs [`rcp::udp::UdpRcServer`] —
 //! previously only ever exercised in this crate's own unit tests, against
-//! mock sockets — over a real, bound [`rcp::udp::StdUdpSocket`], serving
+//! mock sockets — over a real, bound [`rcp::udp::UdpAvtpTransport`], serving
 //! real inbound UDP datagrams until `--max-requests` is reached (default:
 //! unbounded, run until a fatal socket error). Before this item, this
 //! crate had no concrete `rcp::udp::UdpSocket` implementation over a real
@@ -88,7 +88,7 @@ use rcp::discovery;
 use rcp::ep0::EP0_BYTE_BUS_ID;
 use rcp::mock::{MockEndpoint, RcServer};
 use rcp::regmap::{EndpointType, GeneralRegisters};
-use rcp::udp::{StdUdpSocket, UdpRcServer};
+use rcp::udp::{UdpAvtpTransport, UdpRcServer};
 
 const TOOL: &str = "rust-rcp";
 const PROTOCOL: &str = "RCP";
@@ -421,12 +421,12 @@ fn cmd_register_read(args: &[String]) {
 /// EP0-addressed [`AcfAbbMessage`] write request, dispatched through
 /// [`RcServer::handle_abb`]. If `--root` is given, `--stream` is first
 /// designated the server's root client via [`RcServer::set_root_client`]
-/// before the write is attempted — without it, a non-root stream is
-/// rejected with `RcpError::UnauthorizedAccess` before ever reaching the
-/// write-policy check.
+/// before the write is attempted. With or without it, the write is
+/// answered with `RcpError::LockedMemAccess`: every General-block register
+/// is read-only, and (as in c-RCP, `c-RCP/src/regmap.c:283`) that code does
+/// not depend on the writer.
 ///
-/// Reports whatever [`RcServer::handle_abb`] actually returns, including
-/// `RcpError::LockedMemAccess` for the root client itself: see
+/// Reports whatever [`RcServer::handle_abb`] actually returns: see
 /// [`RcServer::handle_abb`]'s own doc comment for why a general-register
 /// write is currently never actually accepted by this in-process server.
 //fusa:req REQ-CLI-005
@@ -616,7 +616,7 @@ fn cmd_endpoint_write(args: &[String]) {
 /// `rust-rcp serve --udp <bind-ip> [--port <n>] [--stream <hex>]
 /// [--max-requests <n>]`.
 ///
-/// Binds a real [`StdUdpSocket`] to `--udp:--port` (default
+/// Binds a real bind-mode [`UdpAvtpTransport`] to `--udp:--port` (default
 /// [`rcp::udp::ANNEX_J_CONTROL_PORT`]) and runs [`UdpRcServer`] against it
 /// — a fresh [`RcServer`] with [`GeneralRegisters::default`] and an empty
 /// endpoint table, the same starting state `discover`/`register`/
@@ -636,10 +636,12 @@ fn cmd_serve(args: &[String]) {
             process::exit(1);
         }
     };
-    let bind_ip: std::net::IpAddr = match bind_ip_str.parse() {
+    // UdpAvtpTransport is IPv4-only, as c-RCP's inet_pton(AF_INET, ...)
+    // (c-RCP/src/udp.c:329-358).
+    let bind_ip: std::net::Ipv4Addr = match bind_ip_str.parse() {
         Ok(ip) => ip,
         Err(e) => {
-            eprintln!("error: invalid --udp address {bind_ip_str:?}: {e}");
+            eprintln!("error: invalid --udp IPv4 address {bind_ip_str:?}: {e}");
             process::exit(1);
         }
     };
@@ -647,20 +649,20 @@ fn cmd_serve(args: &[String]) {
     let local_stream = parse_stream_arg(args, "--stream").unwrap_or_else(|| StreamId::from_u64(0));
     let max_requests = parse_u32_arg(args, "--max-requests");
 
-    let socket = match StdUdpSocket::bind(std::net::SocketAddr::new(bind_ip, port)) {
-        Ok(s) => s,
+    let transport = match UdpAvtpTransport::bind(&bind_ip.to_string(), port, false) {
+        Ok(t) => t,
         Err(e) => {
             eprintln!("error: {}", e);
             process::exit(3);
         }
     };
-    let bound_addr = socket
+    let bound_addr = transport
         .local_addr()
         .map(|a| a.to_string())
         .unwrap_or_else(|_| format!("{bind_ip}:{port}"));
 
     let rc_server = RcServer::new(GeneralRegisters::default());
-    let server = UdpRcServer::new(local_stream, Arc::new(socket), rc_server);
+    let server = UdpRcServer::new(local_stream, Arc::new(transport), rc_server);
 
     println!(
         "serve: listening on udp {} (stream={})",
@@ -1076,11 +1078,10 @@ mod tests {
 
     #[test]
     //fusa:test REQ-CLI-005
-    fn register_write_succeeds_for_the_root_client() {
-        // Mirrors rcp::mock::rc_server_tests::ep0_write_succeeds_for_the_root_client
-        // — RegisterCategory::General now has LockPolicy::W, writable
-        // whenever reachable, so a write from the root client succeeds.
-        // This is the CLI's own exercise of that same, already-tested gate.
+    fn register_write_is_locked_even_for_the_root_client() {
+        // Mirrors rcp::mock::rc_server_tests::ep0_general_write_from_the_root_client_is_locked_in_every_state
+        // — TC18 Table 20 marks the General block read-only (c-RCP
+        // REQ-RMAP-025), so even the root client's write is refused.
         let server = RcServer::new(GeneralRegisters::default());
         let sid = stream(1);
         server.set_root_client(Some(sid));
@@ -1100,8 +1101,11 @@ mod tests {
             },
             payload,
         };
-        server.handle_abb(sid, &request).unwrap();
-        assert_eq!(server.general_registers().svr_vendor_id, 0xAAAA);
+        assert_eq!(
+            server.handle_abb(sid, &request).unwrap_err(),
+            rcp::RcpError::LockedMemAccess
+        );
+        assert_eq!(server.general_registers().svr_vendor_id, 0);
     }
 
     // ── endpoint read / endpoint write ───────────────────────────────────────

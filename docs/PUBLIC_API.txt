@@ -439,9 +439,34 @@ impl core::marker::UnsafeUnpin for rcp::authz::Policy
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::authz::Policy
 impl core::panic::unwind_safe::UnwindSafe for rcp::authz::Policy
 pub mod rcp::avtp
+pub enum rcp::avtp::HeaderSelection
+pub rcp::avtp::HeaderSelection::Accept(rcp::avtp::HeaderVariant)
+pub rcp::avtp::HeaderSelection::Drop
+pub rcp::avtp::HeaderSelection::IgnorePresentationTime(rcp::avtp::TscfHeader)
+impl core::clone::Clone for rcp::avtp::HeaderSelection
+pub fn rcp::avtp::HeaderSelection::clone(&self) -> Self
+impl core::cmp::Eq for rcp::avtp::HeaderSelection
+impl core::cmp::PartialEq for rcp::avtp::HeaderSelection
+pub fn rcp::avtp::HeaderSelection::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::avtp::HeaderSelection
+pub fn rcp::avtp::HeaderSelection::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::avtp::HeaderSelection
+impl core::marker::StructuralPartialEq for rcp::avtp::HeaderSelection
+impl core::marker::Freeze for rcp::avtp::HeaderSelection
+impl core::marker::Send for rcp::avtp::HeaderSelection
+impl core::marker::Sync for rcp::avtp::HeaderSelection
+impl core::marker::Unpin for rcp::avtp::HeaderSelection
+impl core::marker::UnsafeUnpin for rcp::avtp::HeaderSelection
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::avtp::HeaderSelection
+impl core::panic::unwind_safe::UnwindSafe for rcp::avtp::HeaderSelection
 pub enum rcp::avtp::HeaderVariant
 pub rcp::avtp::HeaderVariant::Ntscf(rcp::avtp::NtscfHeader)
 pub rcp::avtp::HeaderVariant::Tscf(rcp::avtp::TscfHeader)
+impl rcp::avtp::HeaderVariant
+pub fn rcp::avtp::HeaderVariant::octet1(&self) -> u8
+pub fn rcp::avtp::HeaderVariant::stream_id(&self) -> u64
+pub fn rcp::avtp::HeaderVariant::subtype(&self) -> u8
+pub fn rcp::avtp::HeaderVariant::tu(&self) -> bool
 impl core::clone::Clone for rcp::avtp::HeaderVariant
 pub fn rcp::avtp::HeaderVariant::clone(&self) -> Self
 impl core::cmp::Eq for rcp::avtp::HeaderVariant
@@ -477,10 +502,50 @@ impl core::marker::Unpin for rcp::avtp::TimeSyncCapability
 impl core::marker::UnsafeUnpin for rcp::avtp::TimeSyncCapability
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::avtp::TimeSyncCapability
 impl core::panic::unwind_safe::UnwindSafe for rcp::avtp::TimeSyncCapability
+pub enum rcp::avtp::TscfFallback
+pub rcp::avtp::TscfFallback::Drop = 0
+pub rcp::avtp::TscfFallback::Ignore = 1
+impl core::clone::Clone for rcp::avtp::TscfFallback
+pub fn rcp::avtp::TscfFallback::clone(&self) -> Self
+impl core::cmp::Eq for rcp::avtp::TscfFallback
+impl core::cmp::PartialEq for rcp::avtp::TscfFallback
+pub fn rcp::avtp::TscfFallback::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::avtp::TscfFallback
+pub fn rcp::avtp::TscfFallback::default() -> Self
+impl core::fmt::Debug for rcp::avtp::TscfFallback
+pub fn rcp::avtp::TscfFallback::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for rcp::avtp::TscfFallback
+pub fn rcp::avtp::TscfFallback::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for rcp::avtp::TscfFallback
+impl core::marker::StructuralPartialEq for rcp::avtp::TscfFallback
+impl core::marker::Freeze for rcp::avtp::TscfFallback
+impl core::marker::Send for rcp::avtp::TscfFallback
+impl core::marker::Sync for rcp::avtp::TscfFallback
+impl core::marker::Unpin for rcp::avtp::TscfFallback
+impl core::marker::UnsafeUnpin for rcp::avtp::TscfFallback
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::avtp::TscfFallback
+impl core::panic::unwind_safe::UnwindSafe for rcp::avtp::TscfFallback
+pub struct rcp::avtp::LoopbackTransport
+impl rcp::avtp::LoopbackTransport
+pub fn rcp::avtp::LoopbackTransport::new(bool, usize) -> Self
+impl rcp::avtp::AvtpTransport for rcp::avtp::LoopbackTransport
+pub fn rcp::avtp::LoopbackTransport::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::avtp::LoopbackTransport::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::avtp::LoopbackTransport::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::avtp::LoopbackTransport::time_sync_supported(&self) -> bool
+impl !core::marker::Freeze for rcp::avtp::LoopbackTransport
+impl core::marker::Send for rcp::avtp::LoopbackTransport
+impl core::marker::Sync for rcp::avtp::LoopbackTransport
+impl core::marker::Unpin for rcp::avtp::LoopbackTransport
+impl core::marker::UnsafeUnpin for rcp::avtp::LoopbackTransport
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::avtp::LoopbackTransport
+impl core::panic::unwind_safe::UnwindSafe for rcp::avtp::LoopbackTransport
 pub struct rcp::avtp::NtscfHeader
 pub rcp::avtp::NtscfHeader::ntscf_data_length: u16
 pub rcp::avtp::NtscfHeader::sequence_num: u8
 pub rcp::avtp::NtscfHeader::stream_id: u64
+impl rcp::avtp::NtscfHeader
+pub fn rcp::avtp::NtscfHeader::octet1(&self) -> u8
 impl core::clone::Clone for rcp::avtp::NtscfHeader
 pub fn rcp::avtp::NtscfHeader::clone(&self) -> Self
 impl core::cmp::Eq for rcp::avtp::NtscfHeader
@@ -536,9 +601,18 @@ impl core::panic::unwind_safe::RefUnwindSafe for rcp::avtp::StreamId
 impl core::panic::unwind_safe::UnwindSafe for rcp::avtp::StreamId
 pub struct rcp::avtp::TscfHeader
 pub rcp::avtp::TscfHeader::avtp_timestamp: u32
+pub rcp::avtp::TscfHeader::mr: bool
+pub rcp::avtp::TscfHeader::reserved0: u32
+pub rcp::avtp::TscfHeader::reserved1: u16
 pub rcp::avtp::TscfHeader::sequence_num: u8
 pub rcp::avtp::TscfHeader::stream_data_length: u16
 pub rcp::avtp::TscfHeader::stream_id: u64
+pub rcp::avtp::TscfHeader::tu: bool
+pub rcp::avtp::TscfHeader::tv: bool
+pub rcp::avtp::TscfHeader::version: u8
+impl rcp::avtp::TscfHeader
+pub fn rcp::avtp::TscfHeader::octet1(&self) -> u8
+pub fn rcp::avtp::TscfHeader::timestamp_meaning(&self) -> rcp::timestamp::TimestampMeaning
 impl core::clone::Clone for rcp::avtp::TscfHeader
 pub fn rcp::avtp::TscfHeader::clone(&self) -> Self
 impl core::cmp::Eq for rcp::avtp::TscfHeader
@@ -557,21 +631,65 @@ impl core::marker::Unpin for rcp::avtp::TscfHeader
 impl core::marker::UnsafeUnpin for rcp::avtp::TscfHeader
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::avtp::TscfHeader
 impl core::panic::unwind_safe::UnwindSafe for rcp::avtp::TscfHeader
+pub const rcp::avtp::AVTP_MAX_FRAME_LEN: usize
 pub const rcp::avtp::NTSCF_DATA_LENGTH_MAX: u16
 pub const rcp::avtp::NTSCF_HEADER_LEN: usize
 pub const rcp::avtp::NTSCF_SUBTYPE: u8
 pub const rcp::avtp::TSCF_DATA_LENGTH_MAX: u16
 pub const rcp::avtp::TSCF_HEADER_LEN: usize
 pub const rcp::avtp::TSCF_SUBTYPE: u8
+pub trait rcp::avtp::AvtpTransport: core::marker::Send + core::marker::Sync
+pub fn rcp::avtp::AvtpTransport::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::avtp::AvtpTransport::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::avtp::AvtpTransport::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::avtp::AvtpTransport::time_sync_supported(&self) -> bool
+impl rcp::avtp::AvtpTransport for rcp::avtp::LoopbackTransport
+pub fn rcp::avtp::LoopbackTransport::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::avtp::LoopbackTransport::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::avtp::LoopbackTransport::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::avtp::LoopbackTransport::time_sync_supported(&self) -> bool
+impl rcp::avtp::AvtpTransport for rcp::l2::L2AvtpTransport
+pub fn rcp::l2::L2AvtpTransport::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::l2::L2AvtpTransport::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::l2::L2AvtpTransport::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::l2::L2AvtpTransport::time_sync_supported(&self) -> bool
+impl rcp::avtp::AvtpTransport for rcp::shmem::ShmemAvtpTransport
+pub fn rcp::shmem::ShmemAvtpTransport::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::shmem::ShmemAvtpTransport::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::shmem::ShmemAvtpTransport::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::shmem::ShmemAvtpTransport::time_sync_supported(&self) -> bool
+impl rcp::avtp::AvtpTransport for rcp::udp::UdpAvtpTransport
+pub fn rcp::udp::UdpAvtpTransport::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::time_sync_supported(&self) -> bool
+impl<T: rcp::avtp::AvtpTransport + ?core::marker::Sized> rcp::avtp::AvtpTransport for alloc::rcs::arc::Arc<T>
+pub fn alloc::rcs::arc::Arc<T>::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn alloc::rcs::arc::Arc<T>::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn alloc::rcs::arc::Arc<T>::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn alloc::rcs::arc::Arc<T>::time_sync_supported(&self) -> bool
+impl<T: rcp::avtp::AvtpTransport> rcp::avtp::AvtpTransport for rcp::tsn::TsnTransport<T>
+pub fn rcp::tsn::TsnTransport<T>::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::tsn::TsnTransport<T>::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::tsn::TsnTransport<T>::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::tsn::TsnTransport<T>::time_sync_supported(&self) -> bool
 pub fn rcp::avtp::build_stream_id([u8; 6], u16) -> u64
 pub fn rcp::avtp::decode_ntscf_frame(&[u8]) -> core::result::Result<(rcp::avtp::NtscfHeader, &[u8]), rcp::RcpError>
 pub fn rcp::avtp::decode_ntscf_header(&[u8]) -> core::result::Result<rcp::avtp::NtscfHeader, rcp::RcpError>
+pub fn rcp::avtp::decode_tscf_frame(&[u8]) -> core::result::Result<(rcp::avtp::TscfHeader, &[u8]), rcp::RcpError>
 pub fn rcp::avtp::decode_tscf_header(&[u8]) -> core::result::Result<rcp::avtp::TscfHeader, rcp::RcpError>
 pub fn rcp::avtp::encode_ntscf_frame(rcp::avtp::StreamId, u8, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::avtp::encode_ntscf_header(&rcp::avtp::NtscfHeader) -> core::result::Result<[u8; 12], rcp::RcpError>
+pub fn rcp::avtp::encode_tscf_frame(&rcp::avtp::TscfHeader, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::avtp::encode_tscf_header(&rcp::avtp::TscfHeader) -> core::result::Result<[u8; 24], rcp::RcpError>
+pub fn rcp::avtp::extend_timestamp(u32, u64) -> u64
 pub fn rcp::avtp::parse_stream_id(u64) -> ([u8; 6], u16)
-pub fn rcp::avtp::select_header_variant(&[u8], rcp::avtp::TimeSyncCapability) -> core::result::Result<rcp::avtp::HeaderVariant, rcp::RcpError>
+pub fn rcp::avtp::peek_subtype(&[u8]) -> core::result::Result<u8, rcp::RcpError>
+pub fn rcp::avtp::request_acf_abb(&dyn rcp::avtp::AvtpTransport, rcp::avtp::StreamId, &rcp::acf::AcfAbbMessage, u8, core::option::Option<core::time::Duration>) -> core::result::Result<rcp::acf::AcfAbbMessage, rcp::RcpError>
+pub fn rcp::avtp::request_acf_gbb(&dyn rcp::avtp::AvtpTransport, rcp::avtp::StreamId, &rcp::acf::AcfGbbMessage, u8, core::option::Option<core::time::Duration>) -> core::result::Result<rcp::acf::AcfGbbMessage, rcp::RcpError>
+pub fn rcp::avtp::select_header_variant(&[u8], rcp::avtp::TimeSyncCapability, rcp::avtp::TscfFallback) -> core::result::Result<rcp::avtp::HeaderSelection, rcp::RcpError>
+pub fn rcp::avtp::should_drop_tscf(bool, u8, rcp::avtp::TscfFallback) -> bool
+pub fn rcp::avtp::tscf_reserved_all_zero(&rcp::avtp::TscfHeader) -> bool
 pub mod rcp::can
 pub enum rcp::can::CanRequest
 pub rcp::can::CanRequest::ConfigWrite
@@ -1166,6 +1284,32 @@ impl<'a> core::marker::Unpin for rcp::e2e::AcfCoverageMessage<'a>
 impl<'a> core::marker::UnsafeUnpin for rcp::e2e::AcfCoverageMessage<'a>
 impl<'a> core::panic::unwind_safe::RefUnwindSafe for rcp::e2e::AcfCoverageMessage<'a>
 impl<'a> core::panic::unwind_safe::UnwindSafe for rcp::e2e::AcfCoverageMessage<'a>
+pub enum rcp::e2e::E2eError
+pub rcp::e2e::E2eError::CrcMismatch
+pub rcp::e2e::E2eError::CrcMismatch::acf_frame: alloc::vec::Vec<u8>
+pub rcp::e2e::E2eError::ShortFrame
+impl rcp::e2e::E2eError
+pub fn rcp::e2e::E2eError::code(&self) -> u8
+pub fn rcp::e2e::E2eError::strerror(&self) -> &'static str
+pub fn rcp::e2e::E2eError::wire_error(&self) -> core::option::Option<rcp::RcpError>
+impl core::clone::Clone for rcp::e2e::E2eError
+pub fn rcp::e2e::E2eError::clone(&self) -> Self
+impl core::cmp::Eq for rcp::e2e::E2eError
+impl core::cmp::PartialEq for rcp::e2e::E2eError
+pub fn rcp::e2e::E2eError::eq(&self, &Self) -> bool
+impl core::error::Error for rcp::e2e::E2eError
+impl core::fmt::Debug for rcp::e2e::E2eError
+pub fn rcp::e2e::E2eError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rcp::e2e::E2eError
+pub fn rcp::e2e::E2eError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::e2e::E2eError
+impl core::marker::Freeze for rcp::e2e::E2eError
+impl core::marker::Send for rcp::e2e::E2eError
+impl core::marker::Sync for rcp::e2e::E2eError
+impl core::marker::Unpin for rcp::e2e::E2eError
+impl core::marker::UnsafeUnpin for rcp::e2e::E2eError
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::e2e::E2eError
+impl core::panic::unwind_safe::UnwindSafe for rcp::e2e::E2eError
 pub enum rcp::e2e::FragmentCrcExpectation
 pub rcp::e2e::FragmentCrcExpectation::Expected
 pub rcp::e2e::FragmentCrcExpectation::NotExpected
@@ -1210,11 +1354,22 @@ pub const rcp::e2e::CRC_TRAILER_QUADLETS: u16
 pub fn rcp::e2e::build_crc32_coverage_buffer(&rcp::avtp::HeaderVariant, &rcp::e2e::AcfCoverageMessage<'_>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::e2e::build_crc32_coverage_buffer_for_fragment_train(&rcp::avtp::HeaderVariant, &rcp::e2e::AcfCoverageMessage<'_>, &[&[u8]]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::e2e::check_fragment_crc_placement(bool, bool) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::e2e::compute_crc(u8, u8, bool, u64, u32, &[u8]) -> u32
+pub fn rcp::e2e::compute_fragmented_crc(u8, u8, bool, u64, u32, &[u8], &[u8]) -> u32
 pub fn rcp::e2e::crc32_tc18(&[u8]) -> u32
 pub fn rcp::e2e::crc32_tc18_for_fragment_train(&rcp::avtp::HeaderVariant, &rcp::e2e::AcfCoverageMessage<'_>, &[&[u8]]) -> core::result::Result<u32, rcp::RcpError>
+pub fn rcp::e2e::data_length_for_protected_members(usize) -> usize
 pub fn rcp::e2e::finalize_crc_trailer(&mut alloc::vec::Vec<u8>, u32) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::e2e::fragment_carries_crc(bool) -> bool
 pub fn rcp::e2e::fragment_crc_expectation(bool) -> rcp::e2e::FragmentCrcExpectation
+pub fn rcp::e2e::length_with_crc(usize) -> usize
 pub fn rcp::e2e::split_crc_trailer(&[u8]) -> core::result::Result<(alloc::vec::Vec<u8>, u32), rcp::RcpError>
+pub fn rcp::e2e::unwrap(u8, u8, bool, u64, u32, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::e2e::E2eError>
+pub fn rcp::e2e::unwrap_for_header(&rcp::avtp::HeaderVariant, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::e2e::E2eError>
+pub fn rcp::e2e::unwrap_framed(u64, bool, u8, bool, u32, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::e2e::E2eError>
+pub fn rcp::e2e::wrap(u8, u8, bool, u64, u32, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::e2e::wrap_for_header(&rcp::avtp::HeaderVariant, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::e2e::wrap_framed(u64, bool, u8, bool, u32, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub mod rcp::ep0
 pub enum rcp::ep0::Ep0AccessKind
 pub rcp::ep0::Ep0AccessKind::Read
@@ -1950,6 +2105,24 @@ impl core::panic::unwind_safe::UnwindSafe for rcp::iso21434::Threat
 pub fn rcp::iso21434::filter_by_risk(&[rcp::iso21434::Threat], rcp::iso21434::RiskLevel) -> alloc::vec::Vec<&rcp::iso21434::Threat>
 pub fn rcp::iso21434::risk_level(rcp::iso21434::Feasibility, rcp::iso21434::Impact) -> rcp::iso21434::RiskLevel
 pub mod rcp::l2
+pub struct rcp::l2::L2AvtpTransport
+impl rcp::l2::L2AvtpTransport
+pub fn rcp::l2::L2AvtpTransport::dst_mac(&self) -> [u8; 6]
+pub fn rcp::l2::L2AvtpTransport::local_mac(&self) -> [u8; 6]
+pub fn rcp::l2::L2AvtpTransport::new(alloc::rcs::arc::Arc<dyn rcp::l2::L2Socket>, [u8; 6], [u8; 6], bool) -> Self
+pub fn rcp::l2::L2AvtpTransport::open(&str, [u8; 6], bool) -> core::result::Result<Self, rcp::RcpError>
+impl rcp::avtp::AvtpTransport for rcp::l2::L2AvtpTransport
+pub fn rcp::l2::L2AvtpTransport::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::l2::L2AvtpTransport::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::l2::L2AvtpTransport::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::l2::L2AvtpTransport::time_sync_supported(&self) -> bool
+impl !core::marker::Freeze for rcp::l2::L2AvtpTransport
+impl core::marker::Send for rcp::l2::L2AvtpTransport
+impl core::marker::Sync for rcp::l2::L2AvtpTransport
+impl core::marker::Unpin for rcp::l2::L2AvtpTransport
+impl core::marker::UnsafeUnpin for rcp::l2::L2AvtpTransport
+impl !core::panic::unwind_safe::RefUnwindSafe for rcp::l2::L2AvtpTransport
+impl !core::panic::unwind_safe::UnwindSafe for rcp::l2::L2AvtpTransport
 pub struct rcp::l2::L2Transport
 impl rcp::l2::L2Transport
 pub fn rcp::l2::L2Transport::close(&self) -> core::result::Result<(), rcp::RcpError>
@@ -1959,7 +2132,7 @@ pub fn rcp::l2::L2Transport::new(rcp::avtp::StreamId, alloc::rcs::arc::Arc<dyn r
 pub fn rcp::l2::L2Transport::send_acf_abb(&self, &rcp::acf::AcfAbbMessage, u8, core::option::Option<core::time::Duration>) -> core::result::Result<rcp::acf::AcfAbbMessage, rcp::RcpError>
 pub fn rcp::l2::L2Transport::send_acf_gbb(&self, &rcp::acf::AcfGbbMessage, u8, core::option::Option<core::time::Duration>) -> core::result::Result<rcp::acf::AcfGbbMessage, rcp::RcpError>
 pub fn rcp::l2::L2Transport::src_mac(&self) -> [u8; 6]
-impl core::marker::Freeze for rcp::l2::L2Transport
+impl !core::marker::Freeze for rcp::l2::L2Transport
 impl core::marker::Send for rcp::l2::L2Transport
 impl core::marker::Sync for rcp::l2::L2Transport
 impl core::marker::Unpin for rcp::l2::L2Transport
@@ -1975,6 +2148,8 @@ pub fn rcp::l2::RawEthernetSocket::fmt(&self, &mut core::fmt::Formatter<'_>) -> 
 impl rcp::l2::L2Socket for rcp::l2::RawEthernetSocket
 pub fn rcp::l2::RawEthernetSocket::recv(&self, core::option::Option<core::time::Duration>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::l2::RawEthernetSocket::send(&self, &[u8]) -> core::result::Result<usize, rcp::RcpError>
+impl rcp::tsn::SoPriority for rcp::l2::RawEthernetSocket
+pub fn rcp::l2::RawEthernetSocket::set_so_priority(&self, u8) -> core::result::Result<(), rcp::RcpError>
 impl core::marker::Freeze for rcp::l2::RawEthernetSocket
 impl core::marker::Send for rcp::l2::RawEthernetSocket
 impl core::marker::Sync for rcp::l2::RawEthernetSocket
@@ -1993,6 +2168,81 @@ pub fn rcp::l2::decode_ethernet_frame(&[u8]) -> core::result::Result<rcp::l2::De
 pub fn rcp::l2::encode_ethernet_frame([u8; 6], [u8; 6], &[u8]) -> alloc::vec::Vec<u8>
 pub type rcp::l2::DecodedEthernetFrame<'a> = ([u8; 6], [u8; 6], &'a [u8])
 pub mod rcp::lifecycle
+#[repr(u8)] pub enum rcp::lifecycle::FieldKind
+pub rcp::lifecycle::FieldKind::FunctionalW = 1
+pub rcp::lifecycle::FieldKind::FunctionalWStar = 2
+pub rcp::lifecycle::FieldKind::HwGeneric = 0
+pub rcp::lifecycle::FieldKind::ReadOnly = 3
+impl core::clone::Clone for rcp::lifecycle::FieldKind
+pub fn rcp::lifecycle::FieldKind::clone(&self) -> Self
+impl core::cmp::Eq for rcp::lifecycle::FieldKind
+impl core::cmp::PartialEq for rcp::lifecycle::FieldKind
+pub fn rcp::lifecycle::FieldKind::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::lifecycle::FieldKind
+pub fn rcp::lifecycle::FieldKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for rcp::lifecycle::FieldKind
+pub fn rcp::lifecycle::FieldKind::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for rcp::lifecycle::FieldKind
+impl core::marker::StructuralPartialEq for rcp::lifecycle::FieldKind
+impl core::marker::Freeze for rcp::lifecycle::FieldKind
+impl core::marker::Send for rcp::lifecycle::FieldKind
+impl core::marker::Sync for rcp::lifecycle::FieldKind
+impl core::marker::Unpin for rcp::lifecycle::FieldKind
+impl core::marker::UnsafeUnpin for rcp::lifecycle::FieldKind
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::lifecycle::FieldKind
+impl core::panic::unwind_safe::UnwindSafe for rcp::lifecycle::FieldKind
+#[repr(u8)] pub enum rcp::lifecycle::LifecycleAccept
+pub rcp::lifecycle::LifecycleAccept::Accept = 0
+pub rcp::lifecycle::LifecycleAccept::Drop = 1
+pub rcp::lifecycle::LifecycleAccept::Reject = 2
+impl core::clone::Clone for rcp::lifecycle::LifecycleAccept
+pub fn rcp::lifecycle::LifecycleAccept::clone(&self) -> Self
+impl core::cmp::Eq for rcp::lifecycle::LifecycleAccept
+impl core::cmp::PartialEq for rcp::lifecycle::LifecycleAccept
+pub fn rcp::lifecycle::LifecycleAccept::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::lifecycle::LifecycleAccept
+pub fn rcp::lifecycle::LifecycleAccept::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for rcp::lifecycle::LifecycleAccept
+pub fn rcp::lifecycle::LifecycleAccept::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for rcp::lifecycle::LifecycleAccept
+impl core::marker::StructuralPartialEq for rcp::lifecycle::LifecycleAccept
+impl core::marker::Freeze for rcp::lifecycle::LifecycleAccept
+impl core::marker::Send for rcp::lifecycle::LifecycleAccept
+impl core::marker::Sync for rcp::lifecycle::LifecycleAccept
+impl core::marker::Unpin for rcp::lifecycle::LifecycleAccept
+impl core::marker::UnsafeUnpin for rcp::lifecycle::LifecycleAccept
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::lifecycle::LifecycleAccept
+impl core::panic::unwind_safe::UnwindSafe for rcp::lifecycle::LifecycleAccept
+#[repr(u8)] pub enum rcp::lifecycle::LifecycleError
+pub rcp::lifecycle::LifecycleError::EpsNotIdle = 5
+pub rcp::lifecycle::LifecycleError::HwCfgInconsistent = 1
+pub rcp::lifecycle::LifecycleError::InvalidTransition = 3
+pub rcp::lifecycle::LifecycleError::RcpCfgInconsistent = 2
+pub rcp::lifecycle::LifecycleError::Unauthorized = 4
+impl rcp::lifecycle::LifecycleError
+pub fn rcp::lifecycle::LifecycleError::code(self) -> u8
+pub fn rcp::lifecycle::LifecycleError::message(self) -> &'static str
+impl core::clone::Clone for rcp::lifecycle::LifecycleError
+pub fn rcp::lifecycle::LifecycleError::clone(&self) -> Self
+impl core::cmp::Eq for rcp::lifecycle::LifecycleError
+impl core::cmp::PartialEq for rcp::lifecycle::LifecycleError
+pub fn rcp::lifecycle::LifecycleError::eq(&self, &Self) -> bool
+impl core::error::Error for rcp::lifecycle::LifecycleError
+impl core::fmt::Debug for rcp::lifecycle::LifecycleError
+pub fn rcp::lifecycle::LifecycleError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rcp::lifecycle::LifecycleError
+pub fn rcp::lifecycle::LifecycleError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for rcp::lifecycle::LifecycleError
+pub fn rcp::lifecycle::LifecycleError::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for rcp::lifecycle::LifecycleError
+impl core::marker::StructuralPartialEq for rcp::lifecycle::LifecycleError
+impl core::marker::Freeze for rcp::lifecycle::LifecycleError
+impl core::marker::Send for rcp::lifecycle::LifecycleError
+impl core::marker::Sync for rcp::lifecycle::LifecycleError
+impl core::marker::Unpin for rcp::lifecycle::LifecycleError
+impl core::marker::UnsafeUnpin for rcp::lifecycle::LifecycleError
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::lifecycle::LifecycleError
+impl core::panic::unwind_safe::UnwindSafe for rcp::lifecycle::LifecycleError
 pub enum rcp::lifecycle::LockPolicy
 pub rcp::lifecycle::LockPolicy::W
 pub rcp::lifecycle::LockPolicy::WStar
@@ -2021,7 +2271,7 @@ pub const rcp::lifecycle::RcServerState::INITIAL: Self
 pub fn rcp::lifecycle::RcServerState::from_u8(u8) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::lifecycle::RcServerState::to_u8(self) -> u8
 impl rcp::lifecycle::RcServerState
-pub fn rcp::lifecycle::RcServerState::try_transition(self, Self, impl core::ops::function::FnOnce() -> bool) -> core::result::Result<Self, rcp::RcpError>
+pub fn rcp::lifecycle::RcServerState::try_transition(self, Self, core::option::Option<&rcp::lifecycle::PlausibilitySnapshot<'_>>, rcp::lifecycle::WriterCtx, bool) -> core::result::Result<Self, rcp::lifecycle::LifecycleError>
 impl core::clone::Clone for rcp::lifecycle::RcServerState
 pub fn rcp::lifecycle::RcServerState::clone(&self) -> Self
 impl core::cmp::Eq for rcp::lifecycle::RcServerState
@@ -2064,12 +2314,135 @@ impl core::marker::Unpin for rcp::lifecycle::RegisterCategory
 impl core::marker::UnsafeUnpin for rcp::lifecycle::RegisterCategory
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::lifecycle::RegisterCategory
 impl core::panic::unwind_safe::UnwindSafe for rcp::lifecycle::RegisterCategory
+#[repr(u8)] pub enum rcp::lifecycle::TscfFallback
+pub rcp::lifecycle::TscfFallback::Drop = 0
+pub rcp::lifecycle::TscfFallback::Ignore = 1
+impl core::clone::Clone for rcp::lifecycle::TscfFallback
+pub fn rcp::lifecycle::TscfFallback::clone(&self) -> Self
+impl core::cmp::Eq for rcp::lifecycle::TscfFallback
+impl core::cmp::PartialEq for rcp::lifecycle::TscfFallback
+pub fn rcp::lifecycle::TscfFallback::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::lifecycle::TscfFallback
+pub fn rcp::lifecycle::TscfFallback::default() -> Self
+impl core::fmt::Debug for rcp::lifecycle::TscfFallback
+pub fn rcp::lifecycle::TscfFallback::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for rcp::lifecycle::TscfFallback
+pub fn rcp::lifecycle::TscfFallback::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for rcp::lifecycle::TscfFallback
+impl core::marker::StructuralPartialEq for rcp::lifecycle::TscfFallback
+impl core::marker::Freeze for rcp::lifecycle::TscfFallback
+impl core::marker::Send for rcp::lifecycle::TscfFallback
+impl core::marker::Sync for rcp::lifecycle::TscfFallback
+impl core::marker::Unpin for rcp::lifecycle::TscfFallback
+impl core::marker::UnsafeUnpin for rcp::lifecycle::TscfFallback
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::lifecycle::TscfFallback
+impl core::panic::unwind_safe::UnwindSafe for rcp::lifecycle::TscfFallback
+pub struct rcp::lifecycle::EndpointPlausibility
+pub rcp::lifecycle::EndpointPlausibility::ep_used: bool
+pub rcp::lifecycle::EndpointPlausibility::has_request_stream: bool
+pub rcp::lifecycle::EndpointPlausibility::has_stream_assoc: bool
+pub rcp::lifecycle::EndpointPlausibility::hw_pin_mapped: bool
+pub rcp::lifecycle::EndpointPlausibility::request_stream_index: usize
+impl core::clone::Clone for rcp::lifecycle::EndpointPlausibility
+pub fn rcp::lifecycle::EndpointPlausibility::clone(&self) -> Self
+impl core::cmp::Eq for rcp::lifecycle::EndpointPlausibility
+impl core::cmp::PartialEq for rcp::lifecycle::EndpointPlausibility
+pub fn rcp::lifecycle::EndpointPlausibility::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::lifecycle::EndpointPlausibility
+pub fn rcp::lifecycle::EndpointPlausibility::default() -> Self
+impl core::fmt::Debug for rcp::lifecycle::EndpointPlausibility
+pub fn rcp::lifecycle::EndpointPlausibility::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::lifecycle::EndpointPlausibility
+impl core::marker::StructuralPartialEq for rcp::lifecycle::EndpointPlausibility
+impl core::marker::Freeze for rcp::lifecycle::EndpointPlausibility
+impl core::marker::Send for rcp::lifecycle::EndpointPlausibility
+impl core::marker::Sync for rcp::lifecycle::EndpointPlausibility
+impl core::marker::Unpin for rcp::lifecycle::EndpointPlausibility
+impl core::marker::UnsafeUnpin for rcp::lifecycle::EndpointPlausibility
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::lifecycle::EndpointPlausibility
+impl core::panic::unwind_safe::UnwindSafe for rcp::lifecycle::EndpointPlausibility
+pub struct rcp::lifecycle::PlausibilitySnapshot<'a>
+pub rcp::lifecycle::PlausibilitySnapshot::endpoints: &'a [rcp::lifecycle::EndpointPlausibility]
+pub rcp::lifecycle::PlausibilitySnapshot::request_streams: &'a [rcp::lifecycle::RequestStreamPlausibility]
+pub rcp::lifecycle::PlausibilitySnapshot::response_stream_count: usize
+impl<'a> core::clone::Clone for rcp::lifecycle::PlausibilitySnapshot<'a>
+pub fn rcp::lifecycle::PlausibilitySnapshot<'a>::clone(&self) -> Self
+impl<'a> core::cmp::Eq for rcp::lifecycle::PlausibilitySnapshot<'a>
+impl<'a> core::cmp::PartialEq for rcp::lifecycle::PlausibilitySnapshot<'a>
+pub fn rcp::lifecycle::PlausibilitySnapshot<'a>::eq(&self, &Self) -> bool
+impl<'a> core::default::Default for rcp::lifecycle::PlausibilitySnapshot<'a>
+pub fn rcp::lifecycle::PlausibilitySnapshot<'a>::default() -> Self
+impl<'a> core::fmt::Debug for rcp::lifecycle::PlausibilitySnapshot<'a>
+pub fn rcp::lifecycle::PlausibilitySnapshot<'a>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a> core::marker::Copy for rcp::lifecycle::PlausibilitySnapshot<'a>
+impl<'a> core::marker::StructuralPartialEq for rcp::lifecycle::PlausibilitySnapshot<'a>
+impl<'a> core::marker::Freeze for rcp::lifecycle::PlausibilitySnapshot<'a>
+impl<'a> core::marker::Send for rcp::lifecycle::PlausibilitySnapshot<'a>
+impl<'a> core::marker::Sync for rcp::lifecycle::PlausibilitySnapshot<'a>
+impl<'a> core::marker::Unpin for rcp::lifecycle::PlausibilitySnapshot<'a>
+impl<'a> core::marker::UnsafeUnpin for rcp::lifecycle::PlausibilitySnapshot<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for rcp::lifecycle::PlausibilitySnapshot<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for rcp::lifecycle::PlausibilitySnapshot<'a>
+pub struct rcp::lifecycle::RequestStreamPlausibility
+pub rcp::lifecycle::RequestStreamPlausibility::configured: bool
+pub rcp::lifecycle::RequestStreamPlausibility::has_response_stream: bool
+pub rcp::lifecycle::RequestStreamPlausibility::response_stream_index: usize
+impl core::clone::Clone for rcp::lifecycle::RequestStreamPlausibility
+pub fn rcp::lifecycle::RequestStreamPlausibility::clone(&self) -> Self
+impl core::cmp::Eq for rcp::lifecycle::RequestStreamPlausibility
+impl core::cmp::PartialEq for rcp::lifecycle::RequestStreamPlausibility
+pub fn rcp::lifecycle::RequestStreamPlausibility::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::lifecycle::RequestStreamPlausibility
+pub fn rcp::lifecycle::RequestStreamPlausibility::default() -> Self
+impl core::fmt::Debug for rcp::lifecycle::RequestStreamPlausibility
+pub fn rcp::lifecycle::RequestStreamPlausibility::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::lifecycle::RequestStreamPlausibility
+impl core::marker::StructuralPartialEq for rcp::lifecycle::RequestStreamPlausibility
+impl core::marker::Freeze for rcp::lifecycle::RequestStreamPlausibility
+impl core::marker::Send for rcp::lifecycle::RequestStreamPlausibility
+impl core::marker::Sync for rcp::lifecycle::RequestStreamPlausibility
+impl core::marker::Unpin for rcp::lifecycle::RequestStreamPlausibility
+impl core::marker::UnsafeUnpin for rcp::lifecycle::RequestStreamPlausibility
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::lifecycle::RequestStreamPlausibility
+impl core::panic::unwind_safe::UnwindSafe for rcp::lifecycle::RequestStreamPlausibility
+pub struct rcp::lifecycle::WriterCtx
+pub rcp::lifecycle::WriterCtx::via_discovery_stream: bool
+pub rcp::lifecycle::WriterCtx::via_non_unicast_frame: bool
+pub rcp::lifecycle::WriterCtx::via_owning_stream: bool
+pub rcp::lifecycle::WriterCtx::via_root_client_ep0: bool
+pub rcp::lifecycle::WriterCtx::via_valid_stream_association: bool
+impl core::clone::Clone for rcp::lifecycle::WriterCtx
+pub fn rcp::lifecycle::WriterCtx::clone(&self) -> Self
+impl core::cmp::Eq for rcp::lifecycle::WriterCtx
+impl core::cmp::PartialEq for rcp::lifecycle::WriterCtx
+pub fn rcp::lifecycle::WriterCtx::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::lifecycle::WriterCtx
+pub fn rcp::lifecycle::WriterCtx::default() -> Self
+impl core::fmt::Debug for rcp::lifecycle::WriterCtx
+pub fn rcp::lifecycle::WriterCtx::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::lifecycle::WriterCtx
+impl core::marker::StructuralPartialEq for rcp::lifecycle::WriterCtx
+impl core::marker::Freeze for rcp::lifecycle::WriterCtx
+impl core::marker::Send for rcp::lifecycle::WriterCtx
+impl core::marker::Sync for rcp::lifecycle::WriterCtx
+impl core::marker::Unpin for rcp::lifecycle::WriterCtx
+impl core::marker::UnsafeUnpin for rcp::lifecycle::WriterCtx
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::lifecycle::WriterCtx
+impl core::panic::unwind_safe::UnwindSafe for rcp::lifecycle::WriterCtx
+pub const rcp::lifecycle::DISCOVERY_BYTE_BUS_ID: u16
+pub fn rcp::lifecycle::check_field_writable(rcp::lifecycle::RcServerState, rcp::lifecycle::FieldKind, rcp::lifecycle::WriterCtx) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::lifecycle::check_field_writable_w_plus(rcp::lifecycle::RcServerState, rcp::lifecycle::WriterCtx, bool) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::lifecycle::check_hw_cfg(core::option::Option<&rcp::lifecycle::PlausibilitySnapshot<'_>>) -> core::result::Result<(), rcp::lifecycle::LifecycleError>
+pub fn rcp::lifecycle::check_rcp_cfg(core::option::Option<&rcp::lifecycle::PlausibilitySnapshot<'_>>) -> core::result::Result<(), rcp::lifecycle::LifecycleError>
 pub fn rcp::lifecycle::check_register_reachable(rcp::lifecycle::RcServerState, rcp::lifecycle::RegisterCategory) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::lifecycle::check_register_writable(rcp::lifecycle::RcServerState, rcp::lifecycle::RegisterCategory) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::lifecycle::is_field_writable(rcp::lifecycle::RcServerState, rcp::lifecycle::FieldKind, rcp::lifecycle::WriterCtx) -> bool
+pub fn rcp::lifecycle::is_field_writable_w_plus(rcp::lifecycle::RcServerState, rcp::lifecycle::WriterCtx, bool) -> bool
 pub fn rcp::lifecycle::is_register_reachable(rcp::lifecycle::RcServerState, rcp::lifecycle::RegisterCategory) -> bool
 pub fn rcp::lifecycle::is_register_writable(rcp::lifecycle::RcServerState, rcp::lifecycle::RegisterCategory) -> bool
 pub fn rcp::lifecycle::is_transition_defined(rcp::lifecycle::RcServerState, rcp::lifecycle::RcServerState) -> bool
 pub fn rcp::lifecycle::lock_policy(rcp::lifecycle::RegisterCategory) -> core::option::Option<rcp::lifecycle::LockPolicy>
+pub fn rcp::lifecycle::should_accept(rcp::lifecycle::RcServerState, bool, u8, u8, u16, rcp::lifecycle::TscfFallback) -> rcp::lifecycle::LifecycleAccept
 pub mod rcp::lin
 pub enum rcp::lin::LinRequest
 pub rcp::lin::LinRequest::ConfigWrite
@@ -2360,7 +2733,7 @@ pub fn rcp::mock::RcServer::new(rcp::regmap::GeneralRegisters) -> alloc::rcs::ar
 pub fn rcp::mock::RcServer::register_endpoint(&self, rcp::avtp::StreamId, u16, alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>) -> core::result::Result<rcp::addressing::EndpointId, rcp::RcpError>
 pub fn rcp::mock::RcServer::set_root_client(&self, core::option::Option<rcp::avtp::StreamId>)
 pub fn rcp::mock::RcServer::state(&self) -> rcp::lifecycle::RcServerState
-pub fn rcp::mock::RcServer::try_transition(&self, rcp::lifecycle::RcServerState, impl core::ops::function::FnOnce() -> bool) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::mock::RcServer::try_transition(&self, rcp::lifecycle::RcServerState, core::option::Option<&rcp::lifecycle::PlausibilitySnapshot<'_>>, rcp::lifecycle::WriterCtx, bool) -> core::result::Result<(), rcp::lifecycle::LifecycleError>
 impl !core::marker::Freeze for rcp::mock::RcServer
 impl core::marker::Send for rcp::mock::RcServer
 impl core::marker::Sync for rcp::mock::RcServer
@@ -2838,6 +3211,29 @@ impl core::marker::Unpin for rcp::regmap::EndpointType
 impl core::marker::UnsafeUnpin for rcp::regmap::EndpointType
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::regmap::EndpointType
 impl core::panic::unwind_safe::UnwindSafe for rcp::regmap::EndpointType
+#[repr(u8)] pub enum rcp::regmap::GeneralRegmapError
+pub rcp::regmap::GeneralRegmapError::BadMsgType = 2
+pub rcp::regmap::GeneralRegmapError::ShortFrame = 1
+pub rcp::regmap::GeneralRegmapError::WrongBus = 3
+pub rcp::regmap::GeneralRegmapError::WrongOp = 4
+impl core::clone::Clone for rcp::regmap::GeneralRegmapError
+pub fn rcp::regmap::GeneralRegmapError::clone(&self) -> Self
+impl core::cmp::Eq for rcp::regmap::GeneralRegmapError
+impl core::cmp::PartialEq for rcp::regmap::GeneralRegmapError
+pub fn rcp::regmap::GeneralRegmapError::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::regmap::GeneralRegmapError
+pub fn rcp::regmap::GeneralRegmapError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for rcp::regmap::GeneralRegmapError
+pub fn rcp::regmap::GeneralRegmapError::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for rcp::regmap::GeneralRegmapError
+impl core::marker::StructuralPartialEq for rcp::regmap::GeneralRegmapError
+impl core::marker::Freeze for rcp::regmap::GeneralRegmapError
+impl core::marker::Send for rcp::regmap::GeneralRegmapError
+impl core::marker::Sync for rcp::regmap::GeneralRegmapError
+impl core::marker::Unpin for rcp::regmap::GeneralRegmapError
+impl core::marker::UnsafeUnpin for rcp::regmap::GeneralRegmapError
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::regmap::GeneralRegmapError
+impl core::panic::unwind_safe::UnwindSafe for rcp::regmap::GeneralRegmapError
 pub struct rcp::regmap::CommonFunctionalConfig
 pub rcp::regmap::CommonFunctionalConfig::ep_clear_req_storage: bool
 pub rcp::regmap::CommonFunctionalConfig::ep_enable: bool
@@ -2955,6 +3351,23 @@ impl core::marker::Unpin for rcp::regmap::GeneralRegisters
 impl core::marker::UnsafeUnpin for rcp::regmap::GeneralRegisters
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::regmap::GeneralRegisters
 impl core::panic::unwind_safe::UnwindSafe for rcp::regmap::GeneralRegisters
+pub struct rcp::regmap::GeneralWriteRejection
+pub rcp::regmap::GeneralWriteRejection::error: rcp::RcpError
+pub rcp::regmap::GeneralWriteRejection::transaction_num: u8
+impl core::clone::Clone for rcp::regmap::GeneralWriteRejection
+pub fn rcp::regmap::GeneralWriteRejection::clone(&self) -> Self
+impl core::cmp::PartialEq for rcp::regmap::GeneralWriteRejection
+pub fn rcp::regmap::GeneralWriteRejection::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::regmap::GeneralWriteRejection
+pub fn rcp::regmap::GeneralWriteRejection::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::regmap::GeneralWriteRejection
+impl core::marker::Freeze for rcp::regmap::GeneralWriteRejection
+impl core::marker::Send for rcp::regmap::GeneralWriteRejection
+impl core::marker::Sync for rcp::regmap::GeneralWriteRejection
+impl core::marker::Unpin for rcp::regmap::GeneralWriteRejection
+impl core::marker::UnsafeUnpin for rcp::regmap::GeneralWriteRejection
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::regmap::GeneralWriteRejection
+impl core::panic::unwind_safe::UnwindSafe for rcp::regmap::GeneralWriteRejection
 pub struct rcp::regmap::HwPinMappingEntry
 pub rcp::regmap::HwPinMappingEntry::hw_ep_nr: u8
 pub rcp::regmap::HwPinMappingEntry::hw_ep_pin_nr: u8
@@ -3220,6 +3633,7 @@ pub fn rcp::regmap::check_functional_config_matches_ep_type(&rcp::regmap::PerEpC
 pub fn rcp::regmap::decode_rows<T: rcp::regmap::ConfigTableRow>(&[u8]) -> core::result::Result<alloc::vec::Vec<T>, rcp::RcpError>
 pub fn rcp::regmap::encode_rows<T: rcp::regmap::ConfigTableRow>(&[T]) -> alloc::vec::Vec<u8>
 pub fn rcp::regmap::functional_config_matches_ep_type(&rcp::regmap::PerEpConfigBlock, &rcp::regmap::PerEpTypeFunctionalConfig) -> bool
+pub fn rcp::regmap::general_decode_write_request(&[u8]) -> core::result::Result<rcp::regmap::GeneralWriteRejection, rcp::regmap::GeneralRegmapError>
 pub fn rcp::regmap::register_category(rcp::regmap::ConfigLayer) -> rcp::lifecycle::RegisterCategory
 pub mod rcp::relay
 pub enum rcp::relay::BackPressurePolicy
@@ -3469,6 +3883,35 @@ impl core::marker::Unpin for rcp::request::OverflowOutcome
 impl core::marker::UnsafeUnpin for rcp::request::OverflowOutcome
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::OverflowOutcome
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::OverflowOutcome
+pub enum rcp::request::RequestCodecError
+pub rcp::request::RequestCodecError::BadMsgType
+pub rcp::request::RequestCodecError::EvtHsCsNonzero
+pub rcp::request::RequestCodecError::NotRepurposed
+pub rcp::request::RequestCodecError::ReservedNonzero
+pub rcp::request::RequestCodecError::ShortFrame
+pub rcp::request::RequestCodecError::UnknownType
+pub rcp::request::RequestCodecError::UnsupportedCmd
+impl rcp::request::RequestCodecError
+pub fn rcp::request::RequestCodecError::response_error(self) -> core::option::Option<rcp::RcpError>
+impl core::clone::Clone for rcp::request::RequestCodecError
+pub fn rcp::request::RequestCodecError::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::RequestCodecError
+impl core::cmp::PartialEq for rcp::request::RequestCodecError
+pub fn rcp::request::RequestCodecError::eq(&self, &Self) -> bool
+impl core::error::Error for rcp::request::RequestCodecError
+impl core::fmt::Debug for rcp::request::RequestCodecError
+pub fn rcp::request::RequestCodecError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rcp::request::RequestCodecError
+pub fn rcp::request::RequestCodecError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::request::RequestCodecError
+impl core::marker::StructuralPartialEq for rcp::request::RequestCodecError
+impl core::marker::Freeze for rcp::request::RequestCodecError
+impl core::marker::Send for rcp::request::RequestCodecError
+impl core::marker::Sync for rcp::request::RequestCodecError
+impl core::marker::Unpin for rcp::request::RequestCodecError
+impl core::marker::UnsafeUnpin for rcp::request::RequestCodecError
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::RequestCodecError
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::RequestCodecError
 #[repr(u8)] pub enum rcp::request::RequestKind
 pub rcp::request::RequestKind::Chained = 1
 pub rcp::request::RequestKind::ClearAll = 5
@@ -3521,12 +3964,13 @@ pub rcp::request::RequestLifecycleGuardInput::CompoundWait::gate: rcp::request::
 pub rcp::request::RequestLifecycleGuardInput::CompoundWait::svr_sequencers_max: u8
 pub rcp::request::RequestLifecycleGuardInput::Standard
 pub rcp::request::RequestLifecycleGuardInput::Timed
-pub rcp::request::RequestLifecycleGuardInput::Timed::current: rcp::timestamp::AvtpTimestamp
+pub rcp::request::RequestLifecycleGuardInput::Timed::current: u64
 pub rcp::request::RequestLifecycleGuardInput::Timed::exec_time: rcp::request::TimedExecutionTime
 pub rcp::request::RequestLifecycleGuardInput::Triggered
-pub rcp::request::RequestLifecycleGuardInput::Triggered::endpoint_busy: bool
-pub rcp::request::RequestLifecycleGuardInput::Triggered::occurrences_so_far: u16
-pub rcp::request::RequestLifecycleGuardInput::Triggered::repeat: rcp::request::TriggerRepeatCount
+pub rcp::request::RequestLifecycleGuardInput::Triggered::elapsed: u32
+pub rcp::request::RequestLifecycleGuardInput::Triggered::endpoint_idle: bool
+pub rcp::request::RequestLifecycleGuardInput::Triggered::runtime: rcp::request::TriggeredRuntime
+pub rcp::request::RequestLifecycleGuardInput::Triggered::step: rcp::request::TriggeredStep
 impl core::clone::Clone for rcp::request::RequestLifecycleGuardInput
 pub fn rcp::request::RequestLifecycleGuardInput::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::RequestLifecycleGuardInput
@@ -3605,29 +4049,28 @@ impl core::marker::Unpin for rcp::request::SafeStateMechanism
 impl core::marker::UnsafeUnpin for rcp::request::SafeStateMechanism
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::SafeStateMechanism
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::SafeStateMechanism
-pub enum rcp::request::SequenceEnforcementOutcome
-pub rcp::request::SequenceEnforcementOutcome::Accepted
-pub rcp::request::SequenceEnforcementOutcome::RejectedNoSafestate
-pub rcp::request::SequenceEnforcementOutcome::RejectedSafestate
-impl rcp::request::SequenceEnforcementOutcome
-pub fn rcp::request::SequenceEnforcementOutcome::drives_safestate(&self) -> bool
-pub fn rcp::request::SequenceEnforcementOutcome::is_rejected(&self) -> bool
-impl core::clone::Clone for rcp::request::SequenceEnforcementOutcome
-pub fn rcp::request::SequenceEnforcementOutcome::clone(&self) -> Self
-impl core::cmp::Eq for rcp::request::SequenceEnforcementOutcome
-impl core::cmp::PartialEq for rcp::request::SequenceEnforcementOutcome
-pub fn rcp::request::SequenceEnforcementOutcome::eq(&self, &Self) -> bool
-impl core::fmt::Debug for rcp::request::SequenceEnforcementOutcome
-pub fn rcp::request::SequenceEnforcementOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::marker::Copy for rcp::request::SequenceEnforcementOutcome
-impl core::marker::StructuralPartialEq for rcp::request::SequenceEnforcementOutcome
-impl core::marker::Freeze for rcp::request::SequenceEnforcementOutcome
-impl core::marker::Send for rcp::request::SequenceEnforcementOutcome
-impl core::marker::Sync for rcp::request::SequenceEnforcementOutcome
-impl core::marker::Unpin for rcp::request::SequenceEnforcementOutcome
-impl core::marker::UnsafeUnpin for rcp::request::SequenceEnforcementOutcome
-impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::SequenceEnforcementOutcome
-impl core::panic::unwind_safe::UnwindSafe for rcp::request::SequenceEnforcementOutcome
+pub enum rcp::request::SequencerAccess
+pub rcp::request::SequencerAccess::Denied
+pub rcp::request::SequencerAccess::Permitted
+pub rcp::request::SequencerAccess::Unknown
+impl rcp::request::SequencerAccess
+pub fn rcp::request::SequencerAccess::wire_error(self) -> core::option::Option<rcp::RcpError>
+impl core::clone::Clone for rcp::request::SequencerAccess
+pub fn rcp::request::SequencerAccess::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::SequencerAccess
+impl core::cmp::PartialEq for rcp::request::SequencerAccess
+pub fn rcp::request::SequencerAccess::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::request::SequencerAccess
+pub fn rcp::request::SequencerAccess::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::request::SequencerAccess
+impl core::marker::StructuralPartialEq for rcp::request::SequencerAccess
+impl core::marker::Freeze for rcp::request::SequencerAccess
+impl core::marker::Send for rcp::request::SequencerAccess
+impl core::marker::Sync for rcp::request::SequencerAccess
+impl core::marker::Unpin for rcp::request::SequencerAccess
+impl core::marker::UnsafeUnpin for rcp::request::SequencerAccess
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::SequencerAccess
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::SequencerAccess
 pub enum rcp::request::TriggerRepeatCount
 pub rcp::request::TriggerRepeatCount::Finite(u16)
 pub rcp::request::TriggerRepeatCount::Infinite
@@ -3650,6 +4093,70 @@ impl core::marker::Unpin for rcp::request::TriggerRepeatCount
 impl core::marker::UnsafeUnpin for rcp::request::TriggerRepeatCount
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::TriggerRepeatCount
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::TriggerRepeatCount
+pub struct rcp::request::ChainedMember
+pub rcp::request::ChainedMember::byte_bus_id: u16
+pub rcp::request::ChainedMember::chain_exec_delay: u16
+pub rcp::request::ChainedMember::cs: bool
+pub rcp::request::ChainedMember::payload: alloc::vec::Vec<u8>
+pub rcp::request::ChainedMember::transaction_num: u8
+impl core::clone::Clone for rcp::request::ChainedMember
+pub fn rcp::request::ChainedMember::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::ChainedMember
+impl core::cmp::PartialEq for rcp::request::ChainedMember
+pub fn rcp::request::ChainedMember::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::request::ChainedMember
+pub fn rcp::request::ChainedMember::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::request::ChainedMember
+impl core::marker::Freeze for rcp::request::ChainedMember
+impl core::marker::Send for rcp::request::ChainedMember
+impl core::marker::Sync for rcp::request::ChainedMember
+impl core::marker::Unpin for rcp::request::ChainedMember
+impl core::marker::UnsafeUnpin for rcp::request::ChainedMember
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::ChainedMember
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::ChainedMember
+pub struct rcp::request::ClearRequest
+pub rcp::request::ClearRequest::byte_bus_id: u16
+pub rcp::request::ClearRequest::transaction_num: u8
+impl core::clone::Clone for rcp::request::ClearRequest
+pub fn rcp::request::ClearRequest::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::ClearRequest
+impl core::cmp::PartialEq for rcp::request::ClearRequest
+pub fn rcp::request::ClearRequest::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::request::ClearRequest
+pub fn rcp::request::ClearRequest::default() -> Self
+impl core::fmt::Debug for rcp::request::ClearRequest
+pub fn rcp::request::ClearRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::request::ClearRequest
+impl core::marker::StructuralPartialEq for rcp::request::ClearRequest
+impl core::marker::Freeze for rcp::request::ClearRequest
+impl core::marker::Send for rcp::request::ClearRequest
+impl core::marker::Sync for rcp::request::ClearRequest
+impl core::marker::Unpin for rcp::request::ClearRequest
+impl core::marker::UnsafeUnpin for rcp::request::ClearRequest
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::ClearRequest
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::ClearRequest
+pub struct rcp::request::ClearSingleRequest
+pub rcp::request::ClearSingleRequest::byte_bus_id: u16
+pub rcp::request::ClearSingleRequest::clear_transaction_num: u8
+pub rcp::request::ClearSingleRequest::transaction_num: u8
+impl core::clone::Clone for rcp::request::ClearSingleRequest
+pub fn rcp::request::ClearSingleRequest::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::ClearSingleRequest
+impl core::cmp::PartialEq for rcp::request::ClearSingleRequest
+pub fn rcp::request::ClearSingleRequest::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::request::ClearSingleRequest
+pub fn rcp::request::ClearSingleRequest::default() -> Self
+impl core::fmt::Debug for rcp::request::ClearSingleRequest
+pub fn rcp::request::ClearSingleRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::request::ClearSingleRequest
+impl core::marker::StructuralPartialEq for rcp::request::ClearSingleRequest
+impl core::marker::Freeze for rcp::request::ClearSingleRequest
+impl core::marker::Send for rcp::request::ClearSingleRequest
+impl core::marker::Sync for rcp::request::ClearSingleRequest
+impl core::marker::Unpin for rcp::request::ClearSingleRequest
+impl core::marker::UnsafeUnpin for rcp::request::ClearSingleRequest
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::ClearSingleRequest
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::ClearSingleRequest
 pub struct rcp::request::ClearTransactionNum(pub u8)
 impl core::clone::Clone for rcp::request::ClearTransactionNum
 pub fn rcp::request::ClearTransactionNum::clone(&self) -> Self
@@ -3711,6 +4218,52 @@ impl core::marker::Unpin for rcp::request::CompoundGateConfig
 impl core::marker::UnsafeUnpin for rcp::request::CompoundGateConfig
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::CompoundGateConfig
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::CompoundGateConfig
+pub struct rcp::request::CompoundRequest
+pub rcp::request::CompoundRequest::byte_bus_id: u16
+pub rcp::request::CompoundRequest::evt: rcp::acf::Evt
+pub rcp::request::CompoundRequest::payload: alloc::vec::Vec<u8>
+pub rcp::request::CompoundRequest::request_type: rcp::request::RequestKind
+pub rcp::request::CompoundRequest::step: rcp::request::CompoundStep
+pub rcp::request::CompoundRequest::transaction_num: u8
+impl core::clone::Clone for rcp::request::CompoundRequest
+pub fn rcp::request::CompoundRequest::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::CompoundRequest
+impl core::cmp::PartialEq for rcp::request::CompoundRequest
+pub fn rcp::request::CompoundRequest::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::request::CompoundRequest
+pub fn rcp::request::CompoundRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::request::CompoundRequest
+impl core::marker::Freeze for rcp::request::CompoundRequest
+impl core::marker::Send for rcp::request::CompoundRequest
+impl core::marker::Sync for rcp::request::CompoundRequest
+impl core::marker::Unpin for rcp::request::CompoundRequest
+impl core::marker::UnsafeUnpin for rcp::request::CompoundRequest
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::CompoundRequest
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::CompoundRequest
+pub struct rcp::request::CompoundStep
+pub rcp::request::CompoundStep::exec_delay: u16
+pub rcp::request::CompoundStep::next_state: u8
+pub rcp::request::CompoundStep::repeat_count: u16
+pub rcp::request::CompoundStep::sequencer_index: u8
+pub rcp::request::CompoundStep::start_state: u8
+impl core::clone::Clone for rcp::request::CompoundStep
+pub fn rcp::request::CompoundStep::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::CompoundStep
+impl core::cmp::PartialEq for rcp::request::CompoundStep
+pub fn rcp::request::CompoundStep::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::request::CompoundStep
+pub fn rcp::request::CompoundStep::default() -> Self
+impl core::fmt::Debug for rcp::request::CompoundStep
+pub fn rcp::request::CompoundStep::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::request::CompoundStep
+impl core::marker::StructuralPartialEq for rcp::request::CompoundStep
+impl core::marker::Freeze for rcp::request::CompoundStep
+impl core::marker::Send for rcp::request::CompoundStep
+impl core::marker::Sync for rcp::request::CompoundStep
+impl core::marker::Unpin for rcp::request::CompoundStep
+impl core::marker::UnsafeUnpin for rcp::request::CompoundStep
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::CompoundStep
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::CompoundStep
 pub struct rcp::request::PendingRequestKey
 pub rcp::request::PendingRequestKey::arrival_seq: u64
 pub rcp::request::PendingRequestKey::kind: rcp::request::RequestKind
@@ -3730,13 +4283,64 @@ impl core::marker::Unpin for rcp::request::PendingRequestKey
 impl core::marker::UnsafeUnpin for rcp::request::PendingRequestKey
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::PendingRequestKey
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::PendingRequestKey
+pub struct rcp::request::SequenceEnforcementOutcome
+pub rcp::request::SequenceEnforcementOutcome::accept: bool
+pub rcp::request::SequenceEnforcementOutcome::discontinuity: bool
+pub rcp::request::SequenceEnforcementOutcome::enter_safe_state: bool
+impl rcp::request::SequenceEnforcementOutcome
+pub fn rcp::request::SequenceEnforcementOutcome::drives_safestate(&self) -> bool
+pub fn rcp::request::SequenceEnforcementOutcome::is_rejected(&self) -> bool
+impl core::clone::Clone for rcp::request::SequenceEnforcementOutcome
+pub fn rcp::request::SequenceEnforcementOutcome::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::SequenceEnforcementOutcome
+impl core::cmp::PartialEq for rcp::request::SequenceEnforcementOutcome
+pub fn rcp::request::SequenceEnforcementOutcome::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::request::SequenceEnforcementOutcome
+pub fn rcp::request::SequenceEnforcementOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::request::SequenceEnforcementOutcome
+impl core::marker::StructuralPartialEq for rcp::request::SequenceEnforcementOutcome
+impl core::marker::Freeze for rcp::request::SequenceEnforcementOutcome
+impl core::marker::Send for rcp::request::SequenceEnforcementOutcome
+impl core::marker::Sync for rcp::request::SequenceEnforcementOutcome
+impl core::marker::Unpin for rcp::request::SequenceEnforcementOutcome
+impl core::marker::UnsafeUnpin for rcp::request::SequenceEnforcementOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::SequenceEnforcementOutcome
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::SequenceEnforcementOutcome
+pub struct rcp::request::SequenceTracker
+impl rcp::request::SequenceTracker
+pub fn rcp::request::SequenceTracker::evaluate(&mut self, bool, bool, u8) -> rcp::request::SequenceEnforcementOutcome
+pub fn rcp::request::SequenceTracker::new() -> Self
+pub fn rcp::request::SequenceTracker::prev_seq(&self) -> core::option::Option<u8>
+impl core::clone::Clone for rcp::request::SequenceTracker
+pub fn rcp::request::SequenceTracker::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::SequenceTracker
+impl core::cmp::PartialEq for rcp::request::SequenceTracker
+pub fn rcp::request::SequenceTracker::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::request::SequenceTracker
+pub fn rcp::request::SequenceTracker::default() -> Self
+impl core::fmt::Debug for rcp::request::SequenceTracker
+pub fn rcp::request::SequenceTracker::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::request::SequenceTracker
+impl core::marker::StructuralPartialEq for rcp::request::SequenceTracker
+impl core::marker::Freeze for rcp::request::SequenceTracker
+impl core::marker::Send for rcp::request::SequenceTracker
+impl core::marker::Sync for rcp::request::SequenceTracker
+impl core::marker::Unpin for rcp::request::SequenceTracker
+impl core::marker::UnsafeUnpin for rcp::request::SequenceTracker
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::SequenceTracker
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::SequenceTracker
 pub struct rcp::request::SequencerBank
 impl rcp::request::SequencerBank
+pub fn rcp::request::SequencerBank::access_check(&self, u8, u8) -> rcp::request::SequencerAccess
+pub fn rcp::request::SequencerBank::access_permitted(&self, u8, u8) -> bool
 pub fn rcp::request::SequencerBank::advance_if_still_in_start_state(&mut self, &rcp::request::CompoundGateConfig, rcp::request::SequencerState) -> core::result::Result<bool, rcp::RcpError>
+pub fn rcp::request::SequencerBank::check_compound_admission(&self, &rcp::request::CompoundStep, u8) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::SequencerBank::check_compound_gate(&self, &rcp::request::CompoundGateConfig) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::SequencerBank::force_state(&mut self, u8, rcp::request::SequencerState) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::SequencerBank::new(u8) -> Self
+pub fn rcp::request::SequencerBank::owner(&self, u8) -> core::result::Result<u8, rcp::RcpError>
 pub fn rcp::request::SequencerBank::read(&self, u8) -> core::result::Result<rcp::request::SequencerState, rcp::RcpError>
+pub fn rcp::request::SequencerBank::set_owner(&mut self, u8, u8) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::SequencerBank::svr_sequencers_max(&self) -> u8
 impl core::clone::Clone for rcp::request::SequencerBank
 pub fn rcp::request::SequencerBank::clone(&self) -> Self
@@ -3772,7 +4376,10 @@ impl core::marker::Unpin for rcp::request::SequencerState
 impl core::marker::UnsafeUnpin for rcp::request::SequencerState
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::SequencerState
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::SequencerState
-pub struct rcp::request::TimedExecutionTime(pub rcp::timestamp::AvtpTimestamp)
+pub struct rcp::request::TimedExecutionTime(_)
+impl rcp::request::TimedExecutionTime
+pub fn rcp::request::TimedExecutionTime::new(u64) -> core::result::Result<Self, rcp::RcpError>
+pub fn rcp::request::TimedExecutionTime::presentation_time(self) -> u64
 impl core::clone::Clone for rcp::request::TimedExecutionTime
 pub fn rcp::request::TimedExecutionTime::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::TimedExecutionTime
@@ -3782,6 +4389,8 @@ impl core::default::Default for rcp::request::TimedExecutionTime
 pub fn rcp::request::TimedExecutionTime::default() -> Self
 impl core::fmt::Debug for rcp::request::TimedExecutionTime
 pub fn rcp::request::TimedExecutionTime::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for rcp::request::TimedExecutionTime
+pub fn rcp::request::TimedExecutionTime::hash<__H: core::hash::Hasher>(&self, &mut __H)
 impl core::marker::Copy for rcp::request::TimedExecutionTime
 impl core::marker::StructuralPartialEq for rcp::request::TimedExecutionTime
 impl core::marker::Freeze for rcp::request::TimedExecutionTime
@@ -3791,6 +4400,26 @@ impl core::marker::Unpin for rcp::request::TimedExecutionTime
 impl core::marker::UnsafeUnpin for rcp::request::TimedExecutionTime
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::TimedExecutionTime
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::TimedExecutionTime
+pub struct rcp::request::TimedRequest
+pub rcp::request::TimedRequest::byte_bus_id: u16
+pub rcp::request::TimedRequest::payload: alloc::vec::Vec<u8>
+pub rcp::request::TimedRequest::presentation_time: u64
+pub rcp::request::TimedRequest::transaction_num: u8
+impl core::clone::Clone for rcp::request::TimedRequest
+pub fn rcp::request::TimedRequest::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::TimedRequest
+impl core::cmp::PartialEq for rcp::request::TimedRequest
+pub fn rcp::request::TimedRequest::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::request::TimedRequest
+pub fn rcp::request::TimedRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::request::TimedRequest
+impl core::marker::Freeze for rcp::request::TimedRequest
+impl core::marker::Send for rcp::request::TimedRequest
+impl core::marker::Sync for rcp::request::TimedRequest
+impl core::marker::Unpin for rcp::request::TimedRequest
+impl core::marker::UnsafeUnpin for rcp::request::TimedRequest
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::TimedRequest
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::TimedRequest
 pub struct rcp::request::TriggerExecDelay(pub u32)
 impl core::clone::Clone for rcp::request::TriggerExecDelay
 pub fn rcp::request::TriggerExecDelay::clone(&self) -> Self
@@ -3810,7 +4439,86 @@ impl core::marker::Unpin for rcp::request::TriggerExecDelay
 impl core::marker::UnsafeUnpin for rcp::request::TriggerExecDelay
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::TriggerExecDelay
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::TriggerExecDelay
+pub struct rcp::request::TriggeredRequest
+pub rcp::request::TriggeredRequest::byte_bus_id: u16
+pub rcp::request::TriggeredRequest::payload: alloc::vec::Vec<u8>
+pub rcp::request::TriggeredRequest::request_type: rcp::request::RequestKind
+pub rcp::request::TriggeredRequest::step: rcp::request::TriggeredStep
+pub rcp::request::TriggeredRequest::transaction_num: u8
+impl core::clone::Clone for rcp::request::TriggeredRequest
+pub fn rcp::request::TriggeredRequest::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::TriggeredRequest
+impl core::cmp::PartialEq for rcp::request::TriggeredRequest
+pub fn rcp::request::TriggeredRequest::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::request::TriggeredRequest
+pub fn rcp::request::TriggeredRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::request::TriggeredRequest
+impl core::marker::Freeze for rcp::request::TriggeredRequest
+impl core::marker::Send for rcp::request::TriggeredRequest
+impl core::marker::Sync for rcp::request::TriggeredRequest
+impl core::marker::Unpin for rcp::request::TriggeredRequest
+impl core::marker::UnsafeUnpin for rcp::request::TriggeredRequest
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::TriggeredRequest
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::TriggeredRequest
+pub struct rcp::request::TriggeredRuntime
+pub rcp::request::TriggeredRuntime::occurrence_count: u32
+pub rcp::request::TriggeredRuntime::started: bool
+impl rcp::request::TriggeredRuntime
+pub fn rcp::request::TriggeredRuntime::enter_started(&mut self)
+pub fn rcp::request::TriggeredRuntime::fire_ready(&self, &rcp::request::TriggeredStep, u32, bool) -> bool
+pub fn rcp::request::TriggeredRuntime::record_occurrence(&mut self, &rcp::request::TriggeredStep, u8, u8) -> bool
+pub fn rcp::request::TriggeredRuntime::threshold_reached(&self, &rcp::request::TriggeredStep) -> bool
+pub fn rcp::request::TriggeredRuntime::tick(&mut self, &rcp::request::TriggeredStep, u32, bool) -> bool
+impl core::clone::Clone for rcp::request::TriggeredRuntime
+pub fn rcp::request::TriggeredRuntime::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::TriggeredRuntime
+impl core::cmp::PartialEq for rcp::request::TriggeredRuntime
+pub fn rcp::request::TriggeredRuntime::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::request::TriggeredRuntime
+pub fn rcp::request::TriggeredRuntime::default() -> Self
+impl core::fmt::Debug for rcp::request::TriggeredRuntime
+pub fn rcp::request::TriggeredRuntime::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::request::TriggeredRuntime
+impl core::marker::StructuralPartialEq for rcp::request::TriggeredRuntime
+impl core::marker::Freeze for rcp::request::TriggeredRuntime
+impl core::marker::Send for rcp::request::TriggeredRuntime
+impl core::marker::Sync for rcp::request::TriggeredRuntime
+impl core::marker::Unpin for rcp::request::TriggeredRuntime
+impl core::marker::UnsafeUnpin for rcp::request::TriggeredRuntime
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::TriggeredRuntime
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::TriggeredRuntime
+pub struct rcp::request::TriggeredStep
+pub rcp::request::TriggeredStep::exec_delay: u16
+pub rcp::request::TriggeredStep::repeat_count: u16
+pub rcp::request::TriggeredStep::trigger_signal_nr: u8
+pub rcp::request::TriggeredStep::trigger_source_ep: u8
+pub rcp::request::TriggeredStep::trigger_threshold: u8
+impl rcp::request::TriggeredStep
+pub fn rcp::request::TriggeredStep::exec_delay_elapsed(&self, u32) -> bool
+impl core::clone::Clone for rcp::request::TriggeredStep
+pub fn rcp::request::TriggeredStep::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::TriggeredStep
+impl core::cmp::PartialEq for rcp::request::TriggeredStep
+pub fn rcp::request::TriggeredStep::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::request::TriggeredStep
+pub fn rcp::request::TriggeredStep::default() -> Self
+impl core::fmt::Debug for rcp::request::TriggeredStep
+pub fn rcp::request::TriggeredStep::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::request::TriggeredStep
+impl core::marker::StructuralPartialEq for rcp::request::TriggeredStep
+impl core::marker::Freeze for rcp::request::TriggeredStep
+impl core::marker::Send for rcp::request::TriggeredStep
+impl core::marker::Sync for rcp::request::TriggeredStep
+impl core::marker::Unpin for rcp::request::TriggeredStep
+impl core::marker::UnsafeUnpin for rcp::request::TriggeredStep
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::TriggeredStep
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::TriggeredStep
+pub const rcp::request::COMPOUND_REPEAT_INFINITE: u16
 pub const rcp::request::MIN_SEQUENCERS_FOR_COMPOUND_BUNDLE: u8
+pub const rcp::request::SEQUENCER_OWNER_UNCLAIMED: u8
+pub const rcp::request::TIMED_PRESENTATION_TIME_MAX: u64
+pub const rcp::request::TIMED_PRESENTATION_TIME_MODULUS: u64
+pub const rcp::request::TRIGGERED_REPEAT_INFINITE: u16
 pub const rcp::request::TRIGGER_REPEAT_COUNT_INFINITE_SENTINEL: u16
 pub fn rcp::request::advance_sequencer_if_still_in_start_state(rcp::request::SequencerState, &rcp::request::CompoundGateConfig, rcp::request::SequencerState) -> core::option::Option<rcp::request::SequencerState>
 pub fn rcp::request::check_chain_continuation(bool, bool) -> core::result::Result<(), rcp::RcpError>
@@ -3822,15 +4530,31 @@ pub fn rcp::request::check_compound_gate(rcp::request::SequencerState, &rcp::req
 pub fn rcp::request::check_rx_enforce_e2e(&[u8], u32, bool) -> core::result::Result<(), (rcp::RcpError, rcp::request::E2eFailureScope)>
 pub fn rcp::request::check_sequencer_num_in_bounds(u8, u8) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::check_watchdog_overflow_purge(rcp::request::RequestKind, bool) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::request::complete_repetition(&mut u16) -> bool
+pub fn rcp::request::decode_chained_member(&[u8]) -> core::result::Result<rcp::request::ChainedMember, rcp::request::RequestCodecError>
+pub fn rcp::request::decode_clear_all(&[u8]) -> core::result::Result<rcp::request::ClearRequest, rcp::request::RequestCodecError>
+pub fn rcp::request::decode_clear_non_safestate(&[u8]) -> core::result::Result<rcp::request::ClearRequest, rcp::request::RequestCodecError>
+pub fn rcp::request::decode_clear_single(&[u8]) -> core::result::Result<rcp::request::ClearSingleRequest, rcp::request::RequestCodecError>
+pub fn rcp::request::decode_compound_request(&[u8]) -> core::result::Result<rcp::request::CompoundRequest, rcp::request::RequestCodecError>
+pub fn rcp::request::decode_timed_request(&[u8]) -> core::result::Result<rcp::request::TimedRequest, rcp::request::RequestCodecError>
+pub fn rcp::request::decode_triggered_request(&[u8]) -> core::result::Result<rcp::request::TriggeredRequest, rcp::request::RequestCodecError>
 pub fn rcp::request::e2e_failure_scope(bool) -> rcp::request::E2eFailureScope
+pub fn rcp::request::encode_chained_member(&rcp::request::ChainedMember) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::request::encode_clear_all(&rcp::request::ClearRequest) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::request::encode_clear_non_safestate(&rcp::request::ClearRequest) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::request::encode_clear_single(&rcp::request::ClearSingleRequest) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::request::encode_compound_request(&rcp::request::CompoundRequest) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::request::encode_timed_request(&rcp::request::TimedRequest) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::request::encode_triggered_request(&rcp::request::TriggeredRequest) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::request::enter_sequencer_driven_safe_state(&mut rcp::request::SequencerBank, &rcp::request::CompoundGateConfig) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::evaluate_request_storage_overflow(bool, bool) -> rcp::request::OverflowOutcome
-pub fn rcp::request::evaluate_rx_enforce_seq(u32, u32, bool, bool) -> rcp::request::SequenceEnforcementOutcome
+pub fn rcp::request::evaluate_rx_enforce_seq(&mut rcp::request::SequenceTracker, bool, bool, u8) -> rcp::request::SequenceEnforcementOutcome
 pub fn rcp::request::execution_priority_tier(rcp::request::RequestKind) -> rcp::request::ExecutionPriorityTier
 pub fn rcp::request::is_gate_satisfied(rcp::request::SequencerState, &rcp::request::CompoundGateConfig) -> bool
 pub fn rcp::request::is_request_lifecycle_transition_defined(rcp::request::RequestLifecycleState, rcp::request::RequestLifecycleState) -> bool
-pub fn rcp::request::is_timed_request_ready(rcp::timestamp::AvtpTimestamp, rcp::request::TimedExecutionTime) -> bool
+pub fn rcp::request::is_timed_request_ready(u64, rcp::request::TimedExecutionTime) -> bool
 pub fn rcp::request::is_trigger_repeat_exhausted(u16, rcp::request::TriggerRepeatCount) -> bool
+pub fn rcp::request::peek_request_type(&[u8]) -> core::result::Result<u8, rcp::request::RequestCodecError>
 pub fn rcp::request::purge_normal_priority_on_watchdog_overflow(&[rcp::request::PendingRequestKey], bool) -> (alloc::vec::Vec<usize>, alloc::vec::Vec<usize>)
 pub fn rcp::request::resolve_compound_exec_delay(rcp::request::RequestKind, &rcp::request::CompoundExecDelays) -> core::option::Option<u32>
 pub fn rcp::request::resolve_safe_state_action(bool, rcp::request::SafeStateMechanism) -> rcp::request::SafeStateAction
@@ -3838,7 +4562,8 @@ pub fn rcp::request::resolve_safe_state_mechanism(bool, u8, u8) -> rcp::request:
 pub fn rcp::request::resolve_trigger_exec_delay(rcp::request::RequestKind, rcp::request::TriggerExecDelay) -> core::option::Option<u32>
 pub fn rcp::request::safe_state_sequencer_gate(u8, u8) -> rcp::request::CompoundGateConfig
 pub fn rcp::request::select_next_pending_request(&[rcp::request::PendingRequestKey]) -> core::option::Option<usize>
-pub fn rcp::request::should_count_trigger_occurrence(bool) -> bool
+pub fn rcp::request::should_count_trigger_occurrence(&rcp::request::TriggeredStep, u8, u8) -> bool
+pub fn rcp::request::timed_due(u64, u64) -> bool
 pub fn rcp::request::try_force_cancel_all(&mut rcp::request::RequestLifecycleState) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::try_force_cancel_non_safestate(&mut rcp::request::RequestLifecycleState, bool) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::try_force_cancel_single(&mut rcp::request::RequestLifecycleState, u8, rcp::request::ClearTransactionNum) -> core::result::Result<(), rcp::RcpError>
@@ -3872,12 +4597,26 @@ impl core::marker::Unpin for rcp::shmem::ShmBridge
 impl core::marker::UnsafeUnpin for rcp::shmem::ShmBridge
 impl !core::panic::unwind_safe::RefUnwindSafe for rcp::shmem::ShmBridge
 impl !core::panic::unwind_safe::UnwindSafe for rcp::shmem::ShmBridge
+pub struct rcp::shmem::ShmemAvtpTransport
+impl rcp::avtp::AvtpTransport for rcp::shmem::ShmemAvtpTransport
+pub fn rcp::shmem::ShmemAvtpTransport::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::shmem::ShmemAvtpTransport::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::shmem::ShmemAvtpTransport::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::shmem::ShmemAvtpTransport::time_sync_supported(&self) -> bool
+impl core::marker::Freeze for rcp::shmem::ShmemAvtpTransport
+impl core::marker::Send for rcp::shmem::ShmemAvtpTransport
+impl core::marker::Sync for rcp::shmem::ShmemAvtpTransport
+impl core::marker::Unpin for rcp::shmem::ShmemAvtpTransport
+impl core::marker::UnsafeUnpin for rcp::shmem::ShmemAvtpTransport
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::shmem::ShmemAvtpTransport
+impl core::panic::unwind_safe::UnwindSafe for rcp::shmem::ShmemAvtpTransport
 pub trait rcp::shmem::ShmChannel: core::marker::Send + core::marker::Sync
 pub fn rcp::shmem::ShmChannel::read(&self, core::option::Option<core::time::Duration>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::shmem::ShmChannel::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
 impl rcp::shmem::ShmChannel for rcp::shmem::InProcChannel
 pub fn rcp::shmem::InProcChannel::read(&self, core::option::Option<core::time::Duration>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::shmem::InProcChannel::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::shmem::shmem_avtp_pair_new(bool, usize) -> (rcp::shmem::ShmemAvtpTransport, rcp::shmem::ShmemAvtpTransport)
 pub mod rcp::sim
 pub enum rcp::sim::SimCall
 pub rcp::sim::SimCall::Read
@@ -4079,6 +4818,9 @@ pub mod rcp::timestamp
 pub enum rcp::timestamp::TimestampMeaning
 pub rcp::timestamp::TimestampMeaning::Timed
 pub rcp::timestamp::TimestampMeaning::Untimed
+impl rcp::timestamp::TimestampMeaning
+pub fn rcp::timestamp::TimestampMeaning::from_valid_bit(bool) -> Self
+pub fn rcp::timestamp::TimestampMeaning::is_untimed(self) -> bool
 impl core::clone::Clone for rcp::timestamp::TimestampMeaning
 pub fn rcp::timestamp::TimestampMeaning::clone(&self) -> Self
 impl core::cmp::Eq for rcp::timestamp::TimestampMeaning
@@ -4101,9 +4843,7 @@ pub struct rcp::timestamp::AvtpTimestamp(pub u32)
 impl rcp::timestamp::AvtpTimestamp
 pub const rcp::timestamp::AvtpTimestamp::ROLLOVER_PERIOD: u64
 pub fn rcp::timestamp::AvtpTimestamp::is_after(self, Self) -> bool
-pub fn rcp::timestamp::AvtpTimestamp::is_untimed(self) -> bool
 pub fn rcp::timestamp::AvtpTimestamp::new(u32) -> Self
-pub fn rcp::timestamp::AvtpTimestamp::semantics(self) -> rcp::timestamp::TimestampMeaning
 pub fn rcp::timestamp::AvtpTimestamp::to_u32(self) -> u32
 pub fn rcp::timestamp::AvtpTimestamp::wrapping_delta(self, Self) -> i64
 impl core::clone::Clone for rcp::timestamp::AvtpTimestamp
@@ -4134,9 +4874,7 @@ pub struct rcp::timestamp::MessageTimestamp(pub u64)
 impl rcp::timestamp::MessageTimestamp
 pub const rcp::timestamp::MessageTimestamp::ROLLOVER_PERIOD: u128
 pub fn rcp::timestamp::MessageTimestamp::is_after(self, Self) -> bool
-pub fn rcp::timestamp::MessageTimestamp::is_untimed(self) -> bool
 pub fn rcp::timestamp::MessageTimestamp::new(u64) -> Self
-pub fn rcp::timestamp::MessageTimestamp::semantics(self) -> rcp::timestamp::TimestampMeaning
 pub fn rcp::timestamp::MessageTimestamp::to_u64(self) -> u64
 pub fn rcp::timestamp::MessageTimestamp::wrapping_delta(self, Self) -> i64
 impl core::clone::Clone for rcp::timestamp::MessageTimestamp
@@ -4184,6 +4922,75 @@ pub trait rcp::tlstransport::TlsStream: core::marker::Send + core::marker::Sync
 pub fn rcp::tlstransport::TlsStream::peer_verified(&self) -> bool
 pub fn rcp::tlstransport::TlsStream::read_to_vec(&self, core::option::Option<core::time::Duration>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::tlstransport::TlsStream::write_all(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub mod rcp::tsn
+pub struct rcp::tsn::TsnConfig
+pub rcp::tsn::TsnConfig::cycle_ns: i32
+pub rcp::tsn::TsnConfig::pcp_map: rcp::tsn::TsnPcpMap
+pub rcp::tsn::TsnConfig::vlan_id: i32
+impl core::clone::Clone for rcp::tsn::TsnConfig
+pub fn rcp::tsn::TsnConfig::clone(&self) -> Self
+impl core::cmp::Eq for rcp::tsn::TsnConfig
+impl core::cmp::PartialEq for rcp::tsn::TsnConfig
+pub fn rcp::tsn::TsnConfig::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::tsn::TsnConfig
+pub fn rcp::tsn::TsnConfig::default() -> Self
+impl core::fmt::Debug for rcp::tsn::TsnConfig
+pub fn rcp::tsn::TsnConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::tsn::TsnConfig
+impl core::marker::StructuralPartialEq for rcp::tsn::TsnConfig
+impl core::marker::Freeze for rcp::tsn::TsnConfig
+impl core::marker::Send for rcp::tsn::TsnConfig
+impl core::marker::Sync for rcp::tsn::TsnConfig
+impl core::marker::Unpin for rcp::tsn::TsnConfig
+impl core::marker::UnsafeUnpin for rcp::tsn::TsnConfig
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::tsn::TsnConfig
+impl core::panic::unwind_safe::UnwindSafe for rcp::tsn::TsnConfig
+pub struct rcp::tsn::TsnPcpMap
+pub rcp::tsn::TsnPcpMap::pcp: [u8; 7]
+impl core::clone::Clone for rcp::tsn::TsnPcpMap
+pub fn rcp::tsn::TsnPcpMap::clone(&self) -> Self
+impl core::cmp::Eq for rcp::tsn::TsnPcpMap
+impl core::cmp::PartialEq for rcp::tsn::TsnPcpMap
+pub fn rcp::tsn::TsnPcpMap::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::tsn::TsnPcpMap
+pub fn rcp::tsn::TsnPcpMap::default() -> Self
+impl core::fmt::Debug for rcp::tsn::TsnPcpMap
+pub fn rcp::tsn::TsnPcpMap::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::tsn::TsnPcpMap
+impl core::marker::StructuralPartialEq for rcp::tsn::TsnPcpMap
+impl core::marker::Freeze for rcp::tsn::TsnPcpMap
+impl core::marker::Send for rcp::tsn::TsnPcpMap
+impl core::marker::Sync for rcp::tsn::TsnPcpMap
+impl core::marker::Unpin for rcp::tsn::TsnPcpMap
+impl core::marker::UnsafeUnpin for rcp::tsn::TsnPcpMap
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::tsn::TsnPcpMap
+impl core::panic::unwind_safe::UnwindSafe for rcp::tsn::TsnPcpMap
+pub struct rcp::tsn::TsnTransport<T: rcp::avtp::AvtpTransport>
+impl<T: rcp::avtp::AvtpTransport> rcp::tsn::TsnTransport<T>
+pub fn rcp::tsn::TsnTransport<T>::config(&self) -> &rcp::tsn::TsnConfig
+pub fn rcp::tsn::TsnTransport<T>::inner(&self) -> &T
+pub fn rcp::tsn::TsnTransport<T>::new(T, core::option::Option<alloc::rcs::arc::Arc<dyn rcp::tsn::SoPriority>>, rcp::tsn::TsnConfig) -> Self
+impl<T: rcp::avtp::AvtpTransport> rcp::avtp::AvtpTransport for rcp::tsn::TsnTransport<T>
+pub fn rcp::tsn::TsnTransport<T>::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::tsn::TsnTransport<T>::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::tsn::TsnTransport<T>::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::tsn::TsnTransport<T>::time_sync_supported(&self) -> bool
+impl<T> core::marker::Freeze for rcp::tsn::TsnTransport<T> where T: core::marker::Freeze
+impl<T> core::marker::Send for rcp::tsn::TsnTransport<T>
+impl<T> core::marker::Sync for rcp::tsn::TsnTransport<T>
+impl<T> core::marker::Unpin for rcp::tsn::TsnTransport<T> where T: core::marker::Unpin
+impl<T> core::marker::UnsafeUnpin for rcp::tsn::TsnTransport<T> where T: core::marker::UnsafeUnpin
+impl<T> !core::panic::unwind_safe::RefUnwindSafe for rcp::tsn::TsnTransport<T>
+impl<T> !core::panic::unwind_safe::UnwindSafe for rcp::tsn::TsnTransport<T>
+pub trait rcp::tsn::SoPriority: core::marker::Send + core::marker::Sync
+pub fn rcp::tsn::SoPriority::set_so_priority(&self, u8) -> core::result::Result<(), rcp::RcpError>
+impl rcp::tsn::SoPriority for rcp::l2::RawEthernetSocket
+pub fn rcp::l2::RawEthernetSocket::set_so_priority(&self, u8) -> core::result::Result<(), rcp::RcpError>
+impl rcp::tsn::SoPriority for std::net::udp::UdpSocket
+pub fn std::net::udp::UdpSocket::set_so_priority(&self, u8) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::tsn::classify_frame(&[u8]) -> rcp::request::ExecutionPriorityTier
+pub fn rcp::tsn::default_pcp_map() -> rcp::tsn::TsnPcpMap
+pub fn rcp::tsn::pcp_for(&rcp::tsn::TsnPcpMap, rcp::request::ExecutionPriorityTier) -> u8
 pub mod rcp::uart
 pub enum rcp::uart::UartReadCompletionReason
 pub rcp::uart::UartReadCompletionReason::Both
@@ -4370,11 +5177,33 @@ impl core::marker::Unpin for rcp::udp::StdUdpSocket
 impl core::marker::UnsafeUnpin for rcp::udp::StdUdpSocket
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::udp::StdUdpSocket
 impl core::panic::unwind_safe::UnwindSafe for rcp::udp::StdUdpSocket
+pub struct rcp::udp::UdpAvtpTransport
+impl rcp::udp::UdpAvtpTransport
+pub fn rcp::udp::UdpAvtpTransport::bind(&str, u16, bool) -> core::result::Result<Self, rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::bind_default_port(&str, bool) -> core::result::Result<Self, rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::dial(&str, u16, bool) -> core::result::Result<Self, rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::dial_default_port(&str, bool) -> core::result::Result<Self, rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::last_recv_seq(&self) -> u32
+pub fn rcp::udp::UdpAvtpTransport::local_addr(&self) -> core::result::Result<core::net::socket_addr::SocketAddr, rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::local_port(&self) -> u16
+pub fn rcp::udp::UdpAvtpTransport::try_clone_socket(&self) -> core::result::Result<std::net::udp::UdpSocket, rcp::RcpError>
+impl rcp::avtp::AvtpTransport for rcp::udp::UdpAvtpTransport
+pub fn rcp::udp::UdpAvtpTransport::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::time_sync_supported(&self) -> bool
+impl !core::marker::Freeze for rcp::udp::UdpAvtpTransport
+impl core::marker::Send for rcp::udp::UdpAvtpTransport
+impl core::marker::Sync for rcp::udp::UdpAvtpTransport
+impl core::marker::Unpin for rcp::udp::UdpAvtpTransport
+impl core::marker::UnsafeUnpin for rcp::udp::UdpAvtpTransport
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::udp::UdpAvtpTransport
+impl core::panic::unwind_safe::UnwindSafe for rcp::udp::UdpAvtpTransport
 pub struct rcp::udp::UdpRcServer
 impl rcp::udp::UdpRcServer
 pub fn rcp::udp::UdpRcServer::discovery_claim(&self) -> core::option::Option<rcp::discovery::DiscoveryClaim>
 pub fn rcp::udp::UdpRcServer::local_stream(&self) -> rcp::avtp::StreamId
-pub fn rcp::udp::UdpRcServer::new(rcp::avtp::StreamId, alloc::rcs::arc::Arc<dyn rcp::udp::UdpSocket>, alloc::rcs::arc::Arc<rcp::mock::RcServer>) -> Self
+pub fn rcp::udp::UdpRcServer::new(rcp::avtp::StreamId, alloc::rcs::arc::Arc<dyn rcp::avtp::AvtpTransport>, alloc::rcs::arc::Arc<rcp::mock::RcServer>) -> Self
 pub fn rcp::udp::UdpRcServer::rc_server(&self) -> &alloc::rcs::arc::Arc<rcp::mock::RcServer>
 pub fn rcp::udp::UdpRcServer::serve_one(&self, core::option::Option<core::time::Duration>, u8, std::time::Instant, core::time::Duration) -> core::result::Result<(), rcp::RcpError>
 impl !core::marker::Freeze for rcp::udp::UdpRcServer

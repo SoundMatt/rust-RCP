@@ -84,15 +84,20 @@ def main() -> int:
     markdown = hara_md_path.read_text()
 
     failures = []
+    # `.fusa-hara.json` uses rust-FuSa's canonical HARA schema (the one
+    # `rsfusa hara show` parses, and c-RCP's camelCase layout): S/E/C and the
+    # recorded ASIL live under each hazard's `risk` object, safety goals
+    # under top-level `safetyGoals`.
     for hazard in data["hazards"]:
+        risk = hazard["risk"]
         want = expected_asil(
-            hazard["severity"], hazard["exposure"], hazard["controllability"]
+            risk["severity"], risk["exposure"], risk["controllability"]
         )
-        got = hazard["asil"]
+        got = risk["asil"]
         if got != want:
             failures.append(
-                f"{hazard['id']}: S={hazard['severity']} E={hazard['exposure']} "
-                f"C={hazard['controllability']} -> Table 4 says {want}, "
+                f"{hazard['id']}: S={risk['severity']} E={risk['exposure']} "
+                f"C={risk['controllability']} -> Table 4 says {want}, "
                 f".fusa-hara.json says {got}"
             )
 
@@ -106,13 +111,13 @@ def main() -> int:
         md_asil = md_hazards.get(hazard["id"])
         if md_asil is None:
             failures.append(f"{hazard['id']}: missing from HARA.md's Hazard Summary table")
-        elif md_asil != hazard["asil"]:
+        elif md_asil != hazard["risk"]["asil"]:
             failures.append(
                 f"{hazard['id']}: HARA.md Hazard Summary table says {md_asil}, "
-                f".fusa-hara.json says {hazard['asil']}"
+                f".fusa-hara.json says {hazard['risk']['asil']}"
             )
 
-    for goal in data["safety_goals"]:
+    for goal in data["safetyGoals"]:
         md_asil = md_goals.get(goal["id"])
         if md_asil is None:
             failures.append(f"{goal['id']}: missing from HARA.md's Safety Goals table")

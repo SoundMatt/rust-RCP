@@ -65,7 +65,10 @@ use crate::acf::{
 use crate::addressing::{EndpointId, EndpointTable};
 use crate::avtp::{decode_ntscf_frame, encode_ntscf_frame, StreamId};
 use crate::ep0::{check_ep0_access_for_stream, route_byte_bus_id, RequestRoute};
-use crate::lifecycle::{RcServerState, RegisterCategory};
+use crate::lifecycle::{
+    check_field_writable, FieldKind, LifecycleError, PlausibilitySnapshot, RcServerState,
+    RegisterCategory, WriterCtx,
+};
 use crate::regmap::{EndpointType, GeneralRegisters};
 
 // ── Endpoint abstraction ──────────────────────────────────────────────────────
@@ -231,19 +234,22 @@ impl RcServer {
         *self.general.lock().unwrap()
     }
 
-    /// Attempt to move this server from its current state to `target`,
-    /// delegating to [`RcServerState::try_transition`]. On success, this
-    /// server's stored state is updated to `target`; on failure, it is left
-    /// unchanged.
+    /// Attempt to move this server from its current state to `target` on
+    /// behalf of `writer`, delegating to [`RcServerState::try_transition`]
+    /// — c-RCP's `rcp_mock_server_transition` (`c-RCP/src/mock.c:363`).
+    /// On success, this server's stored state is updated to `target`; on
+    /// failure, it is left unchanged and the [`LifecycleError`] is
+    /// returned.
     //fusa:req REQ-MOCKSRV-002
     pub fn try_transition(
         &self,
         target: RcServerState,
-        is_consistent: impl FnOnce() -> bool,
-    ) -> Result<(), RcpError> {
+        snap: Option<&PlausibilitySnapshot<'_>>,
+        writer: WriterCtx,
+        all_other_eps_idle: bool,
+    ) -> Result<(), LifecycleError> {
         let mut state = self.state.lock().unwrap();
-        let new_state = state.try_transition(target, is_consistent)?;
-        *state = new_state;
+        *state = state.try_transition(target, snap, writer, all_other_eps_idle)?;
         Ok(())
     }
 
@@ -283,28 +289,19 @@ impl RcServer {
     ///
     /// Routing follows [`crate::ep0::route_byte_bus_id`]:
     ///
-    /// - [`RequestRoute::Ep0`]: gated by
-    ///   [`check_ep0_access_for_stream`] against
-    ///   [`RegisterCategory::General`] only — this test double models no
-    ///   other register category's storage, so an EP0 access this crate
-    ///   would otherwise route to `HwConfig`/`RcpConfig` is answered as
-    ///   `General` too rather than rejected outright, a scope-narrowing
-    ///   simplification flagged here rather than silently assumed. A read
-    ///   returns the current [`GeneralRegisters::encode`] snapshot
-    ///   verbatim, for either the root client or any other stream (reads
-    ///   are never root-client-gated, per [`check_ep0_access_for_stream`]'s
-    ///   own doc comment). A write requires the payload to decode as a
-    ///   complete [`GeneralRegisters`] block (`Err(RcpError::ShortFrame)`
-    ///   otherwise) and replaces the snapshot wholesale, once past the
-    ///   root-client check — [`crate::lifecycle::lock_policy`] assigns
-    ///   [`RegisterCategory::General`] [`crate::lifecycle::LockPolicy::W`],
-    ///   writable whenever reachable, and `General` is reachable in every
-    ///   lifecycle state (see [`crate::lifecycle::is_register_reachable`]),
-    ///   so an EP0 write from the root client succeeds in every state. A
-    ///   write from any other stream is still rejected with
-    ///   `Err(RcpError::UnauthorizedAccess)` by
-    ///   [`check_ep0_access_for_stream`] before category writability is
-    ///   even considered — see that function's own doc comment.
+    /// - [`RequestRoute::Ep0`]: this test double models only the
+    ///   [`RegisterCategory::General`] block's storage, so every EP0 access
+    ///   is treated as a General access. A read is gated by
+    ///   [`check_ep0_access_for_stream`] and returns the current
+    ///   [`GeneralRegisters::encode`] snapshot verbatim, for any stream. A
+    ///   write is always rejected with `Err(RcpError::LockedMemAccess)`,
+    ///   for the root client and every other stream alike, and the
+    ///   snapshot is never modified: TC18 RC5 §12.7.5 Table 20 marks every
+    ///   General register read-only. This mirrors c-RCP's
+    ///   `rcp_regmap_general_decode_write_request`
+    ///   (`c-RCP/src/regmap.c:262`, REQ-RMAP-025), which answers any
+    ///   General write with `LOCKED_MEM_ACCESS` whatever the writer (see
+    ///   [`crate::regmap::general_decode_write_request`]).
     /// - [`RequestRoute::DeviceEndpoint`]: resolved through
     ///   [`EndpointTable::lookup`], `Err(RcpError::EpNotFound)` if nothing
     ///   is registered under the pair, otherwise dispatched to the
@@ -329,6 +326,18 @@ impl RcServer {
             RequestRoute::Ep0 => {
                 let state = self.state();
                 let root_client = *self.root_client.lock().unwrap();
+                if request.info.op {
+                    // TC18 Table 20 / c-RCP REQ-RMAP-025: the General block
+                    // is read-only. Rejected before the root-client check,
+                    // so the error is LOCKED_MEM_ACCESS for every writer.
+                    let writer = WriterCtx {
+                        via_root_client_ep0: crate::ep0::is_root_client(root_client, stream_id),
+                        ..WriterCtx::default()
+                    };
+                    return Err(check_field_writable(state, FieldKind::ReadOnly, writer)
+                        .err()
+                        .unwrap_or(RcpError::LockedMemAccess));
+                }
                 check_ep0_access_for_stream(
                     state,
                     RegisterCategory::General,
@@ -336,13 +345,7 @@ impl RcServer {
                     stream_id,
                     root_client,
                 )?;
-                if request.info.op {
-                    let decoded = GeneralRegisters::decode(&request.payload)?;
-                    *self.general.lock().unwrap() = decoded;
-                    Vec::new()
-                } else {
-                    self.general.lock().unwrap().encode().to_vec()
-                }
+                self.general.lock().unwrap().encode().to_vec()
             }
             RequestRoute::DeviceEndpoint => {
                 let endpoint_id = self
@@ -477,14 +480,37 @@ mod rc_server_tests {
     //fusa:test REQ-MOCKSRV-002
     fn try_transition_updates_state_on_success_and_leaves_it_on_failure() {
         let srv = RcServer::new(GeneralRegisters::default());
-        srv.try_transition(RcServerState::HwConfigured, || true)
-            .unwrap();
+        let snap = PlausibilitySnapshot::default();
+        srv.try_transition(
+            RcServerState::HwConfigured,
+            Some(&snap),
+            WriterCtx::default(),
+            true,
+        )
+        .unwrap();
         assert_eq!(srv.state(), RcServerState::HwConfigured);
 
+        // No plausibility evidence at all is RCP_CFG_INCONSISTENT.
+        let root = WriterCtx {
+            via_root_client_ep0: true,
+            ..WriterCtx::default()
+        };
         let err = srv
-            .try_transition(RcServerState::RcpConfigured, || false)
+            .try_transition(RcServerState::RcpConfigured, None, root, true)
             .unwrap_err();
-        assert_eq!(err, RcpError::InvalidParameter);
+        assert_eq!(err, LifecycleError::RcpCfgInconsistent);
+        assert_eq!(srv.state(), RcServerState::HwConfigured);
+
+        // An unauthorized writer is refused before plausibility.
+        let err = srv
+            .try_transition(
+                RcServerState::RcpConfigured,
+                Some(&snap),
+                WriterCtx::default(),
+                true,
+            )
+            .unwrap_err();
+        assert_eq!(err, LifecycleError::Unauthorized);
         assert_eq!(srv.state(), RcServerState::HwConfigured);
     }
 
@@ -527,27 +553,45 @@ mod rc_server_tests {
     #[test]
     //fusa:test REQ-MOCKSRV-004
     //fusa:test REQ-MOCKSRV-005
-    fn ep0_write_succeeds_for_the_root_client() {
-        // RegisterCategory::General now has LockPolicy::W
-        // (crate::lifecycle::lock_policy), writable whenever reachable, and
-        // General is reachable in every lifecycle state — so the designated
-        // root client, the only stream ever permitted to write EP0 at all,
-        // can successfully write it. See handle_abb's own doc comment for
-        // the corrected reasoning.
+    //fusa:test REQ-RMAP-037
+    fn ep0_general_write_from_the_root_client_is_locked_in_every_state() {
+        // TC18 RC5 Table 20: the General block is read-only (issue #190).
+        // c-RCP's rcp_regmap_general_decode_write_request answers with
+        // LOCKED_MEM_ACCESS; the root client cannot overwrite the block.
         let srv = RcServer::new(GeneralRegisters::default());
         let sid = stream(1);
         srv.set_root_client(Some(sid));
+        let snap = PlausibilitySnapshot::default();
+        let root = WriterCtx {
+            via_root_client_ep0: true,
+            ..WriterCtx::default()
+        };
 
         let new_regs = GeneralRegisters {
             svr_vendor_id: 0xBEEF,
             ..Default::default()
         };
         let req = abb_request(EP0_BYTE_BUS_ID, true, new_regs.encode().to_vec());
-        let resp = srv.handle_abb(sid, &req).unwrap();
-        assert!(resp.payload.is_empty());
+        for target in [RcServerState::HwConfigured, RcServerState::RcpConfigured] {
+            assert_eq!(
+                srv.handle_abb(sid, &req).unwrap_err(),
+                RcpError::LockedMemAccess
+            );
+            assert_eq!(
+                srv.general_registers().svr_vendor_id,
+                GeneralRegisters::default().svr_vendor_id
+            );
+            srv.try_transition(target, Some(&snap), root, true).unwrap();
+        }
+        assert_eq!(
+            srv.handle_abb(sid, &req).unwrap_err(),
+            RcpError::LockedMemAccess
+        );
 
-        // The snapshot must reflect the newly written value.
-        assert_eq!(srv.general_registers().svr_vendor_id, 0xBEEF);
+        // On the wire, the error response carries LOCKED_MEM_ACCESS too.
+        let resp = crate::acf::build_error_response(&req.info, &RcpError::LockedMemAccess)
+            .expect("LOCKED_MEM_ACCESS has a Table 27 code");
+        assert!(resp.info.err);
     }
 
     #[test]
@@ -563,8 +607,11 @@ mod rc_server_tests {
             true,
             GeneralRegisters::default().encode().to_vec(),
         );
+        // c-RCP parity: the read-only rule is writer-independent, so a
+        // non-root writer also gets LOCKED_MEM_ACCESS, not
+        // UNAUTHORIZED_ACCESS (c-RCP/src/regmap.c:283).
         let err = srv.handle_abb(other, &req).unwrap_err();
-        assert_eq!(err, RcpError::UnauthorizedAccess);
+        assert_eq!(err, RcpError::LockedMemAccess);
         // The snapshot must be unchanged.
         assert_eq!(
             srv.general_registers().svr_vendor_id,
@@ -582,11 +629,16 @@ mod rc_server_tests {
         // HW_UNCONFIGURED (initial).
         assert!(srv.handle_abb(sid, &req).is_ok());
 
-        srv.try_transition(RcServerState::HwConfigured, || true)
+        let snap = PlausibilitySnapshot::default();
+        let root = WriterCtx {
+            via_root_client_ep0: true,
+            ..WriterCtx::default()
+        };
+        srv.try_transition(RcServerState::HwConfigured, Some(&snap), root, true)
             .unwrap();
         assert!(srv.handle_abb(sid, &req).is_ok());
 
-        srv.try_transition(RcServerState::RcpConfigured, || true)
+        srv.try_transition(RcServerState::RcpConfigured, Some(&snap), root, true)
             .unwrap();
         assert!(srv.handle_abb(sid, &req).is_ok());
     }
