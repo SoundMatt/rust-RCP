@@ -126,6 +126,7 @@
 //! replies over any [`AvtpTransport`] (normally a bind-mode
 //! [`UdpAvtpTransport`]).
 
+use std::collections::HashMap;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
@@ -136,7 +137,9 @@ use crate::addressing::{EndpointId, EndpointTable};
 use crate::avtp::{self, AvtpTransport, StreamId, AVTP_MAX_FRAME_LEN};
 use crate::discovery::DiscoveryClaim;
 use crate::ep0::{self, RequestRoute};
-use crate::server::{FrameDispatch, Peer, RcServer};
+use crate::regmap::ResponseStreamConfigEntry;
+use crate::respqueue::{self, ResponseQueue};
+use crate::server::{FrameDispatch, Peer, RcServer, ResponseRoute};
 use crate::RcpError;
 
 // ── UdpSocket trait ───────────────────────────────────────────────────────────
@@ -724,10 +727,49 @@ pub fn resolve_endpoint(
 /// requester's address from each received datagram (`udp.c:250`) and
 /// [`AvtpTransport::send_frame`] replies to it, so the response goes back
 /// to whichever address the request arrived from.
+///
+/// # Response queues (issue #195)
+///
+/// A response whose request stream's `rx_ack_stream_index` /
+/// `rx_resp_stream_index` names an installed response-queue row
+/// ([`RcServer::set_response_queue_cfg`], TC18 RC5 §12.7.9 Table 27) is not
+/// sent straight back: [`RcServer::response_route`] routes it into that
+/// row's [`ResponseQueue`], which this server owns, and this server
+/// transmits the queue through the same [`AvtpTransport`] in NTSCF frames
+/// addressed under the queue's own stream
+/// ([`respqueue::response_queue_stream_id`], with this server's
+/// [`Self::local_stream`] MAC):
+///
+/// - [`Self::serve_one`] flushes a queue it pushed into for as long as its
+///   `flush_on_count` trigger holds ([`ResponseQueue::should_flush`]), one
+///   [`ResponseQueue::plan_batch`]-sized frame at a time;
+/// - [`Self::flush_due`] applies `Flush_time`: a due queue is flushed
+///   completely, or, when empty, emits the
+///   [`RcServer::check_response_queue_heartbeat`] heartbeat.
+///
+/// Each queue's frames carry their own running `sequence_num`. A response
+/// with no response queue to go to is sent as before.
+///
+/// c-RCP parity: c-RCP's server double never pushes into or transmits a
+/// response queue (`c-RCP/src/mock.c:396-400`, `mock.c:1690-1699`); the
+/// queue primitives (`respqueue.c`) and the heartbeat check
+/// (`mock.c:483-534`) are this crate's c-RCP ports, and this type is the
+/// integrator c-RCP leaves the composition to.
 pub struct UdpRcServer {
     local_stream: StreamId,
     transport: Arc<dyn AvtpTransport>,
     server: Arc<RcServer>,
+    queues: Mutex<HashMap<u8, TxQueue>>,
+    epoch: Instant,
+}
+
+/// One response queue this server transmits, with the configuration it
+/// was created from and its stream's next NTSCF `sequence_num`.
+#[derive(Debug)]
+struct TxQueue {
+    cfg: ResponseStreamConfigEntry,
+    queue: ResponseQueue,
+    sequence_num: u8,
 }
 
 /// What one [`UdpRcServer::serve_one`] call did with the datagram it
@@ -740,8 +782,13 @@ pub struct ServeReport {
     pub dispatch: FrameDispatch,
     /// Whether a response frame was sent back.
     pub response_sent: bool,
-    /// Why a non-empty response could not be framed, if it could not.
+    /// Why a non-empty response could not be framed or queued, if it could
+    /// not (`InvalidSize`: too large for its frame or response queue).
     pub response_error: Option<RcpError>,
+    /// How many responses were routed into a response queue.
+    pub queued: usize,
+    /// How many response-queue frames this call transmitted.
+    pub queue_frames_sent: usize,
 }
 
 impl UdpRcServer {
@@ -759,7 +806,151 @@ impl UdpRcServer {
             local_stream,
             transport,
             server,
+            queues: Mutex::new(HashMap::new()),
+            epoch: Instant::now(),
         }
+    }
+
+    /// A snapshot of the 1-based response queue `response_stream_index`,
+    /// if anything has been routed into it.
+    //fusa:req REQ-UDP-033
+    pub fn response_queue(&self, response_stream_index: u8) -> Option<ResponseQueue> {
+        self.queues
+            .lock()
+            .unwrap()
+            .get(&response_stream_index)
+            .map(|q| q.queue.clone())
+    }
+
+    /// Apply `Flush_time` to every installed response queue at `now`: each
+    /// queue whose [`RcServer::check_response_queue_heartbeat`] reports its
+    /// `Flush_time` elapsed is flushed completely, or sends that empty
+    /// heartbeat AVTPDU when nothing is queued. Returns how many frames
+    /// were sent; `Err` only when the transport fails. See this type's
+    /// doc comment, "Response queues".
+    //fusa:req REQ-UDP-033
+    //fusa:req REQ-RMAP-064
+    //fusa:req REQ-RMAP-065
+    //fusa:req REQ-SRV-017
+    pub fn flush_due(&self, now: Instant) -> Result<usize, RcpError> {
+        let now_us = self.micros(now);
+        let mac = self.local_stream.sender_mac;
+        let mut sent = 0;
+        for (i, cfg) in self.server.response_queue_cfg().iter().enumerate() {
+            let index = (i + 1) as u8; // safe: <= RESPONSE_QUEUE_CFG_MAX_ENTRIES (64)
+            let Some(heartbeat) = self
+                .server
+                .check_response_queue_heartbeat(index, mac, now_us)
+            else {
+                continue;
+            };
+            let mut queues = self.queues.lock().unwrap();
+            match queues.get_mut(&index).filter(|q| !q.queue.is_empty()) {
+                Some(txq) => {
+                    while !txq.queue.is_empty() {
+                        sent += usize::from(self.transmit(index, cfg, txq, now_us)?.is_ok());
+                    }
+                }
+                None => {
+                    self.transport.send_frame(&heartbeat)?;
+                    sent += 1;
+                }
+            }
+        }
+        Ok(sent)
+    }
+
+    fn micros(&self, now: Instant) -> u64 {
+        u64::try_from(now.saturating_duration_since(self.epoch).as_micros()).unwrap_or(u64::MAX)
+    }
+
+    /// Route one member response: into its response queue (`Some(index)`
+    /// when queued), or `None` for the direct reply.
+    fn enqueue(
+        &self,
+        requester: Option<StreamId>,
+        response: &[u8],
+        report: &mut ServeReport,
+    ) -> Option<u8> {
+        let route = requester.map_or(ResponseRoute::Direct, |s| {
+            self.server.response_route(s, response)
+        });
+        let ResponseRoute::Queue(index) = route else {
+            return None;
+        };
+        let cfg = *self
+            .server
+            .response_queue_cfg()
+            .get(usize::from(index) - 1)?;
+        let mut queues = self.queues.lock().unwrap();
+        let txq = queues.entry(index).or_insert_with(|| TxQueue {
+            cfg,
+            queue: ResponseQueue::from_config(&cfg),
+            sequence_num: 0,
+        });
+        if (txq.cfg.resp_queue_size, txq.cfg.resp_max_avtpdu_size)
+            != (cfg.resp_queue_size, cfg.resp_max_avtpdu_size)
+        {
+            txq.queue = ResponseQueue::from_config(&cfg);
+        }
+        txq.cfg = cfg;
+        if txq.queue.push(response) {
+            report.queued += 1;
+        } else {
+            report.response_error = Some(RcpError::InvalidSize);
+        }
+        Some(index)
+    }
+
+    /// Transmit `index`'s batches for as long as its `flush_on_count`
+    /// trigger holds, counting them in `report`.
+    fn flush_by_count(
+        &self,
+        index: u8,
+        now_us: u64,
+        report: &mut ServeReport,
+    ) -> Result<(), RcpError> {
+        let mut queues = self.queues.lock().unwrap();
+        let Some(txq) = queues.get_mut(&index) else {
+            return Ok(());
+        };
+        let cfg = txq.cfg;
+        while txq
+            .queue
+            .should_flush(usize::from(cfg.resp_flush_on_count) * 4)
+        {
+            match self.transmit(index, &cfg, txq, now_us)? {
+                Ok(()) => report.queue_frames_sent += 1,
+                Err(e) => report.response_error = Some(e),
+            }
+        }
+        Ok(())
+    }
+
+    /// Pop one [`ResponseQueue::plan_batch`] of `txq` and send it as one
+    /// NTSCF frame on the queue's stream, restarting its `Flush_time`
+    /// interval. The outer `Err` is a transport failure; the inner one a
+    /// batch too large to frame (dropped).
+    fn transmit(
+        &self,
+        index: u8,
+        cfg: &ResponseStreamConfigEntry,
+        txq: &mut TxQueue,
+        now_us: u64,
+    ) -> Result<Result<(), RcpError>, RcpError> {
+        let n = txq
+            .queue
+            .plan_batch(usize::from(cfg.resp_max_avtpdu_size) * 4);
+        let body: Vec<u8> = (0..n).filter_map(|_| txq.queue.pop()).flatten().collect();
+        let stream = respqueue::response_queue_stream_id(cfg, self.local_stream.sender_mac);
+        let frame = match avtp::encode_ntscf_frame(stream, txq.sequence_num, &body) {
+            Ok(frame) => frame,
+            Err(e) => return Ok(Err(e)),
+        };
+        self.transport.send_frame(&frame)?;
+        txq.sequence_num = txq.sequence_num.wrapping_add(1);
+        self.server.note_response_queue_transmit(index, now_us);
+        Ok(Ok(()))
     }
 
     /// This server's local [`StreamId`] — the identity every response frame
@@ -805,12 +996,19 @@ impl UdpRcServer {
     /// recording the drop and sends nothing, and a receive loop survives it
     /// (issue #89). Nothing is sent when no member produced a response
     /// (queued without acknowledge, dropped, suppressed).
+    ///
+    /// A response routed to a response queue is pushed there instead and
+    /// that queue is flushed by `flush_on_count` (see this type's doc
+    /// comment, "Response queues"); [`ServeReport::queued`] and
+    /// [`ServeReport::queue_frames_sent`] record it.
     //fusa:req REQ-UDP-008
     //fusa:req REQ-UDP-009
     //fusa:req REQ-UDP-010
     //fusa:req REQ-UDP-011
     //fusa:req REQ-UDP-032
     //fusa:req REQ-UDP-031
+    //fusa:req REQ-UDP-033
+    //fusa:req REQ-RMAP-063
     pub fn serve_one(
         &self,
         recv_timeout: Option<Duration>,
@@ -829,17 +1027,37 @@ impl UdpRcServer {
             dispatch,
             response_sent: false,
             response_error: None,
+            queued: 0,
+            queue_frames_sent: 0,
         };
-        let body = report.dispatch.response_bytes();
-        if body.is_empty() {
-            return Ok(report);
-        }
-        match avtp::encode_ntscf_frame(self.local_stream, sequence_num, &body) {
-            Ok(response_frame) => {
-                self.transport.send_frame(&response_frame)?;
-                report.response_sent = true;
+        let requester = report.dispatch.requester;
+        let responses: Vec<Vec<u8>> = report
+            .dispatch
+            .members
+            .iter()
+            .filter_map(|m| m.response.clone())
+            .collect();
+        let mut body = Vec::new();
+        let mut touched: Vec<u8> = Vec::new();
+        for response in &responses {
+            match self.enqueue(requester, response, &mut report) {
+                Some(index) if !touched.contains(&index) => touched.push(index),
+                Some(_) => {}
+                None => body.extend_from_slice(response),
             }
-            Err(e) => report.response_error = Some(e),
+        }
+        if !body.is_empty() {
+            match avtp::encode_ntscf_frame(self.local_stream, sequence_num, &body) {
+                Ok(response_frame) => {
+                    self.transport.send_frame(&response_frame)?;
+                    report.response_sent = true;
+                }
+                Err(e) => report.response_error = Some(e),
+            }
+        }
+        let now_us = self.micros(now);
+        for index in touched {
+            self.flush_by_count(index, now_us, &mut report)?;
         }
         Ok(report)
     }
@@ -1685,6 +1903,223 @@ mod tests {
             let (_, resp) = decode_response(&sent[0].0);
             assert!(resp.info.err);
             assert_eq!(resp.payload, vec![15]); // INVALID_PARAMETER = 15
+        }
+        // ── response queues (issue #195) ─────────────────────────────────
+
+        fn queue_stream() -> StreamId {
+            StreamId::new(server_stream().sender_mac, 0x0B0C)
+        }
+
+        /// A server whose client_stream(2) requests are bound to a
+        /// MockEndpoint at byte_bus_id 7 and whose responses (and
+        /// acknowledges) go to response queue `resp_index`, with
+        /// `rows` installed.
+        fn queued_server(
+            resp_index: u8,
+            rows: &[ResponseStreamConfigEntry],
+            inbound: usize,
+        ) -> (UdpRcServer, Arc<QueuedUdpSocket>) {
+            let rc = RcServer::new(GeneralRegisters::default());
+            let sid = client_stream(2);
+            let endpoint = MockEndpoint::new(EndpointType::Gpio, vec![0; 4]);
+            rc.register_endpoint(sid, 7, endpoint).unwrap();
+            rc.set_request_stream_cfg(&[crate::regmap::RequestStreamConfigEntry {
+                rx_stream_id: sid.to_u64(),
+                rx_ack_stream_index: resp_index,
+                rx_resp_stream_index: resp_index,
+                ..Default::default()
+            }])
+            .unwrap();
+            rc.set_ep_id_map(&[crate::regmap::EpByteBusIdMapEntry {
+                map_stream_index: 1,
+                map_ep_nr: 1,
+                map_byte_bus_id: 7,
+            }])
+            .unwrap();
+            rc.set_response_queue_cfg(rows).unwrap();
+            let frames = (0..inbound)
+                .map(|i| {
+                    let mut request = abb(7, true, vec![0xDE, 0xAD, 0xBE, 0xEF]);
+                    request.info.transaction_num = i as u8;
+                    (frame_for(sid, &request), client_addr())
+                })
+                .collect();
+            let socket = QueuedUdpSocket::with_inbound(frames);
+            (
+                UdpRcServer::new(server_stream(), socket.clone(), rc),
+                socket,
+            )
+        }
+
+        fn row(
+            max_avtpdu_size: u16,
+            queue_size: u16,
+            flush_on_count: u16,
+            flush_time: u16,
+        ) -> ResponseStreamConfigEntry {
+            ResponseStreamConfigEntry {
+                resp_stream_uid: 0x0B0C,
+                resp_max_avtpdu_size: max_avtpdu_size,
+                resp_queue_size: queue_size,
+                resp_flush_on_count: flush_on_count,
+                resp_flush_time: flush_time,
+            }
+        }
+
+        fn serve(srv: &UdpRcServer) -> ServeReport {
+            srv.serve_one(None, 0x40, Instant::now(), discovery::DISCOVERY_TIME_OUT)
+                .unwrap()
+        }
+
+        #[test]
+        //fusa:test REQ-UDP-033
+        //fusa:test REQ-RMAP-063
+        //fusa:test REQ-SRVCFG-003
+        fn a_routed_response_is_flushed_by_count_on_the_queue_stream() {
+            let (srv, socket) = queued_server(1, &[row(0, 0, 1, 0)], 2);
+            let report = serve(&srv);
+            assert!(!report.response_sent, "nothing goes straight back");
+            assert_eq!((report.queued, report.queue_frames_sent), (1, 1));
+            let response = report.dispatch.response_bytes();
+            let report = serve(&srv);
+            assert_eq!(report.queue_frames_sent, 1);
+            let sent = socket.sent();
+            assert_eq!(sent.len(), 2);
+            for (seq, (bytes, addr)) in sent.iter().enumerate() {
+                assert_eq!(*addr, client_addr());
+                let (hdr, body) = avtp::decode_ntscf_frame(bytes).unwrap();
+                assert_eq!(StreamId::from_u64(hdr.stream_id), queue_stream());
+                assert_eq!(hdr.sequence_num, seq as u8, "the queue stream's own count");
+                assert_eq!(body.len(), response.len());
+            }
+            assert!(srv.response_queue(1).unwrap().is_empty());
+        }
+
+        #[test]
+        //fusa:test REQ-UDP-033
+        //fusa:test REQ-RMAP-064
+        //fusa:test REQ-RMAP-065
+        //fusa:test REQ-SRV-017
+        fn below_flush_on_count_responses_wait_for_flush_time_then_heartbeat() {
+            let (srv, socket) = queued_server(1, &[row(0, 0, 1000, 100)], 2);
+            let first = serve(&srv);
+            let second = serve(&srv);
+            assert_eq!((first.queued, first.queue_frames_sent), (1, 0));
+            assert_eq!((second.queued, second.queue_frames_sent), (1, 0));
+            assert!(socket.sent().is_empty());
+            assert_eq!(srv.response_queue(1).unwrap().len(), 2);
+
+            let t0 = Instant::now();
+            assert_eq!(srv.flush_due(t0).unwrap(), 0, "the first check only seeds");
+            assert_eq!(srv.flush_due(t0 + Duration::from_micros(50)).unwrap(), 0);
+            assert_eq!(srv.flush_due(t0 + Duration::from_micros(100)).unwrap(), 1);
+            let sent = socket.sent();
+            let (hdr, body) = avtp::decode_ntscf_frame(&sent[0].0).unwrap();
+            assert_eq!(StreamId::from_u64(hdr.stream_id), queue_stream());
+            let mut expected = first.dispatch.response_bytes();
+            expected.extend(second.dispatch.response_bytes());
+            assert_eq!(body, expected.as_slice(), "both packed in one AVTPDU");
+            assert!(srv.response_queue(1).unwrap().is_empty());
+
+            assert_eq!(srv.flush_due(t0 + Duration::from_micros(200)).unwrap(), 1);
+            let heartbeat = &socket.sent()[1].0;
+            let mut golden = vec![0x82, 0x80, 0x00, 0x00];
+            golden.extend(queue_stream().to_u64().to_be_bytes());
+            assert_eq!(heartbeat, &golden, "empty NTSCF heartbeat, c-RCP bytes");
+        }
+
+        #[test]
+        //fusa:test REQ-UDP-033
+        //fusa:test REQ-RMAP-063
+        fn a_flush_packs_batches_within_max_avtpdu_size() {
+            let (probe, _) = queued_server(1, &[row(0, 0, 1, 0)], 1);
+            let len = serve(&probe).dispatch.response_bytes().len();
+            let quadlets = len.div_ceil(4) as u16;
+            let (srv, socket) = queued_server(1, &[row(quadlets, 0, 1000, 100)], 2);
+            serve(&srv);
+            serve(&srv);
+            let t0 = Instant::now();
+            srv.flush_due(t0).unwrap();
+            assert_eq!(srv.flush_due(t0 + Duration::from_micros(100)).unwrap(), 2);
+            let seqs: Vec<u8> = socket
+                .sent()
+                .iter()
+                .map(|(b, _)| avtp::decode_ntscf_frame(b).unwrap().0.sequence_num)
+                .collect();
+            assert_eq!(seqs, vec![0, 1]);
+        }
+
+        #[test]
+        //fusa:test REQ-UDP-033
+        fn a_response_too_large_for_its_queue_is_reported_and_not_sent() {
+            let (srv, socket) = queued_server(1, &[row(1, 0, 1, 0)], 1);
+            let report = serve(&srv);
+            assert_eq!(report.response_error, Some(RcpError::InvalidSize));
+            assert_eq!((report.queued, report.queue_frames_sent), (0, 0));
+            assert!(socket.sent().is_empty());
+        }
+
+        #[test]
+        //fusa:test REQ-UDP-033
+        //fusa:test REQ-SRVCFG-003
+        fn a_pointer_past_the_installed_rows_still_replies_directly() {
+            let (srv, socket) = queued_server(2, &[row(0, 0, 1, 0)], 1);
+            let report = serve(&srv);
+            assert!(report.response_sent);
+            assert_eq!(report.queued, 0);
+            let (resp_stream, _) = decode_response(&socket.sent()[0].0);
+            assert_eq!(resp_stream, server_stream());
+            assert!(srv.response_queue(1).is_none());
+        }
+
+        #[test]
+        //fusa:test REQ-UDP-033
+        fn resizing_a_queue_recreates_it() {
+            let (srv, _socket) = queued_server(1, &[row(0, 0, 1000, 0)], 3);
+            serve(&srv);
+            serve(&srv);
+            assert_eq!(srv.response_queue(1).unwrap().len(), 2);
+            srv.rc_server()
+                .set_response_queue_cfg(&[row(0, 100, 1000, 0)])
+                .unwrap();
+            serve(&srv);
+            let q = srv.response_queue(1).unwrap();
+            assert_eq!((q.len(), q.capacity_octets()), (1, 400));
+        }
+
+        #[test]
+        //fusa:test REQ-UDP-033
+        //fusa:test REQ-RMAP-064
+        fn a_count_triggered_transmission_restarts_flush_time() {
+            let (srv, socket) = queued_server(1, &[row(0, 0, 1, 100)], 1);
+            let t0 = Instant::now();
+            assert_eq!(srv.flush_due(t0).unwrap(), 0, "seed at t0");
+            let report = srv
+                .serve_one(
+                    None,
+                    0,
+                    t0 + Duration::from_micros(50),
+                    discovery::DISCOVERY_TIME_OUT,
+                )
+                .unwrap();
+            assert_eq!(report.queue_frames_sent, 1);
+            assert_eq!(srv.flush_due(t0 + Duration::from_micros(100)).unwrap(), 0);
+            assert_eq!(srv.flush_due(t0 + Duration::from_micros(150)).unwrap(), 1);
+            assert_eq!(socket.sent().len(), 2);
+        }
+
+        #[test]
+        //fusa:test REQ-UDP-033
+        fn a_transport_failure_while_flushing_is_returned() {
+            let (srv, _socket) = queued_server(1, &[row(0, 0, 1000, 100)], 0);
+            let t0 = Instant::now();
+            assert_eq!(srv.flush_due(t0), Ok(0));
+            // No request was ever received, so the test transport has no
+            // peer to send the heartbeat to.
+            assert_eq!(
+                srv.flush_due(t0 + Duration::from_micros(100)),
+                Err(RcpError::Busy)
+            );
         }
     }
 

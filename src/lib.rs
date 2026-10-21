@@ -113,6 +113,7 @@ pub mod redundancy;
 pub mod regmap;
 pub mod relay;
 pub mod request;
+pub mod respqueue;
 pub mod server;
 pub mod shmem;
 pub mod sim;

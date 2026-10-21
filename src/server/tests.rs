@@ -2579,3 +2579,135 @@ fn response_builders_match_c_rcp_golden_vectors() {
     }
     assert_eq!(checked, 9 * (1 + 2 * 17));
 }
+
+// ── Response routing / response-queue config + heartbeat (issue #195) ───────
+
+fn queue_row(stream_uid: u16, flush_time: u16) -> ResponseStreamConfigEntry {
+    ResponseStreamConfigEntry {
+        resp_stream_uid: stream_uid,
+        resp_flush_time: flush_time,
+        ..ResponseStreamConfigEntry::default()
+    }
+}
+
+#[test]
+//fusa:test REQ-RMAP-034
+fn set_response_queue_cfg_bounds_the_table_and_syncs_capacity() {
+    let srv = RcServer::new(GeneralRegisters::default());
+    let rows = vec![queue_row(1, 0); RESPONSE_QUEUE_CFG_MAX_ENTRIES + 1];
+    assert_eq!(
+        srv.set_response_queue_cfg(&rows),
+        Err(RcpError::InvalidSize)
+    );
+    assert!(srv.response_queue_cfg().is_empty());
+    srv.set_response_queue_cfg(&rows[..2]).unwrap();
+    assert_eq!(srv.response_queue_cfg(), rows[..2].to_vec());
+    assert_eq!(srv.general_registers().svr_response_stream_cfg.capacity, 2);
+    srv.set_response_queue_cfg(&rows[..1]).unwrap();
+    assert_eq!(srv.general_registers().svr_response_stream_cfg.capacity, 1);
+}
+
+#[test]
+//fusa:test REQ-SRVCFG-003
+//fusa:test REQ-RMAP-048
+//fusa:test REQ-RMAP-049
+fn response_route_follows_the_ack_and_resp_stream_pointers() {
+    let sid = stream(1);
+    let srv = RcServer::new(GeneralRegisters::default());
+    let mut resp_msg = abb_request(5, false, vec![]);
+    resp_msg.info.rsp = true;
+    let resp = encode_acf_abb(&resp_msg).unwrap();
+    resp_msg.info.evt = Evt {
+        ack: true,
+        sub_opcode: 0x07,
+    };
+    let ack_resp = encode_acf_abb(&resp_msg).unwrap();
+    // Unconfigured request stream: straight back, whatever the response.
+    assert_eq!(srv.response_route(sid, &resp), ResponseRoute::Direct);
+    srv.set_request_stream_cfg(&[RequestStreamConfigEntry {
+        rx_ack_stream_index: 2,
+        rx_resp_stream_index: 1,
+        ..cfg_for(sid)
+    }])
+    .unwrap();
+    // Pointers set, but no response-queue rows installed: Direct.
+    assert_eq!(srv.response_route(sid, &resp), ResponseRoute::Direct);
+    srv.set_response_queue_cfg(&[queue_row(0x10, 0), queue_row(0x20, 0)])
+        .unwrap();
+    assert_eq!(srv.response_route(sid, &resp), ResponseRoute::Queue(1));
+    assert_eq!(srv.response_route(sid, &ack_resp), ResponseRoute::Queue(2));
+    assert_eq!(srv.response_route(sid, &[0u8; 3]), ResponseRoute::Direct);
+    assert_eq!(srv.response_route(stream(9), &resp), ResponseRoute::Direct);
+    srv.set_response_queue_cfg(&[queue_row(0x10, 0)]).unwrap();
+    assert_eq!(
+        srv.response_route(sid, &ack_resp),
+        ResponseRoute::Direct,
+        "a pointer past the installed rows has no queue"
+    );
+    srv.set_request_stream_cfg(&[RequestStreamConfigEntry {
+        rx_ack_stream_index: 0,
+        rx_resp_stream_index: 0,
+        ..cfg_for(sid)
+    }])
+    .unwrap();
+    assert_eq!(srv.response_route(sid, &resp), ResponseRoute::Suppress);
+    assert_eq!(srv.response_route(sid, &ack_resp), ResponseRoute::Suppress);
+}
+
+/// Golden vectors from c-RCP's real `rcp_mock_server_check_response_queue_heartbeat()`
+/// (`mock.c:483`): two rows `{stream_uid 0x0B0C, flush_time 100}` and
+/// `{stream_uid 0x0002, flush_time 0}`, mac `02:AA:BB:CC:DD:EE`.
+#[test]
+//fusa:test REQ-RMAP-065
+//fusa:test REQ-SRV-017
+fn response_queue_heartbeat_matches_c_rcp_golden_vectors() {
+    let srv = RcServer::new(GeneralRegisters::default());
+    srv.set_response_queue_cfg(&[queue_row(0x0B0C, 100), queue_row(0x0002, 0)])
+        .unwrap();
+    let mac = [0x02, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE];
+    assert_eq!(
+        srv.check_response_queue_heartbeat(1, mac, 1000),
+        None,
+        "seed"
+    );
+    assert_eq!(srv.check_response_queue_heartbeat(1, mac, 1099), None);
+    assert_eq!(
+        srv.check_response_queue_heartbeat(1, mac, 1100),
+        Some(vec![
+            0x82, 0x80, 0x00, 0x00, 0x02, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0x0B, 0x0C
+        ])
+    );
+    assert_eq!(
+        srv.check_response_queue_heartbeat(1, mac, 1150),
+        None,
+        "timer reset"
+    );
+    assert_eq!(
+        srv.check_response_queue_heartbeat(1, mac, 900),
+        None,
+        "non-monotonic"
+    );
+    assert_eq!(srv.check_response_queue_heartbeat(0, mac, 5000), None);
+    assert_eq!(srv.check_response_queue_heartbeat(3, mac, 5000), None);
+    assert_eq!(srv.check_response_queue_heartbeat(2, mac, 0), None);
+    assert_eq!(
+        srv.check_response_queue_heartbeat(2, mac, 1_000_000),
+        None,
+        "Flush_time 0 never fires"
+    );
+}
+
+#[test]
+//fusa:test REQ-RMAP-064
+fn a_noted_transmission_restarts_the_flush_time_interval() {
+    let srv = RcServer::new(GeneralRegisters::default());
+    srv.set_response_queue_cfg(&[queue_row(1, 100)]).unwrap();
+    let mac = [0x02; 6];
+    srv.note_response_queue_transmit(1, 1000);
+    srv.note_response_queue_transmit(0, 0);
+    srv.note_response_queue_transmit(2, 0);
+    assert_eq!(srv.check_response_queue_heartbeat(1, mac, 1099), None);
+    srv.note_response_queue_transmit(1, 1090);
+    assert_eq!(srv.check_response_queue_heartbeat(1, mac, 1150), None);
+    assert!(srv.check_response_queue_heartbeat(1, mac, 1190).is_some());
+}

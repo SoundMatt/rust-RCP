@@ -2736,6 +2736,7 @@ impl core::panic::unwind_safe::UnwindSafe for rcp::mock::MockEndpoint
 pub struct rcp::mock::RcServer
 impl rcp::server::RcServer
 pub fn rcp::server::RcServer::broadcast_safe_state(&self, u8) -> usize
+pub fn rcp::server::RcServer::check_response_queue_heartbeat(&self, u8, [u8; 6], u64) -> core::option::Option<alloc::vec::Vec<u8>>
 pub fn rcp::server::RcServer::check_watchdog(&self, u8, u64) -> core::option::Option<rcp::server::WatchdogCheck>
 pub fn rcp::server::RcServer::discovery_claim(&self) -> core::option::Option<rcp::discovery::DiscoveryClaim>
 pub fn rcp::server::RcServer::dispatch_frame(&self, &[u8], &rcp::server::Peer) -> rcp::server::FrameDispatch
@@ -2747,17 +2748,21 @@ pub fn rcp::server::RcServer::general_registers(&self) -> rcp::regmap::GeneralRe
 pub fn rcp::server::RcServer::handle_ntscf_frame(&self, rcp::avtp::StreamId, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::server::RcServer::last_watchdog_kick(&self, u8) -> core::option::Option<std::time::Instant>
 pub fn rcp::server::RcServer::new(rcp::regmap::GeneralRegisters) -> alloc::rcs::arc::Arc<Self>
+pub fn rcp::server::RcServer::note_response_queue_transmit(&self, u8, u64)
 pub fn rcp::server::RcServer::notify_trigger(&self, u8, u8) -> usize
 pub fn rcp::server::RcServer::pending_count(&self, rcp::avtp::StreamId, u16) -> usize
 pub fn rcp::server::RcServer::register_endpoint(&self, rcp::avtp::StreamId, u16, alloc::rcs::arc::Arc<dyn rcp::server::Endpoint>) -> core::result::Result<rcp::addressing::EndpointId, rcp::RcpError>
 pub fn rcp::server::RcServer::release_stream(&self, rcp::avtp::StreamId)
 pub fn rcp::server::RcServer::request_stream_cfg(&self) -> alloc::vec::Vec<rcp::regmap::RequestStreamConfigEntry>
 pub fn rcp::server::RcServer::request_stream_index(&self, rcp::avtp::StreamId) -> u8
+pub fn rcp::server::RcServer::response_queue_cfg(&self) -> alloc::vec::Vec<rcp::regmap::ResponseStreamConfigEntry>
+pub fn rcp::server::RcServer::response_route(&self, rcp::avtp::StreamId, &[u8]) -> rcp::server::ResponseRoute
 pub fn rcp::server::RcServer::set_discovery_timeout(&self, core::time::Duration)
 pub fn rcp::server::RcServer::set_endpoint_admission_suspended(&self, rcp::avtp::StreamId, u16, bool) -> bool
 pub fn rcp::server::RcServer::set_endpoint_enable(&self, rcp::avtp::StreamId, u16, bool) -> bool
 pub fn rcp::server::RcServer::set_ep_id_map(&self, &[rcp::regmap::EpByteBusIdMapEntry]) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::server::RcServer::set_request_stream_cfg(&self, &[rcp::regmap::RequestStreamConfigEntry]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::server::RcServer::set_response_queue_cfg(&self, &[rcp::regmap::ResponseStreamConfigEntry]) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::server::RcServer::set_root_client(&self, core::option::Option<rcp::avtp::StreamId>)
 pub fn rcp::server::RcServer::set_sequencer_count(&self, u8)
 pub fn rcp::server::RcServer::set_time_sync_supported(&self, bool)
@@ -4602,6 +4607,46 @@ pub fn rcp::request::timed_due(u64, u64) -> bool
 pub fn rcp::request::try_force_cancel_all(&mut rcp::request::RequestLifecycleState) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::try_force_cancel_non_safestate(&mut rcp::request::RequestLifecycleState, bool) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::try_force_cancel_single(&mut rcp::request::RequestLifecycleState, u8, rcp::request::ClearTransactionNum) -> core::result::Result<(), rcp::RcpError>
+pub mod rcp::respqueue
+pub struct rcp::respqueue::ResponseQueue
+impl rcp::respqueue::ResponseQueue
+pub fn rcp::respqueue::ResponseQueue::capacity_octets(&self) -> usize
+pub fn rcp::respqueue::ResponseQueue::clear(&mut self)
+pub fn rcp::respqueue::ResponseQueue::clear_overflow(&mut self)
+pub fn rcp::respqueue::ResponseQueue::from_config(&rcp::regmap::ResponseStreamConfigEntry) -> Self
+pub fn rcp::respqueue::ResponseQueue::is_empty(&self) -> bool
+pub fn rcp::respqueue::ResponseQueue::len(&self) -> usize
+pub fn rcp::respqueue::ResponseQueue::max_avtpdu_size_octets(&self) -> usize
+pub fn rcp::respqueue::ResponseQueue::new(usize, usize) -> Self
+pub fn rcp::respqueue::ResponseQueue::octets(&self) -> usize
+pub fn rcp::respqueue::ResponseQueue::overflow(&self) -> bool
+pub fn rcp::respqueue::ResponseQueue::plan_batch(&self, usize) -> usize
+pub fn rcp::respqueue::ResponseQueue::pop(&mut self) -> core::option::Option<alloc::vec::Vec<u8>>
+pub fn rcp::respqueue::ResponseQueue::push(&mut self, &[u8]) -> bool
+pub fn rcp::respqueue::ResponseQueue::push_seq(&mut self, &[u8], u8) -> bool
+pub fn rcp::respqueue::ResponseQueue::should_flush(&self, usize) -> bool
+impl core::clone::Clone for rcp::respqueue::ResponseQueue
+pub fn rcp::respqueue::ResponseQueue::clone(&self) -> Self
+impl core::cmp::Eq for rcp::respqueue::ResponseQueue
+impl core::cmp::PartialEq for rcp::respqueue::ResponseQueue
+pub fn rcp::respqueue::ResponseQueue::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::respqueue::ResponseQueue
+pub fn rcp::respqueue::ResponseQueue::default() -> Self
+impl core::fmt::Debug for rcp::respqueue::ResponseQueue
+pub fn rcp::respqueue::ResponseQueue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::respqueue::ResponseQueue
+impl core::marker::Freeze for rcp::respqueue::ResponseQueue
+impl core::marker::Send for rcp::respqueue::ResponseQueue
+impl core::marker::Sync for rcp::respqueue::ResponseQueue
+impl core::marker::Unpin for rcp::respqueue::ResponseQueue
+impl core::marker::UnsafeUnpin for rcp::respqueue::ResponseQueue
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::respqueue::ResponseQueue
+impl core::panic::unwind_safe::UnwindSafe for rcp::respqueue::ResponseQueue
+pub const rcp::respqueue::RESPQUEUE_MAX_ENTRIES: usize
+pub fn rcp::respqueue::max_avtpdu_size_within_mtu(usize, usize) -> bool
+pub fn rcp::respqueue::max_fragment_payload(usize, usize) -> usize
+pub fn rcp::respqueue::response_queue_stream_id(&rcp::regmap::ResponseStreamConfigEntry, [u8; 6]) -> rcp::avtp::StreamId
+pub fn rcp::respqueue::should_flush_by_time(u64, u64) -> bool
 pub mod rcp::server
 pub enum rcp::server::AdmitResult
 pub rcp::server::AdmitResult::Cancellation
@@ -4674,6 +4719,26 @@ impl core::marker::Unpin for rcp::server::DispatchResult
 impl core::marker::UnsafeUnpin for rcp::server::DispatchResult
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::server::DispatchResult
 impl core::panic::unwind_safe::UnwindSafe for rcp::server::DispatchResult
+pub enum rcp::server::ResponseRoute
+pub rcp::server::ResponseRoute::Direct
+pub rcp::server::ResponseRoute::Queue(u8)
+pub rcp::server::ResponseRoute::Suppress
+impl core::clone::Clone for rcp::server::ResponseRoute
+pub fn rcp::server::ResponseRoute::clone(&self) -> Self
+impl core::cmp::Eq for rcp::server::ResponseRoute
+impl core::cmp::PartialEq for rcp::server::ResponseRoute
+pub fn rcp::server::ResponseRoute::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::server::ResponseRoute
+pub fn rcp::server::ResponseRoute::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::server::ResponseRoute
+impl core::marker::StructuralPartialEq for rcp::server::ResponseRoute
+impl core::marker::Freeze for rcp::server::ResponseRoute
+impl core::marker::Send for rcp::server::ResponseRoute
+impl core::marker::Sync for rcp::server::ResponseRoute
+impl core::marker::Unpin for rcp::server::ResponseRoute
+impl core::marker::UnsafeUnpin for rcp::server::ResponseRoute
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::server::ResponseRoute
+impl core::panic::unwind_safe::UnwindSafe for rcp::server::ResponseRoute
 pub enum rcp::server::SchedKind
 pub rcp::server::SchedKind::Cancellation
 pub rcp::server::SchedKind::Chained
@@ -4882,6 +4947,7 @@ impl core::panic::unwind_safe::UnwindSafe for rcp::server::PresentationGate
 pub struct rcp::server::RcServer
 impl rcp::server::RcServer
 pub fn rcp::server::RcServer::broadcast_safe_state(&self, u8) -> usize
+pub fn rcp::server::RcServer::check_response_queue_heartbeat(&self, u8, [u8; 6], u64) -> core::option::Option<alloc::vec::Vec<u8>>
 pub fn rcp::server::RcServer::check_watchdog(&self, u8, u64) -> core::option::Option<rcp::server::WatchdogCheck>
 pub fn rcp::server::RcServer::discovery_claim(&self) -> core::option::Option<rcp::discovery::DiscoveryClaim>
 pub fn rcp::server::RcServer::dispatch_frame(&self, &[u8], &rcp::server::Peer) -> rcp::server::FrameDispatch
@@ -4893,17 +4959,21 @@ pub fn rcp::server::RcServer::general_registers(&self) -> rcp::regmap::GeneralRe
 pub fn rcp::server::RcServer::handle_ntscf_frame(&self, rcp::avtp::StreamId, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::server::RcServer::last_watchdog_kick(&self, u8) -> core::option::Option<std::time::Instant>
 pub fn rcp::server::RcServer::new(rcp::regmap::GeneralRegisters) -> alloc::rcs::arc::Arc<Self>
+pub fn rcp::server::RcServer::note_response_queue_transmit(&self, u8, u64)
 pub fn rcp::server::RcServer::notify_trigger(&self, u8, u8) -> usize
 pub fn rcp::server::RcServer::pending_count(&self, rcp::avtp::StreamId, u16) -> usize
 pub fn rcp::server::RcServer::register_endpoint(&self, rcp::avtp::StreamId, u16, alloc::rcs::arc::Arc<dyn rcp::server::Endpoint>) -> core::result::Result<rcp::addressing::EndpointId, rcp::RcpError>
 pub fn rcp::server::RcServer::release_stream(&self, rcp::avtp::StreamId)
 pub fn rcp::server::RcServer::request_stream_cfg(&self) -> alloc::vec::Vec<rcp::regmap::RequestStreamConfigEntry>
 pub fn rcp::server::RcServer::request_stream_index(&self, rcp::avtp::StreamId) -> u8
+pub fn rcp::server::RcServer::response_queue_cfg(&self) -> alloc::vec::Vec<rcp::regmap::ResponseStreamConfigEntry>
+pub fn rcp::server::RcServer::response_route(&self, rcp::avtp::StreamId, &[u8]) -> rcp::server::ResponseRoute
 pub fn rcp::server::RcServer::set_discovery_timeout(&self, core::time::Duration)
 pub fn rcp::server::RcServer::set_endpoint_admission_suspended(&self, rcp::avtp::StreamId, u16, bool) -> bool
 pub fn rcp::server::RcServer::set_endpoint_enable(&self, rcp::avtp::StreamId, u16, bool) -> bool
 pub fn rcp::server::RcServer::set_ep_id_map(&self, &[rcp::regmap::EpByteBusIdMapEntry]) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::server::RcServer::set_request_stream_cfg(&self, &[rcp::regmap::RequestStreamConfigEntry]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::server::RcServer::set_response_queue_cfg(&self, &[rcp::regmap::ResponseStreamConfigEntry]) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::server::RcServer::set_root_client(&self, core::option::Option<rcp::avtp::StreamId>)
 pub fn rcp::server::RcServer::set_sequencer_count(&self, u8)
 pub fn rcp::server::RcServer::set_time_sync_supported(&self, bool)
@@ -5032,6 +5102,7 @@ impl core::panic::unwind_safe::UnwindSafe for rcp::server::WatchdogCheck
 pub const rcp::server::EP_ID_MAP_MAX_ENTRIES: usize
 pub const rcp::server::MAX_FRAME_MEMBERS: usize
 pub const rcp::server::REQUEST_STREAM_CFG_MAX_ENTRIES: usize
+pub const rcp::server::RESPONSE_QUEUE_CFG_MAX_ENTRIES: usize
 pub const rcp::server::SERVER_MAX_PENDING: usize
 pub const rcp::server::STREAM_FAULT_TRACKER_MAX_STREAMS: usize
 pub trait rcp::server::Endpoint: core::marker::Send + core::marker::Sync
@@ -5682,6 +5753,8 @@ impl core::panic::unwind_safe::RefUnwindSafe for rcp::udp::ResolvedEndpoint
 impl core::panic::unwind_safe::UnwindSafe for rcp::udp::ResolvedEndpoint
 pub struct rcp::udp::ServeReport
 pub rcp::udp::ServeReport::dispatch: rcp::server::FrameDispatch
+pub rcp::udp::ServeReport::queue_frames_sent: usize
+pub rcp::udp::ServeReport::queued: usize
 pub rcp::udp::ServeReport::response_error: core::option::Option<rcp::RcpError>
 pub rcp::udp::ServeReport::response_sent: bool
 impl core::clone::Clone for rcp::udp::ServeReport
@@ -5738,11 +5811,13 @@ impl core::panic::unwind_safe::UnwindSafe for rcp::udp::UdpAvtpTransport
 pub struct rcp::udp::UdpRcServer
 impl rcp::udp::UdpRcServer
 pub fn rcp::udp::UdpRcServer::discovery_claim(&self) -> core::option::Option<rcp::discovery::DiscoveryClaim>
+pub fn rcp::udp::UdpRcServer::flush_due(&self, std::time::Instant) -> core::result::Result<usize, rcp::RcpError>
 pub fn rcp::udp::UdpRcServer::local_stream(&self) -> rcp::avtp::StreamId
 pub fn rcp::udp::UdpRcServer::new(rcp::avtp::StreamId, alloc::rcs::arc::Arc<dyn rcp::avtp::AvtpTransport>, alloc::rcs::arc::Arc<rcp::server::RcServer>) -> Self
 pub fn rcp::udp::UdpRcServer::rc_server(&self) -> &alloc::rcs::arc::Arc<rcp::server::RcServer>
+pub fn rcp::udp::UdpRcServer::response_queue(&self, u8) -> core::option::Option<rcp::respqueue::ResponseQueue>
 pub fn rcp::udp::UdpRcServer::serve_one(&self, core::option::Option<core::time::Duration>, u8, std::time::Instant, core::time::Duration) -> core::result::Result<rcp::udp::ServeReport, rcp::RcpError>
-impl core::marker::Freeze for rcp::udp::UdpRcServer
+impl !core::marker::Freeze for rcp::udp::UdpRcServer
 impl core::marker::Send for rcp::udp::UdpRcServer
 impl core::marker::Sync for rcp::udp::UdpRcServer
 impl core::marker::Unpin for rcp::udp::UdpRcServer
