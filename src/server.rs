@@ -23,7 +23,13 @@
 //!   ack/response stream indices), the EP_ID_config endpoint↔stream map
 //!   ([`RcServer::set_ep_id_map`]), one [`SequenceTracker`] per request
 //!   stream, the per-stream CRC fault tracker, and the `rx_stream_status`
-//!   blocked latch ([`StreamStatus`]).
+//!   blocked latch ([`StreamStatus`]). It also holds the response-queue
+//!   configuration table and its heartbeat bookkeeping
+//!   ([`RcServer::set_response_queue_cfg`],
+//!   [`RcServer::check_response_queue_heartbeat`], `mock.c:463-534`) and
+//!   routes responses by `rx_ack_stream_index` / `rx_resp_stream_index`
+//!   ([`RcServer::response_route`], `mock.c:1716`); the queues themselves
+//!   are [`crate::respqueue`].
 //!
 //! [`RcServer::dispatch_frame`] is the **one** frame-level entry point: the
 //! UDP transport ([`crate::udp::UdpRcServer::serve_one`]), the RELAY adapter
@@ -78,6 +84,7 @@ use crate::lifecycle::{
 };
 use crate::regmap::{
     EndpointType, EpByteBusIdMapEntry, GeneralRegisters, RequestStreamConfigEntry,
+    ResponseStreamConfigEntry,
 };
 use crate::request::{
     complete_repetition, decode_chained_member, decode_clear_single, decode_compound_request,
@@ -1265,6 +1272,11 @@ fn complete_one(req: &mut PendingRequest, ctx: &TickCtx<'_>, seqs: &mut Sequence
 //fusa:req REQ-SRVCFG-001
 pub const REQUEST_STREAM_CFG_MAX_ENTRIES: usize = 64;
 
+/// How many response-queue configuration rows (TC18 RC5 §12.7.9 Table 27)
+/// the server holds: `RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES`.
+//fusa:req REQ-RMAP-034
+pub const RESPONSE_QUEUE_CFG_MAX_ENTRIES: usize = 64;
+
 /// How many EP_ID_config rows the server holds:
 /// `RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES`.
 //fusa:req REQ-SRVCFG-002
@@ -1550,6 +1562,13 @@ struct ServerCore {
     /// Held under the core lock so a number is assigned and gated in one
     /// critical section.
     message_seq: HashMap<u64, u8>,
+    /// The response-queue configuration table (`response_queue_cfg[]`,
+    /// `c-RCP/src/mock.c:193`).
+    response_queue_cfg: Vec<ResponseStreamConfigEntry>,
+    /// Per response queue, the last-transmit moment in microseconds once
+    /// seeded (`response_queue_seeded[]` / `_last_transmit_us[]`,
+    /// `c-RCP/src/mock.c:213-214`).
+    response_queue_last_transmit_us: Vec<Option<u64>>,
 }
 
 impl ServerCore {
@@ -1568,6 +1587,8 @@ impl ServerCore {
             discovery_timeout: discovery::DISCOVERY_TIME_OUT,
             time_sync_supported: false,
             message_seq: HashMap::new(),
+            response_queue_cfg: Vec::new(),
+            response_queue_last_transmit_us: vec![None; RESPONSE_QUEUE_CFG_MAX_ENTRIES],
         }
     }
 
@@ -1612,18 +1633,51 @@ impl ServerCore {
     //fusa:req REQ-RMAP-049
     fn suppress(&self, stream: StreamId, response: Option<Vec<u8>>) -> Option<Vec<u8>> {
         let bytes = response?;
+        (self.route(stream, &bytes) != ResponseRoute::Suppress).then_some(bytes)
+    }
+
+    /// See [`RcServer::response_route`].
+    //fusa:req REQ-RMAP-048
+    //fusa:req REQ-RMAP-049
+    //fusa:req REQ-SRVCFG-003
+    fn route(&self, stream: StreamId, response: &[u8]) -> ResponseRoute {
         let Some(cfg) = self.cfg(self.resolve_index(stream)) else {
-            return Some(bytes);
+            return ResponseRoute::Direct;
         };
-        let Some(hdr) = peek_header(&bytes) else {
-            return Some(bytes);
+        let Some(hdr) = peek_header(response) else {
+            return ResponseRoute::Direct;
         };
         let index = match hdr.response_kind() {
             ResponseKind::Acknowledge => cfg.rx_ack_stream_index,
             _ => cfg.rx_resp_stream_index,
         };
-        (index != 0).then_some(bytes)
+        if index == 0 {
+            ResponseRoute::Suppress
+        } else if usize::from(index) <= self.response_queue_cfg.len() {
+            ResponseRoute::Queue(index)
+        } else {
+            ResponseRoute::Direct
+        }
     }
+}
+
+/// Where a response to a request on a given request stream goes, by that
+/// stream's `rx_ack_stream_index` (an Acknowledge) or
+/// `rx_resp_stream_index` (every other response) (TC18 RC5 §12.7.7 Table
+/// 24): see [`RcServer::response_route`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+//fusa:req REQ-SRVCFG-003
+pub enum ResponseRoute {
+    /// The governing pointer is `0`: "no acknowledge / response is to be
+    /// sent". [`RcServer::dispatch_frame`] has already dropped it.
+    Suppress,
+    /// Into the 1-based response queue (a [`ResponseStreamConfigEntry`]
+    /// row installed by [`RcServer::set_response_queue_cfg`]).
+    Queue(u8),
+    /// No response queue applies — the request stream is unconfigured,
+    /// the response did not classify, or the pointer names no installed
+    /// response-queue row: sent straight back to the requester.
+    Direct,
 }
 
 /// An OPEN Alliance TC18 RC Server: lifecycle state, general registers,
@@ -1919,6 +1973,120 @@ impl RcServer {
     //fusa:req REQ-SRVCFG-002
     pub fn ep_id_map(&self) -> Vec<EpByteBusIdMapEntry> {
         self.core.lock().unwrap().ep_id_map.clone()
+    }
+
+    /// Install the response-queue configuration table (TC18 RC5 §12.7.9
+    /// Table 27) and sync `svr_response_stream_cfg`'s capacity. More than
+    /// [`RESPONSE_QUEUE_CFG_MAX_ENTRIES`] rows is
+    /// `Err(RcpError::InvalidSize)`, leaving the table unchanged
+    /// (`rcp_mock_server_set_response_queue_cfg()`, `c-RCP/src/mock.c:463`).
+    /// The heartbeat bookkeeping is index-parallel with the rows and is not
+    /// reset, as in c-RCP.
+    //fusa:req REQ-RMAP-034
+    pub fn set_response_queue_cfg(
+        &self,
+        entries: &[ResponseStreamConfigEntry],
+    ) -> Result<(), RcpError> {
+        if entries.len() > RESPONSE_QUEUE_CFG_MAX_ENTRIES {
+            return Err(RcpError::InvalidSize);
+        }
+        self.core.lock().unwrap().response_queue_cfg = entries.to_vec();
+        self.general
+            .lock()
+            .unwrap()
+            .svr_response_stream_cfg
+            .capacity = entries.len() as u16; // safe: <= 64 rows
+        Ok(())
+    }
+
+    /// The installed response-queue configuration table.
+    //fusa:req REQ-RMAP-034
+    pub fn response_queue_cfg(&self) -> Vec<ResponseStreamConfigEntry> {
+        self.core.lock().unwrap().response_queue_cfg.clone()
+    }
+
+    /// Where `response` — built for a request received on `stream` — is
+    /// routed, by the request stream's `rx_ack_stream_index` (Acknowledge)
+    /// or `rx_resp_stream_index` (everything else): the same
+    /// classification [`Self::dispatch_frame`] suppresses by
+    /// (`suppress_response_per_stream_cfg()`, `c-RCP/src/mock.c:1716`).
+    ///
+    /// c-RCP parity: c-RCP consumes the two pointers only for suppression
+    /// and owns no transport to deliver on the selected response stream
+    /// (`mock.c:1690-1699`); this crate also routes a non-zero pointer that
+    /// names an installed response-queue row to that queue
+    /// ([`crate::udp::UdpRcServer`] transmits it). Everything c-RCP sends
+    /// straight back (unconfigured stream, unclassifiable response, a
+    /// pointer past the installed rows) stays [`ResponseRoute::Direct`].
+    //fusa:req REQ-SRVCFG-003
+    pub fn response_route(&self, stream: StreamId, response: &[u8]) -> ResponseRoute {
+        self.core.lock().unwrap().route(stream, response)
+    }
+
+    /// The response-queue heartbeat (TC18 RC5 §12.7.9 `Flush_time`,
+    /// §13.7.1.1): `Some(heartbeat)` once `response_stream_index`'s
+    /// `Flush_time` has elapsed since its last transmission, where the
+    /// heartbeat is an empty NTSCF AVTPDU on the queue's stream
+    /// ([`crate::respqueue::response_queue_stream_id`] with `mac`), and the
+    /// queue's last-transmit time becomes `now_us`
+    /// (`rcp_mock_server_check_response_queue_heartbeat()`,
+    /// `c-RCP/src/mock.c:483-534`).
+    ///
+    /// `None` for an index outside `1..=` the installed rows, on the first
+    /// check of a queue (which only seeds its last-transmit time to
+    /// `now_us`), for a `now_us` earlier than the last transmission
+    /// (non-monotonic input), and while `Flush_time` (`0`: never) has not
+    /// elapsed.
+    ///
+    /// c-RCP parity: the heartbeat's NTSCF `sequence_num` is always `0`
+    /// (c-RCP encodes a zeroed header with only `sv` and `stream_id` set,
+    /// `mock.c:517-521`), not the queue stream's running sequence number;
+    /// copied as-is.
+    //fusa:req REQ-RMAP-065
+    //fusa:req REQ-SRV-017
+    pub fn check_response_queue_heartbeat(
+        &self,
+        response_stream_index: u8,
+        mac: [u8; 6],
+        now_us: u64,
+    ) -> Option<Vec<u8>> {
+        let mut core = self.core.lock().unwrap();
+        let idx = usize::from(response_stream_index).checked_sub(1)?;
+        let cfg = *core.response_queue_cfg.get(idx)?;
+        let slot = &mut core.response_queue_last_transmit_us[idx];
+        let Some(last) = *slot else {
+            *slot = Some(now_us);
+            return None;
+        };
+        let elapsed = now_us.checked_sub(last)?;
+        if !crate::respqueue::should_flush_by_time(elapsed, u64::from(cfg.resp_flush_time)) {
+            return None;
+        }
+        let stream = crate::respqueue::response_queue_stream_id(&cfg, mac);
+        let heartbeat = encode_ntscf_frame(stream, 0, &[]).ok()?;
+        *slot = Some(now_us);
+        Some(heartbeat)
+    }
+
+    /// Record that `response_stream_index` transmitted at `now_us`,
+    /// restarting its `Flush_time` interval ("time since the last
+    /// transmission", TC18 RC5 §12.7.9). Ignored for an index outside the
+    /// installed rows.
+    ///
+    /// c-RCP parity: c-RCP advances this bookkeeping only from its
+    /// heartbeat check (`mock.c:527-529`), having no transmit path of its
+    /// own; [`crate::udp::UdpRcServer`] calls this after a
+    /// `flush_on_count`-triggered transmission.
+    //fusa:req REQ-RMAP-064
+    pub fn note_response_queue_transmit(&self, response_stream_index: u8, now_us: u64) {
+        let mut core = self.core.lock().unwrap();
+        let count = core.response_queue_cfg.len();
+        if let Some(idx) = usize::from(response_stream_index)
+            .checked_sub(1)
+            .filter(|&i| i < count)
+        {
+            core.response_queue_last_transmit_us[idx] = Some(now_us);
+        }
     }
 
     /// Whether gPTP time synchronization is established. While `false`
