@@ -1127,25 +1127,6 @@ pub fn rcp::discovery::is_discovery_broadcast_stream_id(rcp::avtp::StreamId) -> 
 pub fn rcp::discovery::is_discovery_configure_request(&rcp::acf::AcfAbbMessage) -> bool
 pub fn rcp::discovery::is_discovery_request(&rcp::acf::AcfAbbMessage) -> bool
 pub fn rcp::discovery::try_claim_discovery_stream(core::option::Option<rcp::discovery::DiscoveryClaim>, rcp::avtp::StreamId, std::time::Instant, core::time::Duration) -> core::result::Result<rcp::discovery::DiscoveryClaim, rcp::RcpError>
-pub mod rcp::dyndata
-pub struct rcp::dyndata::DynStore
-impl rcp::dyndata::DynStore
-pub fn rcp::dyndata::DynStore::delete(&self, &str) -> bool
-pub fn rcp::dyndata::DynStore::get(&self, &str) -> core::option::Option<alloc::vec::Vec<u8>>
-pub fn rcp::dyndata::DynStore::is_empty(&self) -> bool
-pub fn rcp::dyndata::DynStore::keys(&self) -> alloc::vec::Vec<alloc::string::String>
-pub fn rcp::dyndata::DynStore::len(&self) -> usize
-pub fn rcp::dyndata::DynStore::new() -> Self
-pub fn rcp::dyndata::DynStore::set(&self, impl core::convert::Into<alloc::string::String>, alloc::vec::Vec<u8>)
-impl core::default::Default for rcp::dyndata::DynStore
-pub fn rcp::dyndata::DynStore::default() -> Self
-impl !core::marker::Freeze for rcp::dyndata::DynStore
-impl core::marker::Send for rcp::dyndata::DynStore
-impl core::marker::Sync for rcp::dyndata::DynStore
-impl core::marker::Unpin for rcp::dyndata::DynStore
-impl core::marker::UnsafeUnpin for rcp::dyndata::DynStore
-impl core::panic::unwind_safe::RefUnwindSafe for rcp::dyndata::DynStore
-impl core::panic::unwind_safe::UnwindSafe for rcp::dyndata::DynStore
 pub mod rcp::e2e
 pub enum rcp::e2e::AcfCoverageMessage<'a>
 pub rcp::e2e::AcfCoverageMessage::Abb(&'a rcp::acf::AcfAbbMessage)
@@ -1355,23 +1336,6 @@ impl core::marker::Unpin for rcp::faultinject::FaultSpec
 impl core::marker::UnsafeUnpin for rcp::faultinject::FaultSpec
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::faultinject::FaultSpec
 impl core::panic::unwind_safe::UnwindSafe for rcp::faultinject::FaultSpec
-pub mod rcp::federation
-pub struct rcp::federation::FederationRouter
-impl rcp::federation::FederationRouter
-pub fn rcp::federation::FederationRouter::add_peer(&self, impl core::convert::Into<alloc::string::String>, alloc::rcs::arc::Arc<std::sync::poison::mutex::Mutex<rcp::discovery::DiscoveryCache>>)
-pub fn rcp::federation::FederationRouter::lookup_peer(&self, &str, rcp::avtp::StreamId) -> core::result::Result<rcp::discovery::DiscoveryCacheEntry, rcp::RcpError>
-pub fn rcp::federation::FederationRouter::new() -> Self
-pub fn rcp::federation::FederationRouter::peer_ids(&self) -> alloc::vec::Vec<alloc::string::String>
-pub fn rcp::federation::FederationRouter::remove_peer(&self, &str) -> core::option::Option<alloc::rcs::arc::Arc<std::sync::poison::mutex::Mutex<rcp::discovery::DiscoveryCache>>>
-impl core::default::Default for rcp::federation::FederationRouter
-pub fn rcp::federation::FederationRouter::default() -> Self
-impl !core::marker::Freeze for rcp::federation::FederationRouter
-impl core::marker::Send for rcp::federation::FederationRouter
-impl core::marker::Sync for rcp::federation::FederationRouter
-impl core::marker::Unpin for rcp::federation::FederationRouter
-impl core::marker::UnsafeUnpin for rcp::federation::FederationRouter
-impl core::panic::unwind_safe::RefUnwindSafe for rcp::federation::FederationRouter
-impl core::panic::unwind_safe::UnwindSafe for rcp::federation::FederationRouter
 pub mod rcp::formal
 pub struct rcp::formal::CheckResult
 pub rcp::formal::CheckResult::failed: alloc::vec::Vec<&'static str>
@@ -2342,10 +2306,6 @@ impl rcp::mock::Endpoint for rcp::observe::ObserveEndpoint
 pub fn rcp::observe::ObserveEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::observe::ObserveEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::observe::ObserveEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
-impl rcp::mock::Endpoint for rcp::proxy::ProxyEndpoint
-pub fn rcp::proxy::ProxyEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
-pub fn rcp::proxy::ProxyEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
-pub fn rcp::proxy::ProxyEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
 impl rcp::mock::Endpoint for rcp::ratelimit::RateLimitEndpoint
 pub fn rcp::ratelimit::RateLimitEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::ratelimit::RateLimitEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
@@ -2354,10 +2314,6 @@ impl rcp::mock::Endpoint for rcp::record::RecordEndpoint
 pub fn rcp::record::RecordEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::record::RecordEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::record::RecordEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
-impl rcp::mock::Endpoint for rcp::redundancy::RedundancyEndpoint
-pub fn rcp::redundancy::RedundancyEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
-pub fn rcp::redundancy::RedundancyEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
-pub fn rcp::redundancy::RedundancyEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
 impl rcp::mock::Endpoint for rcp::sim::SimEndpoint
 pub fn rcp::sim::SimEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::sim::SimEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
@@ -2496,23 +2452,6 @@ pub fn rcp::powerstate::shutdown_to_unpowered(rcp::powerstate::PowerMode) -> rcp
 pub fn rcp::powerstate::try_cold_start(rcp::powerstate::PowerMode, rcp::powerstate::PowerModeGateInput) -> core::result::Result<rcp::powerstate::PowerMode, rcp::RcpError>
 pub fn rcp::powerstate::try_enter_power_mode(rcp::powerstate::PowerMode, rcp::powerstate::PowerMode, rcp::powerstate::PowerModeGateInput) -> core::result::Result<rcp::powerstate::PowerMode, rcp::RcpError>
 pub fn rcp::powerstate::try_hot_start(rcp::powerstate::PowerMode, rcp::powerstate::WakeUpHandshakeState, rcp::powerstate::PowerModeGateInput) -> core::result::Result<rcp::powerstate::PowerMode, rcp::RcpError>
-pub mod rcp::proxy
-pub struct rcp::proxy::ProxyEndpoint
-impl rcp::proxy::ProxyEndpoint
-pub fn rcp::proxy::ProxyEndpoint::detach(&self)
-pub fn rcp::proxy::ProxyEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>) -> Self
-pub fn rcp::proxy::ProxyEndpoint::swap(&self, alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>)
-impl rcp::mock::Endpoint for rcp::proxy::ProxyEndpoint
-pub fn rcp::proxy::ProxyEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
-pub fn rcp::proxy::ProxyEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
-pub fn rcp::proxy::ProxyEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
-impl !core::marker::Freeze for rcp::proxy::ProxyEndpoint
-impl core::marker::Send for rcp::proxy::ProxyEndpoint
-impl core::marker::Sync for rcp::proxy::ProxyEndpoint
-impl core::marker::Unpin for rcp::proxy::ProxyEndpoint
-impl core::marker::UnsafeUnpin for rcp::proxy::ProxyEndpoint
-impl core::panic::unwind_safe::RefUnwindSafe for rcp::proxy::ProxyEndpoint
-impl core::panic::unwind_safe::UnwindSafe for rcp::proxy::ProxyEndpoint
 pub mod rcp::pwm
 pub enum rcp::pwm::PwmInReadResolution
 pub rcp::pwm::PwmInReadResolution::Measured(rcp::pwm::PwmDurationPair)
@@ -2712,23 +2651,6 @@ impl core::marker::Unpin for rcp::record::RecordEndpoint
 impl core::marker::UnsafeUnpin for rcp::record::RecordEndpoint
 impl !core::panic::unwind_safe::RefUnwindSafe for rcp::record::RecordEndpoint
 impl !core::panic::unwind_safe::UnwindSafe for rcp::record::RecordEndpoint
-pub mod rcp::redundancy
-pub struct rcp::redundancy::RedundancyEndpoint
-impl rcp::redundancy::RedundancyEndpoint
-pub fn rcp::redundancy::RedundancyEndpoint::failover_count(&self) -> u32
-pub fn rcp::redundancy::RedundancyEndpoint::has_secondary(&self) -> bool
-pub fn rcp::redundancy::RedundancyEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>, alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>) -> Self
-impl rcp::mock::Endpoint for rcp::redundancy::RedundancyEndpoint
-pub fn rcp::redundancy::RedundancyEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
-pub fn rcp::redundancy::RedundancyEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
-pub fn rcp::redundancy::RedundancyEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
-impl !core::marker::Freeze for rcp::redundancy::RedundancyEndpoint
-impl core::marker::Send for rcp::redundancy::RedundancyEndpoint
-impl core::marker::Sync for rcp::redundancy::RedundancyEndpoint
-impl core::marker::Unpin for rcp::redundancy::RedundancyEndpoint
-impl core::marker::UnsafeUnpin for rcp::redundancy::RedundancyEndpoint
-impl core::panic::unwind_safe::RefUnwindSafe for rcp::redundancy::RedundancyEndpoint
-impl core::panic::unwind_safe::UnwindSafe for rcp::redundancy::RedundancyEndpoint
 pub mod rcp::regmap
 pub enum rcp::regmap::ConfigLayer
 pub rcp::regmap::ConfigLayer::CommonFunctional
@@ -4109,27 +4031,6 @@ impl core::marker::Unpin for rcp::timestamp::MessageTimestamp
 impl core::marker::UnsafeUnpin for rcp::timestamp::MessageTimestamp
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::timestamp::MessageTimestamp
 impl core::panic::unwind_safe::UnwindSafe for rcp::timestamp::MessageTimestamp
-pub mod rcp::tlstransport
-pub struct rcp::tlstransport::TlsBridge
-impl rcp::tlstransport::TlsBridge
-pub fn rcp::tlstransport::TlsBridge::close(&self) -> core::result::Result<(), rcp::RcpError>
-pub fn rcp::tlstransport::TlsBridge::local_stream(&self) -> rcp::avtp::StreamId
-pub fn rcp::tlstransport::TlsBridge::new(rcp::avtp::StreamId, alloc::rcs::arc::Arc<dyn rcp::tlstransport::TlsStream>) -> core::result::Result<Self, rcp::RcpError>
-pub fn rcp::tlstransport::TlsBridge::send_acf_abb(&self, &rcp::acf::AcfAbbMessage, u8, core::option::Option<core::time::Duration>) -> core::result::Result<rcp::acf::AcfAbbMessage, rcp::RcpError>
-pub fn rcp::tlstransport::TlsBridge::send_acf_gbb(&self, &rcp::acf::AcfGbbMessage, u8, core::option::Option<core::time::Duration>) -> core::result::Result<rcp::acf::AcfGbbMessage, rcp::RcpError>
-impl core::marker::Freeze for rcp::tlstransport::TlsBridge
-impl core::marker::Send for rcp::tlstransport::TlsBridge
-impl core::marker::Sync for rcp::tlstransport::TlsBridge
-impl core::marker::Unpin for rcp::tlstransport::TlsBridge
-impl core::marker::UnsafeUnpin for rcp::tlstransport::TlsBridge
-impl !core::panic::unwind_safe::RefUnwindSafe for rcp::tlstransport::TlsBridge
-impl !core::panic::unwind_safe::UnwindSafe for rcp::tlstransport::TlsBridge
-pub const rcp::tlstransport::MIN_TLS_VERSION: &str
-pub const rcp::tlstransport::REQUIRE_MUTUAL_AUTH: bool
-pub trait rcp::tlstransport::TlsStream: core::marker::Send + core::marker::Sync
-pub fn rcp::tlstransport::TlsStream::peer_verified(&self) -> bool
-pub fn rcp::tlstransport::TlsStream::read_to_vec(&self, core::option::Option<core::time::Duration>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
-pub fn rcp::tlstransport::TlsStream::write_all(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
 pub mod rcp::uart
 pub enum rcp::uart::UartReadCompletionReason
 pub rcp::uart::UartReadCompletionReason::Both

@@ -12,8 +12,8 @@
 //! graceful-shutdown wrapper over a `Registry`; concept persists once a
 //! `Registry`-equivalent (discovered-server set) exists"), [`AdminServer`]
 //! is rebuilt against [`crate::discovery::DiscoveryCache`] — the same
-//! "discovery-derived server registry" dependency [`crate::federation`]'s
-//! own retargeting note names — in place of the deleted `Registry` trait.
+//! "discovery-derived server registry" dependency the (since-removed,
+//! issue #211) `federation` module's own retargeting note named — in place of the deleted `Registry` trait.
 //!
 //! Two behavioral narrowings from the old type, both flagged per Guiding
 //! Principle 5 rather than silently made, since `DiscoveryCache` is a

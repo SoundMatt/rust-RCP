@@ -34,7 +34,27 @@ reqs_list = reqs_data["requirements"] if isinstance(reqs_data, dict) else reqs_d
 # exempt from the annotation requirement below and reported separately.
 NOT_IMPL   = "not-implemented"
 unimpl     = {r["id"]: r for r in reqs_list if r.get("status") == NOT_IMPL}
-declared   = {r["id"] for r in reqs_list} - set(unimpl)
+
+# A requirement carrying "status": "retired" (c-RCP's convention, together
+# with "scope": "retired") belonged to code that has since been removed
+# outright (issue #211: tlstransport/proxy/redundancy/federation/dyndata).
+# The entry is kept for audit history but is NOT an implemented
+# requirement, so it is exempt from the coverage rule below. Its only
+# permitted trace is the retirement guard in src/retired.rs (which keeps
+# rsfusa trace at 100% and verifies the retirement itself); a retired ID
+# annotated from any other file means live code still claims it — an error.
+RETIRED      = "retired"
+RETIRED_FILE = src_dir / "retired.rs"
+retired    = {r["id"]: r for r in reqs_list if r.get("status") == RETIRED}
+bad_scope  = sorted(i for i, r in retired.items() if r.get("scope") != RETIRED)
+declared   = {r["id"] for r in reqs_list} - set(unimpl) - set(retired)
+
+ann_re = re.compile(r"//fusa:(?:req|test)\s+(REQ-[\w-]+)")
+live_retired = sorted(
+    (rid, str(p))
+    for p in src_dir.rglob("*.rs") if p != RETIRED_FILE
+    for rid in set(ann_re.findall(p.read_text())) & set(retired)
+)
 
 src_text  = "\n".join(p.read_text() for p in src_dir.rglob("*.rs"))
 in_src    = set(re.findall(r"//fusa:req\s+(REQ-[\w-]+)", src_text))
@@ -50,8 +70,8 @@ for req_id in sorted(declared):
     if missing:
         gaps.append((req_id, missing))
 
-undeclared_src  = in_src  - declared - set(unimpl)
-undeclared_test = in_test - declared - set(unimpl)
+undeclared_src  = in_src  - declared - set(unimpl) - set(retired)
+undeclared_test = in_test - declared - set(unimpl) - set(retired)
 
 # An entry marked not-implemented must not also be traced to code/tests —
 # that would mean the marker is stale and the corpus is lying in the other
@@ -79,6 +99,18 @@ if stale_unimpl:
     for r in stale_unimpl:
         print(f"  {r}")
 
+if live_retired:
+    print(f"\nERROR: {len(live_retired)} retired requirement annotation(s) "
+          f"outside {RETIRED_FILE}:")
+    for rid, path in live_retired:
+        print(f"  {rid}: {path}")
+
+if bad_scope:
+    print(f'\nERROR: {len(bad_scope)} requirement(s) with status "{RETIRED}" '
+          f'but scope != "{RETIRED}":')
+    for r in bad_scope:
+        print(f"  {r}")
+
 total = len(declared)
 covered = len(declared - {g[0] for g in gaps})
 pct = 100 * covered // total if total else 0
@@ -89,7 +121,10 @@ if unimpl:
     for req_id in sorted(unimpl):
         print(f"  {req_id}: {unimpl[req_id].get('title', '')}")
 
-if gaps or stale_unimpl:
+if retired:
+    print(f"Retired (code removed; entries kept for audit history): {len(retired)}")
+
+if gaps or stale_unimpl or live_retired or bad_scope:
     sys.exit(1)
 print("OK — no FuSa gaps detected")
 EOF

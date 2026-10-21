@@ -2,13 +2,13 @@
   "project": "rust-RCP",
   "standard": "ISO/SAE 21434:2021",
   "createdAt": "2026-07-29T00:00:00Z",
-  "scope": "rust-RCP is a software library component used in road-vehicle zonal-architecture ECUs. This TARA covers cybersecurity threats arising from rust-RCP's OPEN Alliance TC18 Remote Control Protocol core surface — AVTPDU/ACF wire framing, (stream_id, byte_bus_id) endpoint addressing, the RC Server lifecycle/register-map model and EP0 root-client access control, discovery-stream claiming, E2E safe-point CRC-32 integrity, authorization policy, rate limiting, execution-priority scheduling, and the UDP/TLS transport bridges — when integrated into a central HPC or zone controller that exchanges RCP frames over an in-vehicle network. System-level CAL may differ after architectural decomposition per ISO/SAE 21434 clause 15. This TARA is rebased against the TC18 core Milestones 1-9 of `ROADMAP.md` built; it supersedes the previous TARA, which analyzed the now-replaced private `Zone`/`Command`/`Controller`/`Registry` protocol. That legacy surface received no fresh threat modeling of its own and has since been deleted outright by Milestone 10's core-surface cutover (`ROADMAP.md`) — per that milestone's own breaking-change notice, with no compatibility shim — so this TARA's scope no longer needs to carve it out at all.",
+  "scope": "rust-RCP is a software library component used in road-vehicle zonal-architecture ECUs. This TARA covers cybersecurity threats arising from rust-RCP's OPEN Alliance TC18 Remote Control Protocol core surface — AVTPDU/ACF wire framing, (stream_id, byte_bus_id) endpoint addressing, the RC Server lifecycle/register-map model and EP0 root-client access control, discovery-stream claiming, E2E safe-point CRC-32 integrity, authorization policy, rate limiting, execution-priority scheduling, and the UDP/L2/shared-memory transport bridges (link-layer security — MACsec — is a deployment-level control outside this library; the former TLS bridge was removed by issue #211, c-RCP parity: c-RCP ROADMAP.md:104) — when integrated into a central HPC or zone controller that exchanges RCP frames over an in-vehicle network. System-level CAL may differ after architectural decomposition per ISO/SAE 21434 clause 15. This TARA is rebased against the TC18 core Milestones 1-9 of `ROADMAP.md` built; it supersedes the previous TARA, which analyzed the now-replaced private `Zone`/`Command`/`Controller`/`Registry` protocol. That legacy surface received no fresh threat modeling of its own and has since been deleted outright by Milestone 10's core-surface cutover (`ROADMAP.md`) — per that milestone's own breaking-change notice, with no compatibility shim — so this TARA's scope no longer needs to carve it out at all.",
 
   "assets": [
     {
       "id": "A-001",
       "name": "AVTPDU/ACF frame structural integrity",
-      "description": "Correctness of the IEEE 1722 NTSCF AVTPDU header (subtype, sv bit, ntscf_data_length) as decoded by avtp::decode_ntscf_frame, and of the ACF ABB message shape (byte_bus_id, opcode/sub_opcode, address, length) as decoded by acf::decode_acf_abb, ahead of the UDP/TLS bridges",
+      "description": "Correctness of the IEEE 1722 NTSCF AVTPDU header (subtype, sv bit, ntscf_data_length) as decoded by avtp::decode_ntscf_frame, and of the ACF ABB message shape (byte_bus_id, opcode/sub_opcode, address, length) as decoded by acf::decode_acf_abb, ahead of the UDP/L2/shared-memory bridges",
       "cybersecurityProperty": "Integrity"
     },
     {
@@ -37,8 +37,8 @@
     },
     {
       "id": "A-006",
-      "name": "Transport confidentiality/authenticity (TLS bridge)",
-      "description": "tlstransport::TlsBridge enforces TLS 1.2+ and mutual authentication so that wire frames are not exposed to, or accepted from, an unauthenticated peer",
+      "name": "Link-layer confidentiality/authenticity (MACsec, deployment-provided)",
+      "description": "AVTPDU traffic is protected against eavesdropping and injection only by link-layer authentication/encryption (MACsec, IEEE 802.1AE) enforced by the deployment — TC18's own security control, a product-specific/opaque link-layer configuration block this library does not implement (c-RCP parity: c-RCP ROADMAP.md:104 tls.h/tls.c DEPRECATE disposition, include/rcp/authz.h:45, tara.json TS-004; rust-RCP's former tlstransport TLS bridge was removed by issue #211). The only piece of it inside this library is the per-request-stream MACsec secure-channel selector register (regmap::RequestStreamConfigEntry::rx_secure_channel_index, REQ-RMAP-015); acting on it is a link-layer concern",
       "cybersecurityProperty": "Confidentiality"
     },
     {
@@ -62,8 +62,8 @@
       "asset": "A-001",
       "property": "Integrity",
       "stride": "Tampering",
-      "description": "An attacker on the RCP transport (UDP or an unauthenticated TLS peer) sends malformed AVTPDU/ACF frames — truncated below the NTSCF header width, a subtype byte other than NTSCF_SUBTYPE, or an ntscf_data_length field wider than the encoded ACF payload — attempting to desynchronize the receiver or trigger undefined decode behaviour.",
-      "attackPath": "Attacker gains network access to the UDP/TLS transport; crafts a raw byte sequence shorter than the NTSCF header, or with a subtype byte other than avtp::NTSCF_SUBTYPE (0x82), or an ntscf_data_length/ACF byte_bus_id-opcode shape decode_acf_abb does not recognize; sends it before any application-level filtering.",
+      "description": "An attacker on the RCP transport (UDP, L2 or any link segment without MACsec) sends malformed AVTPDU/ACF frames — truncated below the NTSCF header width, a subtype byte other than NTSCF_SUBTYPE, or an ntscf_data_length field wider than the encoded ACF payload — attempting to desynchronize the receiver or trigger undefined decode behaviour.",
+      "attackPath": "Attacker gains network access to the UDP/L2 transport; crafts a raw byte sequence shorter than the NTSCF header, or with a subtype byte other than avtp::NTSCF_SUBTYPE (0x82), or an ntscf_data_length/ACF byte_bus_id-opcode shape decode_acf_abb does not recognize; sends it before any application-level filtering.",
       "impact": {
         "safety": "Moderate",
         "financial": "Negligible",
@@ -109,8 +109,8 @@
       "feasibilityRating": "Medium",
       "cal": "CAL-3",
       "cybersecurityGoal": "CSG-RCP-02",
-      "mitigations": ["REQ-TLS-001", "REQ-TLS-002", "REQ-CRC-004"],
-      "residualRisk": "Medium on plain UDP — deployments carrying safety-relevant commands MUST use the TLS bridge (mutual auth, TLS >= 1.2); UDP-only deployments rely solely on the non-cryptographic E2E CRC-32 safe-point check"
+      "mitigations": ["REQ-RMAP-015", "REQ-CRC-004"],
+      "residualRisk": "Medium without MACsec — deployments carrying safety-relevant commands MUST supply link-layer authentication/encryption (MACsec, IEEE 802.1AE) enforced by the deployment — TC18's own security control, a product-specific/opaque link-layer configuration block this library does not implement (c-RCP parity: c-RCP ROADMAP.md:104 tls.h/tls.c DEPRECATE disposition, include/rcp/authz.h:45, tara.json TS-004; rust-RCP's former tlstransport TLS bridge was removed by issue #211); without it the only in-library check is the non-cryptographic E2E CRC-32 safe-point check"
     },
     {
       "id": "T-RCP-03",
@@ -137,8 +137,8 @@
       "feasibilityRating": "High",
       "cal": "CAL-3",
       "cybersecurityGoal": "CSG-RCP-02",
-      "mitigations": ["REQ-SEQENF-003", "REQ-TLS-001", "REQ-TLS-002"],
-      "residualRisk": "Medium — this crate's legacy seqNum/ReplayGuard replay window was removed outright by Milestone 9's e2e REPLACE cutover (ROADMAP.md Satellite Package Disposition), and crate::request::evaluate_rx_enforce_seq/REQ-SEQENF-003's rx_enforce_seq monotonic-sequence check is, as of this item, additive standalone plumbing rather than a mechanism wired into a live request-acceptance path — so no rust-RCP-internal replay protection is currently enforced end-to-end; running RCP over the mutually authenticated TLS bridge (REQ-TLS-001/002) is the primary real-world mitigation until a live rx_enforce_seq integration lands"
+      "mitigations": ["REQ-SEQENF-003", "REQ-RMAP-015"],
+      "residualRisk": "Medium — this crate's legacy seqNum/ReplayGuard replay window was removed outright by Milestone 9's e2e REPLACE cutover (ROADMAP.md Satellite Package Disposition), and crate::request::evaluate_rx_enforce_seq/REQ-SEQENF-003's rx_enforce_seq monotonic-sequence check is, as of this item, additive standalone plumbing rather than a mechanism wired into a live request-acceptance path — so no rust-RCP-internal replay protection is currently enforced end-to-end; deployment-provided MACsec (IEEE 802.1AE, which carries its own replay protection) is the primary real-world mitigation until a live rx_enforce_seq integration lands (c-RCP parity: c-RCP ROADMAP.md:104, tara.json TS-004; the former TLS bridge was removed by issue #211)"
     },
     {
       "id": "T-RCP-04",
@@ -198,12 +198,12 @@
     },
     {
       "id": "T-RCP-06",
-      "title": "TLS downgrade or missing peer authentication",
+      "title": "Missing link-layer authentication (no MACsec)",
       "asset": "A-006",
       "property": "Confidentiality",
       "stride": "Spoofing",
-      "description": "An attacker forces (or a misconfigured deployment permits) a TLS session below TLSv1.2, or a peer without a valid client certificate, allowing eavesdropping or impersonation of a zone controller/HPC endpoint.",
-      "attackPath": "Attacker performs a protocol-downgrade attack against the TLS handshake, or connects to a TlsBridge whose injected TlsStream implementation does not actually enforce mutual authentication despite REQUIRE_MUTUAL_AUTH being declared true.",
+      "description": "An attacker with link-layer access eavesdrops on or tampers with AVTPDU traffic in the absence of MACsec, since this library implements no link-layer authentication or encryption of its own (c-RCP parity: c-RCP tara.json TS-004).",
+      "attackPath": "Attacker gains physical/link-layer access to the native Ethernet/AVB segment or the IEEE1722-over-UDP/IP path of a deployment that does not enforce MACsec on it (or leaves a request stream on rx_secure_channel_index 0, MACsec uncontrolled port), then reads or injects AVTPDUs directly.",
       "impact": {
         "safety": "Moderate",
         "financial": "Moderate",
@@ -221,8 +221,8 @@
       "feasibilityRating": "Low",
       "cal": "CAL-2",
       "cybersecurityGoal": "CSG-RCP-05",
-      "mitigations": ["REQ-TLS-001", "REQ-TLS-002"],
-      "residualRisk": "Low in-library — MIN_TLS_VERSION/REQUIRE_MUTUAL_AUTH are the declared policy constants; actual enforcement depends on the concrete TlsStream implementation the integrator injects, which rust-RCP does not itself provide or audit"
+      "mitigations": ["REQ-RMAP-015"],
+      "residualRisk": "OPEN, by design out of this library's own scope — link-layer authentication/encryption (MACsec, IEEE 802.1AE) enforced by the deployment — TC18's own security control, a product-specific/opaque link-layer configuration block this library does not implement (c-RCP parity: c-RCP ROADMAP.md:104 tls.h/tls.c DEPRECATE disposition, include/rcp/authz.h:45, tara.json TS-004; rust-RCP's former tlstransport TLS bridge was removed by issue #211). This library's own transports (udp, l2, shmem) carry AVTPDUs with no authentication or encryption layer of their own; it only exposes the per-stream secure-channel selector (REQ-RMAP-015). Integrators are expected to supply MACsec at the link layer"
     },
     {
       "id": "T-RCP-07",
@@ -249,8 +249,8 @@
       "feasibilityRating": "High",
       "cal": "CAL-3",
       "cybersecurityGoal": "CSG-RCP-02",
-      "mitigations": ["REQ-TLS-001", "REQ-TLS-002"],
-      "residualRisk": "Medium-High without transport-layer authentication — the e2e::crc32_tc18-based safe-point check MUST be documented as a safety control (random error detection) only, not a security control; deployments exposed to an adversarial network MUST run RCP over the TLS bridge (mutually authenticated) rather than relying on the CRC-32 safe-point check alone"
+      "mitigations": ["REQ-RMAP-015"],
+      "residualRisk": "Medium-High without transport-layer authentication — the e2e::crc32_tc18-based safe-point check MUST be documented as a safety control (random error detection) only, not a security control; deployments exposed to an adversarial network MUST supply link-layer authentication/encryption (MACsec, IEEE 802.1AE) enforced by the deployment — TC18's own security control, a product-specific/opaque link-layer configuration block this library does not implement (c-RCP parity: c-RCP ROADMAP.md:104 tls.h/tls.c DEPRECATE disposition, include/rcp/authz.h:45, tara.json TS-004; rust-RCP's former tlstransport TLS bridge was removed by issue #211) rather than relying on the CRC-32 safe-point check alone"
     },
     {
       "id": "T-RCP-08",
@@ -277,8 +277,8 @@
       "feasibilityRating": "Medium",
       "cal": "CAL-3",
       "cybersecurityGoal": "CSG-RCP-04",
-      "mitigations": ["REQ-WDG-002", "REQ-WDG-005", "REQ-TLS-001", "REQ-TLS-002"],
-      "residualRisk": "Medium — forging traffic that resets a stream's liveness timer is a transport-layer attack outside rust-RCP's own visibility; running the watchdog path over an authenticated, integrity-protected transport (TLS bridge, mutual auth) is the primary mitigation, since the library cannot itself distinguish a genuine request from a forged one without it"
+      "mitigations": ["REQ-WDG-002", "REQ-WDG-005", "REQ-RMAP-015"],
+      "residualRisk": "Medium — forging traffic that resets a stream's liveness timer is a transport-layer attack outside rust-RCP's own visibility; running the watchdog path over an authenticated, integrity-protected link (deployment-provided MACsec, IEEE 802.1AE; c-RCP parity: c-RCP ROADMAP.md:104) is the primary mitigation, since the library cannot itself distinguish a genuine request from a forged one without it"
     },
     {
       "id": "T-RCP-09",
@@ -333,8 +333,8 @@
       "feasibilityRating": "High",
       "cal": "CAL-2",
       "cybersecurityGoal": "CSG-RCP-07",
-      "mitigations": ["REQ-DISC-007", "REQ-DISC-008", "REQ-DISC-009", "REQ-DISC-013", "REQ-DISC-014", "REQ-TLS-001", "REQ-TLS-002"],
-      "residualRisk": "Medium — the first-claimant rule and Discovery_TimeOut lapse-and-reopen behavior are a coordination mechanism for cooperating clients, not an authentication mechanism; the spec's discovery model has no notion of claimant identity beyond stream possession, so an attacker with plain network access can always attempt to win the race or the lapse-reclaim window. Running discovery configuration over the mutually authenticated TLS bridge restricts this to already-trusted peers, at which point the residual concern becomes a benign multi-client coexistence race rather than a security boundary"
+      "mitigations": ["REQ-DISC-007", "REQ-DISC-008", "REQ-DISC-009", "REQ-DISC-013", "REQ-DISC-014", "REQ-RMAP-015"],
+      "residualRisk": "Medium — the first-claimant rule and Discovery_TimeOut lapse-and-reopen behavior are a coordination mechanism for cooperating clients, not an authentication mechanism; the spec's discovery model has no notion of claimant identity beyond stream possession, so an attacker with plain network access can always attempt to win the race or the lapse-reclaim window. Deployment-provided MACsec (IEEE 802.1AE; c-RCP parity: c-RCP ROADMAP.md:104, tara.json TS-003/TS-004) on the discovery path restricts this to already-trusted peers, at which point the residual concern becomes a benign multi-client coexistence race rather than a security boundary"
     }
   ],
 
@@ -348,10 +348,10 @@
     },
     {
       "id": "CSG-RCP-02",
-      "description": "rust-RCP shall provide a mechanism to detect corrupted safe-point Command/Response/Status frames (the TC18 CRC-32 safe-point check), and shall document that neither it nor rx_enforce_seq's monotonic-sequence check (not yet wired into a live request path) provide replay protection or cryptographic integrity/authenticity against an active attacker — that requires running RCP over the mutually authenticated TLS bridge.",
+      "description": "rust-RCP shall provide a mechanism to detect corrupted safe-point Command/Response/Status frames (the TC18 CRC-32 safe-point check), and shall document that neither it nor rx_enforce_seq's monotonic-sequence check (not yet wired into a live request path) provide replay protection or cryptographic integrity/authenticity against an active attacker — that requires link-layer authentication/encryption (MACsec, IEEE 802.1AE) enforced by the deployment — TC18's own security control, a product-specific/opaque link-layer configuration block this library does not implement (c-RCP parity: c-RCP ROADMAP.md:104 tls.h/tls.c DEPRECATE disposition, include/rcp/authz.h:45, tara.json TS-004; rust-RCP's former tlstransport TLS bridge was removed by issue #211).",
       "cal": "CAL-3",
       "threats": ["T-RCP-02", "T-RCP-03", "T-RCP-07"],
-      "requirements": ["REQ-CRC-004", "REQ-SEQENF-003", "REQ-TLS-001", "REQ-TLS-002"]
+      "requirements": ["REQ-CRC-004", "REQ-SEQENF-003", "REQ-RMAP-015"]
     },
     {
       "id": "CSG-RCP-03",
@@ -369,10 +369,10 @@
     },
     {
       "id": "CSG-RCP-05",
-      "description": "rust-RCP's TLS bridge shall declare and enforce a minimum TLS version of 1.2 and mandatory mutual authentication for any transport carrying safety-relevant commands.",
+      "description": "Link-layer authentication (MACsec, IEEE 802.1AE) shall be enforced by the deployment on any transport carrying safety-relevant requests; rust-RCP shall expose the per-request-stream secure-channel selector (rx_secure_channel_index) TC18 defines for it. Deployment-level control, not implemented within this library (c-RCP parity: c-RCP tara.json TS-004 cybersecurity_goal, HARA.md SG-007; ROADMAP.md:104).",
       "cal": "CAL-2",
       "threats": ["T-RCP-06"],
-      "requirements": ["REQ-TLS-001", "REQ-TLS-002"]
+      "requirements": ["REQ-RMAP-015"]
     },
     {
       "id": "CSG-RCP-06",

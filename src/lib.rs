@@ -84,12 +84,10 @@ pub mod config;
 mod conformance;
 pub mod deadline;
 pub mod discovery;
-pub mod dyndata;
 pub mod e2e;
 pub mod ep0;
 pub mod evtgroup;
 pub mod faultinject;
-pub mod federation;
 pub mod formal;
 pub mod fragment;
 pub mod gpio;
@@ -105,19 +103,21 @@ pub mod mdns;
 pub mod mock;
 pub mod observe;
 pub mod powerstate;
-pub mod proxy;
 pub mod pwm;
 pub mod ratelimit;
 pub mod record;
-pub mod redundancy;
 pub mod regmap;
 pub mod relay;
 pub mod request;
+// Test-only: retirement guard for the requirements of the modules removed
+// by issue #211 (`tlstransport`, `proxy`, `redundancy`, `federation`,
+// `dyndata`). See its own module doc comment.
+#[cfg(test)]
+mod retired;
 pub mod shmem;
 pub mod sim;
 pub mod spi;
 pub mod timestamp;
-pub mod tlstransport;
 pub mod uart;
 pub mod udp;
 pub mod wakeup;
@@ -338,10 +338,10 @@ pub enum RcpError {
     // `Zone`/`Controller`/`Registry` API (removed outright by Milestone
     // 10's core-surface cutover, `ROADMAP.md` — no compatibility shim was
     // kept). They are retained here as general-purpose `RcpError`
-    // variants: `capi`, `authz`, `federation`, and other still-live
+    // variants: `capi`, `authz`, and other still-live
     // modules construct and match on them for meanings that have nothing
     // to do with the removed `Zone` type (e.g. `NotFound` for "no such
-    // federation peer", `Busy` for a full rate-limit token bucket). Their
+    // entry", `Busy` for a full rate-limit token bucket). Their
     // `#[error(...)]` Display text below is rewritten to drop the
     // retired-model "zone" wording (rust-RCP-FS-03) — a fourth sibling
     // variant, `ZoneMismatch`, existed here with no TC18 or general-purpose

@@ -31,7 +31,7 @@ Key security controls:
 
 | Control | Module | Requirement |
 |---|---|---|
-| Mutual TLS | `tlstransport` | REQ-TLS-002 |
+| Link-layer authentication/encryption (MACsec, IEEE 802.1AE) — **deployment-level control, not implemented in this library** (c-RCP parity: c-RCP `ROADMAP.md:104` DEPRECATE disposition of `tls.h`/`tls.c`, `include/rcp/authz.h:45`; the former `tlstransport` module was removed by issue #211). This crate only exposes the per-stream MACsec secure-channel selector register | `regmap` (`RequestStreamConfigEntry::rx_secure_channel_index`) | REQ-RMAP-015 |
 | CRC-32 (TC18 safe-point) payload integrity | `e2e` | REQ-CRC-004 |
 | Monotonic sequence check (not yet dispatch-wired) | `request` | REQ-SEQENF-003 |
 | Endpoint ACL ((ep_type, request-type) allowlist) | `authz` | REQ-AUTHZ-005 |

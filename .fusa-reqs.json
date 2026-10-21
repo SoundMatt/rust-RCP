@@ -457,8 +457,8 @@
     },
     {
       "id": "REQ-WIRE-006",
-      "title": "UdpTransport/TlsBridge send ACF_ABB and ACF_GBB over NTSCF frames",
-      "text": "UdpTransport::send_acf_abb/send_acf_gbb and TlsBridge::send_acf_abb/send_acf_gbb each wrap their message in encode_ntscf_frame, and decode the response the same way, recovering the original message's fields",
+      "title": "UdpTransport sends ACF_ABB and ACF_GBB over NTSCF frames",
+      "text": "UdpTransport::send_acf_abb/send_acf_gbb each wrap their message in encode_ntscf_frame, and decode the response the same way, recovering the original message's fields",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -740,129 +740,157 @@
     },
     {
       "id": "REQ-PROXY-001",
-      "title": "ProxyEndpoint wraps inner",
-      "text": "ProxyEndpoint forwards all calls to an interchangeable inner endpoint",
+      "title": "RETIRED -- ProxyEndpoint wraps inner (proxy module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/proxy.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:114): no zone concept to proxy; the spec delegates multi-hop/bridging concerns to the network, not the RC system. Original requirement text, kept for audit history only: \"ProxyEndpoint forwards all calls to an interchangeable inner endpoint\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-PROXY-002",
-      "title": "ep_type set from original inner",
-      "text": "ProxyEndpoint.ep_type() is set from the original inner endpoint at construction",
+      "title": "RETIRED -- ep_type set from original inner (proxy module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/proxy.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:114): no zone concept to proxy; the spec delegates multi-hop/bridging concerns to the network, not the RC system. Original requirement text, kept for audit history only: \"ProxyEndpoint.ep_type() is set from the original inner endpoint at construction\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-PROXY-003",
-      "title": "read forwarded",
-      "text": "ProxyEndpoint.read() forwards to the current inner endpoint",
+      "title": "RETIRED -- read forwarded (proxy module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/proxy.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:114): no zone concept to proxy; the spec delegates multi-hop/bridging concerns to the network, not the RC system. Original requirement text, kept for audit history only: \"ProxyEndpoint.read() forwards to the current inner endpoint\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-PROXY-004",
-      "title": "write forwarded",
-      "text": "ProxyEndpoint.write() forwards to the current inner endpoint",
+      "title": "RETIRED -- write forwarded (proxy module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/proxy.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:114): no zone concept to proxy; the spec delegates multi-hop/bridging concerns to the network, not the RC system. Original requirement text, kept for audit history only: \"ProxyEndpoint.write() forwards to the current inner endpoint\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-PROXY-005",
-      "title": "swap replaces inner atomically",
-      "text": "swap() atomically replaces the inner endpoint",
+      "title": "RETIRED -- swap replaces inner atomically (proxy module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/proxy.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:114): no zone concept to proxy; the spec delegates multi-hop/bridging concerns to the network, not the RC system. Original requirement text, kept for audit history only: \"swap() atomically replaces the inner endpoint\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-PROXY-006",
-      "title": "detach returns NotConnected",
-      "text": "After detach(), read() and write() return Err(NotConnected)",
+      "title": "RETIRED -- detach returns NotConnected (proxy module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/proxy.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:114): no zone concept to proxy; the spec delegates multi-hop/bridging concerns to the network, not the RC system. Original requirement text, kept for audit history only: \"After detach(), read() and write() return Err(NotConnected)\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-RED-001",
-      "title": "RedundancyEndpoint provides hot standby",
-      "text": "RedundancyEndpoint implements 1-of-2 hot standby",
+      "title": "RETIRED -- RedundancyEndpoint provides hot standby (redundancy module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/redundancy.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:115): an RC Server is a single node with one lifecycle state -- TC18 defines no server-redundancy concept. Original requirement text, kept for audit history only: \"RedundancyEndpoint implements 1-of-2 hot standby\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-RED-002",
-      "title": "ep_type matches primary",
-      "text": "RedundancyEndpoint.ep_type() matches the primary endpoint's ep_type",
+      "title": "RETIRED -- ep_type matches primary (redundancy module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/redundancy.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:115): an RC Server is a single node with one lifecycle state -- TC18 defines no server-redundancy concept. Original requirement text, kept for audit history only: \"RedundancyEndpoint.ep_type() matches the primary endpoint's ep_type\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-RED-003",
-      "title": "Primary success no failover",
-      "text": "When the primary succeeds, no failover is triggered",
+      "title": "RETIRED -- Primary success no failover (redundancy module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/redundancy.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:115): an RC Server is a single node with one lifecycle state -- TC18 defines no server-redundancy concept. Original requirement text, kept for audit history only: \"When the primary succeeds, no failover is triggered\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-RED-004",
-      "title": "Primary failure triggers failover",
-      "text": "On primary error, the secondary is promoted and the call is retried",
+      "title": "RETIRED -- Primary failure triggers failover (redundancy module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/redundancy.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:115): an RC Server is a single node with one lifecycle state -- TC18 defines no server-redundancy concept. Original requirement text, kept for audit history only: \"On primary error, the secondary is promoted and the call is retried\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-RED-005",
-      "title": "Both failed returns error",
-      "text": "When both primary and secondary fail, the error is returned to the caller",
+      "title": "RETIRED -- Both failed returns error (redundancy module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/redundancy.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:115): an RC Server is a single node with one lifecycle state -- TC18 defines no server-redundancy concept. Original requirement text, kept for audit history only: \"When both primary and secondary fail, the error is returned to the caller\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-RED-006",
-      "title": "Failover count increments",
-      "text": "failover_count() increments each time a failover occurs",
+      "title": "RETIRED -- Failover count increments (redundancy module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/redundancy.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:115): an RC Server is a single node with one lifecycle state -- TC18 defines no server-redundancy concept. Original requirement text, kept for audit history only: \"failover_count() increments each time a failover occurs\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-RED-007",
-      "title": "No secondary after failover",
-      "text": "After one failover, has_secondary() returns false",
+      "title": "RETIRED -- No secondary after failover (redundancy module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/redundancy.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:115): an RC Server is a single node with one lifecycle state -- TC18 defines no server-redundancy concept. Original requirement text, kept for audit history only: \"After one failover, has_secondary() returns false\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-RED-008",
-      "title": "read forwarded to primary",
-      "text": "read() delegates to the current primary, with the same failover behavior as write()",
+      "title": "RETIRED -- read forwarded to primary (redundancy module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/redundancy.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:115): an RC Server is a single node with one lifecycle state -- TC18 defines no server-redundancy concept. Original requirement text, kept for audit history only: \"read() delegates to the current primary, with the same failover behavior as write()\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-FI-001",
@@ -1091,93 +1119,113 @@
     },
     {
       "id": "REQ-FED-001",
-      "title": "FederationRouter routes by vehicle ID",
-      "text": "FederationRouter maps vehicle IDs to remote DiscoveryCaches",
+      "title": "RETIRED -- FederationRouter routes by vehicle ID (federation module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/federation.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:116): the zone/HPC-lease registry model has no TC18 counterpart. Original requirement text, kept for audit history only: \"FederationRouter maps vehicle IDs to remote DiscoveryCaches\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-FED-002",
-      "title": "add_peer registers a remote discovery cache",
-      "text": "add_peer() registers a DiscoveryCache under a vehicle ID string",
+      "title": "RETIRED -- add_peer registers a remote discovery cache (federation module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/federation.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:116): the zone/HPC-lease registry model has no TC18 counterpart. Original requirement text, kept for audit history only: \"add_peer() registers a DiscoveryCache under a vehicle ID string\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-FED-003",
-      "title": "remove_peer deregisters",
-      "text": "remove_peer() removes a registered vehicle's discovery cache",
+      "title": "RETIRED -- remove_peer deregisters (federation module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/federation.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:116): the zone/HPC-lease registry model has no TC18 counterpart. Original requirement text, kept for audit history only: \"remove_peer() removes a registered vehicle's discovery cache\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-FED-004",
-      "title": "peer_ids lists all",
-      "text": "peer_ids() returns all registered vehicle ID strings",
+      "title": "RETIRED -- peer_ids lists all (federation module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/federation.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:116): the zone/HPC-lease registry model has no TC18 counterpart. Original requirement text, kept for audit history only: \"peer_ids() returns all registered vehicle ID strings\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-FED-005",
-      "title": "lookup_peer resolves a cached stream identity",
-      "text": "lookup_peer(vehicle_id, stream_id) returns the peer's cached DiscoveryCacheEntry, or Err(NotFound) if the vehicle or stream is unknown",
+      "title": "RETIRED -- lookup_peer resolves a cached stream identity (federation module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/federation.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:116): the zone/HPC-lease registry model has no TC18 counterpart. Original requirement text, kept for audit history only: \"lookup_peer(vehicle_id, stream_id) returns the peer's cached DiscoveryCacheEntry, or Err(NotFound) if the vehicle or stream is unknown\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-DYN-001",
-      "title": "DynStore is a thread-safe KV store",
-      "text": "DynStore provides a thread-safe key/value store",
+      "title": "RETIRED -- DynStore is a thread-safe KV store (dyndata module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/dyndata.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:120): every TC18 endpoint type has one fixed, spec-defined payload shape; a runtime schema/key-value registry solves a problem this protocol does not have. Original requirement text, kept for audit history only: \"DynStore provides a thread-safe key/value store\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-DYN-002",
-      "title": "set inserts or replaces",
-      "text": "set() inserts a new key or replaces an existing value",
+      "title": "RETIRED -- set inserts or replaces (dyndata module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/dyndata.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:120): every TC18 endpoint type has one fixed, spec-defined payload shape; a runtime schema/key-value registry solves a problem this protocol does not have. Original requirement text, kept for audit history only: \"set() inserts a new key or replaces an existing value\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-DYN-003",
-      "title": "get returns value or None",
-      "text": "get() returns Some(value) for existing keys, None otherwise",
+      "title": "RETIRED -- get returns value or None (dyndata module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/dyndata.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:120): every TC18 endpoint type has one fixed, spec-defined payload shape; a runtime schema/key-value registry solves a problem this protocol does not have. Original requirement text, kept for audit history only: \"get() returns Some(value) for existing keys, None otherwise\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-DYN-004",
-      "title": "delete removes key",
-      "text": "delete() removes a key; returns true if it existed",
+      "title": "RETIRED -- delete removes key (dyndata module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/dyndata.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:120): every TC18 endpoint type has one fixed, spec-defined payload shape; a runtime schema/key-value registry solves a problem this protocol does not have. Original requirement text, kept for audit history only: \"delete() removes a key; returns true if it existed\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-DYN-005",
-      "title": "keys lists all",
-      "text": "keys() returns all parameter names currently in the store",
+      "title": "RETIRED -- keys lists all (dyndata module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/dyndata.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:120): every TC18 endpoint type has one fixed, spec-defined payload shape; a runtime schema/key-value registry solves a problem this protocol does not have. Original requirement text, kept for audit history only: \"keys() returns all parameter names currently in the store\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-CFG-001",
@@ -1588,48 +1636,58 @@
     },
     {
       "id": "REQ-TLS-001",
-      "title": "MIN_TLS_VERSION constant",
-      "text": "MIN_TLS_VERSION == \"TLSv1.2\"",
+      "title": "RETIRED -- MIN_TLS_VERSION constant (tlstransport module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/tlstransport.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:104, removed at ROADMAP.md:3803-3804; include/rcp/authz.h:45): TC18's actual security control is MACsec (IEEE 802.1AE, link-layer, a product-specific/opaque configuration block), a materially different mechanism to an application-level TLS session wrapper; link-layer authentication is a deployment-level control this library does not implement (the per-stream MACsec secure-channel selector register is REQ-RMAP-015). Original requirement text, kept for audit history only: \"MIN_TLS_VERSION == \"TLSv1.2\"\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-TLS-002",
-      "title": "Mutual auth required",
-      "text": "REQUIRE_MUTUAL_AUTH == true; unverified peer returns Err(NotConnected)",
+      "title": "RETIRED -- Mutual auth required (tlstransport module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/tlstransport.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:104, removed at ROADMAP.md:3803-3804; include/rcp/authz.h:45): TC18's actual security control is MACsec (IEEE 802.1AE, link-layer, a product-specific/opaque configuration block), a materially different mechanism to an application-level TLS session wrapper; link-layer authentication is a deployment-level control this library does not implement (the per-stream MACsec secure-channel selector register is REQ-RMAP-015). Original requirement text, kept for audit history only: \"REQUIRE_MUTUAL_AUTH == true; unverified peer returns Err(NotConnected)\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-TLS-003",
-      "title": "TlsStream trait",
-      "text": "TlsStream defines write_all, read_to_vec, peer_verified",
+      "title": "RETIRED -- TlsStream trait (tlstransport module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/tlstransport.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:104, removed at ROADMAP.md:3803-3804; include/rcp/authz.h:45): TC18's actual security control is MACsec (IEEE 802.1AE, link-layer, a product-specific/opaque configuration block), a materially different mechanism to an application-level TLS session wrapper; link-layer authentication is a deployment-level control this library does not implement (the per-stream MACsec secure-channel selector register is REQ-RMAP-015). Original requirement text, kept for audit history only: \"TlsStream defines write_all, read_to_vec, peer_verified\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-TLS-004",
-      "title": "TlsBridge uses NTSCF/ACF encoding, addressed by StreamId",
-      "text": "TlsBridge.send_acf_abb()/send_acf_gbb() use avtp::encode_ntscf_frame + acf::encode_acf_abb/encode_acf_gbb, and decode responses via avtp::decode_ntscf_frame + acf::decode_acf_abb/decode_acf_gbb, verified via acf::verify_echo_back \u2014 the same framing crate::udp::UdpTransport uses, over a TlsStream instead of a UDP socket",
+      "title": "RETIRED -- TlsBridge uses NTSCF/ACF encoding, addressed by StreamId (tlstransport module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/tlstransport.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:104, removed at ROADMAP.md:3803-3804; include/rcp/authz.h:45): TC18's actual security control is MACsec (IEEE 802.1AE, link-layer, a product-specific/opaque configuration block), a materially different mechanism to an application-level TLS session wrapper; link-layer authentication is a deployment-level control this library does not implement (the per-stream MACsec secure-channel selector register is REQ-RMAP-015). Original requirement text, kept for audit history only: \"TlsBridge.send_acf_abb()/send_acf_gbb() use avtp::encode_ntscf_frame + acf::encode_acf_abb/encode_acf_gbb, and decode responses via avtp::decode_ntscf_frame + acf::decode_acf_abb/decode_acf_gbb, verified via acf::verify_echo_back — the same framing crate::udp::UdpTransport uses, over a TlsStream instead of a UDP socket\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-TLS-005",
-      "title": "Close is no-op",
-      "text": "TlsBridge.close() returns Ok(())",
+      "title": "RETIRED -- Close is no-op (tlstransport module removed, issue #211)",
+      "text": "RETIRED (issue #211): src/tlstransport.rs was removed outright, with no deprecation shim, together with the code and tests that traced this requirement. c-RCP DEPRECATE disposition (c-RCP ROADMAP.md:104, removed at ROADMAP.md:3803-3804; include/rcp/authz.h:45): TC18's actual security control is MACsec (IEEE 802.1AE, link-layer, a product-specific/opaque configuration block), a materially different mechanism to an application-level TLS session wrapper; link-layer authentication is a deployment-level control this library does not implement (the per-stream MACsec secure-channel selector register is REQ-RMAP-015). Original requirement text, kept for audit history only: \"TlsBridge.close() returns Ok(())\". No live code implements this requirement; its only remaining trace is the retirement guard in src/retired.rs, which verifies the entry stays marked retired and that no live module re-annotates it.",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "retired",
+      "status": "retired"
     },
     {
       "id": "REQ-CAPI-001",

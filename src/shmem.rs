@@ -16,8 +16,8 @@
 //! frames"), [`ShmChannel`] is unchanged — it was already a plain
 //! byte-in/byte-out abstraction with no `Zone`/`Command` coupling of its
 //! own — and [`ShmBridge`] is retargeted exactly the way
-//! `src/tlstransport.rs`'s `TlsBridge` was retargeted by the `wire`
-//! REPLACE cutover earlier in this milestone: addressed by
+//! `crate::udp::UdpTransport` was retargeted by the `wire` REPLACE
+//! cutover earlier in this milestone: addressed by
 //! [`crate::avtp::StreamId`] instead of `Zone`, and carrying NTSCF-wrapped
 //! ACF_ABB/ACF_GBB messages instead of the deleted `wire::encode_command`
 //! frame.
@@ -129,8 +129,8 @@ impl ShmBridge {
 
     /// Send an ACF_ABB request wrapped in an NTSCF frame, and decode the
     /// ACF_ABB response, verifying it echoes the request's `byte_bus_id` —
-    /// the same framing `crate::tlstransport::TlsBridge::send_acf_abb`
-    /// uses, over an [`ShmChannel`] pair instead of a TLS stream.
+    /// the same framing `crate::udp::UdpTransport::send_acf_abb` uses,
+    /// over an [`ShmChannel`] pair instead of a UDP socket.
     //fusa:req REQ-SHM-004
     pub fn send_acf_abb(
         &self,

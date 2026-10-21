@@ -94,10 +94,11 @@ The wire format, RC Server model, and endpoint-addressing/dispatch path
 Everything else that is `pub`, currently including the device-endpoint
 wire-codec modules (`can`, `lin`, `gpio`, `i2c`, `spi`, `uart`, `adc`,
 `pwm`, `iseled`, `mdio`, `wakeup`), the `mock::Endpoint`-wrapping decorators
-(`ratelimit`, `deadline`, `faultinject`, `proxy`, `redundancy`, `observe`,
+(`ratelimit`, `deadline`, `faultinject`, `observe`,
 `authz`, `record`, `loan`, `admin`, `powerstate`, `watchdog`, `evtgroup`,
-`federation`, `dyndata`, `config`), and the transport bridges (`udp`,
-`l2`, `tlstransport`, `shmem`, `mdns`). These get the same semver *mechanics* as
+`config`), and the transport bridges (`udp`, `l2`, `shmem`, `mdns`).
+(`tlstransport`, `proxy`, `redundancy`, `federation` and `dyndata` were
+removed outright by issue #211, mirroring c-RCP's DEPRECATE disposition.) These get the same semver *mechanics* as
 Tier 1 (a breaking change here is still a MAJOR bump post-`v1.0.0`) but are
 individually newer and less exercised end-to-end than Tier 1, so expect
 more of them to gain `#[non_exhaustive]`/other stability annotations as
