@@ -448,40 +448,18 @@ impl FragmentReassemblyBuffer {
         info: &ByteMessageInfo,
         payload: &[u8],
     ) -> Result<FragmentAcceptOutcome, RcpError> {
-        if !self.fragmentation_supported() {
-            return Err(RcpError::UnsupportedCmd);
-        }
-        // Rust-only guard (not a wire behaviour): c-RCP appends a new
-        // message onto a completed one unless the caller resets
-        // (`fragment.c:163-169`); this buffer fails closed instead.
-        if self.complete {
-            return Err(RcpError::InvalidParameter);
-        }
-
-        let segment_num = info.read_size_segment.as_segment_num();
-        if info.ms && segment_num > READ_SIZE_SEGMENT_12BIT_MAX {
-            return Err(RcpError::InvalidParameter);
-        }
+        let segment_num = self.check_feed_preconditions(info)?;
         let prospective_total = self.total_len + payload.len();
         let too_large = prospective_total > self.max_request_size as usize;
 
         if !self.collecting {
-            if too_large {
-                return Err(RcpError::PayloadTooLarge);
-            }
-            if !info.ms {
-                // Never-fragmented, single-segment message.
-                self.push(payload, prospective_total);
-                self.complete = true;
-                return Ok(FragmentAcceptOutcome::Complete);
-            }
-            if segment_num != 0 {
-                return Err(RcpError::InvalidParameter);
-            }
-            self.push(payload, prospective_total);
-            self.collecting = true;
-            self.expected_segment_num = 1;
-            return Ok(FragmentAcceptOutcome::Continuing);
+            return self.accept_on_idle(
+                info.ms,
+                segment_num,
+                payload,
+                prospective_total,
+                too_large,
+            );
         }
 
         if info.ms && segment_num != self.expected_segment_num {
@@ -500,6 +478,55 @@ impl FragmentReassemblyBuffer {
         self.collecting = false;
         self.complete = true;
         Ok(FragmentAcceptOutcome::Complete)
+    }
+
+    /// The state-independent checks [`Self::accept_fragment`] runs first, in
+    /// check order (`c-RCP/src/fragment.c:158-192`). Returns the raw
+    /// `read_size`/`segment_num` field on success.
+    fn check_feed_preconditions(&self, info: &ByteMessageInfo) -> Result<u16, RcpError> {
+        if !self.fragmentation_supported() {
+            return Err(RcpError::UnsupportedCmd);
+        }
+        // Rust-only guard (not a wire behaviour): c-RCP appends a new
+        // message onto a completed one unless the caller resets
+        // (`fragment.c:163-169`); this buffer fails closed instead.
+        if self.complete {
+            return Err(RcpError::InvalidParameter);
+        }
+        let segment_num = info.read_size_segment.as_segment_num();
+        if info.ms && segment_num > READ_SIZE_SEGMENT_12BIT_MAX {
+            return Err(RcpError::InvalidParameter);
+        }
+        Ok(segment_num)
+    }
+
+    /// [`Self::accept_fragment`] on an idle buffer: either a complete
+    /// never-fragmented message (`ms = 0`) or the first fragment of a train,
+    /// which must carry `segment_num == 0`.
+    fn accept_on_idle(
+        &mut self,
+        ms: bool,
+        segment_num: u16,
+        payload: &[u8],
+        prospective_total: usize,
+        too_large: bool,
+    ) -> Result<FragmentAcceptOutcome, RcpError> {
+        if too_large {
+            return Err(RcpError::PayloadTooLarge);
+        }
+        if !ms {
+            // Never-fragmented, single-segment message.
+            self.push(payload, prospective_total);
+            self.complete = true;
+            return Ok(FragmentAcceptOutcome::Complete);
+        }
+        if segment_num != 0 {
+            return Err(RcpError::InvalidParameter);
+        }
+        self.push(payload, prospective_total);
+        self.collecting = true;
+        self.expected_segment_num = 1;
+        Ok(FragmentAcceptOutcome::Continuing)
     }
 
     fn push(&mut self, payload: &[u8], new_total: usize) {
