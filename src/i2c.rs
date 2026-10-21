@@ -131,33 +131,36 @@
 //! Groups A/B/C work) can add that parsing later without this module having
 //! guessed at a framing this crate cannot yet confirm.
 //!
-//! ## Provenance note: the ambiguous high-speed rows
+//! ## Provenance note: the ambiguous high-speed row
 //!
 //! `ROADMAP.md`'s I²C checklist bullet directs this crate to "flag the enum
 //! ambiguity between adjacent high-speed rows as unresolved pending errata,
 //! per this crate's spec-extraction §5.7 — do not silently pick one" rather
-//! than resolving it. [`I2cSpeedMode`] models the lower, unambiguous speed
-//! presets as ordinarily named variants
-//! ([`I2cSpeedMode::Standard`]/[`I2cSpeedMode::Fast`]/[`I2cSpeedMode::FastPlus`]),
-//! then represents the two adjacent high-speed rows this crate's own
-//! spec-extraction pass could not distinguish as two explicitly, neutrally
-//! named variants, [`I2cSpeedMode::HighSpeedRowA`] and
-//! [`I2cSpeedMode::HighSpeedRowB`], rather than guessing which row is (for
-//! example) "High-speed mode" versus some faster or slower neighboring
-//! preset — mirroring [`crate::gpio::GpioWriteSemantics::Unnamed8th`]'s own
-//! treatment of GPIO's single unnamed write-semantics slot, and
-//! [`crate::spi::SpiChannelSelect::Spare6`]/
-//! [`crate::spi::SpiChannelSelect::Spare7`]'s treatment of SPI's two spare
-//! selection values. [`I2cSpeedMode::is_ambiguous_high_speed_row`] lets a
-//! caller detect this rather than treat either variant as confirmed.
-//! Resolving which row is which, and what wire value each of the five
-//! `i2c_mode` presets actually carries, is left to errata reconciliation
-//! against confirmed wire behavior — never against spec prose — matching
-//! every other still-open provenance note in this crate. The specific
-//! `0..=4` wire-value ordering [`I2cSpeedMode::to_u8`] assigns (ascending by
-//! this module's own best-effort speed ordering, with the two ambiguous rows
-//! placed last and adjacent to each other) is this crate's own working
-//! choice, not a transcription of a confirmed wire encoding.
+//! than resolving it. TC18 §13.7.7.2 Table 49 (`i2c_mode`, relative address
+//! `0x0007`, TC18.txt L5225-5231, catalog `TC18-13.7.7.2-001`) lists:
+//!
+//! ```text
+//! 0: Standard Mode 100kbit/s
+//! 1: Fast Mode 400kbit/s
+//! 2: Fast Mode plus 1Mbit/s
+//! 3: High-speed mode 1.7Mbit/s
+//! 3: High-speed mode 3.4Mbit/s     <- duplicated wire value 3
+//! 4: Ultra-fast mode 5 Mbit/s      <- distinct, unambiguous row
+//! ```
+//!
+//! Only wire value `3` is ambiguous: two differently named high-speed rates
+//! share it. [`I2cSpeedMode::HighSpeedRowA`] carries that value without
+//! guessing which of the two rates it means, and
+//! [`I2cSpeedMode::is_ambiguous_high_speed_row`] flags it (and only it) so a
+//! caller can detect it rather than treat it as confirmed — mirroring
+//! [`crate::gpio::GpioWriteSemantics::Unnamed8th`]'s own treatment of GPIO's
+//! single unnamed write-semantics slot. Wire value `4` is Table 49's own
+//! fifth, unambiguous row and is named [`I2cSpeedMode::UltraFast`], matching
+//! c-RCP's `RCP_EP_I2C_MODE_ULTRA_FAST = 4` (`c-RCP/include/rcp/ep_i2c.h:253`).
+//! c-RCP likewise resolves value `3` to a single `RCP_EP_I2C_MODE_HIGH_SPEED`
+//! enumerator under a "pending spec errata" note (`ep_i2c.h:250-252`), so the
+//! `0..=4` wire values [`I2cSpeedMode::to_u8`] assigns are byte-identical to
+//! c-RCP's.
 
 use crate::evtgroup::{evt_row2_kind_of, EvtRow2Kind};
 use crate::RcpError;
@@ -167,9 +170,10 @@ use crate::RcpError;
 /// The `i2c_mode` speed preset this endpoint is configured for.
 ///
 /// See this module's doc comment "Provenance note: the ambiguous high-speed
-/// rows" for why [`I2cSpeedMode::HighSpeedRowA`]/[`I2cSpeedMode::HighSpeedRowB`]
-/// are deliberately left unresolved rather than each given a specific named
-/// speed.
+/// row" for why [`I2cSpeedMode::HighSpeedRowA`] (wire value 3) is
+/// deliberately left unresolved rather than given a specific named speed.
+/// The wire values mirror c-RCP's `rcp_ep_i2c_mode_t`
+/// (`c-RCP/include/rcp/ep_i2c.h:246-258`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 //fusa:req REQ-I2C-001
@@ -181,14 +185,14 @@ pub enum I2cSpeedMode {
     Fast = 1,
     /// Fast-mode-plus speed preset.
     FastPlus = 2,
-    /// The first of the two adjacent high-speed `i2c_mode` rows this
-    /// crate's spec-extraction pass could not distinguish. See this
-    /// module's doc comment.
+    /// Wire value 3, which TC18 Table 49 lists twice (High-speed mode
+    /// 1.7 Mbit/s and 3.4 Mbit/s) — unresolved pending errata. c-RCP's
+    /// `RCP_EP_I2C_MODE_HIGH_SPEED = 3`. See this module's doc comment.
     HighSpeedRowA = 3,
-    /// The second of the two adjacent high-speed `i2c_mode` rows this
-    /// crate's spec-extraction pass could not distinguish. See this
-    /// module's doc comment.
-    HighSpeedRowB = 4,
+    /// Wire value 4, Table 49's unambiguous Ultra-fast mode (5 Mbit/s)
+    /// row. c-RCP's `RCP_EP_I2C_MODE_ULTRA_FAST = 4`
+    /// (`c-RCP/include/rcp/ep_i2c.h:253`).
+    UltraFast = 4,
 }
 
 impl I2cSpeedMode {
@@ -213,19 +217,20 @@ impl I2cSpeedMode {
             1 => Ok(Self::Fast),
             2 => Ok(Self::FastPlus),
             3 => Ok(Self::HighSpeedRowA),
-            4 => Ok(Self::HighSpeedRowB),
+            4 => Ok(Self::UltraFast),
             _ => Err(RcpError::InvalidParameter),
         }
     }
 
-    /// True for [`I2cSpeedMode::HighSpeedRowA`]/[`I2cSpeedMode::HighSpeedRowB`]
-    /// — the two adjacent high-speed `i2c_mode` rows this module's doc
-    /// comment flags as unresolved pending errata. False for
-    /// [`I2cSpeedMode::Standard`]/[`I2cSpeedMode::Fast`]/[`I2cSpeedMode::FastPlus`].
+    /// True only for [`I2cSpeedMode::HighSpeedRowA`] — wire value 3, the
+    /// single `i2c_mode` value TC18 Table 49 lists twice and this module's
+    /// doc comment flags as unresolved pending errata. False for
+    /// [`I2cSpeedMode::Standard`]/[`I2cSpeedMode::Fast`]/[`I2cSpeedMode::FastPlus`]
+    /// and for the unambiguous [`I2cSpeedMode::UltraFast`] (value 4).
     //fusa:req REQ-I2C-003
     //fusa:req REQ-I2C-010
     pub fn is_ambiguous_high_speed_row(self) -> bool {
-        matches!(self, Self::HighSpeedRowA | Self::HighSpeedRowB)
+        matches!(self, Self::HighSpeedRowA)
     }
 }
 
@@ -398,7 +403,7 @@ mod tests {
         I2cSpeedMode::Fast,
         I2cSpeedMode::FastPlus,
         I2cSpeedMode::HighSpeedRowA,
-        I2cSpeedMode::HighSpeedRowB,
+        I2cSpeedMode::UltraFast,
     ];
 
     #[test]
@@ -428,14 +433,12 @@ mod tests {
 
     #[test]
     //fusa:test REQ-I2C-003
-    fn i2c_speed_mode_is_ambiguous_high_speed_row_true_only_for_the_two_flagged_rows() {
+    fn i2c_speed_mode_is_ambiguous_high_speed_row_true_only_for_value_three() {
         for mode in ALL_SPEED_MODES {
-            let expected = matches!(
-                mode,
-                I2cSpeedMode::HighSpeedRowA | I2cSpeedMode::HighSpeedRowB
-            );
+            let expected = mode.to_u8() == 3;
             assert_eq!(mode.is_ambiguous_high_speed_row(), expected);
         }
+        assert!(!I2cSpeedMode::UltraFast.is_ambiguous_high_speed_row());
     }
 
     #[test]
@@ -450,24 +453,30 @@ mod tests {
 
     #[test]
     //fusa:test REQ-I2C-009
-    fn i2c_mode_wire_values_match_tc18_table_46_unambiguous_rows() {
-        // TC18 §13.7.7.2 Table 49 (TC18.txt lines 5226-5228), i2c_mode
+    fn i2c_mode_wire_values_match_tc18_table_49_unambiguous_rows() {
+        // TC18 §13.7.7.2 Table 49 (TC18.txt lines 5225-5231), i2c_mode
         // (relative address 0x0007, 8 bit R/W):
         //   0: Standard Mode 100kbit/s
         //   1: Fast Mode 400kbit/s
         //   2: Fast Mode plus 1Mbit/s
+        //   4: Ultra-fast mode 5 Mbit/s
+        // c-RCP: include/rcp/ep_i2c.h:247-253 (RCP_EP_I2C_MODE_STANDARD..
+        // RCP_EP_I2C_MODE_ULTRA_FAST).
         assert_eq!(I2cSpeedMode::from_u8(0), Ok(I2cSpeedMode::Standard));
         assert_eq!(I2cSpeedMode::from_u8(1), Ok(I2cSpeedMode::Fast));
         assert_eq!(I2cSpeedMode::from_u8(2), Ok(I2cSpeedMode::FastPlus));
+        assert_eq!(I2cSpeedMode::from_u8(4), Ok(I2cSpeedMode::UltraFast));
         assert_eq!(I2cSpeedMode::Standard.to_u8(), 0);
         assert_eq!(I2cSpeedMode::Fast.to_u8(), 1);
         assert_eq!(I2cSpeedMode::FastPlus.to_u8(), 2);
-        // None of these three rows is one of Table 49's duplicated
-        // high-speed rows, so none may be reported as unresolved.
+        assert_eq!(I2cSpeedMode::UltraFast.to_u8(), 4);
+        // None of these four rows is Table 49's duplicated high-speed
+        // value 3, so none may be reported as unresolved.
         for mode in [
             I2cSpeedMode::Standard,
             I2cSpeedMode::Fast,
             I2cSpeedMode::FastPlus,
+            I2cSpeedMode::UltraFast,
         ] {
             assert!(!mode.is_ambiguous_high_speed_row());
         }

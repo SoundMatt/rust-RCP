@@ -116,8 +116,8 @@ use tokio::sync::mpsc;
 
 use crate::acf::{AcfAbbMessage, ByteMessageInfo, ReadSizeOrSegment};
 use crate::avtp::StreamId;
-use crate::mock::{Endpoint, RcServer};
 use crate::relay::{Context, Message, Protocol, SubscriberOptions, Version};
+use crate::server::{Endpoint, RcServer};
 use crate::RcpError;
 
 // ── Adapter trait ─────────────────────────────────────────────────────────────
@@ -228,7 +228,7 @@ pub fn parse_endpoint_id(id: &str) -> Result<(StreamId, u16), RcpError> {
 
 /// Convert a `relay::Message` to an addressed ACF_ABB request per RELAY
 /// spec §15.7.5 (Caller.Call direction, request half), ready to hand to
-/// [`crate::mock::RcServer::handle_abb`].
+/// [`crate::server::RcServer::dispatch_message`].
 ///
 /// `msg.id` is decoded via [`parse_endpoint_id`]. `msg.meta` supplies two
 /// optional, this-binding-defined keys — see this module's provenance
@@ -243,8 +243,8 @@ pub fn parse_endpoint_id(id: &str) -> Result<(StreamId, u16), RcpError> {
 ///
 /// Every other `ByteMessageInfo` field this binding has no `Message`-level
 /// analog for (`evt`, `hs`, `cs`, `transaction_num`, `ms`, `pad`, `mtv`) is
-/// left at its zero default; [`crate::mock::RcServer::handle_abb`]'s
-/// dispatch logic does not consult any of them.
+/// left at its zero default; [`crate::mock::RcServer::dispatch_message`]'s
+/// endpoint execution does not consult any of them.
 //fusa:req REQ-ADAPT-007
 pub fn from_message(msg: &Message) -> Result<(StreamId, AcfAbbMessage), RcpError> {
     let (stream_id, byte_bus_id) = parse_endpoint_id(&msg.id)?;
@@ -361,6 +361,12 @@ pub fn response_to_message(stream_id: StreamId, resp: &AcfAbbMessage) -> Message
 /// `relay::Node`) per RELAY spec §10.3, addressed by
 /// `(StreamId, byte_bus_id)` rather than by the retired `Zone` model.
 ///
+/// Every request goes through [`RcServer::dispatch_message`], i.e. the RC
+/// Server's single frame-level entry point
+/// ([`crate::server::RcServer::dispatch_frame`], issue #224) — never
+/// straight to the execution step — so the same per-stream checks apply as
+/// for a request received over a transport.
+///
 /// `RcServer`'s dispatch methods are synchronous; each call here still
 /// dispatches through [`tokio::task::spawn_blocking`], preserving this
 /// binding's existing §18.3 discipline (a genuine async boundary, not a
@@ -418,7 +424,7 @@ impl crate::relay::Node for RcpAdapter {
         }
         let (stream_id, request) = from_message(&msg).map_err(map_err)?;
         let server = Arc::clone(&self.server);
-        tokio::task::spawn_blocking(move || server.handle_abb(stream_id, &request))
+        tokio::task::spawn_blocking(move || server.dispatch_message(stream_id, &request))
             .await
             .map_err(|_| crate::relay::Error::Closed)?
             .map_err(map_err)?;
@@ -473,10 +479,11 @@ impl crate::relay::Caller for RcpAdapter {
         }
         let (stream_id, request) = from_message(&req).map_err(map_err)?;
         let server = Arc::clone(&self.server);
-        let response = tokio::task::spawn_blocking(move || server.handle_abb(stream_id, &request))
-            .await
-            .map_err(|_| crate::relay::Error::Closed)?
-            .map_err(map_err)?;
+        let response =
+            tokio::task::spawn_blocking(move || server.dispatch_message(stream_id, &request))
+                .await
+                .map_err(|_| crate::relay::Error::Closed)?
+                .map_err(map_err)?;
         Ok(response_to_message(stream_id, &response))
     }
 }
@@ -795,6 +802,29 @@ mod tests {
         let msg = Message::new(Protocol::Rcp, format_endpoint_id(sid, 5), vec![]);
         let err = node.call(Context::background(), msg).await.unwrap_err();
         assert_eq!(err, crate::relay::Error::NotConnected);
+    }
+
+    #[tokio::test]
+    //fusa:test REQ-ADAPT-010
+    async fn adapt_call_goes_through_the_servers_dispatch_pipeline() {
+        // issue #224: the adapter must not bypass the request store. A
+        // write to a disabled endpoint is queued (not executed), so the
+        // call sees no response, and the endpoint is untouched until the
+        // queue is drained.
+        let sid = stream(15);
+        let server = RcServer::new(GeneralRegisters::default());
+        let ep = MockEndpoint::new(EndpointType::Gpio, vec![0u8; 2]);
+        server.register_endpoint(sid, 4, ep.clone()).unwrap();
+        assert!(server.set_endpoint_enable(sid, 4, false));
+        let node = adapt(Arc::clone(&server));
+        let msg = Message::new(Protocol::Rcp, format_endpoint_id(sid, 4), vec![7, 7]);
+        let err = node.call(Context::background(), msg).await.unwrap_err();
+        assert_eq!(err, crate::relay::Error::NotConnected);
+        assert_eq!(ep.read(2).unwrap(), vec![0, 0]);
+        assert_eq!(server.endpoint_queue_len(sid, 4), 1);
+        assert!(server.set_endpoint_enable(sid, 4, true));
+        assert!(server.drain_endpoint(sid, 4).is_some());
+        assert_eq!(ep.read(2).unwrap(), vec![7, 7]);
     }
 
     #[tokio::test]

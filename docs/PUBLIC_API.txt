@@ -185,7 +185,7 @@ pub fn rcp::acf::verify_echo_back(&rcp::acf::ByteMessageInfo, &rcp::acf::ByteMes
 pub mod rcp::adapt
 pub struct rcp::adapt::AdaptEndpoint<M>
 impl<M: core::marker::Send + core::marker::Sync + 'static> rcp::adapt::AdaptEndpoint<M>
-pub fn rcp::adapt::AdaptEndpoint<M>::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>, alloc::rcs::arc::Arc<dyn rcp::adapt::Adapter<M>>) -> Self
+pub fn rcp::adapt::AdaptEndpoint<M>::new(alloc::rcs::arc::Arc<dyn rcp::server::Endpoint>, alloc::rcs::arc::Arc<dyn rcp::adapt::Adapter<M>>) -> Self
 pub fn rcp::adapt::AdaptEndpoint<M>::send_msg(&self, M, u16) -> core::result::Result<M, rcp::RcpError>
 impl<M> core::marker::Freeze for rcp::adapt::AdaptEndpoint<M> where alloc::rcs::arc::Arc<dyn rcp::adapt::Adapter<M>>: core::marker::Freeze
 impl<M> core::marker::Send for rcp::adapt::AdaptEndpoint<M> where alloc::rcs::arc::Arc<dyn rcp::adapt::Adapter<M>>: core::marker::Send
@@ -211,7 +211,7 @@ pub fn rcp::adapt::Adapter::to_write_payload(&self, M) -> core::result::Result<a
 impl rcp::adapt::Adapter<alloc::vec::Vec<u8>> for rcp::adapt::PassthroughAdapter
 pub fn rcp::adapt::PassthroughAdapter::adapt_read_bytes(&self, alloc::vec::Vec<u8>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::adapt::PassthroughAdapter::to_write_payload(&self, alloc::vec::Vec<u8>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
-pub fn rcp::adapt::adapt(alloc::rcs::arc::Arc<rcp::mock::RcServer>) -> alloc::boxed::Box<dyn rcp::relay::Caller>
+pub fn rcp::adapt::adapt(alloc::rcs::arc::Arc<rcp::server::RcServer>) -> alloc::boxed::Box<dyn rcp::relay::Caller>
 pub fn rcp::adapt::format_endpoint_id(rcp::avtp::StreamId, u16) -> alloc::string::String
 pub fn rcp::adapt::from_message(&rcp::relay::Message) -> core::result::Result<(rcp::avtp::StreamId, rcp::acf::AcfAbbMessage), rcp::RcpError>
 pub fn rcp::adapt::parse_endpoint_id(&str) -> core::result::Result<(rcp::avtp::StreamId, u16), rcp::RcpError>
@@ -414,10 +414,10 @@ impl core::panic::unwind_safe::UnwindSafe for rcp::admin::AdminServer
 pub mod rcp::authz
 pub struct rcp::authz::AuthzEndpoint
 impl rcp::authz::AuthzEndpoint
-pub fn rcp::authz::AuthzEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>, rcp::authz::Policy) -> Self
+pub fn rcp::authz::AuthzEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::server::Endpoint>, rcp::authz::Policy) -> Self
 pub fn rcp::authz::AuthzEndpoint::policy(&self) -> rcp::authz::Policy
 pub fn rcp::authz::AuthzEndpoint::set_policy(&self, rcp::authz::Policy)
-impl rcp::mock::Endpoint for rcp::authz::AuthzEndpoint
+impl rcp::server::Endpoint for rcp::authz::AuthzEndpoint
 pub fn rcp::authz::AuthzEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::authz::AuthzEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::authz::AuthzEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
@@ -1138,10 +1138,10 @@ pub mod rcp::deadline
 pub struct rcp::deadline::DeadlineEndpoint
 impl rcp::deadline::DeadlineEndpoint
 pub fn rcp::deadline::DeadlineEndpoint::deadline(&self) -> core::time::Duration
-pub fn rcp::deadline::DeadlineEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>, core::time::Duration) -> Self
+pub fn rcp::deadline::DeadlineEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::server::Endpoint>, core::time::Duration) -> Self
 pub fn rcp::deadline::DeadlineEndpoint::read_with_deadline(&self, u16, core::option::Option<core::time::Duration>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::deadline::DeadlineEndpoint::write_with_deadline(&self, &[u8], core::option::Option<core::time::Duration>) -> core::result::Result<(), rcp::RcpError>
-impl rcp::mock::Endpoint for rcp::deadline::DeadlineEndpoint
+impl rcp::server::Endpoint for rcp::deadline::DeadlineEndpoint
 pub fn rcp::deadline::DeadlineEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::deadline::DeadlineEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::deadline::DeadlineEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
@@ -1493,8 +1493,8 @@ impl rcp::faultinject::FaultInjectEndpoint
 pub fn rcp::faultinject::FaultInjectEndpoint::call_count(&self) -> u64
 pub fn rcp::faultinject::FaultInjectEndpoint::clear(&self)
 pub fn rcp::faultinject::FaultInjectEndpoint::inject(&self, rcp::faultinject::FaultSpec)
-pub fn rcp::faultinject::FaultInjectEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>) -> Self
-impl rcp::mock::Endpoint for rcp::faultinject::FaultInjectEndpoint
+pub fn rcp::faultinject::FaultInjectEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::server::Endpoint>) -> Self
+impl rcp::server::Endpoint for rcp::faultinject::FaultInjectEndpoint
 pub fn rcp::faultinject::FaultInjectEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::faultinject::FaultInjectEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::faultinject::FaultInjectEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
@@ -1817,8 +1817,8 @@ impl core::panic::unwind_safe::UnwindSafe for rcp::i2c::I2cRequest
 pub rcp::i2c::I2cSpeedMode::Fast = 1
 pub rcp::i2c::I2cSpeedMode::FastPlus = 2
 pub rcp::i2c::I2cSpeedMode::HighSpeedRowA = 3
-pub rcp::i2c::I2cSpeedMode::HighSpeedRowB = 4
 pub rcp::i2c::I2cSpeedMode::Standard = 0
+pub rcp::i2c::I2cSpeedMode::UltraFast = 4
 impl rcp::i2c::I2cSpeedMode
 pub fn rcp::i2c::I2cSpeedMode::from_u8(u8) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::i2c::I2cSpeedMode::is_ambiguous_high_speed_row(self) -> bool
@@ -2558,9 +2558,9 @@ impl core::panic::unwind_safe::UnwindSafe for rcp::loan::LoanPool
 pub struct rcp::loan::LoanPoolEndpoint
 impl rcp::loan::LoanPoolEndpoint
 pub fn rcp::loan::LoanPoolEndpoint::loan(&self, usize) -> core::result::Result<rcp::Loan, rcp::RcpError>
-pub fn rcp::loan::LoanPoolEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>, alloc::rcs::arc::Arc<rcp::loan::LoanPool>) -> Self
+pub fn rcp::loan::LoanPoolEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::server::Endpoint>, alloc::rcs::arc::Arc<rcp::loan::LoanPool>) -> Self
 pub fn rcp::loan::LoanPoolEndpoint::write_loaned(&self, rcp::Loan) -> core::result::Result<(), rcp::RcpError>
-impl rcp::mock::Endpoint for rcp::loan::LoanPoolEndpoint
+impl rcp::server::Endpoint for rcp::loan::LoanPoolEndpoint
 pub fn rcp::loan::LoanPoolEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::loan::LoanPoolEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::loan::LoanPoolEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
@@ -2722,7 +2722,7 @@ pub mod rcp::mock
 pub struct rcp::mock::MockEndpoint
 impl rcp::mock::MockEndpoint
 pub fn rcp::mock::MockEndpoint::new(rcp::regmap::EndpointType, alloc::vec::Vec<u8>) -> alloc::rcs::arc::Arc<Self>
-impl rcp::mock::Endpoint for rcp::mock::MockEndpoint
+impl rcp::server::Endpoint for rcp::mock::MockEndpoint
 pub fn rcp::mock::MockEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::mock::MockEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::mock::MockEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
@@ -2734,67 +2734,93 @@ impl core::marker::UnsafeUnpin for rcp::mock::MockEndpoint
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::mock::MockEndpoint
 impl core::panic::unwind_safe::UnwindSafe for rcp::mock::MockEndpoint
 pub struct rcp::mock::RcServer
-impl rcp::mock::RcServer
-pub fn rcp::mock::RcServer::general_registers(&self) -> rcp::regmap::GeneralRegisters
-pub fn rcp::mock::RcServer::handle_abb(&self, rcp::avtp::StreamId, &rcp::acf::AcfAbbMessage) -> core::result::Result<rcp::acf::AcfAbbMessage, rcp::RcpError>
-pub fn rcp::mock::RcServer::handle_ntscf_frame(&self, rcp::avtp::StreamId, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
-pub fn rcp::mock::RcServer::new(rcp::regmap::GeneralRegisters) -> alloc::rcs::arc::Arc<Self>
-pub fn rcp::mock::RcServer::register_endpoint(&self, rcp::avtp::StreamId, u16, alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>) -> core::result::Result<rcp::addressing::EndpointId, rcp::RcpError>
-pub fn rcp::mock::RcServer::set_root_client(&self, core::option::Option<rcp::avtp::StreamId>)
-pub fn rcp::mock::RcServer::state(&self) -> rcp::lifecycle::RcServerState
-pub fn rcp::mock::RcServer::try_transition(&self, rcp::lifecycle::RcServerState, core::option::Option<&rcp::lifecycle::PlausibilitySnapshot<'_>>, rcp::lifecycle::WriterCtx, bool) -> core::result::Result<(), rcp::lifecycle::LifecycleError>
-impl !core::marker::Freeze for rcp::mock::RcServer
-impl core::marker::Send for rcp::mock::RcServer
-impl core::marker::Sync for rcp::mock::RcServer
-impl core::marker::Unpin for rcp::mock::RcServer
-impl core::marker::UnsafeUnpin for rcp::mock::RcServer
-impl core::panic::unwind_safe::RefUnwindSafe for rcp::mock::RcServer
-impl core::panic::unwind_safe::UnwindSafe for rcp::mock::RcServer
+impl rcp::server::RcServer
+pub fn rcp::server::RcServer::broadcast_safe_state(&self, u8) -> usize
+pub fn rcp::server::RcServer::check_watchdog(&self, u8, u64) -> core::option::Option<rcp::server::WatchdogCheck>
+pub fn rcp::server::RcServer::discovery_claim(&self) -> core::option::Option<rcp::discovery::DiscoveryClaim>
+pub fn rcp::server::RcServer::dispatch_frame(&self, &[u8], &rcp::server::Peer) -> rcp::server::FrameDispatch
+pub fn rcp::server::RcServer::dispatch_message(&self, rcp::avtp::StreamId, &rcp::acf::AcfAbbMessage) -> core::result::Result<rcp::acf::AcfAbbMessage, rcp::RcpError>
+pub fn rcp::server::RcServer::drain_endpoint(&self, rcp::avtp::StreamId, u16) -> core::option::Option<rcp::server::Executed>
+pub fn rcp::server::RcServer::endpoint_queue_len(&self, rcp::avtp::StreamId, u16) -> usize
+pub fn rcp::server::RcServer::ep_id_map(&self) -> alloc::vec::Vec<rcp::regmap::EpByteBusIdMapEntry>
+pub fn rcp::server::RcServer::general_registers(&self) -> rcp::regmap::GeneralRegisters
+pub fn rcp::server::RcServer::handle_ntscf_frame(&self, rcp::avtp::StreamId, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::server::RcServer::last_watchdog_kick(&self, u8) -> core::option::Option<std::time::Instant>
+pub fn rcp::server::RcServer::new(rcp::regmap::GeneralRegisters) -> alloc::rcs::arc::Arc<Self>
+pub fn rcp::server::RcServer::notify_trigger(&self, u8, u8) -> usize
+pub fn rcp::server::RcServer::pending_count(&self, rcp::avtp::StreamId, u16) -> usize
+pub fn rcp::server::RcServer::register_endpoint(&self, rcp::avtp::StreamId, u16, alloc::rcs::arc::Arc<dyn rcp::server::Endpoint>) -> core::result::Result<rcp::addressing::EndpointId, rcp::RcpError>
+pub fn rcp::server::RcServer::release_stream(&self, rcp::avtp::StreamId)
+pub fn rcp::server::RcServer::request_stream_cfg(&self) -> alloc::vec::Vec<rcp::regmap::RequestStreamConfigEntry>
+pub fn rcp::server::RcServer::request_stream_index(&self, rcp::avtp::StreamId) -> u8
+pub fn rcp::server::RcServer::set_discovery_timeout(&self, core::time::Duration)
+pub fn rcp::server::RcServer::set_endpoint_admission_suspended(&self, rcp::avtp::StreamId, u16, bool) -> bool
+pub fn rcp::server::RcServer::set_endpoint_enable(&self, rcp::avtp::StreamId, u16, bool) -> bool
+pub fn rcp::server::RcServer::set_ep_id_map(&self, &[rcp::regmap::EpByteBusIdMapEntry]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::server::RcServer::set_request_stream_cfg(&self, &[rcp::regmap::RequestStreamConfigEntry]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::server::RcServer::set_root_client(&self, core::option::Option<rcp::avtp::StreamId>)
+pub fn rcp::server::RcServer::set_sequencer_count(&self, u8)
+pub fn rcp::server::RcServer::set_time_sync_supported(&self, bool)
+pub fn rcp::server::RcServer::state(&self) -> rcp::lifecycle::RcServerState
+pub fn rcp::server::RcServer::stream_faulted(&self, rcp::avtp::StreamId) -> bool
+pub fn rcp::server::RcServer::stream_status(&self, rcp::avtp::StreamId) -> core::option::Option<rcp::server::StreamStatus>
+pub fn rcp::server::RcServer::stream_status_rx_blocked(&self, rcp::avtp::StreamId) -> bool
+pub fn rcp::server::RcServer::tick(&self, rcp::avtp::StreamId, u16, &rcp::server::TickCtx<'_>) -> core::option::Option<rcp::server::Executed>
+pub fn rcp::server::RcServer::try_transition(&self, rcp::lifecycle::RcServerState, core::option::Option<&rcp::lifecycle::PlausibilitySnapshot<'_>>, rcp::lifecycle::WriterCtx, bool) -> core::result::Result<(), rcp::lifecycle::LifecycleError>
+pub fn rcp::server::RcServer::watchdog_purge(&self, rcp::avtp::StreamId, u16) -> usize
+pub fn rcp::server::RcServer::with_sequencers<R>(&self, impl core::ops::function::FnOnce(&mut rcp::request::SequencerBank) -> R) -> R
+impl !core::marker::Freeze for rcp::server::RcServer
+impl core::marker::Send for rcp::server::RcServer
+impl core::marker::Sync for rcp::server::RcServer
+impl core::marker::Unpin for rcp::server::RcServer
+impl core::marker::UnsafeUnpin for rcp::server::RcServer
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::server::RcServer
+impl core::panic::unwind_safe::UnwindSafe for rcp::server::RcServer
 pub trait rcp::mock::Endpoint: core::marker::Send + core::marker::Sync
 pub fn rcp::mock::Endpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::mock::Endpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::mock::Endpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
-impl rcp::mock::Endpoint for rcp::authz::AuthzEndpoint
+impl rcp::server::Endpoint for rcp::authz::AuthzEndpoint
 pub fn rcp::authz::AuthzEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::authz::AuthzEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::authz::AuthzEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
-impl rcp::mock::Endpoint for rcp::deadline::DeadlineEndpoint
+impl rcp::server::Endpoint for rcp::deadline::DeadlineEndpoint
 pub fn rcp::deadline::DeadlineEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::deadline::DeadlineEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::deadline::DeadlineEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
-impl rcp::mock::Endpoint for rcp::faultinject::FaultInjectEndpoint
+impl rcp::server::Endpoint for rcp::faultinject::FaultInjectEndpoint
 pub fn rcp::faultinject::FaultInjectEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::faultinject::FaultInjectEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::faultinject::FaultInjectEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
-impl rcp::mock::Endpoint for rcp::loan::LoanPoolEndpoint
+impl rcp::server::Endpoint for rcp::loan::LoanPoolEndpoint
 pub fn rcp::loan::LoanPoolEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::loan::LoanPoolEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::loan::LoanPoolEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
-impl rcp::mock::Endpoint for rcp::mock::MockEndpoint
+impl rcp::server::Endpoint for rcp::mock::MockEndpoint
 pub fn rcp::mock::MockEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::mock::MockEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::mock::MockEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
-impl rcp::mock::Endpoint for rcp::observe::ObserveEndpoint
+impl rcp::server::Endpoint for rcp::observe::ObserveEndpoint
 pub fn rcp::observe::ObserveEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::observe::ObserveEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::observe::ObserveEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
-impl rcp::mock::Endpoint for rcp::proxy::ProxyEndpoint
+impl rcp::server::Endpoint for rcp::proxy::ProxyEndpoint
 pub fn rcp::proxy::ProxyEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::proxy::ProxyEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::proxy::ProxyEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
-impl rcp::mock::Endpoint for rcp::ratelimit::RateLimitEndpoint
+impl rcp::server::Endpoint for rcp::ratelimit::RateLimitEndpoint
 pub fn rcp::ratelimit::RateLimitEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::ratelimit::RateLimitEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::ratelimit::RateLimitEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
-impl rcp::mock::Endpoint for rcp::record::RecordEndpoint
+impl rcp::server::Endpoint for rcp::record::RecordEndpoint
 pub fn rcp::record::RecordEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::record::RecordEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::record::RecordEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
-impl rcp::mock::Endpoint for rcp::redundancy::RedundancyEndpoint
+impl rcp::server::Endpoint for rcp::redundancy::RedundancyEndpoint
 pub fn rcp::redundancy::RedundancyEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::redundancy::RedundancyEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::redundancy::RedundancyEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
-impl rcp::mock::Endpoint for rcp::sim::SimEndpoint
+impl rcp::server::Endpoint for rcp::sim::SimEndpoint
 pub fn rcp::sim::SimEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::sim::SimEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::sim::SimEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
@@ -2824,8 +2850,8 @@ impl rcp::observe::ObserveEndpoint
 pub fn rcp::observe::ObserveEndpoint::add_read_hook(&self, impl core::ops::function::Fn(u16, &core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>, core::time::Duration) + core::marker::Send + core::marker::Sync + 'static)
 pub fn rcp::observe::ObserveEndpoint::add_write_hook(&self, impl core::ops::function::Fn(&[u8], &core::result::Result<(), rcp::RcpError>, core::time::Duration) + core::marker::Send + core::marker::Sync + 'static)
 pub fn rcp::observe::ObserveEndpoint::metrics(&self) -> alloc::rcs::arc::Arc<rcp::observe::Metrics>
-pub fn rcp::observe::ObserveEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>) -> Self
-impl rcp::mock::Endpoint for rcp::observe::ObserveEndpoint
+pub fn rcp::observe::ObserveEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::server::Endpoint>) -> Self
+impl rcp::server::Endpoint for rcp::observe::ObserveEndpoint
 pub fn rcp::observe::ObserveEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::observe::ObserveEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::observe::ObserveEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
@@ -2936,9 +2962,9 @@ pub mod rcp::proxy
 pub struct rcp::proxy::ProxyEndpoint
 impl rcp::proxy::ProxyEndpoint
 pub fn rcp::proxy::ProxyEndpoint::detach(&self)
-pub fn rcp::proxy::ProxyEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>) -> Self
-pub fn rcp::proxy::ProxyEndpoint::swap(&self, alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>)
-impl rcp::mock::Endpoint for rcp::proxy::ProxyEndpoint
+pub fn rcp::proxy::ProxyEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::server::Endpoint>) -> Self
+pub fn rcp::proxy::ProxyEndpoint::swap(&self, alloc::rcs::arc::Arc<dyn rcp::server::Endpoint>)
+impl rcp::server::Endpoint for rcp::proxy::ProxyEndpoint
 pub fn rcp::proxy::ProxyEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::proxy::ProxyEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::proxy::ProxyEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
@@ -3094,9 +3120,9 @@ impl core::panic::unwind_safe::RefUnwindSafe for rcp::ratelimit::Config
 impl core::panic::unwind_safe::UnwindSafe for rcp::ratelimit::Config
 pub struct rcp::ratelimit::RateLimitEndpoint
 impl rcp::ratelimit::RateLimitEndpoint
-pub fn rcp::ratelimit::RateLimitEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>, rcp::ratelimit::Config) -> Self
-pub fn rcp::ratelimit::RateLimitEndpoint::new_default(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>) -> Self
-impl rcp::mock::Endpoint for rcp::ratelimit::RateLimitEndpoint
+pub fn rcp::ratelimit::RateLimitEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::server::Endpoint>, rcp::ratelimit::Config) -> Self
+pub fn rcp::ratelimit::RateLimitEndpoint::new_default(alloc::rcs::arc::Arc<dyn rcp::server::Endpoint>) -> Self
+impl rcp::server::Endpoint for rcp::ratelimit::RateLimitEndpoint
 pub fn rcp::ratelimit::RateLimitEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::ratelimit::RateLimitEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::ratelimit::RateLimitEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
@@ -3136,8 +3162,8 @@ pub struct rcp::record::RecordEndpoint
 impl rcp::record::RecordEndpoint
 pub fn rcp::record::RecordEndpoint::clear(&self)
 pub fn rcp::record::RecordEndpoint::entries(&self) -> alloc::vec::Vec<rcp::record::Entry>
-pub fn rcp::record::RecordEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>) -> Self
-impl rcp::mock::Endpoint for rcp::record::RecordEndpoint
+pub fn rcp::record::RecordEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::server::Endpoint>) -> Self
+impl rcp::server::Endpoint for rcp::record::RecordEndpoint
 pub fn rcp::record::RecordEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::record::RecordEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::record::RecordEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
@@ -3153,8 +3179,8 @@ pub struct rcp::redundancy::RedundancyEndpoint
 impl rcp::redundancy::RedundancyEndpoint
 pub fn rcp::redundancy::RedundancyEndpoint::failover_count(&self) -> u32
 pub fn rcp::redundancy::RedundancyEndpoint::has_secondary(&self) -> bool
-pub fn rcp::redundancy::RedundancyEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>, alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>) -> Self
-impl rcp::mock::Endpoint for rcp::redundancy::RedundancyEndpoint
+pub fn rcp::redundancy::RedundancyEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::server::Endpoint>, alloc::rcs::arc::Arc<dyn rcp::server::Endpoint>) -> Self
+impl rcp::server::Endpoint for rcp::redundancy::RedundancyEndpoint
 pub fn rcp::redundancy::RedundancyEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::redundancy::RedundancyEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::redundancy::RedundancyEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
@@ -4576,6 +4602,489 @@ pub fn rcp::request::timed_due(u64, u64) -> bool
 pub fn rcp::request::try_force_cancel_all(&mut rcp::request::RequestLifecycleState) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::try_force_cancel_non_safestate(&mut rcp::request::RequestLifecycleState, bool) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::try_force_cancel_single(&mut rcp::request::RequestLifecycleState, u8, rcp::request::ClearTransactionNum) -> core::result::Result<(), rcp::RcpError>
+pub mod rcp::server
+pub enum rcp::server::AdmitResult
+pub rcp::server::AdmitResult::Cancellation
+pub rcp::server::AdmitResult::ExecuteNow
+pub rcp::server::AdmitResult::Pending
+pub rcp::server::AdmitResult::Queued
+pub rcp::server::AdmitResult::Rejected
+pub rcp::server::AdmitResult::Suspended
+impl core::clone::Clone for rcp::server::AdmitResult
+pub fn rcp::server::AdmitResult::clone(&self) -> Self
+impl core::cmp::Eq for rcp::server::AdmitResult
+impl core::cmp::PartialEq for rcp::server::AdmitResult
+pub fn rcp::server::AdmitResult::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::server::AdmitResult
+pub fn rcp::server::AdmitResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::server::AdmitResult
+impl core::marker::StructuralPartialEq for rcp::server::AdmitResult
+impl core::marker::Freeze for rcp::server::AdmitResult
+impl core::marker::Send for rcp::server::AdmitResult
+impl core::marker::Sync for rcp::server::AdmitResult
+impl core::marker::Unpin for rcp::server::AdmitResult
+impl core::marker::UnsafeUnpin for rcp::server::AdmitResult
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::server::AdmitResult
+impl core::panic::unwind_safe::UnwindSafe for rcp::server::AdmitResult
+pub enum rcp::server::CancelResult
+pub rcp::server::CancelResult::Canceled
+pub rcp::server::CancelResult::NotFound
+impl core::clone::Clone for rcp::server::CancelResult
+pub fn rcp::server::CancelResult::clone(&self) -> Self
+impl core::cmp::Eq for rcp::server::CancelResult
+impl core::cmp::PartialEq for rcp::server::CancelResult
+pub fn rcp::server::CancelResult::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::server::CancelResult
+pub fn rcp::server::CancelResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::server::CancelResult
+impl core::marker::StructuralPartialEq for rcp::server::CancelResult
+impl core::marker::Freeze for rcp::server::CancelResult
+impl core::marker::Send for rcp::server::CancelResult
+impl core::marker::Sync for rcp::server::CancelResult
+impl core::marker::Unpin for rcp::server::CancelResult
+impl core::marker::UnsafeUnpin for rcp::server::CancelResult
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::server::CancelResult
+impl core::panic::unwind_safe::UnwindSafe for rcp::server::CancelResult
+#[non_exhaustive] pub enum rcp::server::DispatchResult
+pub rcp::server::DispatchResult::Cancelled
+pub rcp::server::DispatchResult::ChainAborted
+pub rcp::server::DispatchResult::ChainError
+pub rcp::server::DispatchResult::CrcError
+pub rcp::server::DispatchResult::Dropped
+pub rcp::server::DispatchResult::ErrUnknownBus
+pub rcp::server::DispatchResult::Ok
+pub rcp::server::DispatchResult::Pending
+pub rcp::server::DispatchResult::Queued
+pub rcp::server::DispatchResult::Rejected
+pub rcp::server::DispatchResult::SeqError
+pub rcp::server::DispatchResult::StreamFaulted
+impl core::clone::Clone for rcp::server::DispatchResult
+pub fn rcp::server::DispatchResult::clone(&self) -> Self
+impl core::cmp::Eq for rcp::server::DispatchResult
+impl core::cmp::PartialEq for rcp::server::DispatchResult
+pub fn rcp::server::DispatchResult::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::server::DispatchResult
+pub fn rcp::server::DispatchResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::server::DispatchResult
+impl core::marker::StructuralPartialEq for rcp::server::DispatchResult
+impl core::marker::Freeze for rcp::server::DispatchResult
+impl core::marker::Send for rcp::server::DispatchResult
+impl core::marker::Sync for rcp::server::DispatchResult
+impl core::marker::Unpin for rcp::server::DispatchResult
+impl core::marker::UnsafeUnpin for rcp::server::DispatchResult
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::server::DispatchResult
+impl core::panic::unwind_safe::UnwindSafe for rcp::server::DispatchResult
+pub enum rcp::server::SchedKind
+pub rcp::server::SchedKind::Cancellation
+pub rcp::server::SchedKind::Chained
+pub rcp::server::SchedKind::Compound
+pub rcp::server::SchedKind::CompoundWait
+pub rcp::server::SchedKind::Standard
+pub rcp::server::SchedKind::Timed
+pub rcp::server::SchedKind::Triggered
+impl rcp::server::SchedKind
+pub fn rcp::server::SchedKind::rank(self) -> u8
+impl core::clone::Clone for rcp::server::SchedKind
+pub fn rcp::server::SchedKind::clone(&self) -> Self
+impl core::cmp::Eq for rcp::server::SchedKind
+impl core::cmp::PartialEq for rcp::server::SchedKind
+pub fn rcp::server::SchedKind::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::server::SchedKind
+pub fn rcp::server::SchedKind::default() -> Self
+impl core::fmt::Debug for rcp::server::SchedKind
+pub fn rcp::server::SchedKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::server::SchedKind
+impl core::marker::StructuralPartialEq for rcp::server::SchedKind
+impl core::marker::Freeze for rcp::server::SchedKind
+impl core::marker::Send for rcp::server::SchedKind
+impl core::marker::Sync for rcp::server::SchedKind
+impl core::marker::Unpin for rcp::server::SchedKind
+impl core::marker::UnsafeUnpin for rcp::server::SchedKind
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::server::SchedKind
+impl core::panic::unwind_safe::UnwindSafe for rcp::server::SchedKind
+pub enum rcp::server::Submission
+pub rcp::server::Submission::ExecuteNow
+pub rcp::server::Submission::Queued
+pub rcp::server::Submission::Queued::ack: core::option::Option<alloc::vec::Vec<u8>>
+impl core::clone::Clone for rcp::server::Submission
+pub fn rcp::server::Submission::clone(&self) -> Self
+impl core::cmp::Eq for rcp::server::Submission
+impl core::cmp::PartialEq for rcp::server::Submission
+pub fn rcp::server::Submission::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::server::Submission
+pub fn rcp::server::Submission::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::server::Submission
+impl core::marker::Freeze for rcp::server::Submission
+impl core::marker::Send for rcp::server::Submission
+impl core::marker::Sync for rcp::server::Submission
+impl core::marker::Unpin for rcp::server::Submission
+impl core::marker::UnsafeUnpin for rcp::server::Submission
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::server::Submission
+impl core::panic::unwind_safe::UnwindSafe for rcp::server::Submission
+pub struct rcp::server::Admission
+pub rcp::server::Admission::ack: core::option::Option<alloc::vec::Vec<u8>>
+pub rcp::server::Admission::error: core::option::Option<rcp::RcpError>
+pub rcp::server::Admission::index: core::option::Option<usize>
+pub rcp::server::Admission::request_type: u8
+pub rcp::server::Admission::result: rcp::server::AdmitResult
+impl core::clone::Clone for rcp::server::Admission
+pub fn rcp::server::Admission::clone(&self) -> Self
+impl core::cmp::PartialEq for rcp::server::Admission
+pub fn rcp::server::Admission::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::server::Admission
+pub fn rcp::server::Admission::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::server::Admission
+impl core::marker::Freeze for rcp::server::Admission
+impl core::marker::Send for rcp::server::Admission
+impl core::marker::Sync for rcp::server::Admission
+impl core::marker::Unpin for rcp::server::Admission
+impl core::marker::UnsafeUnpin for rcp::server::Admission
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::server::Admission
+impl core::panic::unwind_safe::UnwindSafe for rcp::server::Admission
+pub struct rcp::server::Executed
+pub rcp::server::Executed::response: core::option::Option<alloc::vec::Vec<u8>>
+impl core::clone::Clone for rcp::server::Executed
+pub fn rcp::server::Executed::clone(&self) -> Self
+impl core::cmp::Eq for rcp::server::Executed
+impl core::cmp::PartialEq for rcp::server::Executed
+pub fn rcp::server::Executed::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::server::Executed
+pub fn rcp::server::Executed::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::server::Executed
+impl core::marker::Freeze for rcp::server::Executed
+impl core::marker::Send for rcp::server::Executed
+impl core::marker::Sync for rcp::server::Executed
+impl core::marker::Unpin for rcp::server::Executed
+impl core::marker::UnsafeUnpin for rcp::server::Executed
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::server::Executed
+impl core::panic::unwind_safe::UnwindSafe for rcp::server::Executed
+pub struct rcp::server::FrameDispatch
+pub rcp::server::FrameDispatch::error: core::option::Option<rcp::RcpError>
+pub rcp::server::FrameDispatch::members: alloc::vec::Vec<rcp::server::FrameMemberResult>
+pub rcp::server::FrameDispatch::requester: core::option::Option<rcp::avtp::StreamId>
+pub rcp::server::FrameDispatch::sequence_num: core::option::Option<u8>
+impl rcp::server::FrameDispatch
+pub fn rcp::server::FrameDispatch::response_bytes(&self) -> alloc::vec::Vec<u8>
+impl core::clone::Clone for rcp::server::FrameDispatch
+pub fn rcp::server::FrameDispatch::clone(&self) -> Self
+impl core::cmp::PartialEq for rcp::server::FrameDispatch
+pub fn rcp::server::FrameDispatch::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::server::FrameDispatch
+pub fn rcp::server::FrameDispatch::default() -> Self
+impl core::fmt::Debug for rcp::server::FrameDispatch
+pub fn rcp::server::FrameDispatch::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::server::FrameDispatch
+impl core::marker::Freeze for rcp::server::FrameDispatch
+impl core::marker::Send for rcp::server::FrameDispatch
+impl core::marker::Sync for rcp::server::FrameDispatch
+impl core::marker::Unpin for rcp::server::FrameDispatch
+impl core::marker::UnsafeUnpin for rcp::server::FrameDispatch
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::server::FrameDispatch
+impl core::panic::unwind_safe::UnwindSafe for rcp::server::FrameDispatch
+pub struct rcp::server::FrameMemberResult
+pub rcp::server::FrameMemberResult::byte_bus_id: u16
+pub rcp::server::FrameMemberResult::response: core::option::Option<alloc::vec::Vec<u8>>
+pub rcp::server::FrameMemberResult::result: rcp::server::DispatchResult
+impl core::clone::Clone for rcp::server::FrameMemberResult
+pub fn rcp::server::FrameMemberResult::clone(&self) -> Self
+impl core::cmp::Eq for rcp::server::FrameMemberResult
+impl core::cmp::PartialEq for rcp::server::FrameMemberResult
+pub fn rcp::server::FrameMemberResult::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::server::FrameMemberResult
+pub fn rcp::server::FrameMemberResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::server::FrameMemberResult
+impl core::marker::Freeze for rcp::server::FrameMemberResult
+impl core::marker::Send for rcp::server::FrameMemberResult
+impl core::marker::Sync for rcp::server::FrameMemberResult
+impl core::marker::Unpin for rcp::server::FrameMemberResult
+impl core::marker::UnsafeUnpin for rcp::server::FrameMemberResult
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::server::FrameMemberResult
+impl core::panic::unwind_safe::UnwindSafe for rcp::server::FrameMemberResult
+pub struct rcp::server::Peer
+pub rcp::server::Peer::received_at: std::time::Instant
+pub rcp::server::Peer::stream_id: core::option::Option<rcp::avtp::StreamId>
+impl rcp::server::Peer
+pub fn rcp::server::Peer::from_header(std::time::Instant) -> Self
+pub fn rcp::server::Peer::stream(rcp::avtp::StreamId) -> Self
+impl core::clone::Clone for rcp::server::Peer
+pub fn rcp::server::Peer::clone(&self) -> Self
+impl core::cmp::Eq for rcp::server::Peer
+impl core::cmp::PartialEq for rcp::server::Peer
+pub fn rcp::server::Peer::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::server::Peer
+pub fn rcp::server::Peer::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::server::Peer
+impl core::marker::StructuralPartialEq for rcp::server::Peer
+impl core::marker::Freeze for rcp::server::Peer
+impl core::marker::Send for rcp::server::Peer
+impl core::marker::Sync for rcp::server::Peer
+impl core::marker::Unpin for rcp::server::Peer
+impl core::marker::UnsafeUnpin for rcp::server::Peer
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::server::Peer
+impl core::panic::unwind_safe::UnwindSafe for rcp::server::Peer
+pub struct rcp::server::PendingRequest
+pub rcp::server::PendingRequest::armed: bool
+pub rcp::server::PendingRequest::armed_at: u32
+pub rcp::server::PendingRequest::chain_exec_delay: u16
+pub rcp::server::PendingRequest::chain_group: u32
+pub rcp::server::PendingRequest::chain_position: u8
+pub rcp::server::PendingRequest::compound: rcp::request::CompoundStep
+pub rcp::server::PendingRequest::compound_wait_evt: u8
+pub rcp::server::PendingRequest::compound_wait_target: alloc::vec::Vec<u8>
+pub rcp::server::PendingRequest::cs: bool
+pub rcp::server::PendingRequest::frame: alloc::vec::Vec<u8>
+pub rcp::server::PendingRequest::has_presentation_gate: bool
+pub rcp::server::PendingRequest::kind: rcp::server::SchedKind
+pub rcp::server::PendingRequest::predecessor_done: bool
+pub rcp::server::PendingRequest::presentation_gate_ns: u64
+pub rcp::server::PendingRequest::presentation_time: u64
+pub rcp::server::PendingRequest::request_type: u8
+pub rcp::server::PendingRequest::sequence: u64
+pub rcp::server::PendingRequest::transaction_num: u8
+pub rcp::server::PendingRequest::triggered: rcp::request::TriggeredStep
+pub rcp::server::PendingRequest::triggered_runtime: rcp::request::TriggeredRuntime
+impl core::clone::Clone for rcp::server::PendingRequest
+pub fn rcp::server::PendingRequest::clone(&self) -> Self
+impl core::cmp::Eq for rcp::server::PendingRequest
+impl core::cmp::PartialEq for rcp::server::PendingRequest
+pub fn rcp::server::PendingRequest::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::server::PendingRequest
+pub fn rcp::server::PendingRequest::default() -> Self
+impl core::fmt::Debug for rcp::server::PendingRequest
+pub fn rcp::server::PendingRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::server::PendingRequest
+impl core::marker::Freeze for rcp::server::PendingRequest
+impl core::marker::Send for rcp::server::PendingRequest
+impl core::marker::Sync for rcp::server::PendingRequest
+impl core::marker::Unpin for rcp::server::PendingRequest
+impl core::marker::UnsafeUnpin for rcp::server::PendingRequest
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::server::PendingRequest
+impl core::panic::unwind_safe::UnwindSafe for rcp::server::PendingRequest
+pub struct rcp::server::PresentationGate
+pub rcp::server::PresentationGate::avtp_timestamp: u32
+pub rcp::server::PresentationGate::gptp_reference_now: u64
+impl core::clone::Clone for rcp::server::PresentationGate
+pub fn rcp::server::PresentationGate::clone(&self) -> Self
+impl core::cmp::Eq for rcp::server::PresentationGate
+impl core::cmp::PartialEq for rcp::server::PresentationGate
+pub fn rcp::server::PresentationGate::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::server::PresentationGate
+pub fn rcp::server::PresentationGate::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::server::PresentationGate
+impl core::marker::StructuralPartialEq for rcp::server::PresentationGate
+impl core::marker::Freeze for rcp::server::PresentationGate
+impl core::marker::Send for rcp::server::PresentationGate
+impl core::marker::Sync for rcp::server::PresentationGate
+impl core::marker::Unpin for rcp::server::PresentationGate
+impl core::marker::UnsafeUnpin for rcp::server::PresentationGate
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::server::PresentationGate
+impl core::panic::unwind_safe::UnwindSafe for rcp::server::PresentationGate
+pub struct rcp::server::RcServer
+impl rcp::server::RcServer
+pub fn rcp::server::RcServer::broadcast_safe_state(&self, u8) -> usize
+pub fn rcp::server::RcServer::check_watchdog(&self, u8, u64) -> core::option::Option<rcp::server::WatchdogCheck>
+pub fn rcp::server::RcServer::discovery_claim(&self) -> core::option::Option<rcp::discovery::DiscoveryClaim>
+pub fn rcp::server::RcServer::dispatch_frame(&self, &[u8], &rcp::server::Peer) -> rcp::server::FrameDispatch
+pub fn rcp::server::RcServer::dispatch_message(&self, rcp::avtp::StreamId, &rcp::acf::AcfAbbMessage) -> core::result::Result<rcp::acf::AcfAbbMessage, rcp::RcpError>
+pub fn rcp::server::RcServer::drain_endpoint(&self, rcp::avtp::StreamId, u16) -> core::option::Option<rcp::server::Executed>
+pub fn rcp::server::RcServer::endpoint_queue_len(&self, rcp::avtp::StreamId, u16) -> usize
+pub fn rcp::server::RcServer::ep_id_map(&self) -> alloc::vec::Vec<rcp::regmap::EpByteBusIdMapEntry>
+pub fn rcp::server::RcServer::general_registers(&self) -> rcp::regmap::GeneralRegisters
+pub fn rcp::server::RcServer::handle_ntscf_frame(&self, rcp::avtp::StreamId, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::server::RcServer::last_watchdog_kick(&self, u8) -> core::option::Option<std::time::Instant>
+pub fn rcp::server::RcServer::new(rcp::regmap::GeneralRegisters) -> alloc::rcs::arc::Arc<Self>
+pub fn rcp::server::RcServer::notify_trigger(&self, u8, u8) -> usize
+pub fn rcp::server::RcServer::pending_count(&self, rcp::avtp::StreamId, u16) -> usize
+pub fn rcp::server::RcServer::register_endpoint(&self, rcp::avtp::StreamId, u16, alloc::rcs::arc::Arc<dyn rcp::server::Endpoint>) -> core::result::Result<rcp::addressing::EndpointId, rcp::RcpError>
+pub fn rcp::server::RcServer::release_stream(&self, rcp::avtp::StreamId)
+pub fn rcp::server::RcServer::request_stream_cfg(&self) -> alloc::vec::Vec<rcp::regmap::RequestStreamConfigEntry>
+pub fn rcp::server::RcServer::request_stream_index(&self, rcp::avtp::StreamId) -> u8
+pub fn rcp::server::RcServer::set_discovery_timeout(&self, core::time::Duration)
+pub fn rcp::server::RcServer::set_endpoint_admission_suspended(&self, rcp::avtp::StreamId, u16, bool) -> bool
+pub fn rcp::server::RcServer::set_endpoint_enable(&self, rcp::avtp::StreamId, u16, bool) -> bool
+pub fn rcp::server::RcServer::set_ep_id_map(&self, &[rcp::regmap::EpByteBusIdMapEntry]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::server::RcServer::set_request_stream_cfg(&self, &[rcp::regmap::RequestStreamConfigEntry]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::server::RcServer::set_root_client(&self, core::option::Option<rcp::avtp::StreamId>)
+pub fn rcp::server::RcServer::set_sequencer_count(&self, u8)
+pub fn rcp::server::RcServer::set_time_sync_supported(&self, bool)
+pub fn rcp::server::RcServer::state(&self) -> rcp::lifecycle::RcServerState
+pub fn rcp::server::RcServer::stream_faulted(&self, rcp::avtp::StreamId) -> bool
+pub fn rcp::server::RcServer::stream_status(&self, rcp::avtp::StreamId) -> core::option::Option<rcp::server::StreamStatus>
+pub fn rcp::server::RcServer::stream_status_rx_blocked(&self, rcp::avtp::StreamId) -> bool
+pub fn rcp::server::RcServer::tick(&self, rcp::avtp::StreamId, u16, &rcp::server::TickCtx<'_>) -> core::option::Option<rcp::server::Executed>
+pub fn rcp::server::RcServer::try_transition(&self, rcp::lifecycle::RcServerState, core::option::Option<&rcp::lifecycle::PlausibilitySnapshot<'_>>, rcp::lifecycle::WriterCtx, bool) -> core::result::Result<(), rcp::lifecycle::LifecycleError>
+pub fn rcp::server::RcServer::watchdog_purge(&self, rcp::avtp::StreamId, u16) -> usize
+pub fn rcp::server::RcServer::with_sequencers<R>(&self, impl core::ops::function::FnOnce(&mut rcp::request::SequencerBank) -> R) -> R
+impl !core::marker::Freeze for rcp::server::RcServer
+impl core::marker::Send for rcp::server::RcServer
+impl core::marker::Sync for rcp::server::RcServer
+impl core::marker::Unpin for rcp::server::RcServer
+impl core::marker::UnsafeUnpin for rcp::server::RcServer
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::server::RcServer
+impl core::panic::unwind_safe::UnwindSafe for rcp::server::RcServer
+pub struct rcp::server::ServerEndpoint
+impl rcp::server::ServerEndpoint
+pub fn rcp::server::ServerEndpoint::admit(&mut self, &[u8], u32, core::option::Option<rcp::server::PresentationGate>) -> rcp::server::Admission
+pub fn rcp::server::ServerEndpoint::cancel_all(&mut self) -> usize
+pub fn rcp::server::ServerEndpoint::cancel_chain_from(&mut self, u32, u8) -> usize
+pub fn rcp::server::ServerEndpoint::cancel_non_safestate(&mut self) -> usize
+pub fn rcp::server::ServerEndpoint::cancel_single(&mut self, u8) -> rcp::server::CancelResult
+pub fn rcp::server::ServerEndpoint::chain_predecessor_done(&mut self, usize, u32) -> bool
+pub fn rcp::server::ServerEndpoint::complete(&mut self, usize, &rcp::server::TickCtx<'_>, &mut rcp::request::SequencerBank) -> bool
+pub fn rcp::server::ServerEndpoint::drain_one(&mut self) -> core::option::Option<alloc::vec::Vec<u8>>
+pub fn rcp::server::ServerEndpoint::ep_enable(&self) -> bool
+pub fn rcp::server::ServerEndpoint::new(bool) -> Self
+pub fn rcp::server::ServerEndpoint::notify_trigger(&mut self, u8, u8) -> usize
+pub fn rcp::server::ServerEndpoint::pending(&self, usize) -> core::option::Option<&rcp::server::PendingRequest>
+pub fn rcp::server::ServerEndpoint::pending_count(&self) -> usize
+pub fn rcp::server::ServerEndpoint::queue_len(&self) -> usize
+pub fn rcp::server::ServerEndpoint::select_due(&mut self, &rcp::server::TickCtx<'_>, &rcp::request::SequencerBank) -> core::option::Option<usize>
+pub fn rcp::server::ServerEndpoint::set_admission_suspended(&mut self, bool)
+pub fn rcp::server::ServerEndpoint::set_enable(&mut self, bool)
+pub fn rcp::server::ServerEndpoint::submit(&mut self, &[u8]) -> rcp::server::Submission
+pub fn rcp::server::ServerEndpoint::watchdog_purge(&mut self) -> usize
+impl core::clone::Clone for rcp::server::ServerEndpoint
+pub fn rcp::server::ServerEndpoint::clone(&self) -> Self
+impl core::cmp::PartialEq for rcp::server::ServerEndpoint
+pub fn rcp::server::ServerEndpoint::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::server::ServerEndpoint
+pub fn rcp::server::ServerEndpoint::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::server::ServerEndpoint
+impl core::marker::Freeze for rcp::server::ServerEndpoint
+impl core::marker::Send for rcp::server::ServerEndpoint
+impl core::marker::Sync for rcp::server::ServerEndpoint
+impl core::marker::Unpin for rcp::server::ServerEndpoint
+impl core::marker::UnsafeUnpin for rcp::server::ServerEndpoint
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::server::ServerEndpoint
+impl core::panic::unwind_safe::UnwindSafe for rcp::server::ServerEndpoint
+pub struct rcp::server::StreamStatus
+pub rcp::server::StreamStatus::crc_faulted: bool
+pub rcp::server::StreamStatus::overflow_blocked: bool
+pub rcp::server::StreamStatus::seq_blocked: bool
+pub rcp::server::StreamStatus::wd_blocked: bool
+impl rcp::server::StreamStatus
+pub fn rcp::server::StreamStatus::rx_blocked(&self) -> bool
+impl core::clone::Clone for rcp::server::StreamStatus
+pub fn rcp::server::StreamStatus::clone(&self) -> Self
+impl core::cmp::Eq for rcp::server::StreamStatus
+impl core::cmp::PartialEq for rcp::server::StreamStatus
+pub fn rcp::server::StreamStatus::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::server::StreamStatus
+pub fn rcp::server::StreamStatus::default() -> Self
+impl core::fmt::Debug for rcp::server::StreamStatus
+pub fn rcp::server::StreamStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::server::StreamStatus
+impl core::marker::StructuralPartialEq for rcp::server::StreamStatus
+impl core::marker::Freeze for rcp::server::StreamStatus
+impl core::marker::Send for rcp::server::StreamStatus
+impl core::marker::Sync for rcp::server::StreamStatus
+impl core::marker::Unpin for rcp::server::StreamStatus
+impl core::marker::UnsafeUnpin for rcp::server::StreamStatus
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::server::StreamStatus
+impl core::panic::unwind_safe::UnwindSafe for rcp::server::StreamStatus
+pub struct rcp::server::TickCtx<'a>
+pub rcp::server::TickCtx::current_status: &'a [u8]
+pub rcp::server::TickCtx::endpoint_idle: bool
+pub rcp::server::TickCtx::gptp_locked: bool
+pub rcp::server::TickCtx::gptp_now: u64
+pub rcp::server::TickCtx::in_safe_state: bool
+pub rcp::server::TickCtx::now: u32
+impl<'a> core::clone::Clone for rcp::server::TickCtx<'a>
+pub fn rcp::server::TickCtx<'a>::clone(&self) -> Self
+impl<'a> core::cmp::Eq for rcp::server::TickCtx<'a>
+impl<'a> core::cmp::PartialEq for rcp::server::TickCtx<'a>
+pub fn rcp::server::TickCtx<'a>::eq(&self, &Self) -> bool
+impl<'a> core::default::Default for rcp::server::TickCtx<'a>
+pub fn rcp::server::TickCtx<'a>::default() -> Self
+impl<'a> core::fmt::Debug for rcp::server::TickCtx<'a>
+pub fn rcp::server::TickCtx<'a>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a> core::marker::Copy for rcp::server::TickCtx<'a>
+impl<'a> core::marker::StructuralPartialEq for rcp::server::TickCtx<'a>
+impl<'a> core::marker::Freeze for rcp::server::TickCtx<'a>
+impl<'a> core::marker::Send for rcp::server::TickCtx<'a>
+impl<'a> core::marker::Sync for rcp::server::TickCtx<'a>
+impl<'a> core::marker::Unpin for rcp::server::TickCtx<'a>
+impl<'a> core::marker::UnsafeUnpin for rcp::server::TickCtx<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for rcp::server::TickCtx<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for rcp::server::TickCtx<'a>
+pub struct rcp::server::WatchdogCheck
+pub rcp::server::WatchdogCheck::enter_safe_state: bool
+pub rcp::server::WatchdogCheck::notify: bool
+pub rcp::server::WatchdogCheck::overflowed: bool
+impl core::clone::Clone for rcp::server::WatchdogCheck
+pub fn rcp::server::WatchdogCheck::clone(&self) -> Self
+impl core::cmp::Eq for rcp::server::WatchdogCheck
+impl core::cmp::PartialEq for rcp::server::WatchdogCheck
+pub fn rcp::server::WatchdogCheck::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::server::WatchdogCheck
+pub fn rcp::server::WatchdogCheck::default() -> Self
+impl core::fmt::Debug for rcp::server::WatchdogCheck
+pub fn rcp::server::WatchdogCheck::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::server::WatchdogCheck
+impl core::marker::StructuralPartialEq for rcp::server::WatchdogCheck
+impl core::marker::Freeze for rcp::server::WatchdogCheck
+impl core::marker::Send for rcp::server::WatchdogCheck
+impl core::marker::Sync for rcp::server::WatchdogCheck
+impl core::marker::Unpin for rcp::server::WatchdogCheck
+impl core::marker::UnsafeUnpin for rcp::server::WatchdogCheck
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::server::WatchdogCheck
+impl core::panic::unwind_safe::UnwindSafe for rcp::server::WatchdogCheck
+pub const rcp::server::EP_ID_MAP_MAX_ENTRIES: usize
+pub const rcp::server::MAX_FRAME_MEMBERS: usize
+pub const rcp::server::REQUEST_STREAM_CFG_MAX_ENTRIES: usize
+pub const rcp::server::SERVER_MAX_PENDING: usize
+pub const rcp::server::STREAM_FAULT_TRACKER_MAX_STREAMS: usize
+pub trait rcp::server::Endpoint: core::marker::Send + core::marker::Sync
+pub fn rcp::server::Endpoint::ep_type(&self) -> rcp::regmap::EndpointType
+pub fn rcp::server::Endpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::server::Endpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+impl rcp::server::Endpoint for rcp::authz::AuthzEndpoint
+pub fn rcp::authz::AuthzEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
+pub fn rcp::authz::AuthzEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::authz::AuthzEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+impl rcp::server::Endpoint for rcp::deadline::DeadlineEndpoint
+pub fn rcp::deadline::DeadlineEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
+pub fn rcp::deadline::DeadlineEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::deadline::DeadlineEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+impl rcp::server::Endpoint for rcp::faultinject::FaultInjectEndpoint
+pub fn rcp::faultinject::FaultInjectEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
+pub fn rcp::faultinject::FaultInjectEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::faultinject::FaultInjectEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+impl rcp::server::Endpoint for rcp::loan::LoanPoolEndpoint
+pub fn rcp::loan::LoanPoolEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
+pub fn rcp::loan::LoanPoolEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::loan::LoanPoolEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+impl rcp::server::Endpoint for rcp::mock::MockEndpoint
+pub fn rcp::mock::MockEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
+pub fn rcp::mock::MockEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::mock::MockEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+impl rcp::server::Endpoint for rcp::observe::ObserveEndpoint
+pub fn rcp::observe::ObserveEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
+pub fn rcp::observe::ObserveEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::observe::ObserveEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+impl rcp::server::Endpoint for rcp::proxy::ProxyEndpoint
+pub fn rcp::proxy::ProxyEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
+pub fn rcp::proxy::ProxyEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::proxy::ProxyEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+impl rcp::server::Endpoint for rcp::ratelimit::RateLimitEndpoint
+pub fn rcp::ratelimit::RateLimitEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
+pub fn rcp::ratelimit::RateLimitEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::ratelimit::RateLimitEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+impl rcp::server::Endpoint for rcp::record::RecordEndpoint
+pub fn rcp::record::RecordEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
+pub fn rcp::record::RecordEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::record::RecordEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+impl rcp::server::Endpoint for rcp::redundancy::RedundancyEndpoint
+pub fn rcp::redundancy::RedundancyEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
+pub fn rcp::redundancy::RedundancyEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::redundancy::RedundancyEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+impl rcp::server::Endpoint for rcp::sim::SimEndpoint
+pub fn rcp::sim::SimEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
+pub fn rcp::sim::SimEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::sim::SimEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::server::sched_classify(bool, u8) -> rcp::server::SchedKind
+pub fn rcp::server::sched_compare((rcp::server::SchedKind, u64), (rcp::server::SchedKind, u64)) -> core::cmp::Ordering
+pub fn rcp::server::split_frame_members(&[u8]) -> alloc::vec::Vec<core::ops::range::Range<usize>>
 pub mod rcp::shmem
 pub struct rcp::shmem::InProcChannel
 impl rcp::shmem::InProcChannel
@@ -4651,7 +5160,7 @@ pub fn rcp::sim::SimEndpoint::close(&self)
 pub fn rcp::sim::SimEndpoint::new(rcp::regmap::EndpointType) -> alloc::rcs::arc::Arc<Self>
 pub fn rcp::sim::SimEndpoint::queue_read_response(&self, core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>)
 pub fn rcp::sim::SimEndpoint::queue_write_response(&self, core::result::Result<(), rcp::RcpError>)
-impl rcp::mock::Endpoint for rcp::sim::SimEndpoint
+impl rcp::server::Endpoint for rcp::sim::SimEndpoint
 pub fn rcp::sim::SimEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::sim::SimEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::sim::SimEndpoint::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
@@ -5171,6 +5680,24 @@ impl core::marker::Unpin for rcp::udp::ResolvedEndpoint
 impl core::marker::UnsafeUnpin for rcp::udp::ResolvedEndpoint
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::udp::ResolvedEndpoint
 impl core::panic::unwind_safe::UnwindSafe for rcp::udp::ResolvedEndpoint
+pub struct rcp::udp::ServeReport
+pub rcp::udp::ServeReport::dispatch: rcp::server::FrameDispatch
+pub rcp::udp::ServeReport::response_error: core::option::Option<rcp::RcpError>
+pub rcp::udp::ServeReport::response_sent: bool
+impl core::clone::Clone for rcp::udp::ServeReport
+pub fn rcp::udp::ServeReport::clone(&self) -> Self
+impl core::cmp::PartialEq for rcp::udp::ServeReport
+pub fn rcp::udp::ServeReport::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::udp::ServeReport
+pub fn rcp::udp::ServeReport::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::udp::ServeReport
+impl core::marker::Freeze for rcp::udp::ServeReport
+impl core::marker::Send for rcp::udp::ServeReport
+impl core::marker::Sync for rcp::udp::ServeReport
+impl core::marker::Unpin for rcp::udp::ServeReport
+impl core::marker::UnsafeUnpin for rcp::udp::ServeReport
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::udp::ServeReport
+impl core::panic::unwind_safe::UnwindSafe for rcp::udp::ServeReport
 pub struct rcp::udp::StdUdpSocket
 impl rcp::udp::StdUdpSocket
 pub fn rcp::udp::StdUdpSocket::bind(core::net::socket_addr::SocketAddr) -> core::result::Result<Self, rcp::RcpError>
@@ -5212,10 +5739,10 @@ pub struct rcp::udp::UdpRcServer
 impl rcp::udp::UdpRcServer
 pub fn rcp::udp::UdpRcServer::discovery_claim(&self) -> core::option::Option<rcp::discovery::DiscoveryClaim>
 pub fn rcp::udp::UdpRcServer::local_stream(&self) -> rcp::avtp::StreamId
-pub fn rcp::udp::UdpRcServer::new(rcp::avtp::StreamId, alloc::rcs::arc::Arc<dyn rcp::avtp::AvtpTransport>, alloc::rcs::arc::Arc<rcp::mock::RcServer>) -> Self
-pub fn rcp::udp::UdpRcServer::rc_server(&self) -> &alloc::rcs::arc::Arc<rcp::mock::RcServer>
-pub fn rcp::udp::UdpRcServer::serve_one(&self, core::option::Option<core::time::Duration>, u8, std::time::Instant, core::time::Duration) -> core::result::Result<(), rcp::RcpError>
-impl !core::marker::Freeze for rcp::udp::UdpRcServer
+pub fn rcp::udp::UdpRcServer::new(rcp::avtp::StreamId, alloc::rcs::arc::Arc<dyn rcp::avtp::AvtpTransport>, alloc::rcs::arc::Arc<rcp::server::RcServer>) -> Self
+pub fn rcp::udp::UdpRcServer::rc_server(&self) -> &alloc::rcs::arc::Arc<rcp::server::RcServer>
+pub fn rcp::udp::UdpRcServer::serve_one(&self, core::option::Option<core::time::Duration>, u8, std::time::Instant, core::time::Duration) -> core::result::Result<rcp::udp::ServeReport, rcp::RcpError>
+impl core::marker::Freeze for rcp::udp::UdpRcServer
 impl core::marker::Send for rcp::udp::UdpRcServer
 impl core::marker::Sync for rcp::udp::UdpRcServer
 impl core::marker::Unpin for rcp::udp::UdpRcServer
@@ -5507,6 +6034,6 @@ impl !core::panic::unwind_safe::RefUnwindSafe for rcp::Loan
 impl !core::panic::unwind_safe::UnwindSafe for rcp::Loan
 pub const rcp::RELAY_SPEC_VERSION: &str
 pub const rcp::SPEC_VERSION: &str
-pub fn rcp::adapt(alloc::rcs::arc::Arc<rcp::mock::RcServer>) -> alloc::boxed::Box<dyn rcp::relay::Caller>
+pub fn rcp::adapt(alloc::rcs::arc::Arc<rcp::server::RcServer>) -> alloc::boxed::Box<dyn rcp::relay::Caller>
 pub fn rcp::from_message(&rcp::relay::Message) -> core::result::Result<(rcp::avtp::StreamId, rcp::acf::AcfAbbMessage), rcp::RcpError>
 pub fn rcp::to_message(rcp::avtp::StreamId, &rcp::acf::AcfAbbMessage) -> rcp::relay::Message
