@@ -4365,8 +4365,8 @@
     },
     {
       "id": "REQ-CRC-004",
-      "title": "CRC-32 coverage buffer assembly order",
-      "text": "build_crc32_coverage_buffer assembles the byte sequence crc32_tc18 is computed over in order: the 8-byte stream_id, the 4-byte avtp_timestamp position, the full ACF header, and the payload, and the resulting buffer's CRC is sensitive to changes anywhere in that sequence",
+      "title": "CRC-32 coverage buffer assembly order (c-RCP rcp_e2e_compute_crc order)",
+      "text": "build_crc32_coverage_buffer assembles the bytes crc32_tc18 is computed over in c-RCP's rcp_e2e_compute_crc order (c-RCP src/e2e.c:124-150): avtp_subtype (1 octet), the AVTPDU header's octet 1 (1 octet), a tu octet (0x01/0x00), the 8-octet stream_id and the 4-octet avtp_timestamp, both big-endian, then the full ACF header with acf_msg_length +1, then the payload; crc32_tc18 of that buffer equals the CRC wrap_for_header places for a self-consistent message, and changes when any covered byte changes",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -4376,12 +4376,16 @@
     },
     {
       "id": "REQ-CRC-005",
-      "title": "avtp_timestamp zeroed under NTSCF, real value under TSCF",
-      "text": "build_crc32_coverage_buffer substitutes four zero bytes for the avtp_timestamp position when the AVTPDU header variant is NTSCF (which carries no avtp_timestamp field), and uses the header's real 4-byte avtp_timestamp value when the variant is TSCF",
+      "title": "NTSCF coverage feeds a zero tu octet and a zero avtp_timestamp; TSCF feeds the real values",
+      "text": "build_crc32_coverage_buffer (and every coverage path in e2e) feeds, for an NTSCF header, subtype 0x82, the header's octet 1, a 0x00 tu octet and four 0x00 avtp_timestamp octets, and for a TSCF header subtype 0x05, octet 1, the header's tu bit and its real avtp_timestamp. c-RCP parity (c-RCP src/e2e.c:140-148, :344-368): TC18 RC5 Figure 21 has no avtp_timestamp row and no tu column under NTSCF, but c-RCP feeds the zero stand-ins and this crate copies c-RCP for byte-for-byte interop (issue #152)",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "§13.6 Figure 20/21 (orange header-CRC fields), OA_TC18_specification_v_0.5.1_RC_5 p.88-89; c-RCP parity divergence for NTSCF",
+      "tc18_master_id": "TC18-13.6-005"
     },
     {
       "id": "REQ-CRC-006",
@@ -4397,7 +4401,7 @@
     {
       "id": "REQ-CRC-007",
       "title": "Coverage buffer covers the correct ACF_ABB vs ACF_GBB header shape",
-      "text": "build_crc32_coverage_buffer's ACF header region is exactly ACF_ABB_HEADER_LEN bytes (discriminant + byte_message_info, no message_timestamp) for AcfCoverageMessage::Abb, and exactly ACF_GBB_HEADER_LEN bytes (discriminant + byte_message_info + the 8-byte message_timestamp) for AcfCoverageMessage::Gbb, immediately followed by the payload in both cases",
+      "text": "build_crc32_coverage_buffer's ACF header region, starting after the 15-octet header prefix, is exactly ACF_ABB_HEADER_LEN bytes (byte_message_info, no message_timestamp) for AcfCoverageMessage::Abb and exactly ACF_GBB_HEADER_LEN bytes (byte_message_info + the 8-byte message_timestamp) for AcfCoverageMessage::Gbb, immediately followed by the payload in both cases",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -4425,14 +4429,16 @@
     },
     {
       "id": "REQ-CRC-010",
-      "title": "Fragment-train CRC coverage is computed across the combined payload, using the final fragment's own header fields",
-      "text": "build_crc32_coverage_buffer_for_fragment_train(header, final_fragment, segments) produces the same buffer as calling build_crc32_coverage_buffer with final_fragment's header fields and a payload manually concatenated from segments in order, is sensitive to changes in any individual segment, carries the final fragment's own message_timestamp through for AcfCoverageMessage::Gbb, and propagates the same Err(RcpError::InvalidSize) build_crc32_coverage_buffer itself returns for a length-field overflow after pre-adjustment; crc32_tc18_for_fragment_train(header, final_fragment, segments) equals crc32_tc18 applied to that same buffer",
+      "title": "Fragment-train CRC covers the first fragment's encoded ACF header plus the combined payload (c-RCP parity)",
+      "text": "crc32_tc18_for_fragment_train(header, first_fragment, segments) returns compute_fragmented_crc over header's CRC inputs (NTSCF: tu false, avtp_timestamp 0), first_fragment's encoded ACF header exactly as acf::encode_acf_abb/encode_acf_gbb emit it (its own acf_msg_length, pad, ms and segment_num, no +1 quadlet), and the segments concatenated in order; build_crc32_coverage_buffer_for_fragment_train returns those same covered bytes; both are sensitive to every segment and propagate Err(RcpError::InvalidSize) when first_fragment cannot be encoded. c-RCP parity (c-RCP src/e2e.c:379-406, src/mock.c:2256-2263/2370): TC18-13.6-007 reads as a header for the whole unfragmented message (length and pad recomputed, then +1); this crate copies c-RCP's first-fragment model (issues #169, #170)",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test",
       "tc18": "§13.6 (\"Fragmentation, if applied to a message, happens after CRC calculation. So, the CRC is only calculated once and will be transmitted in the last segment.\"), TC18.txt L4274-4275",
-      "tc18_master_id": "TC18-13.6-007"
+      "tc18_master_id": "TC18-13.6-007",
+      "scope": "tc18",
+      "status": "implemented"
     },
     {
       "id": "REQ-SAFETY-001",
@@ -5217,8 +5223,8 @@
     },
     {
       "id": "REQ-FRAG-007",
-      "title": "verify_reassembled_train_crc composes check_fragment_crc_placement and crc32_tc18_for_fragment_train against the buffer's own collected segments",
-      "text": "fragment::verify_reassembled_train_crc(buffer, header, final_fragment, crc_present) returns Err(RcpError::InvalidParameter) when crc_present is false (the final-fragment CRC-presence rule), otherwise returns exactly what crate::e2e::crc32_tc18_for_fragment_train(header, final_fragment, buffer.segment_refs()) returns for the same inputs, including propagating Err(RcpError::InvalidSize) for an out-of-range final_fragment header and behaving correctly for an empty (zero-fragment) buffer",
+      "title": "verify_reassembled_train_crc composes check_fragment_crc_placement and crc32_tc18_for_fragment_train with the first fragment's header",
+      "text": "fragment::verify_reassembled_train_crc(buffer, header, first_fragment, crc_present) returns Err(RcpError::InvalidParameter) when crc_present is false (the final-fragment CRC-presence rule), otherwise exactly crate::e2e::crc32_tc18_for_fragment_train(header, first_fragment, buffer.segment_refs()), i.e. c-RCP's rcp_e2e_compute_fragmented_crc over the first fragment's encoded header and the reassembled payload, including propagating Err(RcpError::InvalidSize) when first_fragment cannot be encoded and behaving correctly for an empty buffer",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -5519,21 +5525,29 @@
     },
     {
       "id": "REQ-CRC-012",
-      "title": "finalize_crc_trailer places the CRC32 trailer after pad, matching TC18's real wire order",
-      "text": "finalize_crc_trailer(frame, crc), given an already-encoded CRC-free ACF_ABB/ACF_GBB frame built from the real payload alone, bumps that frame's own byte_message_info.acf_msg_length by CRC_TRAILER_QUADLETS (one quadlet) and appends crc's 4 big-endian octets after the encoder's own already-correctly-placed pad octets, producing the wire order header (+ message_timestamp), payload, pad, CRC \u2014 never payload, CRC, pad, which is what a caller gets by concatenating payload and CRC bytes into one blob before calling encode_acf_abb/encode_acf_gbb; returns Err(RcpError::ShortFrame) for a frame shorter than the byte_message_info header and Err(RcpError::InvalidSize) when bumping acf_msg_length would overflow its 9-bit field",
+      "title": "finalize_crc_trailer places a caller-computed CRC32 between the real payload and the pad (TC18 RC5 wire order)",
+      "text": "finalize_crc_trailer(frame, crc), given an encoded ACF_ABB/ACF_GBB frame, increments acf_msg_length by one quadlet and inserts crc's 4 big-endian octets right after the real payload, before the frame's pad octets (located via the pad field, octet 2 bits 7:6), giving header (+ message_timestamp), payload, CRC, pad, the same layout wrap produces; returns Err(RcpError::ShortFrame) for a frame shorter than byte_message_info and Err(RcpError::InvalidSize) when acf_msg_length is already 0x1FF, leaving frame unchanged",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.6 Figure 20/Figure 21 (ACF_ABB under TSCF / ACF_GBB under NTSCF: payload, CRC32, then padding), OA_TC18_specification_v_0.5.1_RC_5 p.88-89",
+      "tc18_master_id": "TC18-13.6-006",
+      "scope": "tc18",
+      "status": "implemented"
     },
     {
       "id": "REQ-CRC-013",
-      "title": "split_crc_trailer recovers the real payload and CRC from a CRC-protected frame without misreading trailer bytes as pad",
-      "text": "split_crc_trailer(frame) un-adjusts byte_message_info.acf_msg_length by CRC_TRAILER_QUADLETS and removes the trailing 4 CRC octets before returning (body, crc), so that acf::decode_acf_abb/acf::decode_acf_gbb's existing pad-stripping logic (which strips exactly byte_message_info.pad octets from the end of the acf_msg_length-described region) correctly recovers the real payload from body instead of misreading the CRC trailer's own bytes as padding; round-trips finalize_crc_trailer's output back to the original real payload and CRC value, and returns Err(RcpError::ShortFrame)/Err(RcpError::InvalidSize) for a frame too short to hold a header plus CRC trailer or whose acf_msg_length is smaller than CRC_TRAILER_QUADLETS",
+      "title": "split_crc_trailer reads the CRC32 from after the real payload and restores the plain frame",
+      "text": "split_crc_trailer(frame) reads the CRC32 from the 4 octets after the real payload (frame length minus 4 minus the pad field's count), removes them, and decrements acf_msg_length by one quadlet, returning (body, crc) where body is the plain frame acf::decode_acf_abb/decode_acf_gbb accept; returns Err(RcpError::ShortFrame) below byte_message_info + 4 octets and Err(RcpError::InvalidSize) when acf_msg_length is 0",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "§13.6 Figure 20/Figure 21 (ACF_ABB under TSCF / ACF_GBB under NTSCF: payload, CRC32, then padding), OA_TC18_specification_v_0.5.1_RC_5 p.88-89",
+      "tc18_master_id": "TC18-13.6-006",
+      "scope": "tc18",
+      "status": "implemented"
     },
     {
       "id": "REQ-UDP-012",
@@ -7552,6 +7566,180 @@
       "status": "implemented",
       "tc18": "§12.7.7 Table 24, TC18.txt L2871-L2873",
       "tc18_master_id": "TC18-12.7.7-001"
+    },
+    {
+      "id": "REQ-E2E-001",
+      "title": "E2eError gives every error a distinct message and c-RCP's numeric code",
+      "text": "e2e::E2eError::strerror shall return a distinct message for every variant, matching c-RCP rcp_e2e_strerror's text, Display shall print that message, and E2eError::code shall return c-RCP's rcp_e2e_errc_t value (ShortFrame = 1, CrcMismatch = 2) (port of c-RCP src/e2e.c:11-25)",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-E2E-003",
+      "title": "compute_crc covers avtp_subtype, header_octet1, tu, stream_id, avtp_timestamp, and the ACF region, in that order",
+      "text": "e2e::compute_crc shall return the same value as crc32_tc18 over the concatenation of avtp_subtype (1 byte), header_octet1 (1 byte), a tu byte (1 byte, LSB = tu), stream_id (8 bytes, big-endian), avtp_timestamp (4 bytes, big-endian), and acf_frame (port of c-RCP rcp_e2e_compute_crc, src/e2e.c:124-150), and shall match c-RCP's output byte-for-byte on shared golden vectors",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.6 (\"In Safe command mode a CRC32 is calculated per ACF type across specific fields of an AVTPDU header, ACF header, and the entire payload (except padding).\"; covered header fields per Figure 20/21), OA_TC18_specification_v_0.5.1_RC_5 p.87-89",
+      "tc18_master_id": "TC18-13.6-002",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-E2E-004",
+      "title": "length_with_crc applies the length-accounting pre-adjustment",
+      "text": "e2e::length_with_crc shall return payload_len + CRC_TRAILER_LEN, saturating at usize::MAX rather than wrapping (port of c-RCP rcp_e2e_length_with_crc)",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.6 (\"When calculating the CRC, it needs to be considered that adding the CRC to the byte_msg_payload increases the acf_msg_length by 1.\"), OA_TC18_specification_v_0.5.1_RC_5 p.88",
+      "tc18_master_id": "TC18-13.6-006",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-E2E-005",
+      "title": "wrap places the CRC32 from compute_crc after the real payload, before the pad",
+      "text": "e2e::wrap shall return a copy of the encoded ACF frame with acf_msg_length incremented by one quadlet and the big-endian compute_crc value over the adjusted header-and-real-payload prefix placed immediately after the real payload, followed by the frame's own pad octets (located via the pad field, octet 2 bits 7:6), giving [header][real payload][CRC32][pad] byte-for-byte as c-RCP rcp_e2e_wrap (src/e2e.c:200-272)",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.6 Figure 20/Figure 21 (ACF_ABB under TSCF / ACF_GBB under NTSCF: payload, CRC32, then padding), OA_TC18_specification_v_0.5.1_RC_5 p.88-89",
+      "tc18_master_id": "TC18-13.6-006",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-E2E-006",
+      "title": "wrap fails safe on invalid input",
+      "text": "e2e::wrap shall return Err(RcpError::InvalidSize) for a frame whose length is not a whole number of quadlets or whose acf_msg_length is already 0x1FF, and Err(RcpError::ShortFrame) when the real prefix is shorter than the 2-octet length field (including an empty frame), never panicking (c-RCP rcp_e2e_wrap returns an empty buffer in the same cases)",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-E2E-007",
+      "title": "unwrap rejects a frame too short for the CRC32 trailer and claimed pad",
+      "text": "e2e::unwrap shall return Err(E2eError::ShortFrame) whenever the frame is shorter than CRC_TRAILER_LEN or than CRC_TRAILER_LEN plus the pad count its pad field claims, never panicking for any input (port of c-RCP rcp_e2e_unwrap)",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-E2E-008",
+      "title": "unwrap reports a CRC mismatch",
+      "text": "e2e::unwrap shall return Err(E2eError::CrcMismatch { acf_frame }) whenever the 4 octets after the real payload do not equal compute_crc over the frame's real prefix; acf_frame is the unverified body for diagnostics and the caller shall skip executing the request (port of c-RCP rcp_e2e_unwrap, src/e2e.c:277-339)",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.6 (\"If a request is received by an endpoint that is in 'Safe command mode' and the CRC does not match, the request is not executed, and an error response is generated\"), OA_TC18_specification_v_0.5.1_RC_5 p.87",
+      "tc18_master_id": "TC18-13.6-001",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-E2E-009",
+      "title": "unwrap round-trips a frame produced by wrap",
+      "text": "For a frame produced by e2e::wrap from an encoded ACF frame, e2e::unwrap called with the same avtp_subtype, header_octet1, tu, stream_id and avtp_timestamp shall return Ok with exactly the original frame (trailer removed, acf_msg_length restored), including frames produced by c-RCP rcp_e2e_wrap_framed",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.6 (\"The CRC calculation for requests and responses follows the identical scheme.\"), TC18.txt L4276",
+      "tc18_master_id": "TC18-13.6-008",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-E2E-010",
+      "title": "fragment_carries_crc implements the fragmentation/CRC interaction rule",
+      "text": "e2e::fragment_carries_crc shall return is_last_fragment unmodified, modeling that only a multi-segment message's final fragment carries a CRC (port of c-RCP rcp_e2e_fragment_carries_crc)",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.6 (\"Fragmentation, if applied to a message, happens after CRC calculation. So, the CRC is only calculated once and will be transmitted in the last segment.\"), TC18.txt L4274-4275",
+      "tc18_master_id": "TC18-13.6-007",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-E2E-035",
+      "title": "wrap_framed/unwrap_framed derive the subtype and force NTSCF tu/avtp_timestamp to zero",
+      "text": "e2e::wrap_framed and e2e::unwrap_framed shall use avtp_subtype 0x82 when is_ntscf_framed and 0x05 otherwise, and under NTSCF shall feed tu = false and avtp_timestamp = 0 whatever the caller passed, otherwise passing tu and avtp_timestamp through; header_octet1 is always passed through (port of c-RCP rcp_e2e_wrap_framed/_unwrap_framed, src/e2e.c:344-368). c-RCP parity: the zero stand-ins are fed to the CRC although TC18 RC5 Figure 21 has no avtp_timestamp/tu field",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "QM",
+      "verificationMethod": "test",
+      "tc18": "§13.6 Figure 21, OA_TC18_specification_v_0.5.1_RC_5 p.89; c-RCP parity divergence",
+      "tc18_master_id": "TC18-13.6-005",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-E2E-037",
+      "title": "AVTPDU data length grows by 4 octets for every E2E-protected ACF message",
+      "text": "e2e::data_length_for_protected_members shall return protected_member_count * CRC_TRAILER_LEN, saturating at usize::MAX (port of c-RCP rcp_e2e_data_length_for_protected_members)",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "QM",
+      "verificationMethod": "test",
+      "tc18": "§13.6, TC18.txt L3814-3815",
+      "tc18_master_id": "TC18-13.6-006",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-E2E-038",
+      "title": "compute_fragmented_crc covers the header prefix, the first fragment's ACF header and every segment's payload",
+      "text": "e2e::compute_fragmented_crc shall return crc32_tc18 over avtp_subtype, header_octet1, a tu byte, stream_id, avtp_timestamp, first_fragment_header and reassembled_payload concatenated (port of c-RCP rcp_e2e_compute_fragmented_crc, src/e2e.c:379-406), matching c-RCP on a shared golden fragment-train vector. c-RCP parity: the first fragment's header is fed as sent (no +1 quadlet, its own length/pad/ms/segment_num) whereas TC18-13.6-007 reads as a whole-message header",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§13.6 (\"Fragmentation, if applied to a message, happens after CRC calculation. So, the CRC is only calculated once and will be transmitted in the last segment.\"), TC18.txt L4274-4275",
+      "tc18_master_id": "TC18-13.6-007",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-WIREERR-003",
+      "title": "E2eError::wire_error maps a CRC mismatch to POCI_FAILURE",
+      "text": "e2e::E2eError::wire_error shall return Some(RcpError::PociFailure) (wire code 12) for CrcMismatch and None for ShortFrame, which has no wire-error-code counterpart (port of c-RCP rcp_e2e_wire_error, src/e2e.c:28-42)",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§12.9.6 Table 30 (\"POCI_FAILURE 12 - CRC of request does not match\"), TC18.txt L3830",
+      "tc18_master_id": "TC18-12.9.6-004",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CRC-020",
+      "title": "wrap_for_header/unwrap_for_header read every CRC input from a decoded AVTPDU header",
+      "text": "e2e::wrap_for_header(header, frame) and e2e::unwrap_for_header(header, frame) shall equal wrap_framed/unwrap_framed called with header's stream_id, its variant (NTSCF or TSCF), HeaderVariant::octet1, HeaderVariant::tu and, for TSCF, its avtp_timestamp, reproducing c-RCP's golden vectors for NTSCF+ACF_ABB and TSCF+ACF_GBB",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "scope": "tc18",
+      "status": "implemented"
     }
   ]
 }

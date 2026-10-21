@@ -40,9 +40,13 @@
 //! Safe-point CRC (TC18-13.6-007, "fragmentation happens after CRC
 //! calculation ... the CRC ... will be transmitted in the last segment"):
 //! like c-RCP (`include/rcp/fragment.h:113-127`), this module does not
-//! compute or place the CRC itself. The caller computes the CRC over the
-//! whole (pre-fragmentation) message via [`crate::e2e`] and appends it to
-//! the final fragment only ([`crate::e2e::check_fragment_crc_placement`]).
+//! compute or place the CRC itself. The caller computes it with
+//! [`crate::e2e::compute_fragmented_crc`] /
+//! [`crate::e2e::crc32_tc18_for_fragment_train`] (the first fragment's
+//! encoded header plus the reassembled payload — c-RCP parity, see that
+//! function) and places it on the final fragment only
+//! ([`crate::e2e::finalize_crc_trailer`],
+//! [`crate::e2e::check_fragment_crc_placement`]).
 //!
 //! ## Decode side
 //!
@@ -561,28 +565,32 @@ impl FragmentReassemblyBuffer {
     }
 }
 
-/// Re-verifies the "only the last fragment carries the CRC" rule and the
-/// safe-point CRC-32 against a real [`FragmentReassemblyBuffer`]'s own
-/// wire-collected segments.
+/// Computes the expected safe-point CRC-32 for a completed train held in
+/// `buffer`, after checking the "only the last fragment carries the CRC"
+/// rule.
 ///
-/// Composes [`crate::e2e::check_fragment_crc_placement`] (called with
-/// `ms = false`, since only a buffer that has reached
-/// [`FragmentAcceptOutcome::Complete`] is a meaningful CRC-verification
-/// target) and [`crate::e2e::crc32_tc18_for_fragment_train`] in sequence,
-/// re-deriving neither. Returns the same `Err` either of those would
-/// return: `Err(RcpError::InvalidParameter)` if `crc_present` disagrees
-/// with the "final fragment carries a CRC" rule, or
-/// `Err(RcpError::InvalidSize)` if `final_fragment`'s own header fields
-/// fail [`crate::acf::encode_byte_message_info`]'s field-width validation.
+/// Composes [`crate::e2e::check_fragment_crc_placement`] (with
+/// `ms = false`: only a [`FragmentAcceptOutcome::Complete`] buffer is
+/// worth verifying) and [`crate::e2e::crc32_tc18_for_fragment_train`] over
+/// the buffer's own segments. `first_fragment` is the train's first
+/// fragment as received; its encoded ACF header is what the CRC covers.
+///
+/// c-RCP parity: the first fragment's header, as c-RCP's
+/// `rcp_mock_server_dispatch_e2e_fragment` keeps and feeds it
+/// (`c-RCP/src/mock.c:2256-2263`, `:2370`); see
+/// [`crate::e2e::compute_fragmented_crc`].
+///
+/// Returns `Err(RcpError::InvalidParameter)` if `crc_present` is false and
+/// `Err(RcpError::InvalidSize)` if `first_fragment` cannot be encoded.
 //fusa:req REQ-FRAG-007
 pub fn verify_reassembled_train_crc(
     buffer: &FragmentReassemblyBuffer,
     header: &HeaderVariant,
-    final_fragment: &AcfCoverageMessage<'_>,
+    first_fragment: &AcfCoverageMessage<'_>,
     crc_present: bool,
 ) -> Result<u32, RcpError> {
     e2e::check_fragment_crc_placement(false, crc_present)?;
-    e2e::crc32_tc18_for_fragment_train(header, final_fragment, &buffer.segment_refs())
+    e2e::crc32_tc18_for_fragment_train(header, first_fragment, &buffer.segment_refs())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1378,14 +1386,10 @@ mod tests {
 
     // ── verify_reassembled_train_crc ─────────────────────────────────────────
 
-    fn sample_final_fragment(acf_msg_length: u16) -> acf::AcfAbbMessage {
+    fn sample_first_fragment(payload: &[u8]) -> acf::AcfAbbMessage {
         acf::AcfAbbMessage {
-            info: acf::ByteMessageInfo {
-                acf_msg_length,
-                ms: false,
-                ..Default::default()
-            },
-            payload: b"ignored-final-fragment-payload".to_vec(),
+            info: fragment_info(true, 0),
+            payload: payload.to_vec(),
         }
     }
 
@@ -1402,14 +1406,29 @@ mod tests {
             stream_id: 0x0102_0304_0506_0708,
             ..Default::default()
         });
-        let final_msg = sample_final_fragment(0);
-        let final_fragment = AcfCoverageMessage::Abb(&final_msg);
+        let first_msg = sample_first_fragment(b"hello-");
+        let first = AcfCoverageMessage::Abb(&first_msg);
 
-        let got = verify_reassembled_train_crc(&buf, &header, &final_fragment, true).unwrap();
+        let got = verify_reassembled_train_crc(&buf, &header, &first, true).unwrap();
         let want =
-            e2e::crc32_tc18_for_fragment_train(&header, &final_fragment, &[b"hello-", b"world"])
-                .unwrap();
+            e2e::crc32_tc18_for_fragment_train(&header, &first, &[b"hello-", b"world"]).unwrap();
         assert_eq!(got, want);
+
+        // It is c-RCP's formula: first fragment's encoded header, then the
+        // reassembled payload.
+        let encoded_first = acf::encode_acf_abb(&first_msg).unwrap();
+        assert_eq!(
+            got,
+            e2e::compute_fragmented_crc(
+                avtp::NTSCF_SUBTYPE,
+                0x80,
+                false,
+                0x0102_0304_0506_0708,
+                0,
+                &encoded_first[..acf::ACF_ABB_HEADER_LEN],
+                b"hello-world"
+            )
+        );
     }
 
     #[test]
@@ -1419,24 +1438,25 @@ mod tests {
         buf.accept_fragment(&fragment_info(false, 0), b"solo")
             .unwrap();
         let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
-        let final_msg = sample_final_fragment(0);
-        let final_fragment = AcfCoverageMessage::Abb(&final_msg);
+        let first_msg = sample_first_fragment(b"solo");
+        let first = AcfCoverageMessage::Abb(&first_msg);
         assert_eq!(
-            verify_reassembled_train_crc(&buf, &header, &final_fragment, false),
+            verify_reassembled_train_crc(&buf, &header, &first, false),
             Err(RcpError::InvalidParameter)
         );
     }
 
     #[test]
     //fusa:test REQ-FRAG-007
-    fn verify_reassembled_train_crc_propagates_length_overflow_error() {
+    fn verify_reassembled_train_crc_propagates_encode_error() {
         let mut buf = FragmentReassemblyBuffer::new(64);
         buf.accept_fragment(&fragment_info(false, 0), b"x").unwrap();
         let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
-        let final_msg = sample_final_fragment(acf::ACF_MSG_LENGTH_9BIT_MAX);
-        let final_fragment = AcfCoverageMessage::Abb(&final_msg);
+        let mut first_msg = sample_first_fragment(b"x");
+        first_msg.info.byte_bus_id = 0x800; // wider than 11 bits
+        let first = AcfCoverageMessage::Abb(&first_msg);
         assert_eq!(
-            verify_reassembled_train_crc(&buf, &header, &final_fragment, true),
+            verify_reassembled_train_crc(&buf, &header, &first, true),
             Err(RcpError::InvalidSize)
         );
     }
@@ -1446,10 +1466,10 @@ mod tests {
     fn verify_reassembled_train_crc_on_empty_buffer_matches_empty_segments() {
         let buf = FragmentReassemblyBuffer::new(64);
         let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
-        let final_msg = sample_final_fragment(0);
-        let final_fragment = AcfCoverageMessage::Abb(&final_msg);
-        let got = verify_reassembled_train_crc(&buf, &header, &final_fragment, true).unwrap();
-        let want = e2e::crc32_tc18_for_fragment_train(&header, &final_fragment, &[]).unwrap();
+        let first_msg = sample_first_fragment(b"");
+        let first = AcfCoverageMessage::Abb(&first_msg);
+        let got = verify_reassembled_train_crc(&buf, &header, &first, true).unwrap();
+        let want = e2e::crc32_tc18_for_fragment_train(&header, &first, &[]).unwrap();
         assert_eq!(got, want);
     }
 }
