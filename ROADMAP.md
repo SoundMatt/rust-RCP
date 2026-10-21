@@ -955,13 +955,15 @@ functional config) before tackling bus-protocol endpoints.
       against `regmap::check_functional_config_matches_ep_type`'s existing
       cross-layer rule unchanged, matching `GpioFunctionalConfig`'s and
       `SpiFunctionalConfig`'s own precedent. Two points flagged per Guiding
-      Principle 5 rather than silently resolved: (1) the two adjacent
-      high-speed `i2c_mode` rows this crate's own spec-extraction pass could
-      not distinguish are modeled as two explicit, neutrally named variants,
-      `I2cSpeedMode::HighSpeedRowA`/`I2cSpeedMode::HighSpeedRowB`, with
+      Principle 5 rather than silently resolved: (1) TC18 Table 49's
+      duplicated `i2c_mode` wire value 3 (listed as both High-speed
+      1.7 Mbit/s and 3.4 Mbit/s) is modeled as one explicit, neutrally named
+      variant, `I2cSpeedMode::HighSpeedRowA`, with
       `I2cSpeedMode::is_ambiguous_high_speed_row` letting a caller detect
-      them, rather than either being silently assigned a specific named
-      speed — mirroring `GpioWriteSemantics::Unnamed8th`'s and
+      it, rather than being silently assigned a specific named speed; wire
+      value 4 is Table 49's unambiguous Ultra-fast row,
+      `I2cSpeedMode::UltraFast` (renamed from `HighSpeedRowB` in v6.0.0 to
+      match c-RCP's `RCP_EP_I2C_MODE_ULTRA_FAST`, issue #153) — mirroring `GpioWriteSemantics::Unnamed8th`'s and
       `SpiChannelSelect::Spare6`/`SpiChannelSelect::Spare7`'s own treatment
       of unresolved enum slots; (2) since this endpoint type is
       controller-only, no peripheral/target-mode role type is modeled at
@@ -995,8 +997,8 @@ functional config) before tackling bus-protocol endpoints.
       `read_size` and `uart_timeout` are met at the same evaluation, this
       crate does not silently prefer one — `UartReadCompletionReason::Both`
       is an explicit third outcome, mirroring
-      `GpioWriteSemantics::Unnamed8th`'s and `I2cSpeedMode::HighSpeedRowA`/
-      `HighSpeedRowB`'s own treatment of unresolved enum slots, and a zero
+      `GpioWriteSemantics::Unnamed8th`'s and `I2cSpeedMode::HighSpeedRowA`'s
+      own treatment of unresolved enum slots, and a zero
       threshold is not treated as a "disabled" sentinel (so a default,
       zeroed config resolves every read as immediately complete via
       `Both`); (2) `read_size` reuses the already-existing
@@ -1122,7 +1124,7 @@ functional config) before tackling bus-protocol endpoints.
       `classify_evt_sub_opcode` validates `sub_opcode`'s 3-bit range but
       always returns `Ok(None)` rather than guessing an assignment,
       mirroring `GpioWriteSemantics::Unnamed8th`'s and
-      `I2cSpeedMode::HighSpeedRowA`/`HighSpeedRowB`'s own treatment of
+      `I2cSpeedMode::HighSpeedRowA`'s own treatment of
       unconfirmed slots; retrofitting GPIO's or SPI's own already-built
       private `sub_opcode` readings onto an `EvtGroup` is explicitly left
       to later work, not guessed at here. (2) the checklist bullet's
@@ -1208,7 +1210,7 @@ per-endpoint scheduler, since the spec defines that ordering natively.
       infinite-repeat sentinel as an explicit variant rather than a bare
       `u16` that would let it silently mean 65535 repeats, mirroring
       `GpioWriteSemantics::Unnamed8th`'s and `I2cSpeedMode::
-      HighSpeedRowA`/`HighSpeedRowB`'s own named-special-value precedent;
+      HighSpeedRowA`'s own named-special-value precedent;
       `is_trigger_repeat_exhausted` implementing the exhaustion check
       against that repeat count; and `should_count_trigger_occurrence`, a
       pure predicate that always returns `true` regardless of the

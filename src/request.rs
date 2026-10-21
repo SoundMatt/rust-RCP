@@ -228,7 +228,7 @@
 //!   a bare `u16` that would let the checklist's own infinite-repeat
 //!   sentinel (`0xFFFF`) silently mean "65535 repeats" instead of "never
 //!   exhausts" — mirroring [`crate::gpio::GpioWriteSemantics::Unnamed8th`]'s
-//!   and [`crate::i2c::I2cSpeedMode::HighSpeedRowA`]/`HighSpeedRowB`'s own
+//!   and [`crate::i2c::I2cSpeedMode::HighSpeedRowA`]'s own
 //!   established "special value gets a named variant, not a silently-folded
 //!   number" precedent. See "Provenance note: the infinite-repeat sentinel"
 //!   below.
