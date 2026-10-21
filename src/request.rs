@@ -247,22 +247,15 @@
 //!   bullet names, added to [`crate::RcpError`] in `src/lib.rs`. See
 //!   "Provenance note: `CHAIN_ABORTED`/`CHAIN_ERROR` as new variants, and
 //!   the distinction between them" below.
-//! - [`TimedExecutionTime`] — the presentation-time execution gate a Timed
-//!   request carries in place of a TSCF header's own
-//!   [`crate::avtp::TscfHeader::avtp_timestamp`], modeled by composing
-//!   [`crate::timestamp::AvtpTimestamp`] rather than duplicating its
-//!   shape. See "Provenance note: `TimedExecutionTime`'s wire placement,
-//!   width, and the choice to compose `AvtpTimestamp`" below.
-//! - [`is_timed_request_ready`] — the presentation-time-execution
-//!   readiness rule this checklist bullet's own wording implies: a Timed
-//!   request is ready to execute once a caller-supplied current
-//!   presentation time has reached or passed the request's own carried
-//!   [`TimedExecutionTime`], reusing
-//!   [`crate::timestamp::AvtpTimestamp::is_after`]'s existing
-//!   wraparound-aware ordering and
-//!   [`crate::timestamp::AvtpTimestamp::is_untimed`]'s existing
-//!   all-zero-means-untimed fallback rather than inventing new ordering or
-//!   fallback logic of its own.
+//! - [`TimedExecutionTime`] — a Timed request's own carried 48-bit
+//!   `presentation_time` (TC18 §11.2.2.7, mod 2^48), mirroring c-RCP's
+//!   48-bit timed request. See "Provenance note: `TimedExecutionTime`'s
+//!   wire placement and width" below.
+//! - [`is_timed_request_ready`] / [`timed_due`] — the presentation-time
+//!   readiness rule: ready once the current 48-bit gPTP time has reached
+//!   or passed the request's `presentation_time`, compared in the wrapping
+//!   48-bit domain exactly as c-RCP's `rcp_timed_due`
+//!   (`c-RCP/src/request.c:864-869`).
 //! - [`check_clear_all_cancellation`] — the clear-all (`0x05`, mandatory)
 //!   cancellation rule: every pending/in-flight request is canceled,
 //!   unconditionally. See "Provenance note: cancellation scope and the
@@ -743,35 +736,20 @@
 //! ahead of the concrete per-link execution path (a later milestone item)
 //! that would actually return it.
 //!
-//! ## Provenance note: `TimedExecutionTime`'s wire placement, width, and the
-//! choice to compose `AvtpTimestamp`
+//! ## Provenance note: `TimedExecutionTime`'s wire placement and width
 //!
-//! `ROADMAP.md`'s checklist bullet names Timed's mechanism only in prose —
-//! "presentation-time execution as an alternative to a TSCF header" — and,
-//! like every other conditional-request kind in this module, states
-//! neither the byte offset a Timed request's own execution-time field
-//! occupies nor its field name. What the wording does pin down is the
-//! *shape* of the alternative being offered: the one presentation-time
-//! field this crate already carries is
-//! [`crate::avtp::TscfHeader::avtp_timestamp`], modeled in Milestone 1 as
-//! [`crate::timestamp::AvtpTimestamp`] — a 32-bit value with its own
-//! rollover-aware comparison and all-zero-means-untimed fallback rule.
-//! Reading "alternative to a TSCF header" as "carries the same kind of
-//! presentation-time value a TSCF header would have supplied, just sourced
-//! from the request itself instead", [`TimedExecutionTime`] composes
-//! [`crate::timestamp::AvtpTimestamp`] directly rather than introducing a
-//! second, differently-shaped timestamp type or an unconfirmed-width `u32`
-//! placeholder of its own — following this recommendation's own guidance
-//! to compose the module's existing timestamp primitives as a
-//! caller-supplied value rather than duplicate them. This is still a
-//! Guiding-Principle-5 judgment call, not a confirmed wire fact: nothing
-//! in this crate's roadmap states that a Timed request's execution-time
-//! field is actually 32 bits wide, or that it is bit-for-bit identical to
-//! [`crate::avtp::TscfHeader::avtp_timestamp`]'s own encoding, only that it
-//! serves the same presentation-time-execution purpose. [`TimedExecutionTime`]
-//! is, like [`RequestKind`] itself, a standalone value type not yet tied to
-//! any offset within [`crate::acf::ByteMessageInfo`] or any other decoded
-//! wire shape.
+//! TC18 §11.2.2.7 Figure 13 / Table 12 (TC18 master catalog
+//! TC18-11.2.2.7-002/-004) define a Timed request's `presentation_time` as
+//! a **48-bit** field (`(AS_sec × 10^9 + AS_ns) mod 2^48`, about a 3.26-day
+//! rollover), split across the ACF_GBB byte_message_info and the
+//! repurposed message_timestamp region. [`TimedExecutionTime`] therefore
+//! wraps a 48-bit value (bounded by [`TIMED_PRESENTATION_TIME_MAX`]) rather
+//! than the 32-bit TSCF `avtp_timestamp` it used to compose; a TSCF
+//! header's 32-bit `avtp_timestamp` is brought into the same 48-bit domain
+//! by [`crate::avtp::extend_timestamp`] before comparison. This mirrors
+//! c-RCP (`c-RCP/include/rcp/request.h:400-438,1017-1024`). The
+//! [`TimedExecutionTime`] value type is not itself tied to a byte offset
+//! within [`crate::acf::ByteMessageInfo`].
 //!
 //! ## Provenance note: cancellation scope and the addressed-endpoint/stream
 //! ambiguity
@@ -1299,7 +1277,6 @@
 //! `CrcError` is still constructible today.
 
 use crate::regmap::SequencerStateEntry;
-use crate::timestamp::AvtpTimestamp;
 use crate::RcpError;
 
 // ── RequestKind ──────────────────────────────────────────────────────────────
@@ -1956,42 +1933,79 @@ pub fn check_chain_continuation(cs: bool, predecessor_errored: bool) -> Result<(
 // ── Timed (0x0A): presentation-time execution as an alternative to a TSCF
 //    header ──────────────────────────────────────────────────────────────────
 
-/// A Timed request's own carried presentation-time execution gate — the
-/// mechanism this checklist bullet names as an alternative to a TSCF
-/// header's own [`crate::avtp::TscfHeader::avtp_timestamp`], for a request
-/// that did not arrive framed with one.
-///
-/// See this module's doc comment "Provenance note: `TimedExecutionTime`'s
-/// wire placement, width, and the choice to compose `AvtpTimestamp`" for
-/// why this composes [`crate::timestamp::AvtpTimestamp`] rather than
-/// duplicating its shape or introducing a new unconfirmed-width
-/// placeholder.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+/// The largest encodable Timed-request `presentation_time`: the all-ones
+/// value of its 48-bit field (TC18 §11.2.2.7 Figure 13 / Table 12:
+/// `presentation_time = (AS_sec × 10^9 + AS_ns) mod 2^48`, about a
+/// 3.26-day rollover). Port of `RCP_TIMED_PRESENTATION_TIME_MAX`
+/// (`c-RCP/include/rcp/request.h:1017-1020`).
 //fusa:req REQ-TIME-002
-pub struct TimedExecutionTime(pub AvtpTimestamp);
+pub const TIMED_PRESENTATION_TIME_MAX: u64 = 0x0000_FFFF_FFFF_FFFF;
 
-/// Whether a Timed request is ready to execute: `true` once `current` — a
-/// caller-supplied reference presentation time, in the same units as
-/// `exec_time` — has reached or passed `exec_time`, the request's own
-/// carried [`TimedExecutionTime`].
+/// One past [`TIMED_PRESENTATION_TIME_MAX`]: the modulus `presentation_time`
+/// wraps at. Port of `RCP_TIMED_PRESENTATION_TIME_MODULUS`
+/// (`c-RCP/include/rcp/request.h:1022-1024`).
+//fusa:req REQ-TIME-002
+pub const TIMED_PRESENTATION_TIME_MODULUS: u64 = 1u64 << 48;
+
+/// A Timed request's own carried 48-bit `presentation_time` — the earliest
+/// gPTP instant (nanoseconds mod 2^48) at which the request may execute.
 ///
-/// Ordering reuses [`crate::timestamp::AvtpTimestamp::is_after`]'s
-/// existing wraparound-aware comparison rather than a plain numeric `>=`,
-/// so a `current` that has just rolled over past `exec_time` is still
-/// correctly read as ready. An `exec_time` whose wrapped
-/// [`crate::timestamp::AvtpTimestamp`] is
-/// [`crate::timestamp::AvtpTimestamp::is_untimed`] (the all-zero fallback
-/// [`crate::timestamp`] already established for TSCF's own
-/// `avtp_timestamp`) carries no timing constraint at all, so this function
-/// reads that case as always ready — mirroring the same fallback rule
-/// rather than treating an untimed `exec_time` as an unreachable instant
-/// far in the past or future. Never panics for any input.
-//fusa:req REQ-TIME-003
-pub fn is_timed_request_ready(current: AvtpTimestamp, exec_time: TimedExecutionTime) -> bool {
-    if exec_time.0.is_untimed() {
-        return true;
+/// Mirrors c-RCP's timed request, which carries `presentation_time` as a
+/// 48-bit `uint64_t` (`c-RCP/include/rcp/request.h:400-438`). There is no
+/// "untimed" value: a Timed request always has a presentation time and 0
+/// is a valid one (timestamp validity is a TSCF `tv` / ACF_GBB `mtv` wire
+/// concern, see [`crate::timestamp::TimestampMeaning`]). A TSCF header's
+/// 32-bit `avtp_timestamp` is brought into this same 48-bit domain with
+/// [`crate::avtp::extend_timestamp`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
+//fusa:req REQ-TIME-002
+pub struct TimedExecutionTime(u64);
+
+impl TimedExecutionTime {
+    /// Wrap a 48-bit `presentation_time`. Returns
+    /// `Err(RcpError::InvalidSize)` above [`TIMED_PRESENTATION_TIME_MAX`] —
+    /// never silently truncated, as c-RCP's `rcp_timed_encode_request`
+    /// (`c-RCP/include/rcp/request.h:1047-1048`).
+    //fusa:req REQ-TIME-002
+    pub fn new(presentation_time: u64) -> Result<Self, RcpError> {
+        if presentation_time > TIMED_PRESENTATION_TIME_MAX {
+            return Err(RcpError::InvalidSize);
+        }
+        Ok(Self(presentation_time))
     }
-    current == exec_time.0 || current.is_after(exec_time.0)
+
+    /// The 48-bit `presentation_time`, in `0..=TIMED_PRESENTATION_TIME_MAX`.
+    //fusa:req REQ-TIME-002
+    pub fn presentation_time(self) -> u64 {
+        self.0
+    }
+}
+
+/// `true` iff `presentation_time` is at or before `now` in the wrapping
+/// 48-bit gPTP domain — i.e. iff a Timed (or TSCF-gated) request's
+/// execution condition is satisfied.
+///
+/// Port of `rcp_timed_due` (`c-RCP/src/request.c:844-869`): the forward
+/// delta `(presentation_time - now) mod 2^48` is due when it is 0 or lies
+/// in the "past" half of the ring (strictly greater than 2^47). Both
+/// inputs are masked by the wrap, so a value returned unmasked by
+/// [`crate::avtp::extend_timestamp`] compares correctly. Never panics.
+//fusa:req REQ-TIME-003
+pub fn timed_due(presentation_time: u64, now: u64) -> bool {
+    let delta = presentation_time.wrapping_sub(now) & TIMED_PRESENTATION_TIME_MAX;
+    delta == 0 || delta > TIMED_PRESENTATION_TIME_MODULUS / 2
+}
+
+/// Whether a Timed request is ready to execute: `true` once `now` — the
+/// current 48-bit gPTP time — has reached or passed `exec_time`'s
+/// `presentation_time` (TC18 §11.2.2.7: "the presentation_time is the
+/// earliest point in time, when the request shall be executed").
+///
+/// Equivalent to [`timed_due`]`(exec_time.presentation_time(), now)`.
+/// Never panics for any input.
+//fusa:req REQ-TIME-003
+pub fn is_timed_request_ready(now: u64, exec_time: TimedExecutionTime) -> bool {
+    timed_due(exec_time.0, now)
 }
 
 // ── Cancellation (0x05/0x06/0x07): clear-all / clear-non-safestate /
@@ -2273,8 +2287,8 @@ pub enum RequestLifecycleGuardInput {
     /// [`RequestKind::Timed`]: [`is_timed_request_ready`] gates the
     /// `Pending` -> `Started` hop.
     Timed {
-        /// The current presentation time.
-        current: AvtpTimestamp,
+        /// The current 48-bit gPTP time (nanoseconds mod 2^48).
+        current: u64,
         /// This request's own carried execution-time gate.
         exec_time: TimedExecutionTime,
     },
@@ -3882,71 +3896,116 @@ mod tests {
 
     #[test]
     //fusa:test REQ-TIME-002
-    fn timed_execution_time_default_is_untimed() {
+    fn timed_execution_time_default_is_presentation_time_zero() {
+        // No "untimed" sentinel: 0 is an ordinary 48-bit presentation time.
         let exec_time = TimedExecutionTime::default();
-        assert_eq!(exec_time.0, AvtpTimestamp::default());
-        assert!(exec_time.0.is_untimed());
+        assert_eq!(exec_time.presentation_time(), 0);
+        assert!(!is_timed_request_ready(
+            TIMED_PRESENTATION_TIME_MAX / 4,
+            TimedExecutionTime::new(TIMED_PRESENTATION_TIME_MAX / 2).unwrap()
+        ));
     }
 
     #[test]
     //fusa:test REQ-TIME-002
-    fn timed_execution_time_wraps_avtp_timestamp_by_value() {
-        let exec_time = TimedExecutionTime(AvtpTimestamp::new(1_000));
-        assert_eq!(exec_time.0.to_u32(), 1_000);
+    fn timed_execution_time_is_48_bits_wide() {
+        // TC18 §11.2.2.7 Table 12: presentation_time mod 2^48.
+        assert_eq!(TIMED_PRESENTATION_TIME_MAX, (1u64 << 48) - 1);
+        assert_eq!(TIMED_PRESENTATION_TIME_MODULUS, 1u64 << 48);
+        let max = TimedExecutionTime::new(TIMED_PRESENTATION_TIME_MAX).unwrap();
+        assert_eq!(max.presentation_time(), 0x0000_FFFF_FFFF_FFFF);
+        // A value above 32 bits is representable (the old u32 model could
+        // not carry it).
+        let wide = TimedExecutionTime::new(0x0000_1234_5678_9ABC).unwrap();
+        assert_eq!(wide.presentation_time(), 0x0000_1234_5678_9ABC);
+        // Never silently truncated.
+        assert_eq!(
+            TimedExecutionTime::new(TIMED_PRESENTATION_TIME_MODULUS),
+            Err(RcpError::InvalidSize)
+        );
+        assert_eq!(
+            TimedExecutionTime::new(u64::MAX),
+            Err(RcpError::InvalidSize)
+        );
     }
 
     #[test]
     //fusa:test REQ-TIME-003
     fn is_timed_request_ready_false_before_exec_time_is_reached() {
-        let exec_time = TimedExecutionTime(AvtpTimestamp::new(1_000));
-        assert!(!is_timed_request_ready(AvtpTimestamp::new(999), exec_time));
+        let exec_time = TimedExecutionTime::new(1_000).unwrap();
+        assert!(!is_timed_request_ready(999, exec_time));
     }
 
     #[test]
     //fusa:test REQ-TIME-003
     fn is_timed_request_ready_true_exactly_at_exec_time() {
-        let exec_time = TimedExecutionTime(AvtpTimestamp::new(1_000));
-        assert!(is_timed_request_ready(AvtpTimestamp::new(1_000), exec_time));
+        let exec_time = TimedExecutionTime::new(1_000).unwrap();
+        assert!(is_timed_request_ready(1_000, exec_time));
     }
 
     #[test]
     //fusa:test REQ-TIME-003
     fn is_timed_request_ready_true_after_exec_time_has_passed() {
-        let exec_time = TimedExecutionTime(AvtpTimestamp::new(1_000));
-        assert!(is_timed_request_ready(AvtpTimestamp::new(1_001), exec_time));
+        let exec_time = TimedExecutionTime::new(1_000).unwrap();
+        assert!(is_timed_request_ready(1_001, exec_time));
     }
 
     #[test]
     //fusa:test REQ-TIME-003
-    fn is_timed_request_ready_true_across_a_rollover() {
-        // AvtpTimestamp::is_after is wraparound-aware; a current time that
-        // just wrapped past u32::MAX back to a small value must still read
-        // as ready for an exec_time set just before the rollover.
-        let exec_time = TimedExecutionTime(AvtpTimestamp::new(u32::MAX - 1));
-        assert!(is_timed_request_ready(AvtpTimestamp::new(2), exec_time));
+    fn is_timed_request_ready_true_across_the_48_bit_rollover() {
+        // A gPTP now that just wrapped past 2^48 back to a small value must
+        // still read as ready for a presentation_time set just before it.
+        let exec_time = TimedExecutionTime::new(TIMED_PRESENTATION_TIME_MAX - 1).unwrap();
+        assert!(is_timed_request_ready(2, exec_time));
+        // ...and the 32-bit boundary is no longer a rollover at all.
+        let past_32 = TimedExecutionTime::new(u64::from(u32::MAX) + 10).unwrap();
+        assert!(!is_timed_request_ready(u64::from(u32::MAX), past_32));
+        assert!(is_timed_request_ready(u64::from(u32::MAX) + 10, past_32));
     }
 
     #[test]
     //fusa:test REQ-TIME-003
-    fn is_timed_request_ready_always_true_for_an_untimed_exec_time() {
-        let exec_time = TimedExecutionTime(AvtpTimestamp::default());
-        for current in [0u32, 1, 1_000, u32::MAX] {
-            assert!(is_timed_request_ready(
-                AvtpTimestamp::new(current),
-                exec_time
-            ));
-        }
+    fn is_timed_request_ready_zero_presentation_time_is_gated_like_any_other() {
+        // Previously an all-zero exec_time was "untimed" and always ready.
+        let zero = TimedExecutionTime::new(0).unwrap();
+        assert!(is_timed_request_ready(0, zero));
+        assert!(is_timed_request_ready(5, zero));
+        assert!(!is_timed_request_ready(
+            TIMED_PRESENTATION_TIME_MAX - 5,
+            zero
+        ));
+    }
+
+    #[test]
+    //fusa:test REQ-TIME-003
+    fn timed_due_matches_c_rcp_half_ring_boundary() {
+        // c-RCP request.c:849-869: due iff delta == 0 or delta > 2^47,
+        // where delta = (presentation_time - now) mod 2^48.
+        let half = TIMED_PRESENTATION_TIME_MODULUS / 2;
+        assert!(!timed_due(half, 0), "delta == 2^47 is still the future");
+        assert!(timed_due(half + 1, 0), "delta > 2^47 is the past");
+        assert!(timed_due(7, 7));
+        // Unmasked inputs (as extend_timestamp may return) are masked.
+        assert!(timed_due(TIMED_PRESENTATION_TIME_MODULUS + 3, 3));
     }
 
     #[test]
     //fusa:test REQ-TIME-003
     fn is_timed_request_ready_never_panics_for_any_sampled_input() {
-        for current in [0u32, 1, 1_000, u32::MAX] {
-            for target in [0u32, 1, 1_000, u32::MAX] {
-                let _ = is_timed_request_ready(
-                    AvtpTimestamp::new(current),
-                    TimedExecutionTime(AvtpTimestamp::new(target)),
-                );
+        let samples = [
+            0u64,
+            1,
+            1_000,
+            u64::from(u32::MAX),
+            TIMED_PRESENTATION_TIME_MAX,
+            u64::MAX,
+        ];
+        for now in samples {
+            for target in samples {
+                let _ = timed_due(target, now);
+                if let Ok(t) = TimedExecutionTime::new(target) {
+                    let _ = is_timed_request_ready(now, t);
+                }
             }
         }
     }
@@ -4368,10 +4427,10 @@ mod tests {
     //fusa:test REQ-RLC-002
     //fusa:test REQ-RLC-003
     fn try_transition_pending_to_started_gates_timed_on_is_timed_request_ready() {
-        let exec_time = TimedExecutionTime(AvtpTimestamp::new(1_000));
+        let exec_time = TimedExecutionTime::new(1_000).unwrap();
 
         let not_ready = RequestLifecycleGuardInput::Timed {
-            current: AvtpTimestamp::new(500),
+            current: 500,
             exec_time,
         };
         assert_eq!(
@@ -4381,7 +4440,7 @@ mod tests {
         );
 
         let ready = RequestLifecycleGuardInput::Timed {
-            current: AvtpTimestamp::new(1_000),
+            current: 1_000,
             exec_time,
         };
         assert_eq!(
@@ -4460,8 +4519,8 @@ mod tests {
             RequestLifecycleGuardInput::ClearNonSafestate,
             RequestLifecycleGuardInput::ClearSingle,
             RequestLifecycleGuardInput::Timed {
-                current: AvtpTimestamp::new(0),
-                exec_time: TimedExecutionTime(AvtpTimestamp::new(0)),
+                current: 0,
+                exec_time: TimedExecutionTime::default(),
             },
             RequestLifecycleGuardInput::Compound {
                 current_sequencer_state: SequencerState(9),
@@ -4568,8 +4627,8 @@ mod tests {
             RequestLifecycleGuardInput::ClearNonSafestate,
             RequestLifecycleGuardInput::ClearSingle,
             RequestLifecycleGuardInput::Timed {
-                current: AvtpTimestamp::new(0),
-                exec_time: TimedExecutionTime(AvtpTimestamp::new(u32::MAX)),
+                current: 0,
+                exec_time: TimedExecutionTime::new(TIMED_PRESENTATION_TIME_MAX).unwrap(),
             },
             RequestLifecycleGuardInput::CompoundWait {
                 current_sequencer_state: SequencerState(9),
@@ -4613,8 +4672,8 @@ mod tests {
             RequestLifecycleGuardInput::ClearNonSafestate,
             RequestLifecycleGuardInput::ClearSingle,
             RequestLifecycleGuardInput::Timed {
-                current: AvtpTimestamp::new(0),
-                exec_time: TimedExecutionTime(AvtpTimestamp::new(0)),
+                current: 0,
+                exec_time: TimedExecutionTime::default(),
             },
             RequestLifecycleGuardInput::CompoundWait {
                 current_sequencer_state: SequencerState(0),

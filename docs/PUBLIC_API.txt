@@ -439,9 +439,34 @@ impl core::marker::UnsafeUnpin for rcp::authz::Policy
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::authz::Policy
 impl core::panic::unwind_safe::UnwindSafe for rcp::authz::Policy
 pub mod rcp::avtp
+pub enum rcp::avtp::HeaderSelection
+pub rcp::avtp::HeaderSelection::Accept(rcp::avtp::HeaderVariant)
+pub rcp::avtp::HeaderSelection::Drop
+pub rcp::avtp::HeaderSelection::IgnorePresentationTime(rcp::avtp::TscfHeader)
+impl core::clone::Clone for rcp::avtp::HeaderSelection
+pub fn rcp::avtp::HeaderSelection::clone(&self) -> Self
+impl core::cmp::Eq for rcp::avtp::HeaderSelection
+impl core::cmp::PartialEq for rcp::avtp::HeaderSelection
+pub fn rcp::avtp::HeaderSelection::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::avtp::HeaderSelection
+pub fn rcp::avtp::HeaderSelection::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::avtp::HeaderSelection
+impl core::marker::StructuralPartialEq for rcp::avtp::HeaderSelection
+impl core::marker::Freeze for rcp::avtp::HeaderSelection
+impl core::marker::Send for rcp::avtp::HeaderSelection
+impl core::marker::Sync for rcp::avtp::HeaderSelection
+impl core::marker::Unpin for rcp::avtp::HeaderSelection
+impl core::marker::UnsafeUnpin for rcp::avtp::HeaderSelection
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::avtp::HeaderSelection
+impl core::panic::unwind_safe::UnwindSafe for rcp::avtp::HeaderSelection
 pub enum rcp::avtp::HeaderVariant
 pub rcp::avtp::HeaderVariant::Ntscf(rcp::avtp::NtscfHeader)
 pub rcp::avtp::HeaderVariant::Tscf(rcp::avtp::TscfHeader)
+impl rcp::avtp::HeaderVariant
+pub fn rcp::avtp::HeaderVariant::octet1(&self) -> u8
+pub fn rcp::avtp::HeaderVariant::stream_id(&self) -> u64
+pub fn rcp::avtp::HeaderVariant::subtype(&self) -> u8
+pub fn rcp::avtp::HeaderVariant::tu(&self) -> bool
 impl core::clone::Clone for rcp::avtp::HeaderVariant
 pub fn rcp::avtp::HeaderVariant::clone(&self) -> Self
 impl core::cmp::Eq for rcp::avtp::HeaderVariant
@@ -477,10 +502,35 @@ impl core::marker::Unpin for rcp::avtp::TimeSyncCapability
 impl core::marker::UnsafeUnpin for rcp::avtp::TimeSyncCapability
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::avtp::TimeSyncCapability
 impl core::panic::unwind_safe::UnwindSafe for rcp::avtp::TimeSyncCapability
+pub enum rcp::avtp::TscfFallback
+pub rcp::avtp::TscfFallback::Drop = 0
+pub rcp::avtp::TscfFallback::Ignore = 1
+impl core::clone::Clone for rcp::avtp::TscfFallback
+pub fn rcp::avtp::TscfFallback::clone(&self) -> Self
+impl core::cmp::Eq for rcp::avtp::TscfFallback
+impl core::cmp::PartialEq for rcp::avtp::TscfFallback
+pub fn rcp::avtp::TscfFallback::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::avtp::TscfFallback
+pub fn rcp::avtp::TscfFallback::default() -> Self
+impl core::fmt::Debug for rcp::avtp::TscfFallback
+pub fn rcp::avtp::TscfFallback::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for rcp::avtp::TscfFallback
+pub fn rcp::avtp::TscfFallback::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for rcp::avtp::TscfFallback
+impl core::marker::StructuralPartialEq for rcp::avtp::TscfFallback
+impl core::marker::Freeze for rcp::avtp::TscfFallback
+impl core::marker::Send for rcp::avtp::TscfFallback
+impl core::marker::Sync for rcp::avtp::TscfFallback
+impl core::marker::Unpin for rcp::avtp::TscfFallback
+impl core::marker::UnsafeUnpin for rcp::avtp::TscfFallback
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::avtp::TscfFallback
+impl core::panic::unwind_safe::UnwindSafe for rcp::avtp::TscfFallback
 pub struct rcp::avtp::NtscfHeader
 pub rcp::avtp::NtscfHeader::ntscf_data_length: u16
 pub rcp::avtp::NtscfHeader::sequence_num: u8
 pub rcp::avtp::NtscfHeader::stream_id: u64
+impl rcp::avtp::NtscfHeader
+pub fn rcp::avtp::NtscfHeader::octet1(&self) -> u8
 impl core::clone::Clone for rcp::avtp::NtscfHeader
 pub fn rcp::avtp::NtscfHeader::clone(&self) -> Self
 impl core::cmp::Eq for rcp::avtp::NtscfHeader
@@ -536,9 +586,18 @@ impl core::panic::unwind_safe::RefUnwindSafe for rcp::avtp::StreamId
 impl core::panic::unwind_safe::UnwindSafe for rcp::avtp::StreamId
 pub struct rcp::avtp::TscfHeader
 pub rcp::avtp::TscfHeader::avtp_timestamp: u32
+pub rcp::avtp::TscfHeader::mr: bool
+pub rcp::avtp::TscfHeader::reserved0: u32
+pub rcp::avtp::TscfHeader::reserved1: u16
 pub rcp::avtp::TscfHeader::sequence_num: u8
 pub rcp::avtp::TscfHeader::stream_data_length: u16
 pub rcp::avtp::TscfHeader::stream_id: u64
+pub rcp::avtp::TscfHeader::tu: bool
+pub rcp::avtp::TscfHeader::tv: bool
+pub rcp::avtp::TscfHeader::version: u8
+impl rcp::avtp::TscfHeader
+pub fn rcp::avtp::TscfHeader::octet1(&self) -> u8
+pub fn rcp::avtp::TscfHeader::timestamp_meaning(&self) -> rcp::timestamp::TimestampMeaning
 impl core::clone::Clone for rcp::avtp::TscfHeader
 pub fn rcp::avtp::TscfHeader::clone(&self) -> Self
 impl core::cmp::Eq for rcp::avtp::TscfHeader
@@ -566,12 +625,18 @@ pub const rcp::avtp::TSCF_SUBTYPE: u8
 pub fn rcp::avtp::build_stream_id([u8; 6], u16) -> u64
 pub fn rcp::avtp::decode_ntscf_frame(&[u8]) -> core::result::Result<(rcp::avtp::NtscfHeader, &[u8]), rcp::RcpError>
 pub fn rcp::avtp::decode_ntscf_header(&[u8]) -> core::result::Result<rcp::avtp::NtscfHeader, rcp::RcpError>
+pub fn rcp::avtp::decode_tscf_frame(&[u8]) -> core::result::Result<(rcp::avtp::TscfHeader, &[u8]), rcp::RcpError>
 pub fn rcp::avtp::decode_tscf_header(&[u8]) -> core::result::Result<rcp::avtp::TscfHeader, rcp::RcpError>
 pub fn rcp::avtp::encode_ntscf_frame(rcp::avtp::StreamId, u8, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::avtp::encode_ntscf_header(&rcp::avtp::NtscfHeader) -> core::result::Result<[u8; 12], rcp::RcpError>
+pub fn rcp::avtp::encode_tscf_frame(&rcp::avtp::TscfHeader, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::avtp::encode_tscf_header(&rcp::avtp::TscfHeader) -> core::result::Result<[u8; 24], rcp::RcpError>
+pub fn rcp::avtp::extend_timestamp(u32, u64) -> u64
 pub fn rcp::avtp::parse_stream_id(u64) -> ([u8; 6], u16)
-pub fn rcp::avtp::select_header_variant(&[u8], rcp::avtp::TimeSyncCapability) -> core::result::Result<rcp::avtp::HeaderVariant, rcp::RcpError>
+pub fn rcp::avtp::peek_subtype(&[u8]) -> core::result::Result<u8, rcp::RcpError>
+pub fn rcp::avtp::select_header_variant(&[u8], rcp::avtp::TimeSyncCapability, rcp::avtp::TscfFallback) -> core::result::Result<rcp::avtp::HeaderSelection, rcp::RcpError>
+pub fn rcp::avtp::should_drop_tscf(bool, u8, rcp::avtp::TscfFallback) -> bool
+pub fn rcp::avtp::tscf_reserved_all_zero(&rcp::avtp::TscfHeader) -> bool
 pub mod rcp::can
 pub enum rcp::can::CanRequest
 pub rcp::can::CanRequest::ConfigWrite
@@ -3521,7 +3586,7 @@ pub rcp::request::RequestLifecycleGuardInput::CompoundWait::gate: rcp::request::
 pub rcp::request::RequestLifecycleGuardInput::CompoundWait::svr_sequencers_max: u8
 pub rcp::request::RequestLifecycleGuardInput::Standard
 pub rcp::request::RequestLifecycleGuardInput::Timed
-pub rcp::request::RequestLifecycleGuardInput::Timed::current: rcp::timestamp::AvtpTimestamp
+pub rcp::request::RequestLifecycleGuardInput::Timed::current: u64
 pub rcp::request::RequestLifecycleGuardInput::Timed::exec_time: rcp::request::TimedExecutionTime
 pub rcp::request::RequestLifecycleGuardInput::Triggered
 pub rcp::request::RequestLifecycleGuardInput::Triggered::endpoint_busy: bool
@@ -3772,7 +3837,10 @@ impl core::marker::Unpin for rcp::request::SequencerState
 impl core::marker::UnsafeUnpin for rcp::request::SequencerState
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::SequencerState
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::SequencerState
-pub struct rcp::request::TimedExecutionTime(pub rcp::timestamp::AvtpTimestamp)
+pub struct rcp::request::TimedExecutionTime(_)
+impl rcp::request::TimedExecutionTime
+pub fn rcp::request::TimedExecutionTime::new(u64) -> core::result::Result<Self, rcp::RcpError>
+pub fn rcp::request::TimedExecutionTime::presentation_time(self) -> u64
 impl core::clone::Clone for rcp::request::TimedExecutionTime
 pub fn rcp::request::TimedExecutionTime::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::TimedExecutionTime
@@ -3782,6 +3850,8 @@ impl core::default::Default for rcp::request::TimedExecutionTime
 pub fn rcp::request::TimedExecutionTime::default() -> Self
 impl core::fmt::Debug for rcp::request::TimedExecutionTime
 pub fn rcp::request::TimedExecutionTime::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for rcp::request::TimedExecutionTime
+pub fn rcp::request::TimedExecutionTime::hash<__H: core::hash::Hasher>(&self, &mut __H)
 impl core::marker::Copy for rcp::request::TimedExecutionTime
 impl core::marker::StructuralPartialEq for rcp::request::TimedExecutionTime
 impl core::marker::Freeze for rcp::request::TimedExecutionTime
@@ -3811,6 +3881,8 @@ impl core::marker::UnsafeUnpin for rcp::request::TriggerExecDelay
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::TriggerExecDelay
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::TriggerExecDelay
 pub const rcp::request::MIN_SEQUENCERS_FOR_COMPOUND_BUNDLE: u8
+pub const rcp::request::TIMED_PRESENTATION_TIME_MAX: u64
+pub const rcp::request::TIMED_PRESENTATION_TIME_MODULUS: u64
 pub const rcp::request::TRIGGER_REPEAT_COUNT_INFINITE_SENTINEL: u16
 pub fn rcp::request::advance_sequencer_if_still_in_start_state(rcp::request::SequencerState, &rcp::request::CompoundGateConfig, rcp::request::SequencerState) -> core::option::Option<rcp::request::SequencerState>
 pub fn rcp::request::check_chain_continuation(bool, bool) -> core::result::Result<(), rcp::RcpError>
@@ -3829,7 +3901,7 @@ pub fn rcp::request::evaluate_rx_enforce_seq(u32, u32, bool, bool) -> rcp::reque
 pub fn rcp::request::execution_priority_tier(rcp::request::RequestKind) -> rcp::request::ExecutionPriorityTier
 pub fn rcp::request::is_gate_satisfied(rcp::request::SequencerState, &rcp::request::CompoundGateConfig) -> bool
 pub fn rcp::request::is_request_lifecycle_transition_defined(rcp::request::RequestLifecycleState, rcp::request::RequestLifecycleState) -> bool
-pub fn rcp::request::is_timed_request_ready(rcp::timestamp::AvtpTimestamp, rcp::request::TimedExecutionTime) -> bool
+pub fn rcp::request::is_timed_request_ready(u64, rcp::request::TimedExecutionTime) -> bool
 pub fn rcp::request::is_trigger_repeat_exhausted(u16, rcp::request::TriggerRepeatCount) -> bool
 pub fn rcp::request::purge_normal_priority_on_watchdog_overflow(&[rcp::request::PendingRequestKey], bool) -> (alloc::vec::Vec<usize>, alloc::vec::Vec<usize>)
 pub fn rcp::request::resolve_compound_exec_delay(rcp::request::RequestKind, &rcp::request::CompoundExecDelays) -> core::option::Option<u32>
@@ -3839,6 +3911,7 @@ pub fn rcp::request::resolve_trigger_exec_delay(rcp::request::RequestKind, rcp::
 pub fn rcp::request::safe_state_sequencer_gate(u8, u8) -> rcp::request::CompoundGateConfig
 pub fn rcp::request::select_next_pending_request(&[rcp::request::PendingRequestKey]) -> core::option::Option<usize>
 pub fn rcp::request::should_count_trigger_occurrence(bool) -> bool
+pub fn rcp::request::timed_due(u64, u64) -> bool
 pub fn rcp::request::try_force_cancel_all(&mut rcp::request::RequestLifecycleState) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::try_force_cancel_non_safestate(&mut rcp::request::RequestLifecycleState, bool) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::try_force_cancel_single(&mut rcp::request::RequestLifecycleState, u8, rcp::request::ClearTransactionNum) -> core::result::Result<(), rcp::RcpError>
@@ -4079,6 +4152,9 @@ pub mod rcp::timestamp
 pub enum rcp::timestamp::TimestampMeaning
 pub rcp::timestamp::TimestampMeaning::Timed
 pub rcp::timestamp::TimestampMeaning::Untimed
+impl rcp::timestamp::TimestampMeaning
+pub fn rcp::timestamp::TimestampMeaning::from_valid_bit(bool) -> Self
+pub fn rcp::timestamp::TimestampMeaning::is_untimed(self) -> bool
 impl core::clone::Clone for rcp::timestamp::TimestampMeaning
 pub fn rcp::timestamp::TimestampMeaning::clone(&self) -> Self
 impl core::cmp::Eq for rcp::timestamp::TimestampMeaning
@@ -4101,9 +4177,7 @@ pub struct rcp::timestamp::AvtpTimestamp(pub u32)
 impl rcp::timestamp::AvtpTimestamp
 pub const rcp::timestamp::AvtpTimestamp::ROLLOVER_PERIOD: u64
 pub fn rcp::timestamp::AvtpTimestamp::is_after(self, Self) -> bool
-pub fn rcp::timestamp::AvtpTimestamp::is_untimed(self) -> bool
 pub fn rcp::timestamp::AvtpTimestamp::new(u32) -> Self
-pub fn rcp::timestamp::AvtpTimestamp::semantics(self) -> rcp::timestamp::TimestampMeaning
 pub fn rcp::timestamp::AvtpTimestamp::to_u32(self) -> u32
 pub fn rcp::timestamp::AvtpTimestamp::wrapping_delta(self, Self) -> i64
 impl core::clone::Clone for rcp::timestamp::AvtpTimestamp
@@ -4134,9 +4208,7 @@ pub struct rcp::timestamp::MessageTimestamp(pub u64)
 impl rcp::timestamp::MessageTimestamp
 pub const rcp::timestamp::MessageTimestamp::ROLLOVER_PERIOD: u128
 pub fn rcp::timestamp::MessageTimestamp::is_after(self, Self) -> bool
-pub fn rcp::timestamp::MessageTimestamp::is_untimed(self) -> bool
 pub fn rcp::timestamp::MessageTimestamp::new(u64) -> Self
-pub fn rcp::timestamp::MessageTimestamp::semantics(self) -> rcp::timestamp::TimestampMeaning
 pub fn rcp::timestamp::MessageTimestamp::to_u64(self) -> u64
 pub fn rcp::timestamp::MessageTimestamp::wrapping_delta(self, Self) -> i64
 impl core::clone::Clone for rcp::timestamp::MessageTimestamp
