@@ -732,14 +732,21 @@ pub fn encode_acf_abb(msg: &AcfAbbMessage) -> Result<Vec<u8>, RcpError> {
 /// §12.9.1.1) are left unread rather than folded into `payload` or
 /// rejected — see [`decode_acf_abb_messages`] for splitting a frame that
 /// carries more than one.
+///
+/// The decoded `info.mtv` is always `false`, whatever bit the peer sent:
+/// ACF_ABB has no `message_timestamp` to be valid about, so it folds to
+/// untimed, mirroring c-RCP's `rcp_acf_decode_abb()` (`src/acf.c:398-400`)
+/// and TC18 Table 17 ("mtv 0b - ... for ACF_ABB").
 //fusa:req REQ-ABB-002
 //fusa:req REQ-ABB-004
 //fusa:req REQ-ABB-005
+//fusa:req REQ-ABB-010
 pub fn decode_acf_abb(b: &[u8]) -> Result<AcfAbbMessage, RcpError> {
     if b.len() < ACF_ABB_HEADER_LEN {
         return Err(RcpError::ShortFrame);
     }
-    let info = decode_byte_message_info(&b[..ACF_ABB_HEADER_LEN])?;
+    let mut info = decode_byte_message_info(&b[..ACF_ABB_HEADER_LEN])?;
+    info.mtv = false;
     if info.acf_msg_type != ACF_ABB_MSG_TYPE {
         return Err(wrong_discriminant_error(
             "acf_abb",
@@ -770,6 +777,7 @@ pub fn decode_acf_abb(b: &[u8]) -> Result<AcfAbbMessage, RcpError> {
 /// silently returning zero messages, so a caller cannot mistake "nothing
 /// to parse" for "one legitimately-empty-payload message".
 //fusa:req REQ-ABB-004
+//fusa:req REQ-ABB-010
 pub fn decode_acf_abb_messages(b: &[u8]) -> Result<Vec<AcfAbbMessage>, RcpError> {
     if b.is_empty() {
         return Err(RcpError::ShortFrame);
@@ -781,7 +789,9 @@ pub fn decode_acf_abb_messages(b: &[u8]) -> Result<Vec<AcfAbbMessage>, RcpError>
         if remaining.len() < ACF_ABB_HEADER_LEN {
             return Err(RcpError::ShortFrame);
         }
-        let info = decode_byte_message_info(&remaining[..ACF_ABB_HEADER_LEN])?;
+        let mut info = decode_byte_message_info(&remaining[..ACF_ABB_HEADER_LEN])?;
+        // Same untimed fold as decode_acf_abb (REQ-ABB-010).
+        info.mtv = false;
         if info.acf_msg_type != ACF_ABB_MSG_TYPE {
             return Err(wrong_discriminant_error(
                 "acf_abb",
@@ -850,8 +860,17 @@ pub struct AcfGbbMessage {
 /// 9-bit quadlet-count range, or if `msg.info` (with those three fields so
 /// overwritten) otherwise fails [`encode_byte_message_info`]'s
 /// field-width validation.
+///
+/// When `msg.info.mtv` is `false` (untimed) the 8-byte `message_timestamp`
+/// region is written as all zeros regardless of `msg.message_timestamp`,
+/// mirroring c-RCP's `rcp_acf_encode_gbb()` (`src/acf.c:435-439`) and TC18
+/// Table 17's "mtv 0b - message_timestamp not valid". A caller that needs
+/// a repurposed (non-timestamp) value in that region on an `mtv = 0`
+/// frame, as conditional requests do, must build the frame itself, as
+/// c-RCP's `request.c` does.
 //fusa:req REQ-GBB-002
 //fusa:req REQ-GBB-003
+//fusa:req REQ-ACF-011
 pub fn encode_acf_gbb(msg: &AcfGbbMessage) -> Result<Vec<u8>, RcpError> {
     let (acf_msg_length, pad) =
         quadlets_and_pad_for_message(ACF_GBB_HEADER_LEN, msg.payload.len())?;
@@ -864,7 +883,15 @@ pub fn encode_acf_gbb(msg: &AcfGbbMessage) -> Result<Vec<u8>, RcpError> {
     let info_bytes = encode_byte_message_info(&info)?;
     let mut buf = Vec::with_capacity(ACF_GBB_HEADER_LEN + msg.payload.len() + pad as usize);
     buf.extend_from_slice(&info_bytes);
-    buf.extend_from_slice(&msg.message_timestamp.to_be_bytes());
+    // An untimed message (mtv = 0) always carries a zeroed timestamp
+    // region on the wire, whatever msg.message_timestamp holds (c-RCP
+    // src/acf.c:435-439, REQ-ACF-011).
+    let message_timestamp = if msg.info.mtv {
+        msg.message_timestamp
+    } else {
+        0
+    };
+    buf.extend_from_slice(&message_timestamp.to_be_bytes());
     buf.extend_from_slice(&msg.payload);
     buf.extend(std::iter::repeat(0u8).take(pad as usize));
     Ok(buf)
@@ -996,10 +1023,9 @@ pub fn verify_echo_back(
 /// then records that member's outcome with no response (c-RCP's
 /// per-member results) rather than failing the whole frame.
 ///
-/// `byte_bus_id`/`transaction_num` are echoed from `request` (via
-/// [`build_response_info`], the same echo-back rule every other response
-/// in this crate uses), `rsp`/`err` are forced to `true`/`true`, and the
-/// response payload is the single Table 30 error-code octet. TC18 does not
+/// `byte_bus_id`/`transaction_num` are echoed from `request` (the same
+/// echo-back rule [`build_response_info`] applies), `rsp`/`err` are forced
+/// to `true`/`true`, and the response payload is the single Table 30 error-code octet. TC18 does not
 /// spell out `byte_msg_payload`'s exact byte layout for an error response
 /// beyond "contains an error code" — this one-octet encoding is this
 /// crate's own working interpretation (Guiding Principle 5), matching the
@@ -1015,23 +1041,223 @@ pub fn verify_echo_back(
 /// since this crate has no capture-timestamp source to put in a
 /// `message_timestamp` in the first place.
 ///
-/// **Known gap.** TC18 §11.3.4 (TC18.txt line 2300) additionally requires an
-/// error response to carry `evt[3:0] < 0x9`. This function copies
-/// `request`'s `evt` verbatim (via [`build_response_info`]), including
-/// `evt[3]` — TC18 §13.5's acknowledge-request bit — so an error response to
-/// a request that asked for an acknowledge can carry an `evt` nibble in
-/// TC18 Table 17's reserved `0x9…0xE` range, or even `0xF`, which Table 17
-/// defines as *acknowledge*. See requirement `REQ-RESP-007`.
+/// The response header is built fresh, mirroring c-RCP's
+/// `rcp_acf_build_error_response()` field for field: `byte_bus_id` and
+/// `transaction_num` are echoed from `request`, `evt = 0x0`, `op = 1`,
+/// `rsp = 1`, `err = 1`, and every other field (`mtv`, `hs`, `cs`, `ms`,
+/// `read_size_segment`) is zero. Nothing else is copied from `request`, so
+/// a request with `evt = 0xF` (acknowledge requested, sub-opcode 7) or one
+/// whose nibble falls in Table 17's reserved `0x9…0xE` range still gets an
+/// error response the §11.3 classifier ([`ByteMessageInfo::response_kind`])
+/// reads as [`ResponseKind::Error`], never as an Acknowledge or a
+/// further-response counter (TC18 §11.3.4: `evt[3:0] < 0x9` and `err = 1`).
+///
+/// c-RCP parity: c-RCP `src/acf.c:298-312` (`rcp_acf_build_error_response`)
+/// sets `op = RCP_ACF_OP_NONE`, which `rcp_acf_pack_header` (`acf.c:53`)
+/// encodes as wire bit `1`, regardless of the request's own `op`. TC18 RC5
+/// §11.3 Table 17 says `op` is mirrored from the originating request; this
+/// function copies c-RCP (always `op = 1`) for byte-for-byte interop
+/// instead of following Table 17.
 //fusa:req REQ-RESP-002
 //fusa:req REQ-RESP-003
+//fusa:req REQ-RESP-007
 pub fn build_error_response(request: &ByteMessageInfo, error: &RcpError) -> Option<AcfAbbMessage> {
     let code = error.tc18_wire_code()?;
-    let mut info = build_response_info(request, *request);
-    info.err = true;
     Some(AcfAbbMessage {
-        info,
+        info: fresh_response_info(request.byte_bus_id, request.transaction_num, 0x0, true),
         payload: vec![code],
     })
+}
+
+/// A fresh response `byte_message_info` header, the shape c-RCP's three
+/// response builders (`src/acf.c:298-357`) share: an all-zero header with
+/// `byte_bus_id`/`transaction_num`/`evt`/`err` set as given, `op = 1`
+/// (c-RCP's `RCP_ACF_OP_NONE`, see [`build_error_response`]'s `c-RCP
+/// parity:` note) and `rsp = 1`.
+fn fresh_response_info(
+    byte_bus_id: u16,
+    transaction_num: u8,
+    evt_nibble: u8,
+    err: bool,
+) -> ByteMessageInfo {
+    ByteMessageInfo {
+        byte_bus_id,
+        transaction_num,
+        evt: Evt {
+            ack: evt_nibble & EVT_ACK_REQUEST_BIT != 0,
+            sub_opcode: evt_nibble & EVT_SUB_OPCODE_MAX,
+        },
+        op: true,
+        rsp: true,
+        err,
+        ..ByteMessageInfo::default()
+    }
+}
+
+// ── Acknowledge responses (TC18 §11.3.1, §12.9.5) ─────────────────────────────
+
+/// `evt[3]`, TC18 §13.5's acknowledge-request bit: "`evt[3]=1` requests
+/// acknowledge" (TC18.txt line 4072).
+//fusa:req REQ-SRV-043
+pub const EVT_ACK_REQUEST_BIT: u8 = 0x08;
+
+/// True iff a request's raw 4-bit `evt` nibble sets `evt[3]`, TC18 §13.5's
+/// endpoint-type-independent acknowledge-request bit. Mirrors c-RCP's
+/// `rcp_acf_evt_requests_acknowledge()` (`src/acf.c:316`). For a decoded
+/// header, pass `info.evt.raw_nibble()`.
+//fusa:req REQ-SRV-043
+pub fn evt_requests_acknowledge(evt: u8) -> bool {
+    evt & EVT_ACK_REQUEST_BIT != 0
+}
+
+/// Build a TC18 §11.3.1 Acknowledge (request filed into endpoint request
+/// storage): `evt = 0xF`, `err = 0`, `rsp = 1`, `op = 1`, no
+/// `byte_msg_payload`, addressed to `byte_bus_id`/`transaction_num`.
+/// Mirrors c-RCP's `rcp_acf_build_acknowledge_response()`
+/// (`src/acf.c:322-336`) byte for byte once encoded with
+/// [`encode_acf_abb`].
+///
+/// c-RCP parity: as in [`build_error_response`], `op` is always `1`
+/// (c-RCP `RCP_ACF_OP_NONE`, `acf.c:331`), not mirrored from the request
+/// as TC18 RC5 Table 17 says.
+//fusa:req REQ-SRV-043
+pub fn build_acknowledge_response(byte_bus_id: u16, transaction_num: u8) -> AcfAbbMessage {
+    AcfAbbMessage {
+        info: fresh_response_info(
+            byte_bus_id,
+            transaction_num,
+            EVT_RESPONSE_ACKNOWLEDGE,
+            false,
+        ),
+        payload: Vec::new(),
+    }
+}
+
+/// Build TC18 §11.3.1's Acknowledge-shaped rejection (request never filed
+/// into endpoint request storage): `evt = 0xF`, `err = 1`, `rsp = 1`,
+/// `op = 1`, and a one-octet `byte_msg_payload` carrying `error`'s Table 30
+/// wire code. Distinct from [`build_error_response`]'s §11.3.4 shape
+/// (`evt = 0x0`), which is for a filed request whose execution failed.
+/// Mirrors c-RCP's `rcp_acf_build_acknowledge_rejected_response()`
+/// (`src/acf.c:338-357`).
+///
+/// Returns `None` when `error` has no Table 30 wire code
+/// ([`RcpError::tc18_wire_code`]), the same rule [`build_error_response`]
+/// applies.
+///
+/// c-RCP parity: `op` is always `1` (c-RCP `RCP_ACF_OP_NONE`,
+/// `acf.c:348`), not mirrored from the request as TC18 RC5 Table 17 says.
+//fusa:req REQ-ACF-055
+pub fn build_acknowledge_rejected_response(
+    byte_bus_id: u16,
+    transaction_num: u8,
+    error: &RcpError,
+) -> Option<AcfAbbMessage> {
+    let code = error.tc18_wire_code()?;
+    Some(AcfAbbMessage {
+        info: fresh_response_info(byte_bus_id, transaction_num, EVT_RESPONSE_ACKNOWLEDGE, true),
+        payload: vec![code],
+    })
+}
+
+// ── Request admission: an rsp = 1 frame is never a request ───────────────────
+
+/// True iff `info` is a request, i.e. its `rsp` bit is 0 (TC18 §11.2.1
+/// Table 4; Table 17's `rsp = 1b` marks a response). Mirrors c-RCP's
+/// `rcp_acf_header_is_request()` (`src/acf.c:206`).
+//fusa:req REQ-ACF-056
+pub fn header_is_request(info: &ByteMessageInfo) -> bool {
+    !info.rsp
+}
+
+/// The admission-time "a response is never admitted as a request" check,
+/// with c-RCP's `rcp_server_endpoint_admit_with_ack()` semantics
+/// (`src/server.c:362-366`): if `frame` holds at least a full
+/// `byte_message_info` header and that header has `rsp = 1`, return
+/// `Err(RcpError::InvalidParameter)`. A frame too short to hold a header
+/// returns `Ok(())` and is left to the ordinary short-frame rejection the
+/// decoders already perform, exactly as c-RCP does.
+//fusa:req REQ-ACF-054
+pub fn reject_response_frame(frame: &[u8]) -> Result<(), RcpError> {
+    if frame.len() < BYTE_MESSAGE_INFO_LEN {
+        return Ok(());
+    }
+    let info = decode_byte_message_info(&frame[..BYTE_MESSAGE_INFO_LEN])?;
+    if header_is_request(&info) {
+        Ok(())
+    } else {
+        Err(RcpError::InvalidParameter)
+    }
+}
+
+// ── Compound-wait evt[2:0] comparison modes (TC18 §13.5.1) ───────────────────
+
+const COMPOUND_WAIT_MODE_EXACT: u8 = 0x0;
+const COMPOUND_WAIT_MODE_AND_ONES: u8 = 0x1;
+const COMPOUND_WAIT_MODE_AND_ZEROS: u8 = 0x2;
+const COMPOUND_WAIT_MODE_HI_GE: u8 = 0x4;
+const COMPOUND_WAIT_MODE_HI_LE: u8 = 0x5;
+const COMPOUND_WAIT_MODE_LO_GE: u8 = 0x6;
+const COMPOUND_WAIT_MODE_LO_LE: u8 = 0x7;
+
+/// The reserved compound-wait comparison mode, `evt[2:0] = 011b`
+/// (TC18 §13.5.1): such a request is ignored and an err-response with
+/// `UNSUPPORTED_CMD` is sent.
+//fusa:req REQ-ACF-024
+pub const COMPOUND_WAIT_MODE_RESERVED: u8 = 0x3;
+
+/// True iff a compound-wait request's `evt[2:0]` selects a defined
+/// comparison mode, i.e. `(evt & 0x7) != 0x3`. Only `evt[2:0]` is
+/// inspected, so `evt[3]` (acknowledge request) never affects the result.
+/// Mirrors c-RCP's `rcp_acf_compound_wait_evt_valid()` (`src/acf.c:240`).
+//fusa:req REQ-ACF-024
+pub fn compound_wait_evt_valid(evt: u8) -> bool {
+    evt & EVT_SUB_OPCODE_MAX != COMPOUND_WAIT_MODE_RESERVED
+}
+
+/// Evaluate a compound-wait condition (TC18 §13.5.1): compare the request's
+/// `byte_msg_payload` against the endpoint's current interface `status`
+/// under the comparison mode `evt[2:0]` selects. Mirrors c-RCP's
+/// `rcp_acf_compound_wait_match()` (`src/acf.c:259-296`) exactly:
+///
+/// - `status.len() < payload.len()` is always `false`; otherwise only the
+///   first `payload.len()` bytes of `status` are compared.
+/// - `000b`: exact byte match (an empty payload matches).
+/// - `001b`: every 1-bit of `payload` is 1 in `status`.
+/// - `010b`: every 1-bit of `payload` is 0 in `status`.
+/// - `100b`/`101b`: `payload[0..2]` (big-endian) `>=`/`<=` `status[0..2]`.
+/// - `110b`/`111b`: `payload[2..4]` (big-endian) `>=`/`<=` `status[2..4]`.
+///   The four quadlet modes return `false` when `payload.len() < 4`.
+/// - `011b` (reserved): always `false`; callers must still reject it with
+///   `UNSUPPORTED_CMD` via [`compound_wait_evt_valid`].
+//fusa:req REQ-ACF-025
+//fusa:req REQ-ACF-026
+//fusa:req REQ-ACF-027
+//fusa:req REQ-ACF-028
+//fusa:req REQ-ACF-029
+//fusa:req REQ-ACF-030
+//fusa:req REQ-ACF-051
+//fusa:req REQ-ACF-052
+//fusa:req REQ-ACF-053
+pub fn compound_wait_match(evt: u8, payload: &[u8], status: &[u8]) -> bool {
+    if status.len() < payload.len() {
+        return false;
+    }
+    let status = &status[..payload.len()];
+    let be16 = |b: &[u8], at: usize| u16::from_be_bytes([b[at], b[at + 1]]);
+    match evt & EVT_SUB_OPCODE_MAX {
+        COMPOUND_WAIT_MODE_EXACT => payload == status,
+        COMPOUND_WAIT_MODE_AND_ONES => payload
+            .iter()
+            .zip(status)
+            .all(|(p, s)| (p & s) | !p == 0xFF),
+        COMPOUND_WAIT_MODE_AND_ZEROS => payload.iter().zip(status).all(|(p, s)| p & s == 0),
+        COMPOUND_WAIT_MODE_HI_GE => payload.len() >= 4 && be16(payload, 0) >= be16(status, 0),
+        COMPOUND_WAIT_MODE_HI_LE => payload.len() >= 4 && be16(payload, 0) <= be16(status, 0),
+        COMPOUND_WAIT_MODE_LO_GE => payload.len() >= 4 && be16(payload, 2) >= be16(status, 2),
+        COMPOUND_WAIT_MODE_LO_LE => payload.len() >= 4 && be16(payload, 2) <= be16(status, 2),
+        _ => false,
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1680,6 +1906,8 @@ mod tests {
                 acf_msg_type: ACF_GBB_MSG_TYPE,
                 acf_msg_length: 6,
                 pad: 3,
+                // mtv=1: an untimed GBB zeroes its timestamp (REQ-ACF-011).
+                mtv: true,
                 ..sample_info()
             },
             message_timestamp: 0x0011_2233_4455_6677,
@@ -1699,6 +1927,7 @@ mod tests {
                     acf_msg_type: ACF_GBB_MSG_TYPE,
                     acf_msg_length: 4,
                     pad: 0,
+                    mtv: true,
                     ..Default::default()
                 },
                 message_timestamp,
@@ -1721,6 +1950,7 @@ mod tests {
                 acf_msg_type: ACF_GBB_MSG_TYPE,
                 acf_msg_length: 68,
                 pad: 0,
+                mtv: true,
                 ..sample_info()
             },
             message_timestamp: 0xDEAD_BEEF_0000_0001,
@@ -2006,7 +2236,6 @@ mod tests {
             RcpError::ShortFrame,
             RcpError::InvalidSize,
             RcpError::Closed,
-            RcpError::CrcError,
         ] {
             assert_eq!(
                 build_error_response(&request, &error),
@@ -2067,6 +2296,323 @@ mod tests {
         }
     }
 
+    // ── c-RCP parity: fresh response headers (golden vectors) ───────────────
+    //
+    // Every golden vector below was produced by c-RCP's own code (librcp.a
+    // built from c-RCP src/acf.c, driven by a small C harness calling
+    // rcp_acf_build_error_response()/rcp_acf_build_acknowledge_response()/
+    // rcp_acf_build_acknowledge_rejected_response()/rcp_acf_encode_gbb()/
+    // rcp_acf_compound_wait_match()).
+
+    /// c-RCP rcp_acf_build_error_response(0x123, 0x42, INVALID_PARAMETER).
+    const C_RCP_ERR_RESPONSE: [u8; 12] = [
+        0x1C, 0x03, 0xC1, 0x23, 0x00, 0x42, 0xE0, 0x00, 0x0F, 0x00, 0x00, 0x00,
+    ];
+    /// c-RCP rcp_acf_build_acknowledge_response(0x123, 0x42).
+    const C_RCP_ACK_RESPONSE: [u8; 8] = [0x1C, 0x02, 0x01, 0x23, 0xF0, 0x42, 0xC0, 0x00];
+    /// c-RCP rcp_acf_build_acknowledge_rejected_response(0x7FF, 0x07,
+    /// REQUEST_STORAGE_OVERFLOW).
+    const C_RCP_ACK_REJECTED_RESPONSE: [u8; 12] = [
+        0x1C, 0x03, 0xC7, 0xFF, 0xF0, 0x07, 0xE0, 0x00, 0x0A, 0x00, 0x00, 0x00,
+    ];
+
+    #[test]
+    //fusa:test REQ-RESP-002
+    //fusa:test REQ-RESP-007
+    fn build_error_response_matches_c_rcp_bytes_whatever_the_request_carries() {
+        // Every request field build_error_response must NOT copy is set to
+        // a nonzero value here: evt, mtv, hs, cs, op=0, ms, read_size.
+        let request = ByteMessageInfo {
+            byte_bus_id: 0x123,
+            transaction_num: 0x42,
+            ..sample_info()
+        };
+        let request = ByteMessageInfo {
+            op: false,
+            mtv: true,
+            hs: true,
+            ms: true,
+            ..request
+        };
+        let response = build_error_response(&request, &RcpError::InvalidParameter).unwrap();
+        assert_eq!(encode_acf_abb(&response).unwrap(), C_RCP_ERR_RESPONSE);
+    }
+
+    #[test]
+    //fusa:test REQ-RESP-007
+    fn build_error_response_to_evt_0xf_or_0x9_request_is_classified_error() {
+        for nibble in [0xFu8, 0x9] {
+            let request = ByteMessageInfo {
+                evt: Evt {
+                    ack: nibble & 0x8 != 0,
+                    sub_opcode: nibble & 0x7,
+                },
+                ..sample_info()
+            };
+            let response = build_error_response(&request, &RcpError::EpError).unwrap();
+            assert_eq!(
+                response.info.evt.raw_nibble(),
+                0x0,
+                "evt nibble {nibble:#x}"
+            );
+            assert_eq!(response.info.response_kind(), ResponseKind::Error);
+            let decoded = decode_acf_abb(&encode_acf_abb(&response).unwrap()).unwrap();
+            assert_eq!(decoded.info.response_kind(), ResponseKind::Error);
+            assert_eq!(decoded.info.byte_bus_id, request.byte_bus_id);
+            assert_eq!(decoded.info.transaction_num, request.transaction_num);
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-WIREERR-007
+    fn crc_failure_produces_a_poci_failure_error_response() {
+        // #175: corrupt the CRC and expect a wire error response.
+        let coverage = [0x01u8, 0x02, 0x03, 0x04];
+        let good = crate::e2e::crc32_tc18(&coverage);
+        let (error, _scope) =
+            crate::request::check_rx_enforce_e2e(&coverage, good ^ 0x1, true).unwrap_err();
+        assert_eq!(error, RcpError::CrcError);
+        let response = build_error_response(&sample_info(), &error).unwrap();
+        assert_eq!(response.payload, vec![12]);
+        assert_eq!(response.info.response_kind(), ResponseKind::Error);
+    }
+
+    #[test]
+    //fusa:test REQ-SRV-043
+    fn evt_requests_acknowledge_is_evt_bit_3_like_c_rcp() {
+        for evt in 0u8..16 {
+            assert_eq!(evt_requests_acknowledge(evt), evt >= 8, "evt {evt:#x}");
+        }
+        let info = sample_info(); // evt.ack = true
+        assert!(evt_requests_acknowledge(info.evt.raw_nibble()));
+    }
+
+    #[test]
+    //fusa:test REQ-SRV-043
+    fn build_acknowledge_response_matches_c_rcp_bytes() {
+        let ack = build_acknowledge_response(0x123, 0x42);
+        assert!(ack.payload.is_empty());
+        assert_eq!(ack.info.response_kind(), ResponseKind::Acknowledge);
+        assert!(!ack.info.err);
+        assert_eq!(encode_acf_abb(&ack).unwrap(), C_RCP_ACK_RESPONSE);
+    }
+
+    #[test]
+    //fusa:test REQ-ACF-055
+    fn build_acknowledge_rejected_response_matches_c_rcp_bytes() {
+        let rej =
+            build_acknowledge_rejected_response(0x7FF, 0x07, &RcpError::ReqStorageOvfl).unwrap();
+        assert!(rej.info.err);
+        assert_eq!(rej.info.response_kind(), ResponseKind::Acknowledge);
+        assert_eq!(encode_acf_abb(&rej).unwrap(), C_RCP_ACK_REJECTED_RESPONSE);
+        assert_eq!(
+            build_acknowledge_rejected_response(1, 2, &RcpError::Timeout),
+            None
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-ACF-056
+    fn header_is_request_is_rsp_clear() {
+        let mut info = sample_info();
+        info.rsp = false;
+        assert!(header_is_request(&info));
+        info.rsp = true;
+        assert!(!header_is_request(&info));
+    }
+
+    #[test]
+    //fusa:test REQ-ACF-054
+    fn reject_response_frame_rejects_rsp_1_with_invalid_parameter() {
+        let request = AcfAbbMessage {
+            info: ByteMessageInfo {
+                rsp: false,
+                ..sample_info()
+            },
+            payload: vec![1, 2, 3],
+        };
+        let frame = encode_acf_abb(&request).unwrap();
+        assert_eq!(reject_response_frame(&frame), Ok(()));
+
+        let response = encode_acf_abb(&build_acknowledge_response(1, 2)).unwrap();
+        assert_eq!(
+            reject_response_frame(&response),
+            Err(RcpError::InvalidParameter)
+        );
+        // GBB frames carry the same header in their first 8 octets.
+        let gbb = encode_acf_gbb(&AcfGbbMessage {
+            info: ByteMessageInfo {
+                rsp: true,
+                ..ByteMessageInfo::default()
+            },
+            message_timestamp: 0,
+            payload: vec![],
+        })
+        .unwrap();
+        assert_eq!(reject_response_frame(&gbb), Err(RcpError::InvalidParameter));
+        // Too short to hold a header: left to the decoders, as c-RCP does.
+        assert_eq!(reject_response_frame(&response[..7]), Ok(()));
+        assert_eq!(reject_response_frame(&[]), Ok(()));
+    }
+
+    // ── c-RCP parity: mtv handling ──────────────────────────────────────────
+
+    #[test]
+    //fusa:test REQ-ACF-011
+    fn encode_acf_gbb_zeroes_message_timestamp_when_untimed_like_c_rcp() {
+        let msg = |mtv| AcfGbbMessage {
+            info: ByteMessageInfo {
+                byte_bus_id: 0x055,
+                transaction_num: 9,
+                op: true,
+                mtv,
+                ..ByteMessageInfo::default()
+            },
+            message_timestamp: 0x0102_0304_0506_0708,
+            payload: vec![0xAA, 0xBB, 0xCC],
+        };
+        // c-RCP rcp_acf_encode_gbb() output, mtv=0 then mtv=1.
+        assert_eq!(
+            encode_acf_gbb(&msg(false)).unwrap(),
+            [
+                0x1A, 0x05, 0x40, 0x55, 0x00, 0x09, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0xAA, 0xBB, 0xCC, 0x00
+            ]
+        );
+        assert_eq!(
+            encode_acf_gbb(&msg(true)).unwrap(),
+            [
+                0x1A, 0x05, 0x60, 0x55, 0x00, 0x09, 0x80, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+                0x07, 0x08, 0xAA, 0xBB, 0xCC, 0x00
+            ]
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-ABB-010
+    fn decode_acf_abb_forces_mtv_untimed_like_c_rcp() {
+        // An ABB frame with mtv=1 on the wire (c-RCP encodes it verbatim;
+        // its decoder folds it back to untimed).
+        let frame = [
+            0x1C, 0x03, 0x60, 0x05, 0x00, 0x00, 0x80, 0x00, 0xAA, 0xBB, 0xCC, 0x00,
+        ];
+        let decoded = decode_acf_abb(&frame).unwrap();
+        assert!(!decoded.info.mtv);
+        assert_eq!(decoded.payload, vec![0xAA, 0xBB, 0xCC]);
+        let mut two = frame.to_vec();
+        two.extend_from_slice(&frame);
+        for m in decode_acf_abb_messages(&two).unwrap() {
+            assert!(!m.info.mtv);
+        }
+    }
+
+    // ── c-RCP parity: compound-wait evt (TC18 §13.5.1) ──────────────────────
+
+    #[test]
+    //fusa:test REQ-ACF-024
+    fn compound_wait_evt_valid_rejects_only_011b() {
+        for evt in 0u8..16 {
+            assert_eq!(
+                compound_wait_evt_valid(evt),
+                evt & 0x7 != 0x3,
+                "evt {evt:#x}"
+            );
+        }
+    }
+
+    /// c-RCP rcp_acf_compound_wait_match() over PAYLOADS x STATUSES (row i,
+    /// column j -> index 4*i+j) for evt[2:0] = 0..=7, plus three edge cases:
+    /// (payload 4 bytes vs status 3 bytes, 2-byte payload, empty payload).
+    const CW_PAYLOADS: [[u8; 4]; 4] = [
+        [0x12, 0x34, 0x56, 0x78],
+        [0x0F, 0x00, 0xF0, 0x01],
+        [0x00, 0x00, 0x00, 0x00],
+        [0xFF, 0xFF, 0xFF, 0xFF],
+    ];
+    const CW_STATUSES: [[u8; 5]; 4] = [
+        [0x12, 0x34, 0x56, 0x78, 0x99],
+        [0x1F, 0x10, 0xF1, 0x01, 0x00],
+        [0x12, 0x33, 0x56, 0x79, 0x00],
+        [0xF0, 0xFF, 0x0F, 0xFE, 0x00],
+    ];
+    const CW_GOLDEN: [([u8; 16], [bool; 3]); 8] = [
+        (
+            [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [false, true, true],
+        ),
+        (
+            [1, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0],
+            [false, true, true],
+        ),
+        (
+            [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+            [false, false, true],
+        ),
+        (
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [false, false, false],
+        ),
+        (
+            [1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1],
+            [false, false, false],
+        ),
+        (
+            [1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+            [false, false, false],
+        ),
+        (
+            [1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1],
+            [false, false, false],
+        ),
+        (
+            [1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0],
+            [false, false, false],
+        ),
+    ];
+
+    #[test]
+    //fusa:test REQ-ACF-025
+    //fusa:test REQ-ACF-026
+    //fusa:test REQ-ACF-027
+    //fusa:test REQ-ACF-028
+    //fusa:test REQ-ACF-029
+    //fusa:test REQ-ACF-030
+    //fusa:test REQ-ACF-051
+    //fusa:test REQ-ACF-052
+    //fusa:test REQ-ACF-053
+    fn compound_wait_match_matches_c_rcp_golden_table() {
+        // evt[3] is ignored: c-RCP gives identical rows for evt and evt|8.
+        for evt in 0u8..16 {
+            let (grid, edges) = &CW_GOLDEN[usize::from(evt & 0x7)];
+            for (i, p) in CW_PAYLOADS.iter().enumerate() {
+                for (j, s) in CW_STATUSES.iter().enumerate() {
+                    assert_eq!(
+                        compound_wait_match(evt, p, s),
+                        grid[4 * i + j] == 1,
+                        "evt {evt} payload {i} status {j}"
+                    );
+                }
+            }
+            let p0 = &CW_PAYLOADS[0];
+            let s0 = &CW_STATUSES[0];
+            assert_eq!(
+                compound_wait_match(evt, p0, &s0[..3]),
+                edges[0],
+                "short status, evt {evt}"
+            );
+            assert_eq!(
+                compound_wait_match(evt, &p0[..2], &s0[..2]),
+                edges[1],
+                "2-byte payload, evt {evt}"
+            );
+            assert_eq!(
+                compound_wait_match(evt, &[], &[]),
+                edges[2],
+                "empty payload, evt {evt}"
+            );
+        }
+    }
+
     // ── TC18 §11.2.1 Table 4 / §11.3 Table 17 literal field values ─────────
 
     #[test]
@@ -2114,7 +2660,10 @@ mod tests {
         })
         .unwrap();
         let gbb = encode_acf_gbb(&AcfGbbMessage {
-            info: ByteMessageInfo::default(),
+            info: ByteMessageInfo {
+                mtv: true,
+                ..ByteMessageInfo::default()
+            },
             message_timestamp: 0x0102_0304_0506_0708,
             payload,
         })

@@ -158,13 +158,19 @@ pub const rcp::acf::ACF_MSG_LENGTH_9BIT_MAX: u16
 pub const rcp::acf::ACF_MSG_TYPE_7BIT_MAX: u8
 pub const rcp::acf::BYTE_MESSAGE_INFO_11BIT_MAX: u16
 pub const rcp::acf::BYTE_MESSAGE_INFO_LEN: usize
+pub const rcp::acf::COMPOUND_WAIT_MODE_RESERVED: u8
+pub const rcp::acf::EVT_ACK_REQUEST_BIT: u8
 pub const rcp::acf::EVT_RESPONSE_ACKNOWLEDGE: u8
 pub const rcp::acf::EVT_SUB_OPCODE_MAX: u8
 pub const rcp::acf::PAD_2BIT_MAX: u8
 pub const rcp::acf::QUADLET_LEN: usize
 pub const rcp::acf::READ_SIZE_SEGMENT_12BIT_MAX: u16
+pub fn rcp::acf::build_acknowledge_rejected_response(u16, u8, &rcp::RcpError) -> core::option::Option<rcp::acf::AcfAbbMessage>
+pub fn rcp::acf::build_acknowledge_response(u16, u8) -> rcp::acf::AcfAbbMessage
 pub fn rcp::acf::build_error_response(&rcp::acf::ByteMessageInfo, &rcp::RcpError) -> core::option::Option<rcp::acf::AcfAbbMessage>
 pub fn rcp::acf::build_response_info(&rcp::acf::ByteMessageInfo, rcp::acf::ByteMessageInfo) -> rcp::acf::ByteMessageInfo
+pub fn rcp::acf::compound_wait_evt_valid(u8) -> bool
+pub fn rcp::acf::compound_wait_match(u8, &[u8], &[u8]) -> bool
 pub fn rcp::acf::decode_acf_abb(&[u8]) -> core::result::Result<rcp::acf::AcfAbbMessage, rcp::RcpError>
 pub fn rcp::acf::decode_acf_abb_messages(&[u8]) -> core::result::Result<alloc::vec::Vec<rcp::acf::AcfAbbMessage>, rcp::RcpError>
 pub fn rcp::acf::decode_acf_gbb(&[u8]) -> core::result::Result<rcp::acf::AcfGbbMessage, rcp::RcpError>
@@ -172,6 +178,9 @@ pub fn rcp::acf::decode_byte_message_info(&[u8]) -> core::result::Result<rcp::ac
 pub fn rcp::acf::encode_acf_abb(&rcp::acf::AcfAbbMessage) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::acf::encode_acf_gbb(&rcp::acf::AcfGbbMessage) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::acf::encode_byte_message_info(&rcp::acf::ByteMessageInfo) -> core::result::Result<[u8; 8], rcp::RcpError>
+pub fn rcp::acf::evt_requests_acknowledge(u8) -> bool
+pub fn rcp::acf::header_is_request(&rcp::acf::ByteMessageInfo) -> bool
+pub fn rcp::acf::reject_response_frame(&[u8]) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::acf::verify_echo_back(&rcp::acf::ByteMessageInfo, &rcp::acf::ByteMessageInfo) -> core::result::Result<(), rcp::RcpError>
 pub mod rcp::adapt
 pub struct rcp::adapt::AdaptEndpoint<M>

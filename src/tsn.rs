@@ -270,17 +270,29 @@ mod tests {
         StreamId::new([0x02, 0, 0, 0, 0, 7], 1)
     }
 
+    /// An NTSCF frame carrying one ACF_GBB message. `mtv = false` builds a
+    /// repurposed request through the request-layer encoder
+    /// ([`request::encode_repurposed_gbb`], c-RCP `encode_gbb_repurposed()`)
+    /// with `request_type` in the first `message_timestamp` octet, as every
+    /// c-RCP request encoder does; `mtv = true` builds a genuine timed GBB
+    /// whose real timestamp happens to start with the same octet.
     fn gbb_frame(mtv: bool, request_type: u8) -> Vec<u8> {
-        let msg = AcfGbbMessage {
-            info: ByteMessageInfo {
-                mtv,
-                byte_bus_id: 3,
-                ..Default::default()
-            },
-            message_timestamp: u64::from(request_type) << 56,
-            payload: vec![0; 4],
+        let ts = u64::from(request_type) << 56;
+        let acf_msg = if mtv {
+            acf::encode_acf_gbb(&AcfGbbMessage {
+                info: ByteMessageInfo {
+                    mtv,
+                    byte_bus_id: 3,
+                    ..Default::default()
+                },
+                message_timestamp: ts,
+                payload: vec![0; 4],
+            })
+            .unwrap()
+        } else {
+            request::encode_repurposed_gbb(3, acf::Evt::default(), false, 0, ts, &[0; 4]).unwrap()
         };
-        avtp::encode_ntscf_frame(sid(), 0, &acf::encode_acf_gbb(&msg).unwrap()).unwrap()
+        avtp::encode_ntscf_frame(sid(), 0, &acf_msg).unwrap()
     }
 
     #[test]

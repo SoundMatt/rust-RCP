@@ -1269,7 +1269,7 @@
 
 use crate::acf::{
     decode_acf_gbb, encode_acf_gbb, AcfGbbMessage, ByteMessageInfo, Evt, ACF_ABB_HEADER_LEN,
-    ACF_GBB_HEADER_LEN, ACF_GBB_MSG_TYPE,
+    ACF_GBB_HEADER_LEN, ACF_GBB_MSG_TYPE, BYTE_MESSAGE_INFO_LEN,
 };
 use crate::regmap::SequencerStateEntry;
 use crate::RcpError;
@@ -1470,9 +1470,9 @@ impl RequestKind {
 // ACF_GBB message with `mtv = 0` whose 8-byte `message_timestamp` region is
 // repurposed: octet 0 is the `request_type` opcode, octets 1..7 the kind's
 // own sub-fields (big endian). Encoders build the frame through
-// [`crate::acf::encode_acf_gbb`] (which, unlike c-RCP's `rcp_acf_encode_gbb`,
-// never zeroes the timestamp region for `mtv = 0`, so no separate raw-header
-// builder is needed); the header carries `op = 1`, `rsp = err = ms = hs = 0`
+// [`crate::acf::encode_acf_gbb`] and then overwrite the timestamp region
+// with the sub-field octets, since `encode_acf_gbb` (like c-RCP's
+// `rcp_acf_encode_gbb`) zeroes that region for `mtv = 0`; the header carries `op = 1`, `rsp = err = ms = hs = 0`
 // and `read_size_segment = 0`, exactly as c-RCP's zero-initialised
 // `rcp_acf_byte_message_info_t` + `RCP_ACF_OP_NONE` packs it.
 
@@ -1573,8 +1573,13 @@ fn decode_repurposed_gbb(b: &[u8]) -> Result<AcfGbbMessage, RequestCodecError> {
     Ok(msg)
 }
 
-/// Build a repurposed ACF_GBB frame (`mtv = 0`, `op = 1`).
-fn encode_repurposed_gbb(
+/// Build a repurposed ACF_GBB frame (`mtv = 0`, `op = 1`), the
+/// counterpart of c-RCP's `encode_gbb_repurposed()` (`c-RCP/src/request.c`).
+/// `pub(crate)` so other in-crate tests (e.g. [`crate::tsn`]) build
+/// repurposed frames through the request layer rather than by stuffing
+/// `message_timestamp` into [`encode_acf_gbb`], which zeroes it for
+/// `mtv = 0` (REQ-ACF-011).
+pub(crate) fn encode_repurposed_gbb(
     byte_bus_id: u16,
     evt: Evt,
     cs: bool,
@@ -1582,7 +1587,7 @@ fn encode_repurposed_gbb(
     ts: u64,
     payload: &[u8],
 ) -> Result<Vec<u8>, RcpError> {
-    encode_acf_gbb(&AcfGbbMessage {
+    let mut frame = encode_acf_gbb(&AcfGbbMessage {
         info: ByteMessageInfo {
             byte_bus_id,
             evt,
@@ -1591,9 +1596,14 @@ fn encode_repurposed_gbb(
             op: true,
             ..ByteMessageInfo::default()
         },
-        message_timestamp: ts,
+        message_timestamp: 0,
         payload: payload.to_vec(),
-    })
+    })?;
+    // encode_acf_gbb zeroes the timestamp region for mtv = 0 (REQ-ACF-011),
+    // so write the repurposed sub-field octets in directly, as c-RCP's
+    // request.c packs them after rcp_acf_encode_gbb().
+    frame[BYTE_MESSAGE_INFO_LEN..ACF_GBB_HEADER_LEN].copy_from_slice(&ts.to_be_bytes());
+    Ok(frame)
 }
 
 /// True iff `evt[2:0]`, `hs` or `cs` is nonzero — the cancellation decoders'

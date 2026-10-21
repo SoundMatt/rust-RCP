@@ -1798,7 +1798,11 @@ mod tests {
         let real_payload: [u8; 5] = [0xB1, 0xB2, 0xB3, 0xB4, 0xB5];
         let message_timestamp: u64 = 0x0102_0304_0506_0708;
         let msg = AcfGbbMessage {
-            info: acf::ByteMessageInfo::default(),
+            // mtv=1: encode_acf_gbb zeroes an untimed timestamp (REQ-ACF-011).
+            info: acf::ByteMessageInfo {
+                mtv: true,
+                ..acf::ByteMessageInfo::default()
+            },
             message_timestamp,
             payload: real_payload.to_vec(),
         };
@@ -2020,7 +2024,9 @@ mod tests {
     //fusa:test REQ-CRC-010
     fn coverage_buffer_for_fragment_train_gbb_carries_first_fragment_timestamp() {
         let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
-        let first_msg = sample_gbb_message(0, 0x1122_3344_5566_7788, b"part-a");
+        let mut first_msg = sample_gbb_message(0, 0x1122_3344_5566_7788, b"part-a");
+        // mtv=1: encode_acf_gbb zeroes an untimed timestamp (REQ-ACF-011).
+        first_msg.info.mtv = true;
         let first = AcfCoverageMessage::Gbb(&first_msg);
         let segments: [&[u8]; 2] = [b"part-a", b"part-b"];
         let buf =
