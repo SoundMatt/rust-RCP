@@ -602,7 +602,7 @@ impl RcpError {
     /// `INVALID_PARAMETER` = 15, `CHAIN_ABORTED` = 16, `CHAIN_ERROR` = 17.
     //fusa:req REQ-ERR-021
     //fusa:req REQ-ERR-022
-    //fusa:req REQ-WIREERR-003
+    //fusa:req REQ-WIREERR-006
     pub fn tc18_wire_code(&self) -> Option<u8> {
         match self {
             Self::UnsupportedCmd => Some(1),
@@ -951,7 +951,7 @@ mod tests {
     }
 
     #[test]
-    //fusa:test REQ-WIREERR-003
+    //fusa:test REQ-WIREERR-006
     fn crc_error_maps_to_poci_failure_like_c_rcp() {
         // c-RCP src/e2e.c:28-34: a CRC mismatch is POCI_FAILURE (12).
         assert_eq!(RcpError::CrcError.tc18_wire_code(), Some(12));

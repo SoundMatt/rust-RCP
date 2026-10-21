@@ -1201,15 +1201,20 @@ mod tests {
                     ..Default::default()
                 };
                 let rc = RcServer::new(general);
-                // RcServerState::try_transition only defines single-hop
-                // moves, so reaching RcpConfigured needs an intermediate
-                // stop at HwConfigured first.
+                // RcServerState::try_transition has no direct
+                // HwUnconfigured -> RcpConfigured edge, so reaching
+                // RcpConfigured needs an intermediate stop at HwConfigured.
+                let snap = crate::lifecycle::PlausibilitySnapshot::default();
+                let root = crate::lifecycle::WriterCtx {
+                    via_root_client_ep0: true,
+                    ..Default::default()
+                };
                 if state != RcServerState::HwUnconfigured {
-                    rc.try_transition(RcServerState::HwConfigured, || true)
+                    rc.try_transition(RcServerState::HwConfigured, Some(&snap), root, true)
                         .unwrap();
                 }
                 if state == RcServerState::RcpConfigured {
-                    rc.try_transition(RcServerState::RcpConfigured, || true)
+                    rc.try_transition(RcServerState::RcpConfigured, Some(&snap), root, true)
                         .unwrap();
                 }
                 assert_eq!(rc.state(), state);
