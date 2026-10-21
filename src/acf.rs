@@ -992,11 +992,9 @@ pub fn verify_echo_back(
 /// to build for an error TC18 itself does not name (e.g. a transport-level
 /// [`RcpError::Timeout`] or [`RcpError::ShortFrame`] from a frame this
 /// crate could not even decode far enough to learn a `byte_bus_id`/
-/// `transaction_num` to echo). Callers (e.g.
-/// [`crate::mock::RcServer::handle_ntscf_frame`]/
-/// [`crate::udp::UdpRcServer::serve_one`]) are expected to fall back to
-/// propagating the original error to their own caller when this returns
-/// `None`, rather than silently dropping it.
+/// `transaction_num` to echo). [`crate::server::RcServer::dispatch_frame`]
+/// then records that member's outcome with no response (c-RCP's
+/// per-member results) rather than failing the whole frame.
 ///
 /// `byte_bus_id`/`transaction_num` are echoed from `request` (via
 /// [`build_response_info`], the same echo-back rule every other response

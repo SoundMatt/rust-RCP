@@ -349,7 +349,7 @@ fn cmd_discover(args: &[String]) {
 /// `rust-rcp register <read|write> [options]`.
 ///
 /// Dispatches to [`cmd_register_read`]/[`cmd_register_write`], both
-/// addressed via [`EP0_BYTE_BUS_ID`] through [`RcServer::handle_abb`].
+/// addressed via [`EP0_BYTE_BUS_ID`] through [`RcServer::dispatch_message`].
 //fusa:req REQ-CLI-002
 fn cmd_register(args: &[String]) {
     match args.get(2).map(String::as_str) {
@@ -366,7 +366,7 @@ fn cmd_register(args: &[String]) {
 ///
 /// Reads the whole general register map via an EP0-addressed
 /// [`AcfAbbMessage`] read request, dispatched through
-/// [`RcServer::handle_abb`] — never root-client-gated, per
+/// [`RcServer::dispatch_message`] — never root-client-gated, per
 /// [`rcp::ep0::check_ep0_access_for_stream`]'s own doc comment.
 //fusa:req REQ-CLI-005
 fn cmd_register_read(args: &[String]) {
@@ -384,7 +384,7 @@ fn cmd_register_read(args: &[String]) {
         payload: Vec::new(),
     };
 
-    let response = match server.handle_abb(stream, &request) {
+    let response = match server.dispatch_message(stream, &request) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("error: {}", e);
@@ -419,16 +419,17 @@ fn cmd_register_read(args: &[String]) {
 ///
 /// Writes `--payload` to the whole general register map via an
 /// EP0-addressed [`AcfAbbMessage`] write request, dispatched through
-/// [`RcServer::handle_abb`]. If `--root` is given, `--stream` is first
+/// [`RcServer::dispatch_message`]. If `--root` is given, `--stream` is first
 /// designated the server's root client via [`RcServer::set_root_client`]
 /// before the write is attempted. With or without it, the write is
 /// answered with `RcpError::LockedMemAccess`: every General-block register
 /// is read-only, and (as in c-RCP, `c-RCP/src/regmap.c:283`) that code does
-/// not depend on the writer.
+/// not depend on the writer. The exception is a payload whose leading
+/// register address is `0` (`rcp::discovery::DISCOVERY_REGISTER_ADDRESS`):
+/// that is the discovery-stream configure/claim, granted to the first
+/// claimant exactly as `serve --udp` grants it (one dispatch pipeline).
 ///
-/// Reports whatever [`RcServer::handle_abb`] actually returns: see
-/// [`RcServer::handle_abb`]'s own doc comment for why a general-register
-/// write is currently never actually accepted by this in-process server.
+/// Reports whatever [`RcServer::dispatch_message`] actually returns.
 //fusa:req REQ-CLI-005
 fn cmd_register_write(args: &[String]) {
     let stream = parse_stream_arg(args, "--stream").unwrap_or_else(|| StreamId::from_u64(0));
@@ -455,7 +456,7 @@ fn cmd_register_write(args: &[String]) {
         payload,
     };
 
-    match server.handle_abb(stream, &request) {
+    match server.dispatch_message(stream, &request) {
         Ok(_) => println!("register write: ok stream={}", format_stream_hex(stream)),
         Err(e) => {
             eprintln!("error: {}", e);
@@ -469,7 +470,7 @@ fn cmd_register_write(args: &[String]) {
 /// `rust-rcp endpoint <read|write> [options]`.
 ///
 /// Dispatches to [`cmd_endpoint_read`]/[`cmd_endpoint_write`], both
-/// addressed via `(--stream, --bus-id)` through [`RcServer::handle_abb`]'s
+/// addressed via `(--stream, --bus-id)` through [`RcServer::dispatch_message`]'s
 /// `DeviceEndpoint` route.
 //fusa:req REQ-CLI-004
 fn cmd_endpoint(args: &[String]) {
@@ -490,7 +491,7 @@ fn cmd_endpoint(args: &[String]) {
 /// [`EndpointType::Gpio`]) holding `--initial` (default empty) under
 /// `(--stream, --bus-id)`, then issues a read request for `--read-size`
 /// bytes (default `u8::MAX`, matching [`rcp::adapt::from_message`]'s own
-/// default) via [`RcServer::handle_abb`].
+/// default) via [`RcServer::dispatch_message`].
 //fusa:req REQ-CLI-005
 fn cmd_endpoint_read(args: &[String]) {
     let stream = parse_stream_arg(args, "--stream").unwrap_or_else(|| StreamId::from_u64(0));
@@ -526,7 +527,7 @@ fn cmd_endpoint_read(args: &[String]) {
         payload: Vec::new(),
     };
 
-    match server.handle_abb(stream, &request) {
+    match server.dispatch_message(stream, &request) {
         Ok(response) => {
             if format == "json" {
                 println!(
@@ -557,7 +558,7 @@ fn cmd_endpoint_read(args: &[String]) {
 /// Registers a fresh [`MockEndpoint`] of `--ep-type` (default
 /// [`EndpointType::Gpio`]) holding `--initial` (default empty) under
 /// `(--stream, --bus-id)`, then issues a write request carrying
-/// `--payload` via [`RcServer::handle_abb`].
+/// `--payload` via [`RcServer::dispatch_message`].
 //fusa:req REQ-CLI-005
 fn cmd_endpoint_write(args: &[String]) {
     let stream = parse_stream_arg(args, "--stream").unwrap_or_else(|| StreamId::from_u64(0));
@@ -598,7 +599,7 @@ fn cmd_endpoint_write(args: &[String]) {
         payload,
     };
 
-    match server.handle_abb(stream, &request) {
+    match server.dispatch_message(stream, &request) {
         Ok(_) => println!(
             "endpoint write: ok stream={} bus_id={}",
             format_stream_hex(stream),
@@ -668,29 +669,52 @@ fn cmd_serve(args: &[String]) {
         format_stream_hex(local_stream)
     );
 
+    if let Err((served, e)) = serve_loop(&server, max_requests) {
+        eprintln!("serve: fatal error after {served} request(s): {e}");
+        process::exit(3);
+    }
+}
+
+/// `cmd_serve`'s receive loop: serve datagrams until `max_requests` have
+/// been handled, or a socket error (returned with the count served so far).
+///
+/// A malformed datagram is logged and dropped, never fatal — the RC
+/// Server's `dispatch_frame` reports per-member results and never aborts
+/// on a bad frame (c-RCP's `dispatch_frame`, issue #89).
+//fusa:req REQ-CLI-011
+fn serve_loop(server: &UdpRcServer, max_requests: Option<u32>) -> Result<(), (u32, rcp::RcpError)> {
     let mut served: u32 = 0;
-    loop {
-        if let Some(max) = max_requests {
-            if served >= max {
-                println!("serve: reached --max-requests={max}, stopping");
-                break;
-            }
-        }
-        match server.serve_one(
-            None,
-            served as u8,
-            Instant::now(),
-            discovery::DISCOVERY_TIME_OUT,
-        ) {
-            Ok(()) => {
-                served += 1;
-                println!("serve: dispatched request #{served}");
-            }
-            Err(e) => {
-                eprintln!("serve: fatal error after {served} request(s): {e}");
-                process::exit(3);
-            }
-        }
+    while max_requests.map_or(true, |max| served < max) {
+        let report = server
+            .serve_one(
+                None,
+                served as u8,
+                Instant::now(),
+                discovery::DISCOVERY_TIME_OUT,
+            )
+            .map_err(|e| (served, e))?;
+        served += 1;
+        log_served(served, &report);
+    }
+    println!("serve: reached --max-requests={}, stopping", served);
+    Ok(())
+}
+
+/// One served datagram's log line(s).
+//fusa:req REQ-CLI-011
+fn log_served(served: u32, report: &rcp::udp::ServeReport) {
+    println!("serve: dispatched request #{served}");
+    if let Some(e) = &report.dispatch.error {
+        eprintln!(
+            "serve: dropped malformed datagram from {}: {e}",
+            report.peer
+        );
+    }
+    if let Some(e) = &report.response_error {
+        eprintln!(
+            "serve: could not frame the response to {}: {e}",
+            report.peer
+        );
     }
 }
 
@@ -896,6 +920,57 @@ mod tests {
         StreamId::new([0x02, 0x11, 0x22, 0x33, 0x44, 0x55], unique_id)
     }
 
+    /// Yields queued datagrams, then `Err(Timeout)`; records what is sent.
+    struct ScriptedSocket {
+        inbound: std::sync::Mutex<Vec<Vec<u8>>>,
+        sent: std::sync::Mutex<usize>,
+    }
+
+    impl rcp::udp::UdpSocket for ScriptedSocket {
+        fn send_to(&self, buf: &[u8], _addr: std::net::SocketAddr) -> Result<usize, RcpError> {
+            *self.sent.lock().unwrap() += 1;
+            Ok(buf.len())
+        }
+
+        fn recv_from(
+            &self,
+            _timeout: Option<std::time::Duration>,
+        ) -> Result<(Vec<u8>, std::net::SocketAddr), RcpError> {
+            let mut inbound = self.inbound.lock().unwrap();
+            if inbound.is_empty() {
+                return Err(RcpError::Timeout);
+            }
+            Ok((inbound.remove(0), "127.0.0.1:9".parse().unwrap()))
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-CLI-011
+    fn serve_loop_survives_malformed_datagrams_and_stops_only_on_a_socket_error() {
+        let read = rcp::acf::encode_acf_abb(&discovery::build_discovery_request(1)).unwrap();
+        let good = rcp::avtp::encode_ntscf_frame(stream(1), 0, &read).unwrap();
+        let socket = Arc::new(ScriptedSocket {
+            inbound: std::sync::Mutex::new(vec![vec![0xFF; 3], Vec::new(), good]),
+            sent: std::sync::Mutex::new(0),
+        });
+        let server = UdpRcServer::new(
+            stream(9),
+            socket.clone(),
+            RcServer::new(GeneralRegisters::default()),
+        );
+        assert!(serve_loop(&server, Some(3)).is_ok());
+        assert_eq!(
+            *socket.sent.lock().unwrap(),
+            1,
+            "only the good datagram is answered"
+        );
+        // The socket running dry is the fatal case.
+        assert_eq!(
+            serve_loop(&server, None).unwrap_err(),
+            (0, RcpError::Timeout)
+        );
+    }
+
     #[test]
     //fusa:test REQ-CLI-002
     fn flag_value_finds_option() {
@@ -1069,7 +1144,7 @@ mod tests {
             },
             payload: Vec::new(),
         };
-        let response = server.handle_abb(sid, &request).unwrap();
+        let response = server.dispatch_message(sid, &request).unwrap();
         let regs = GeneralRegisters::decode(&response.payload).unwrap();
         assert_eq!(regs.svr_device_id, 0xBEEF);
     }
@@ -1084,7 +1159,12 @@ mod tests {
         let sid = stream(1);
         server.set_root_client(Some(sid));
 
+        // A nonzero leading register address: an EP0 write addressed to
+        // register 0 is the discovery-stream configure/claim
+        // (discovery::is_discovery_configure_request), answered by the one
+        // dispatch pipeline exactly as `serve --udp` answers it.
         let payload = GeneralRegisters {
+            svr_oa_tc18_magic_nr: 0x4F41_5443,
             svr_vendor_id: 0xAAAA,
             ..Default::default()
         }
@@ -1100,7 +1180,7 @@ mod tests {
             payload,
         };
         assert_eq!(
-            server.handle_abb(sid, &request).unwrap_err(),
+            server.dispatch_message(sid, &request).unwrap_err(),
             rcp::RcpError::LockedMemAccess
         );
         assert_eq!(server.general_registers().svr_vendor_id, 0);
@@ -1125,7 +1205,7 @@ mod tests {
             },
             payload: Vec::new(),
         };
-        let response = server.handle_abb(sid, &request).unwrap();
+        let response = server.dispatch_message(sid, &request).unwrap();
         assert_eq!(response.payload, vec![0xAA, 0xBB]);
     }
 
@@ -1146,7 +1226,7 @@ mod tests {
             },
             payload: vec![0xCC, 0xDD],
         };
-        server.handle_abb(sid, &write_req).unwrap();
+        server.dispatch_message(sid, &write_req).unwrap();
 
         let read_req = AcfAbbMessage {
             info: ByteMessageInfo {
@@ -1157,13 +1237,16 @@ mod tests {
             },
             payload: Vec::new(),
         };
-        let response = server.handle_abb(sid, &read_req).unwrap();
+        let response = server.dispatch_message(sid, &read_req).unwrap();
         assert_eq!(response.payload, vec![0xCC, 0xDD]);
     }
 
     #[test]
     //fusa:test REQ-CLI-004
-    fn endpoint_read_unregistered_bus_id_is_ep_not_found() {
+    fn endpoint_read_unregistered_bus_id_is_dropped_without_response() {
+        // TC18 §12.9.1 / c-RCP REQ-MOCK-030: an unregistered
+        // (stream_id, byte_bus_id) is dropped without a response, which
+        // dispatch_message reports as NotConnected.
         let server = RcServer::new(GeneralRegisters::default());
         let sid = stream(1);
         let request = AcfAbbMessage {
@@ -1175,8 +1258,8 @@ mod tests {
             },
             payload: Vec::new(),
         };
-        let err = server.handle_abb(sid, &request).unwrap_err();
-        assert_eq!(err, RcpError::EpNotFound);
+        let err = server.dispatch_message(sid, &request).unwrap_err();
+        assert_eq!(err, RcpError::NotConnected);
     }
 
     // ── §11.2 convert tests ───────────────────────────────────────────────────
