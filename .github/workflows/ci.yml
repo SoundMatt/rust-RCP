@@ -367,6 +367,13 @@ jobs:
   audit:
     name: Security audit (cargo-audit)
     runs-on: ubuntu-latest
+    # rustsec/audit-check publishes its findings as a check run (and issues
+    # on scheduled runs); without these the action fails with "Resource not
+    # accessible by integration" whenever there is any finding to report.
+    permissions:
+      contents: read
+      checks: write
+      issues: write
     steps:
       - uses: actions/checkout@v4
       - uses: rustsec/audit-check@v1
