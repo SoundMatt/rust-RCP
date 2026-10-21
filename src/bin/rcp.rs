@@ -421,12 +421,12 @@ fn cmd_register_read(args: &[String]) {
 /// EP0-addressed [`AcfAbbMessage`] write request, dispatched through
 /// [`RcServer::handle_abb`]. If `--root` is given, `--stream` is first
 /// designated the server's root client via [`RcServer::set_root_client`]
-/// before the write is attempted — without it, a non-root stream is
-/// rejected with `RcpError::UnauthorizedAccess` before ever reaching the
-/// write-policy check.
+/// before the write is attempted. With or without it, the write is
+/// answered with `RcpError::LockedMemAccess`: every General-block register
+/// is read-only, and (as in c-RCP, `c-RCP/src/regmap.c:283`) that code does
+/// not depend on the writer.
 ///
-/// Reports whatever [`RcServer::handle_abb`] actually returns, including
-/// `RcpError::LockedMemAccess` for the root client itself: see
+/// Reports whatever [`RcServer::handle_abb`] actually returns: see
 /// [`RcServer::handle_abb`]'s own doc comment for why a general-register
 /// write is currently never actually accepted by this in-process server.
 //fusa:req REQ-CLI-005
@@ -1076,11 +1076,10 @@ mod tests {
 
     #[test]
     //fusa:test REQ-CLI-005
-    fn register_write_succeeds_for_the_root_client() {
-        // Mirrors rcp::mock::rc_server_tests::ep0_write_succeeds_for_the_root_client
-        // — RegisterCategory::General now has LockPolicy::W, writable
-        // whenever reachable, so a write from the root client succeeds.
-        // This is the CLI's own exercise of that same, already-tested gate.
+    fn register_write_is_locked_even_for_the_root_client() {
+        // Mirrors rcp::mock::rc_server_tests::ep0_general_write_from_the_root_client_is_locked_in_every_state
+        // — TC18 Table 20 marks the General block read-only (c-RCP
+        // REQ-RMAP-025), so even the root client's write is refused.
         let server = RcServer::new(GeneralRegisters::default());
         let sid = stream(1);
         server.set_root_client(Some(sid));
@@ -1100,8 +1099,11 @@ mod tests {
             },
             payload,
         };
-        server.handle_abb(sid, &request).unwrap();
-        assert_eq!(server.general_registers().svr_vendor_id, 0xAAAA);
+        assert_eq!(
+            server.handle_abb(sid, &request).unwrap_err(),
+            rcp::RcpError::LockedMemAccess
+        );
+        assert_eq!(server.general_registers().svr_vendor_id, 0);
     }
 
     // ── endpoint read / endpoint write ───────────────────────────────────────

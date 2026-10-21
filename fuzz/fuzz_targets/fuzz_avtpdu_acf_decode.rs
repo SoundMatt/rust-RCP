@@ -17,11 +17,21 @@ fuzz_target!(|data: &[u8]| {
     //fusa:req REQ-TSCF-006
     let _ = rcp::avtp::decode_tscf_header(data);
 
+    //fusa:req REQ-AVTP-024
+    let _ = rcp::avtp::decode_tscf_frame(data);
+
     //fusa:req REQ-HVSEL-005
     // select_header_variant is exercised under both TimeSyncCapability
-    // outcomes, since the rule branches on it before decoding the body.
-    let _ = rcp::avtp::select_header_variant(data, rcp::avtp::TimeSyncCapability::Capable);
-    let _ = rcp::avtp::select_header_variant(data, rcp::avtp::TimeSyncCapability::Incapable);
+    // outcomes and both TSCF fallback policies, since the rule branches on
+    // them before decoding the body.
+    for ts in [
+        rcp::avtp::TimeSyncCapability::Capable,
+        rcp::avtp::TimeSyncCapability::Incapable,
+    ] {
+        for policy in [rcp::avtp::TscfFallback::Drop, rcp::avtp::TscfFallback::Ignore] {
+            let _ = rcp::avtp::select_header_variant(data, ts, policy);
+        }
+    }
 
     //fusa:req REQ-BMI-004
     let _ = rcp::acf::decode_byte_message_info(data);
