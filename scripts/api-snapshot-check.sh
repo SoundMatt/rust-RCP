@@ -9,6 +9,9 @@
 set -euo pipefail
 
 SNAPSHOT="docs/PUBLIC_API.txt"
+# Pinned nightly (rustdoc JSON output drifts between nightlies); keep in sync
+# with the api-stability job in .github/workflows/ci.yml.
+TOOLCHAIN="${PUBLIC_API_TOOLCHAIN:-nightly-2026-10-21}"
 
 if ! command -v cargo-public-api &>/dev/null && ! cargo public-api --help &>/dev/null; then
   echo "ERROR: cargo-public-api required (cargo install cargo-public-api --locked)" >&2
@@ -23,15 +26,14 @@ fi
 current="$(mktemp)"
 trap 'rm -f "$current"' EXIT
 
-cargo +nightly public-api --simplified >"$current" 2>/dev/null \
-  || cargo public-api --simplified >"$current"
+cargo "+$TOOLCHAIN" public-api --simplified >"$current"
 
 if ! diff -u "$SNAPSHOT" "$current"; then
   echo
   echo "Public API surface differs from $SNAPSHOT."
   echo
   echo "If this change is intentional, regenerate the snapshot with:"
-  echo "  cargo +nightly public-api --simplified > $SNAPSHOT"
+  echo "  cargo +$TOOLCHAIN public-api --simplified > $SNAPSHOT"
   echo "and follow the version-bump guidance in docs/SEMVER.md."
   exit 1
 fi

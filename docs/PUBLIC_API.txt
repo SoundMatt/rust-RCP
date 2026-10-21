@@ -8,10 +8,10 @@ pub rcp::acf::ResponseKind::Write
 impl rcp::acf::ResponseKind
 pub fn rcp::acf::ResponseKind::as_str(self) -> &'static str
 impl core::clone::Clone for rcp::acf::ResponseKind
-pub fn rcp::acf::ResponseKind::clone(&self) -> rcp::acf::ResponseKind
+pub fn rcp::acf::ResponseKind::clone(&self) -> Self
 impl core::cmp::Eq for rcp::acf::ResponseKind
 impl core::cmp::PartialEq for rcp::acf::ResponseKind
-pub fn rcp::acf::ResponseKind::eq(&self, &rcp::acf::ResponseKind) -> bool
+pub fn rcp::acf::ResponseKind::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::acf::ResponseKind
 pub fn rcp::acf::ResponseKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::acf::ResponseKind
@@ -27,12 +27,12 @@ pub struct rcp::acf::AcfAbbMessage
 pub rcp::acf::AcfAbbMessage::info: rcp::acf::ByteMessageInfo
 pub rcp::acf::AcfAbbMessage::payload: alloc::vec::Vec<u8>
 impl core::clone::Clone for rcp::acf::AcfAbbMessage
-pub fn rcp::acf::AcfAbbMessage::clone(&self) -> rcp::acf::AcfAbbMessage
+pub fn rcp::acf::AcfAbbMessage::clone(&self) -> Self
 impl core::cmp::Eq for rcp::acf::AcfAbbMessage
 impl core::cmp::PartialEq for rcp::acf::AcfAbbMessage
-pub fn rcp::acf::AcfAbbMessage::eq(&self, &rcp::acf::AcfAbbMessage) -> bool
+pub fn rcp::acf::AcfAbbMessage::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::acf::AcfAbbMessage
-pub fn rcp::acf::AcfAbbMessage::default() -> rcp::acf::AcfAbbMessage
+pub fn rcp::acf::AcfAbbMessage::default() -> Self
 impl core::fmt::Debug for rcp::acf::AcfAbbMessage
 pub fn rcp::acf::AcfAbbMessage::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::acf::AcfAbbMessage
@@ -48,12 +48,12 @@ pub rcp::acf::AcfGbbMessage::info: rcp::acf::ByteMessageInfo
 pub rcp::acf::AcfGbbMessage::message_timestamp: u64
 pub rcp::acf::AcfGbbMessage::payload: alloc::vec::Vec<u8>
 impl core::clone::Clone for rcp::acf::AcfGbbMessage
-pub fn rcp::acf::AcfGbbMessage::clone(&self) -> rcp::acf::AcfGbbMessage
+pub fn rcp::acf::AcfGbbMessage::clone(&self) -> Self
 impl core::cmp::Eq for rcp::acf::AcfGbbMessage
 impl core::cmp::PartialEq for rcp::acf::AcfGbbMessage
-pub fn rcp::acf::AcfGbbMessage::eq(&self, &rcp::acf::AcfGbbMessage) -> bool
+pub fn rcp::acf::AcfGbbMessage::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::acf::AcfGbbMessage
-pub fn rcp::acf::AcfGbbMessage::default() -> rcp::acf::AcfGbbMessage
+pub fn rcp::acf::AcfGbbMessage::default() -> Self
 impl core::fmt::Debug for rcp::acf::AcfGbbMessage
 pub fn rcp::acf::AcfGbbMessage::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::acf::AcfGbbMessage
@@ -84,16 +84,16 @@ pub fn rcp::acf::ByteMessageInfo::read_size(&self) -> core::option::Option<u16>
 pub fn rcp::acf::ByteMessageInfo::response_kind(&self) -> rcp::acf::ResponseKind
 pub fn rcp::acf::ByteMessageInfo::segment_num(&self) -> core::option::Option<u16>
 impl core::clone::Clone for rcp::acf::ByteMessageInfo
-pub fn rcp::acf::ByteMessageInfo::clone(&self) -> rcp::acf::ByteMessageInfo
+pub fn rcp::acf::ByteMessageInfo::clone(&self) -> Self
 impl core::cmp::Eq for rcp::acf::ByteMessageInfo
 impl core::cmp::PartialEq for rcp::acf::ByteMessageInfo
-pub fn rcp::acf::ByteMessageInfo::eq(&self, &rcp::acf::ByteMessageInfo) -> bool
+pub fn rcp::acf::ByteMessageInfo::eq(&self, &Self) -> bool
 impl core::convert::From<rcp::acf::ByteMessageInfo> for rcp::capi::CByteMessageInfo
 pub fn rcp::capi::CByteMessageInfo::from(rcp::acf::ByteMessageInfo) -> Self
 impl core::convert::From<rcp::capi::CByteMessageInfo> for rcp::acf::ByteMessageInfo
 pub fn rcp::acf::ByteMessageInfo::from(rcp::capi::CByteMessageInfo) -> Self
 impl core::default::Default for rcp::acf::ByteMessageInfo
-pub fn rcp::acf::ByteMessageInfo::default() -> rcp::acf::ByteMessageInfo
+pub fn rcp::acf::ByteMessageInfo::default() -> Self
 impl core::fmt::Debug for rcp::acf::ByteMessageInfo
 pub fn rcp::acf::ByteMessageInfo::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::acf::ByteMessageInfo
@@ -111,12 +111,12 @@ pub rcp::acf::Evt::sub_opcode: u8
 impl rcp::acf::Evt
 pub fn rcp::acf::Evt::raw_nibble(&self) -> u8
 impl core::clone::Clone for rcp::acf::Evt
-pub fn rcp::acf::Evt::clone(&self) -> rcp::acf::Evt
+pub fn rcp::acf::Evt::clone(&self) -> Self
 impl core::cmp::Eq for rcp::acf::Evt
 impl core::cmp::PartialEq for rcp::acf::Evt
-pub fn rcp::acf::Evt::eq(&self, &rcp::acf::Evt) -> bool
+pub fn rcp::acf::Evt::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::acf::Evt
-pub fn rcp::acf::Evt::default() -> rcp::acf::Evt
+pub fn rcp::acf::Evt::default() -> Self
 impl core::fmt::Debug for rcp::acf::Evt
 pub fn rcp::acf::Evt::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::acf::Evt
@@ -133,12 +133,12 @@ impl rcp::acf::ReadSizeOrSegment
 pub fn rcp::acf::ReadSizeOrSegment::as_read_size(self) -> u16
 pub fn rcp::acf::ReadSizeOrSegment::as_segment_num(self) -> u16
 impl core::clone::Clone for rcp::acf::ReadSizeOrSegment
-pub fn rcp::acf::ReadSizeOrSegment::clone(&self) -> rcp::acf::ReadSizeOrSegment
+pub fn rcp::acf::ReadSizeOrSegment::clone(&self) -> Self
 impl core::cmp::Eq for rcp::acf::ReadSizeOrSegment
 impl core::cmp::PartialEq for rcp::acf::ReadSizeOrSegment
-pub fn rcp::acf::ReadSizeOrSegment::eq(&self, &rcp::acf::ReadSizeOrSegment) -> bool
+pub fn rcp::acf::ReadSizeOrSegment::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::acf::ReadSizeOrSegment
-pub fn rcp::acf::ReadSizeOrSegment::default() -> rcp::acf::ReadSizeOrSegment
+pub fn rcp::acf::ReadSizeOrSegment::default() -> Self
 impl core::fmt::Debug for rcp::acf::ReadSizeOrSegment
 pub fn rcp::acf::ReadSizeOrSegment::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::acf::ReadSizeOrSegment
@@ -176,13 +176,13 @@ pub fn rcp::acf::verify_echo_back(&rcp::acf::ByteMessageInfo, &rcp::acf::ByteMes
 pub mod rcp::adapt
 pub struct rcp::adapt::AdaptEndpoint<M>
 impl<M: core::marker::Send + core::marker::Sync + 'static> rcp::adapt::AdaptEndpoint<M>
-pub fn rcp::adapt::AdaptEndpoint<M>::new(alloc::sync::Arc<dyn rcp::mock::Endpoint>, alloc::sync::Arc<dyn rcp::adapt::Adapter<M>>) -> Self
+pub fn rcp::adapt::AdaptEndpoint<M>::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>, alloc::rcs::arc::Arc<dyn rcp::adapt::Adapter<M>>) -> Self
 pub fn rcp::adapt::AdaptEndpoint<M>::send_msg(&self, M, u16) -> core::result::Result<M, rcp::RcpError>
-impl<M> core::marker::Freeze for rcp::adapt::AdaptEndpoint<M>
-impl<M> core::marker::Send for rcp::adapt::AdaptEndpoint<M>
-impl<M> core::marker::Sync for rcp::adapt::AdaptEndpoint<M>
-impl<M> core::marker::Unpin for rcp::adapt::AdaptEndpoint<M>
-impl<M> core::marker::UnsafeUnpin for rcp::adapt::AdaptEndpoint<M>
+impl<M> core::marker::Freeze for rcp::adapt::AdaptEndpoint<M> where alloc::rcs::arc::Arc<dyn rcp::adapt::Adapter<M>>: core::marker::Freeze
+impl<M> core::marker::Send for rcp::adapt::AdaptEndpoint<M> where alloc::rcs::arc::Arc<dyn rcp::adapt::Adapter<M>>: core::marker::Send
+impl<M> core::marker::Sync for rcp::adapt::AdaptEndpoint<M> where alloc::rcs::arc::Arc<dyn rcp::adapt::Adapter<M>>: core::marker::Sync
+impl<M> core::marker::Unpin for rcp::adapt::AdaptEndpoint<M> where alloc::rcs::arc::Arc<dyn rcp::adapt::Adapter<M>>: core::marker::Unpin
+impl<M> core::marker::UnsafeUnpin for rcp::adapt::AdaptEndpoint<M> where alloc::rcs::arc::Arc<dyn rcp::adapt::Adapter<M>>: core::marker::UnsafeUnpin
 impl<M> !core::panic::unwind_safe::RefUnwindSafe for rcp::adapt::AdaptEndpoint<M>
 impl<M> !core::panic::unwind_safe::UnwindSafe for rcp::adapt::AdaptEndpoint<M>
 pub struct rcp::adapt::PassthroughAdapter
@@ -202,7 +202,7 @@ pub fn rcp::adapt::Adapter::to_write_payload(&self, M) -> core::result::Result<a
 impl rcp::adapt::Adapter<alloc::vec::Vec<u8>> for rcp::adapt::PassthroughAdapter
 pub fn rcp::adapt::PassthroughAdapter::adapt_read_bytes(&self, alloc::vec::Vec<u8>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::adapt::PassthroughAdapter::to_write_payload(&self, alloc::vec::Vec<u8>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
-pub fn rcp::adapt::adapt(alloc::sync::Arc<rcp::mock::RcServer>) -> alloc::boxed::Box<dyn rcp::relay::Caller>
+pub fn rcp::adapt::adapt(alloc::rcs::arc::Arc<rcp::mock::RcServer>) -> alloc::boxed::Box<dyn rcp::relay::Caller>
 pub fn rcp::adapt::format_endpoint_id(rcp::avtp::StreamId, u16) -> alloc::string::String
 pub fn rcp::adapt::from_message(&rcp::relay::Message) -> core::result::Result<(rcp::avtp::StreamId, rcp::acf::AcfAbbMessage), rcp::RcpError>
 pub fn rcp::adapt::parse_endpoint_id(&str) -> core::result::Result<(rcp::avtp::StreamId, u16), rcp::RcpError>
@@ -215,10 +215,10 @@ pub rcp::adc::AdcRequest::Plain
 impl rcp::adc::AdcRequest
 pub fn rcp::adc::AdcRequest::from_evt_sub_opcode(u8, &[u8]) -> core::result::Result<Self, rcp::RcpError>
 impl core::clone::Clone for rcp::adc::AdcRequest
-pub fn rcp::adc::AdcRequest::clone(&self) -> rcp::adc::AdcRequest
+pub fn rcp::adc::AdcRequest::clone(&self) -> Self
 impl core::cmp::Eq for rcp::adc::AdcRequest
 impl core::cmp::PartialEq for rcp::adc::AdcRequest
-pub fn rcp::adc::AdcRequest::eq(&self, &rcp::adc::AdcRequest) -> bool
+pub fn rcp::adc::AdcRequest::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::adc::AdcRequest
 pub fn rcp::adc::AdcRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::adc::AdcRequest
@@ -234,10 +234,10 @@ pub enum rcp::adc::AdcSamplingMode
 pub rcp::adc::AdcSamplingMode::Continuous
 pub rcp::adc::AdcSamplingMode::RequestDriven
 impl core::clone::Clone for rcp::adc::AdcSamplingMode
-pub fn rcp::adc::AdcSamplingMode::clone(&self) -> rcp::adc::AdcSamplingMode
+pub fn rcp::adc::AdcSamplingMode::clone(&self) -> Self
 impl core::cmp::Eq for rcp::adc::AdcSamplingMode
 impl core::cmp::PartialEq for rcp::adc::AdcSamplingMode
-pub fn rcp::adc::AdcSamplingMode::eq(&self, &rcp::adc::AdcSamplingMode) -> bool
+pub fn rcp::adc::AdcSamplingMode::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::adc::AdcSamplingMode
 pub fn rcp::adc::AdcSamplingMode::default() -> Self
 impl core::fmt::Debug for rcp::adc::AdcSamplingMode
@@ -256,12 +256,12 @@ pub rcp::adc::AdcAveragingConfig::adc_avg_intervals_per_request: u16
 pub rcp::adc::AdcAveragingConfig::adc_combine_avg_values: u16
 pub rcp::adc::AdcAveragingConfig::adc_sample_interval: u32
 impl core::clone::Clone for rcp::adc::AdcAveragingConfig
-pub fn rcp::adc::AdcAveragingConfig::clone(&self) -> rcp::adc::AdcAveragingConfig
+pub fn rcp::adc::AdcAveragingConfig::clone(&self) -> Self
 impl core::cmp::Eq for rcp::adc::AdcAveragingConfig
 impl core::cmp::PartialEq for rcp::adc::AdcAveragingConfig
-pub fn rcp::adc::AdcAveragingConfig::eq(&self, &rcp::adc::AdcAveragingConfig) -> bool
+pub fn rcp::adc::AdcAveragingConfig::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::adc::AdcAveragingConfig
-pub fn rcp::adc::AdcAveragingConfig::default() -> rcp::adc::AdcAveragingConfig
+pub fn rcp::adc::AdcAveragingConfig::default() -> Self
 impl core::fmt::Debug for rcp::adc::AdcAveragingConfig
 pub fn rcp::adc::AdcAveragingConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::adc::AdcAveragingConfig
@@ -279,12 +279,12 @@ pub rcp::adc::AdcFunctionalConfig::resolution: rcp::adc::AdcResolutionBits
 impl rcp::adc::AdcFunctionalConfig
 pub fn rcp::adc::AdcFunctionalConfig::layer_tag(&self) -> rcp::regmap::PerEpTypeFunctionalConfig
 impl core::clone::Clone for rcp::adc::AdcFunctionalConfig
-pub fn rcp::adc::AdcFunctionalConfig::clone(&self) -> rcp::adc::AdcFunctionalConfig
+pub fn rcp::adc::AdcFunctionalConfig::clone(&self) -> Self
 impl core::cmp::Eq for rcp::adc::AdcFunctionalConfig
 impl core::cmp::PartialEq for rcp::adc::AdcFunctionalConfig
-pub fn rcp::adc::AdcFunctionalConfig::eq(&self, &rcp::adc::AdcFunctionalConfig) -> bool
+pub fn rcp::adc::AdcFunctionalConfig::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::adc::AdcFunctionalConfig
-pub fn rcp::adc::AdcFunctionalConfig::default() -> rcp::adc::AdcFunctionalConfig
+pub fn rcp::adc::AdcFunctionalConfig::default() -> Self
 impl core::fmt::Debug for rcp::adc::AdcFunctionalConfig
 pub fn rcp::adc::AdcFunctionalConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::adc::AdcFunctionalConfig
@@ -302,10 +302,10 @@ pub fn rcp::adc::AdcResolutionBits::max_raw_value(self) -> u16
 pub fn rcp::adc::AdcResolutionBits::new(u8) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::adc::AdcResolutionBits::to_u8(self) -> u8
 impl core::clone::Clone for rcp::adc::AdcResolutionBits
-pub fn rcp::adc::AdcResolutionBits::clone(&self) -> rcp::adc::AdcResolutionBits
+pub fn rcp::adc::AdcResolutionBits::clone(&self) -> Self
 impl core::cmp::Eq for rcp::adc::AdcResolutionBits
 impl core::cmp::PartialEq for rcp::adc::AdcResolutionBits
-pub fn rcp::adc::AdcResolutionBits::eq(&self, &rcp::adc::AdcResolutionBits) -> bool
+pub fn rcp::adc::AdcResolutionBits::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::adc::AdcResolutionBits
 pub fn rcp::adc::AdcResolutionBits::default() -> Self
 impl core::fmt::Debug for rcp::adc::AdcResolutionBits
@@ -327,10 +327,10 @@ pub fn rcp::adc::AdcSampleValue::decode([u8; 2], rcp::adc::AdcResolutionBits) ->
 pub fn rcp::adc::AdcSampleValue::encode(&self) -> [u8; 2]
 pub fn rcp::adc::AdcSampleValue::new(u16, rcp::adc::AdcResolutionBits) -> core::result::Result<Self, rcp::RcpError>
 impl core::clone::Clone for rcp::adc::AdcSampleValue
-pub fn rcp::adc::AdcSampleValue::clone(&self) -> rcp::adc::AdcSampleValue
+pub fn rcp::adc::AdcSampleValue::clone(&self) -> Self
 impl core::cmp::Eq for rcp::adc::AdcSampleValue
 impl core::cmp::PartialEq for rcp::adc::AdcSampleValue
-pub fn rcp::adc::AdcSampleValue::eq(&self, &rcp::adc::AdcSampleValue) -> bool
+pub fn rcp::adc::AdcSampleValue::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::adc::AdcSampleValue
 pub fn rcp::adc::AdcSampleValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::adc::AdcSampleValue
@@ -348,10 +348,10 @@ pub fn rcp::adc::validate_adc_sample_request(rcp::adc::AdcSamplingMode) -> core:
 pub mod rcp::addressing
 pub struct rcp::addressing::EndpointId(pub u32)
 impl core::clone::Clone for rcp::addressing::EndpointId
-pub fn rcp::addressing::EndpointId::clone(&self) -> rcp::addressing::EndpointId
+pub fn rcp::addressing::EndpointId::clone(&self) -> Self
 impl core::cmp::Eq for rcp::addressing::EndpointId
 impl core::cmp::PartialEq for rcp::addressing::EndpointId
-pub fn rcp::addressing::EndpointId::eq(&self, &rcp::addressing::EndpointId) -> bool
+pub fn rcp::addressing::EndpointId::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::addressing::EndpointId
 pub fn rcp::addressing::EndpointId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::hash::Hash for rcp::addressing::EndpointId
@@ -371,9 +371,9 @@ pub fn rcp::addressing::EndpointTable::lookup(&self, rcp::avtp::StreamId, u16) -
 pub fn rcp::addressing::EndpointTable::new() -> Self
 pub fn rcp::addressing::EndpointTable::register(&mut self, rcp::avtp::StreamId, u16, rcp::addressing::EndpointId) -> core::result::Result<(), rcp::RcpError>
 impl core::clone::Clone for rcp::addressing::EndpointTable
-pub fn rcp::addressing::EndpointTable::clone(&self) -> rcp::addressing::EndpointTable
+pub fn rcp::addressing::EndpointTable::clone(&self) -> Self
 impl core::default::Default for rcp::addressing::EndpointTable
-pub fn rcp::addressing::EndpointTable::default() -> rcp::addressing::EndpointTable
+pub fn rcp::addressing::EndpointTable::default() -> Self
 impl core::fmt::Debug for rcp::addressing::EndpointTable
 pub fn rcp::addressing::EndpointTable::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for rcp::addressing::EndpointTable
@@ -389,7 +389,7 @@ impl rcp::admin::AdminServer
 pub fn rcp::admin::AdminServer::is_healthy(&self) -> bool
 pub fn rcp::admin::AdminServer::is_peer_healthy(&self, rcp::avtp::StreamId, std::time::Instant, core::time::Duration) -> bool
 pub fn rcp::admin::AdminServer::is_shutting_down(&self) -> bool
-pub fn rcp::admin::AdminServer::new(alloc::sync::Arc<std::sync::poison::mutex::Mutex<rcp::discovery::DiscoveryCache>>) -> Self
+pub fn rcp::admin::AdminServer::new(alloc::rcs::arc::Arc<std::sync::poison::mutex::Mutex<rcp::discovery::DiscoveryCache>>) -> Self
 pub fn rcp::admin::AdminServer::peer_count(&self) -> usize
 pub fn rcp::admin::AdminServer::record_request(&self)
 pub fn rcp::admin::AdminServer::request_count(&self) -> u64
@@ -405,7 +405,7 @@ impl core::panic::unwind_safe::UnwindSafe for rcp::admin::AdminServer
 pub mod rcp::authz
 pub struct rcp::authz::AuthzEndpoint
 impl rcp::authz::AuthzEndpoint
-pub fn rcp::authz::AuthzEndpoint::new(alloc::sync::Arc<dyn rcp::mock::Endpoint>, rcp::authz::Policy) -> Self
+pub fn rcp::authz::AuthzEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>, rcp::authz::Policy) -> Self
 pub fn rcp::authz::AuthzEndpoint::policy(&self) -> rcp::authz::Policy
 pub fn rcp::authz::AuthzEndpoint::set_policy(&self, rcp::authz::Policy)
 impl rcp::mock::Endpoint for rcp::authz::AuthzEndpoint
@@ -426,9 +426,9 @@ pub fn rcp::authz::Policy::allow_all() -> Self
 pub fn rcp::authz::Policy::deny_all() -> Self
 pub fn rcp::authz::Policy::is_allowed(&self, rcp::regmap::EndpointType, bool) -> bool
 impl core::clone::Clone for rcp::authz::Policy
-pub fn rcp::authz::Policy::clone(&self) -> rcp::authz::Policy
+pub fn rcp::authz::Policy::clone(&self) -> Self
 impl core::default::Default for rcp::authz::Policy
-pub fn rcp::authz::Policy::default() -> rcp::authz::Policy
+pub fn rcp::authz::Policy::default() -> Self
 impl core::fmt::Debug for rcp::authz::Policy
 pub fn rcp::authz::Policy::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for rcp::authz::Policy
@@ -443,10 +443,10 @@ pub enum rcp::avtp::HeaderVariant
 pub rcp::avtp::HeaderVariant::Ntscf(rcp::avtp::NtscfHeader)
 pub rcp::avtp::HeaderVariant::Tscf(rcp::avtp::TscfHeader)
 impl core::clone::Clone for rcp::avtp::HeaderVariant
-pub fn rcp::avtp::HeaderVariant::clone(&self) -> rcp::avtp::HeaderVariant
+pub fn rcp::avtp::HeaderVariant::clone(&self) -> Self
 impl core::cmp::Eq for rcp::avtp::HeaderVariant
 impl core::cmp::PartialEq for rcp::avtp::HeaderVariant
-pub fn rcp::avtp::HeaderVariant::eq(&self, &rcp::avtp::HeaderVariant) -> bool
+pub fn rcp::avtp::HeaderVariant::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::avtp::HeaderVariant
 pub fn rcp::avtp::HeaderVariant::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::avtp::HeaderVariant
@@ -462,10 +462,10 @@ pub enum rcp::avtp::TimeSyncCapability
 pub rcp::avtp::TimeSyncCapability::Capable
 pub rcp::avtp::TimeSyncCapability::Incapable
 impl core::clone::Clone for rcp::avtp::TimeSyncCapability
-pub fn rcp::avtp::TimeSyncCapability::clone(&self) -> rcp::avtp::TimeSyncCapability
+pub fn rcp::avtp::TimeSyncCapability::clone(&self) -> Self
 impl core::cmp::Eq for rcp::avtp::TimeSyncCapability
 impl core::cmp::PartialEq for rcp::avtp::TimeSyncCapability
-pub fn rcp::avtp::TimeSyncCapability::eq(&self, &rcp::avtp::TimeSyncCapability) -> bool
+pub fn rcp::avtp::TimeSyncCapability::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::avtp::TimeSyncCapability
 pub fn rcp::avtp::TimeSyncCapability::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::avtp::TimeSyncCapability
@@ -482,12 +482,12 @@ pub rcp::avtp::NtscfHeader::ntscf_data_length: u16
 pub rcp::avtp::NtscfHeader::sequence_num: u8
 pub rcp::avtp::NtscfHeader::stream_id: u64
 impl core::clone::Clone for rcp::avtp::NtscfHeader
-pub fn rcp::avtp::NtscfHeader::clone(&self) -> rcp::avtp::NtscfHeader
+pub fn rcp::avtp::NtscfHeader::clone(&self) -> Self
 impl core::cmp::Eq for rcp::avtp::NtscfHeader
 impl core::cmp::PartialEq for rcp::avtp::NtscfHeader
-pub fn rcp::avtp::NtscfHeader::eq(&self, &rcp::avtp::NtscfHeader) -> bool
+pub fn rcp::avtp::NtscfHeader::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::avtp::NtscfHeader
-pub fn rcp::avtp::NtscfHeader::default() -> rcp::avtp::NtscfHeader
+pub fn rcp::avtp::NtscfHeader::default() -> Self
 impl core::fmt::Debug for rcp::avtp::NtscfHeader
 pub fn rcp::avtp::NtscfHeader::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::avtp::NtscfHeader
@@ -507,10 +507,10 @@ pub fn rcp::avtp::StreamId::from_u64(u64) -> Self
 pub fn rcp::avtp::StreamId::new([u8; 6], u16) -> Self
 pub fn rcp::avtp::StreamId::to_u64(self) -> u64
 impl core::clone::Clone for rcp::avtp::StreamId
-pub fn rcp::avtp::StreamId::clone(&self) -> rcp::avtp::StreamId
+pub fn rcp::avtp::StreamId::clone(&self) -> Self
 impl core::cmp::Eq for rcp::avtp::StreamId
 impl core::cmp::PartialEq for rcp::avtp::StreamId
-pub fn rcp::avtp::StreamId::eq(&self, &rcp::avtp::StreamId) -> bool
+pub fn rcp::avtp::StreamId::eq(&self, &Self) -> bool
 impl core::convert::From<rcp::avtp::StreamId> for rcp::capi::CStreamId
 pub fn rcp::capi::CStreamId::from(rcp::avtp::StreamId) -> Self
 impl core::convert::From<rcp::avtp::StreamId> for u64
@@ -520,7 +520,7 @@ pub fn rcp::avtp::StreamId::from(rcp::capi::CStreamId) -> Self
 impl core::convert::From<u64> for rcp::avtp::StreamId
 pub fn rcp::avtp::StreamId::from(u64) -> rcp::avtp::StreamId
 impl core::default::Default for rcp::avtp::StreamId
-pub fn rcp::avtp::StreamId::default() -> rcp::avtp::StreamId
+pub fn rcp::avtp::StreamId::default() -> Self
 impl core::fmt::Debug for rcp::avtp::StreamId
 pub fn rcp::avtp::StreamId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::hash::Hash for rcp::avtp::StreamId
@@ -540,12 +540,12 @@ pub rcp::avtp::TscfHeader::sequence_num: u8
 pub rcp::avtp::TscfHeader::stream_data_length: u16
 pub rcp::avtp::TscfHeader::stream_id: u64
 impl core::clone::Clone for rcp::avtp::TscfHeader
-pub fn rcp::avtp::TscfHeader::clone(&self) -> rcp::avtp::TscfHeader
+pub fn rcp::avtp::TscfHeader::clone(&self) -> Self
 impl core::cmp::Eq for rcp::avtp::TscfHeader
 impl core::cmp::PartialEq for rcp::avtp::TscfHeader
-pub fn rcp::avtp::TscfHeader::eq(&self, &rcp::avtp::TscfHeader) -> bool
+pub fn rcp::avtp::TscfHeader::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::avtp::TscfHeader
-pub fn rcp::avtp::TscfHeader::default() -> rcp::avtp::TscfHeader
+pub fn rcp::avtp::TscfHeader::default() -> Self
 impl core::fmt::Debug for rcp::avtp::TscfHeader
 pub fn rcp::avtp::TscfHeader::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::avtp::TscfHeader
@@ -579,10 +579,10 @@ pub rcp::can::CanRequest::Plain(rcp::can::CanDataFrame)
 impl rcp::can::CanRequest
 pub fn rcp::can::CanRequest::from_evt_sub_opcode(u8, rcp::can::CanDataFrame) -> core::result::Result<Self, rcp::RcpError>
 impl core::clone::Clone for rcp::can::CanRequest
-pub fn rcp::can::CanRequest::clone(&self) -> rcp::can::CanRequest
+pub fn rcp::can::CanRequest::clone(&self) -> Self
 impl core::cmp::Eq for rcp::can::CanRequest
 impl core::cmp::PartialEq for rcp::can::CanRequest
-pub fn rcp::can::CanRequest::eq(&self, &rcp::can::CanRequest) -> bool
+pub fn rcp::can::CanRequest::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::can::CanRequest
 pub fn rcp::can::CanRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::can::CanRequest
@@ -609,10 +609,10 @@ pub fn rcp::can::FrameFormat::is_xl(self) -> bool
 pub fn rcp::can::FrameFormat::max_data_len(self) -> core::option::Option<usize>
 pub fn rcp::can::FrameFormat::to_u8(self) -> u8
 impl core::clone::Clone for rcp::can::FrameFormat
-pub fn rcp::can::FrameFormat::clone(&self) -> rcp::can::FrameFormat
+pub fn rcp::can::FrameFormat::clone(&self) -> Self
 impl core::cmp::Eq for rcp::can::FrameFormat
 impl core::cmp::PartialEq for rcp::can::FrameFormat
-pub fn rcp::can::FrameFormat::eq(&self, &rcp::can::FrameFormat) -> bool
+pub fn rcp::can::FrameFormat::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::can::FrameFormat
 pub fn rcp::can::FrameFormat::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::can::FrameFormat
@@ -632,10 +632,10 @@ impl rcp::can::CanDataFrame
 pub fn rcp::can::CanDataFrame::decode(&[u8]) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::can::CanDataFrame::encode(&self) -> alloc::vec::Vec<u8>
 impl core::clone::Clone for rcp::can::CanDataFrame
-pub fn rcp::can::CanDataFrame::clone(&self) -> rcp::can::CanDataFrame
+pub fn rcp::can::CanDataFrame::clone(&self) -> Self
 impl core::cmp::Eq for rcp::can::CanDataFrame
 impl core::cmp::PartialEq for rcp::can::CanDataFrame
-pub fn rcp::can::CanDataFrame::eq(&self, &rcp::can::CanDataFrame) -> bool
+pub fn rcp::can::CanDataFrame::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::can::CanDataFrame
 pub fn rcp::can::CanDataFrame::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::can::CanDataFrame
@@ -651,10 +651,10 @@ pub rcp::can::CanFunctionalConfig::format: rcp::can::FrameFormat
 impl rcp::can::CanFunctionalConfig
 pub fn rcp::can::CanFunctionalConfig::layer_tag(&self) -> rcp::regmap::PerEpTypeFunctionalConfig
 impl core::clone::Clone for rcp::can::CanFunctionalConfig
-pub fn rcp::can::CanFunctionalConfig::clone(&self) -> rcp::can::CanFunctionalConfig
+pub fn rcp::can::CanFunctionalConfig::clone(&self) -> Self
 impl core::cmp::Eq for rcp::can::CanFunctionalConfig
 impl core::cmp::PartialEq for rcp::can::CanFunctionalConfig
-pub fn rcp::can::CanFunctionalConfig::eq(&self, &rcp::can::CanFunctionalConfig) -> bool
+pub fn rcp::can::CanFunctionalConfig::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::can::CanFunctionalConfig
 pub fn rcp::can::CanFunctionalConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::can::CanFunctionalConfig
@@ -670,12 +670,12 @@ pub struct rcp::can::CanXlCombinedPayload(pub alloc::vec::Vec<u8>)
 impl rcp::can::CanXlCombinedPayload
 pub fn rcp::can::CanXlCombinedPayload::assemble(&[&[u8]]) -> Self
 impl core::clone::Clone for rcp::can::CanXlCombinedPayload
-pub fn rcp::can::CanXlCombinedPayload::clone(&self) -> rcp::can::CanXlCombinedPayload
+pub fn rcp::can::CanXlCombinedPayload::clone(&self) -> Self
 impl core::cmp::Eq for rcp::can::CanXlCombinedPayload
 impl core::cmp::PartialEq for rcp::can::CanXlCombinedPayload
-pub fn rcp::can::CanXlCombinedPayload::eq(&self, &rcp::can::CanXlCombinedPayload) -> bool
+pub fn rcp::can::CanXlCombinedPayload::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::can::CanXlCombinedPayload
-pub fn rcp::can::CanXlCombinedPayload::default() -> rcp::can::CanXlCombinedPayload
+pub fn rcp::can::CanXlCombinedPayload::default() -> Self
 impl core::fmt::Debug for rcp::can::CanXlCombinedPayload
 pub fn rcp::can::CanXlCombinedPayload::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::can::CanXlCombinedPayload
@@ -694,10 +694,10 @@ impl rcp::can::CanXlFrame
 pub fn rcp::can::CanXlFrame::decode(&[u8]) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::can::CanXlFrame::encode(&self) -> alloc::vec::Vec<u8>
 impl core::clone::Clone for rcp::can::CanXlFrame
-pub fn rcp::can::CanXlFrame::clone(&self) -> rcp::can::CanXlFrame
+pub fn rcp::can::CanXlFrame::clone(&self) -> Self
 impl core::cmp::Eq for rcp::can::CanXlFrame
 impl core::cmp::PartialEq for rcp::can::CanXlFrame
-pub fn rcp::can::CanXlFrame::eq(&self, &rcp::can::CanXlFrame) -> bool
+pub fn rcp::can::CanXlFrame::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::can::CanXlFrame
 pub fn rcp::can::CanXlFrame::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::can::CanXlFrame
@@ -713,12 +713,12 @@ impl rcp::can::CanXlSubHeader
 pub fn rcp::can::CanXlSubHeader::decode(&[u8]) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::can::CanXlSubHeader::encode(&self) -> [u8; 6]
 impl core::clone::Clone for rcp::can::CanXlSubHeader
-pub fn rcp::can::CanXlSubHeader::clone(&self) -> rcp::can::CanXlSubHeader
+pub fn rcp::can::CanXlSubHeader::clone(&self) -> Self
 impl core::cmp::Eq for rcp::can::CanXlSubHeader
 impl core::cmp::PartialEq for rcp::can::CanXlSubHeader
-pub fn rcp::can::CanXlSubHeader::eq(&self, &rcp::can::CanXlSubHeader) -> bool
+pub fn rcp::can::CanXlSubHeader::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::can::CanXlSubHeader
-pub fn rcp::can::CanXlSubHeader::default() -> rcp::can::CanXlSubHeader
+pub fn rcp::can::CanXlSubHeader::default() -> Self
 impl core::fmt::Debug for rcp::can::CanXlSubHeader
 pub fn rcp::can::CanXlSubHeader::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::can::CanXlSubHeader
@@ -766,10 +766,10 @@ pub rcp::capi::CError::Timeout = 3
 pub rcp::capi::CError::UnauthorizedAccess = 12
 pub rcp::capi::CError::UnsupportedCmd = 10
 impl core::clone::Clone for rcp::capi::CError
-pub fn rcp::capi::CError::clone(&self) -> rcp::capi::CError
+pub fn rcp::capi::CError::clone(&self) -> Self
 impl core::cmp::Eq for rcp::capi::CError
 impl core::cmp::PartialEq for rcp::capi::CError
-pub fn rcp::capi::CError::eq(&self, &rcp::capi::CError) -> bool
+pub fn rcp::capi::CError::eq(&self, &Self) -> bool
 impl core::convert::From<&rcp::RcpError> for rcp::capi::CError
 pub fn rcp::capi::CError::from(&rcp::RcpError) -> Self
 impl core::fmt::Debug for rcp::capi::CError
@@ -791,12 +791,12 @@ pub fn rcp::capi::CAbbRequest::info(&self) -> rcp::acf::ByteMessageInfo
 pub fn rcp::capi::CAbbRequest::new(rcp::avtp::StreamId, rcp::acf::ByteMessageInfo) -> Self
 pub fn rcp::capi::CAbbRequest::stream_id(&self) -> rcp::avtp::StreamId
 impl core::clone::Clone for rcp::capi::CAbbRequest
-pub fn rcp::capi::CAbbRequest::clone(&self) -> rcp::capi::CAbbRequest
+pub fn rcp::capi::CAbbRequest::clone(&self) -> Self
 impl core::cmp::Eq for rcp::capi::CAbbRequest
 impl core::cmp::PartialEq for rcp::capi::CAbbRequest
-pub fn rcp::capi::CAbbRequest::eq(&self, &rcp::capi::CAbbRequest) -> bool
+pub fn rcp::capi::CAbbRequest::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::capi::CAbbRequest
-pub fn rcp::capi::CAbbRequest::default() -> rcp::capi::CAbbRequest
+pub fn rcp::capi::CAbbRequest::default() -> Self
 impl core::fmt::Debug for rcp::capi::CAbbRequest
 pub fn rcp::capi::CAbbRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::capi::CAbbRequest
@@ -816,12 +816,12 @@ pub fn rcp::capi::CAbbResponse::info(&self) -> rcp::acf::ByteMessageInfo
 pub fn rcp::capi::CAbbResponse::new(rcp::avtp::StreamId, rcp::acf::ByteMessageInfo) -> Self
 pub fn rcp::capi::CAbbResponse::stream_id(&self) -> rcp::avtp::StreamId
 impl core::clone::Clone for rcp::capi::CAbbResponse
-pub fn rcp::capi::CAbbResponse::clone(&self) -> rcp::capi::CAbbResponse
+pub fn rcp::capi::CAbbResponse::clone(&self) -> Self
 impl core::cmp::Eq for rcp::capi::CAbbResponse
 impl core::cmp::PartialEq for rcp::capi::CAbbResponse
-pub fn rcp::capi::CAbbResponse::eq(&self, &rcp::capi::CAbbResponse) -> bool
+pub fn rcp::capi::CAbbResponse::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::capi::CAbbResponse
-pub fn rcp::capi::CAbbResponse::default() -> rcp::capi::CAbbResponse
+pub fn rcp::capi::CAbbResponse::default() -> Self
 impl core::fmt::Debug for rcp::capi::CAbbResponse
 pub fn rcp::capi::CAbbResponse::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::capi::CAbbResponse
@@ -850,16 +850,16 @@ pub rcp::capi::CByteMessageInfo::read_size_segment: u16
 pub rcp::capi::CByteMessageInfo::rsp: bool
 pub rcp::capi::CByteMessageInfo::transaction_num: u8
 impl core::clone::Clone for rcp::capi::CByteMessageInfo
-pub fn rcp::capi::CByteMessageInfo::clone(&self) -> rcp::capi::CByteMessageInfo
+pub fn rcp::capi::CByteMessageInfo::clone(&self) -> Self
 impl core::cmp::Eq for rcp::capi::CByteMessageInfo
 impl core::cmp::PartialEq for rcp::capi::CByteMessageInfo
-pub fn rcp::capi::CByteMessageInfo::eq(&self, &rcp::capi::CByteMessageInfo) -> bool
+pub fn rcp::capi::CByteMessageInfo::eq(&self, &Self) -> bool
 impl core::convert::From<rcp::acf::ByteMessageInfo> for rcp::capi::CByteMessageInfo
 pub fn rcp::capi::CByteMessageInfo::from(rcp::acf::ByteMessageInfo) -> Self
 impl core::convert::From<rcp::capi::CByteMessageInfo> for rcp::acf::ByteMessageInfo
 pub fn rcp::acf::ByteMessageInfo::from(rcp::capi::CByteMessageInfo) -> Self
 impl core::default::Default for rcp::capi::CByteMessageInfo
-pub fn rcp::capi::CByteMessageInfo::default() -> rcp::capi::CByteMessageInfo
+pub fn rcp::capi::CByteMessageInfo::default() -> Self
 impl core::fmt::Debug for rcp::capi::CByteMessageInfo
 pub fn rcp::capi::CByteMessageInfo::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::capi::CByteMessageInfo
@@ -875,16 +875,16 @@ impl core::panic::unwind_safe::UnwindSafe for rcp::capi::CByteMessageInfo
 pub rcp::capi::CStreamId::sender_mac: [u8; 6]
 pub rcp::capi::CStreamId::unique_id: u16
 impl core::clone::Clone for rcp::capi::CStreamId
-pub fn rcp::capi::CStreamId::clone(&self) -> rcp::capi::CStreamId
+pub fn rcp::capi::CStreamId::clone(&self) -> Self
 impl core::cmp::Eq for rcp::capi::CStreamId
 impl core::cmp::PartialEq for rcp::capi::CStreamId
-pub fn rcp::capi::CStreamId::eq(&self, &rcp::capi::CStreamId) -> bool
+pub fn rcp::capi::CStreamId::eq(&self, &Self) -> bool
 impl core::convert::From<rcp::avtp::StreamId> for rcp::capi::CStreamId
 pub fn rcp::capi::CStreamId::from(rcp::avtp::StreamId) -> Self
 impl core::convert::From<rcp::capi::CStreamId> for rcp::avtp::StreamId
 pub fn rcp::avtp::StreamId::from(rcp::capi::CStreamId) -> Self
 impl core::default::Default for rcp::capi::CStreamId
-pub fn rcp::capi::CStreamId::default() -> rcp::capi::CStreamId
+pub fn rcp::capi::CStreamId::default() -> Self
 impl core::fmt::Debug for rcp::capi::CStreamId
 pub fn rcp::capi::CStreamId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::capi::CStreamId
@@ -904,9 +904,9 @@ pub rcp::certgap::GapReport::untested: alloc::vec::Vec<alloc::string::String>
 impl rcp::certgap::GapReport
 pub fn rcp::certgap::GapReport::has_gaps(&self) -> bool
 impl core::clone::Clone for rcp::certgap::GapReport
-pub fn rcp::certgap::GapReport::clone(&self) -> rcp::certgap::GapReport
+pub fn rcp::certgap::GapReport::clone(&self) -> Self
 impl core::default::Default for rcp::certgap::GapReport
-pub fn rcp::certgap::GapReport::default() -> rcp::certgap::GapReport
+pub fn rcp::certgap::GapReport::default() -> Self
 impl core::fmt::Debug for rcp::certgap::GapReport
 pub fn rcp::certgap::GapReport::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for rcp::certgap::GapReport
@@ -931,9 +931,9 @@ pub rcp::codegen::FieldType::U8
 impl rcp::codegen::FieldType
 pub fn rcp::codegen::FieldType::rust_type(&self) -> &'static str
 impl core::clone::Clone for rcp::codegen::FieldType
-pub fn rcp::codegen::FieldType::clone(&self) -> rcp::codegen::FieldType
+pub fn rcp::codegen::FieldType::clone(&self) -> Self
 impl core::cmp::PartialEq for rcp::codegen::FieldType
-pub fn rcp::codegen::FieldType::eq(&self, &rcp::codegen::FieldType) -> bool
+pub fn rcp::codegen::FieldType::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::codegen::FieldType
 pub fn rcp::codegen::FieldType::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::codegen::FieldType
@@ -949,7 +949,7 @@ pub rcp::codegen::Field::ftype: rcp::codegen::FieldType
 pub rcp::codegen::Field::name: alloc::string::String
 pub rcp::codegen::Field::optional: bool
 impl core::clone::Clone for rcp::codegen::Field
-pub fn rcp::codegen::Field::clone(&self) -> rcp::codegen::Field
+pub fn rcp::codegen::Field::clone(&self) -> Self
 impl core::fmt::Debug for rcp::codegen::Field
 pub fn rcp::codegen::Field::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for rcp::codegen::Field
@@ -963,7 +963,7 @@ pub struct rcp::codegen::StructSchema
 pub rcp::codegen::StructSchema::fields: alloc::vec::Vec<rcp::codegen::Field>
 pub rcp::codegen::StructSchema::name: alloc::string::String
 impl core::clone::Clone for rcp::codegen::StructSchema
-pub fn rcp::codegen::StructSchema::clone(&self) -> rcp::codegen::StructSchema
+pub fn rcp::codegen::StructSchema::clone(&self) -> Self
 impl core::fmt::Debug for rcp::codegen::StructSchema
 pub fn rcp::codegen::StructSchema::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for rcp::codegen::StructSchema
@@ -985,11 +985,11 @@ pub rcp::config::RcServerConfig::request_streams: alloc::vec::Vec<rcp::regmap::R
 pub rcp::config::RcServerConfig::response_streams: alloc::vec::Vec<rcp::regmap::ResponseStreamConfigEntry>
 pub rcp::config::RcServerConfig::sequencer_state: alloc::vec::Vec<rcp::regmap::SequencerStateEntry>
 impl core::clone::Clone for rcp::config::RcServerConfig
-pub fn rcp::config::RcServerConfig::clone(&self) -> rcp::config::RcServerConfig
+pub fn rcp::config::RcServerConfig::clone(&self) -> Self
 impl core::cmp::PartialEq for rcp::config::RcServerConfig
-pub fn rcp::config::RcServerConfig::eq(&self, &rcp::config::RcServerConfig) -> bool
+pub fn rcp::config::RcServerConfig::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::config::RcServerConfig
-pub fn rcp::config::RcServerConfig::default() -> rcp::config::RcServerConfig
+pub fn rcp::config::RcServerConfig::default() -> Self
 impl core::fmt::Debug for rcp::config::RcServerConfig
 pub fn rcp::config::RcServerConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::config::RcServerConfig
@@ -1011,7 +1011,7 @@ pub mod rcp::deadline
 pub struct rcp::deadline::DeadlineEndpoint
 impl rcp::deadline::DeadlineEndpoint
 pub fn rcp::deadline::DeadlineEndpoint::deadline(&self) -> core::time::Duration
-pub fn rcp::deadline::DeadlineEndpoint::new(alloc::sync::Arc<dyn rcp::mock::Endpoint>, core::time::Duration) -> Self
+pub fn rcp::deadline::DeadlineEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>, core::time::Duration) -> Self
 pub fn rcp::deadline::DeadlineEndpoint::read_with_deadline(&self, u16, core::option::Option<core::time::Duration>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::deadline::DeadlineEndpoint::write_with_deadline(&self, &[u8], core::option::Option<core::time::Duration>) -> core::result::Result<(), rcp::RcpError>
 impl rcp::mock::Endpoint for rcp::deadline::DeadlineEndpoint
@@ -1030,10 +1030,10 @@ pub enum rcp::discovery::DiscoveryAccessKind
 pub rcp::discovery::DiscoveryAccessKind::Configure
 pub rcp::discovery::DiscoveryAccessKind::Read
 impl core::clone::Clone for rcp::discovery::DiscoveryAccessKind
-pub fn rcp::discovery::DiscoveryAccessKind::clone(&self) -> rcp::discovery::DiscoveryAccessKind
+pub fn rcp::discovery::DiscoveryAccessKind::clone(&self) -> Self
 impl core::cmp::Eq for rcp::discovery::DiscoveryAccessKind
 impl core::cmp::PartialEq for rcp::discovery::DiscoveryAccessKind
-pub fn rcp::discovery::DiscoveryAccessKind::eq(&self, &rcp::discovery::DiscoveryAccessKind) -> bool
+pub fn rcp::discovery::DiscoveryAccessKind::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::discovery::DiscoveryAccessKind
 pub fn rcp::discovery::DiscoveryAccessKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::discovery::DiscoveryAccessKind
@@ -1055,9 +1055,9 @@ pub fn rcp::discovery::DiscoveryCache::lookup(&self, rcp::avtp::StreamId) -> cor
 pub fn rcp::discovery::DiscoveryCache::new() -> Self
 pub fn rcp::discovery::DiscoveryCache::remember(&mut self, rcp::avtp::StreamId, &rcp::regmap::GeneralRegisters, std::time::Instant) -> core::result::Result<(), rcp::RcpError>
 impl core::clone::Clone for rcp::discovery::DiscoveryCache
-pub fn rcp::discovery::DiscoveryCache::clone(&self) -> rcp::discovery::DiscoveryCache
+pub fn rcp::discovery::DiscoveryCache::clone(&self) -> Self
 impl core::default::Default for rcp::discovery::DiscoveryCache
-pub fn rcp::discovery::DiscoveryCache::default() -> rcp::discovery::DiscoveryCache
+pub fn rcp::discovery::DiscoveryCache::default() -> Self
 impl core::fmt::Debug for rcp::discovery::DiscoveryCache
 pub fn rcp::discovery::DiscoveryCache::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for rcp::discovery::DiscoveryCache
@@ -1078,10 +1078,10 @@ pub fn rcp::discovery::DiscoveryCacheEntry::svr_oa_tc18_magic_nr(&self) -> u32
 pub fn rcp::discovery::DiscoveryCacheEntry::svr_vendor_id(&self) -> u16
 pub fn rcp::discovery::DiscoveryCacheEntry::svr_version(&self) -> u32
 impl core::clone::Clone for rcp::discovery::DiscoveryCacheEntry
-pub fn rcp::discovery::DiscoveryCacheEntry::clone(&self) -> rcp::discovery::DiscoveryCacheEntry
+pub fn rcp::discovery::DiscoveryCacheEntry::clone(&self) -> Self
 impl core::cmp::Eq for rcp::discovery::DiscoveryCacheEntry
 impl core::cmp::PartialEq for rcp::discovery::DiscoveryCacheEntry
-pub fn rcp::discovery::DiscoveryCacheEntry::eq(&self, &rcp::discovery::DiscoveryCacheEntry) -> bool
+pub fn rcp::discovery::DiscoveryCacheEntry::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::discovery::DiscoveryCacheEntry
 pub fn rcp::discovery::DiscoveryCacheEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::discovery::DiscoveryCacheEntry
@@ -1099,10 +1099,10 @@ pub fn rcp::discovery::DiscoveryClaim::claimant(&self) -> rcp::avtp::StreamId
 pub fn rcp::discovery::DiscoveryClaim::claimed_at(&self) -> std::time::Instant
 pub fn rcp::discovery::DiscoveryClaim::has_lapsed(&self, std::time::Instant, core::time::Duration) -> bool
 impl core::clone::Clone for rcp::discovery::DiscoveryClaim
-pub fn rcp::discovery::DiscoveryClaim::clone(&self) -> rcp::discovery::DiscoveryClaim
+pub fn rcp::discovery::DiscoveryClaim::clone(&self) -> Self
 impl core::cmp::Eq for rcp::discovery::DiscoveryClaim
 impl core::cmp::PartialEq for rcp::discovery::DiscoveryClaim
-pub fn rcp::discovery::DiscoveryClaim::eq(&self, &rcp::discovery::DiscoveryClaim) -> bool
+pub fn rcp::discovery::DiscoveryClaim::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::discovery::DiscoveryClaim
 pub fn rcp::discovery::DiscoveryClaim::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::discovery::DiscoveryClaim
@@ -1151,10 +1151,10 @@ pub enum rcp::e2e::AcfCoverageMessage<'a>
 pub rcp::e2e::AcfCoverageMessage::Abb(&'a rcp::acf::AcfAbbMessage)
 pub rcp::e2e::AcfCoverageMessage::Gbb(&'a rcp::acf::AcfGbbMessage)
 impl<'a> core::clone::Clone for rcp::e2e::AcfCoverageMessage<'a>
-pub fn rcp::e2e::AcfCoverageMessage<'a>::clone(&self) -> rcp::e2e::AcfCoverageMessage<'a>
+pub fn rcp::e2e::AcfCoverageMessage<'a>::clone(&self) -> Self
 impl<'a> core::cmp::Eq for rcp::e2e::AcfCoverageMessage<'a>
 impl<'a> core::cmp::PartialEq for rcp::e2e::AcfCoverageMessage<'a>
-pub fn rcp::e2e::AcfCoverageMessage<'a>::eq(&self, &rcp::e2e::AcfCoverageMessage<'a>) -> bool
+pub fn rcp::e2e::AcfCoverageMessage<'a>::eq(&self, &Self) -> bool
 impl<'a> core::fmt::Debug for rcp::e2e::AcfCoverageMessage<'a>
 pub fn rcp::e2e::AcfCoverageMessage<'a>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl<'a> core::marker::Copy for rcp::e2e::AcfCoverageMessage<'a>
@@ -1170,10 +1170,10 @@ pub enum rcp::e2e::FragmentCrcExpectation
 pub rcp::e2e::FragmentCrcExpectation::Expected
 pub rcp::e2e::FragmentCrcExpectation::NotExpected
 impl core::clone::Clone for rcp::e2e::FragmentCrcExpectation
-pub fn rcp::e2e::FragmentCrcExpectation::clone(&self) -> rcp::e2e::FragmentCrcExpectation
+pub fn rcp::e2e::FragmentCrcExpectation::clone(&self) -> Self
 impl core::cmp::Eq for rcp::e2e::FragmentCrcExpectation
 impl core::cmp::PartialEq for rcp::e2e::FragmentCrcExpectation
-pub fn rcp::e2e::FragmentCrcExpectation::eq(&self, &rcp::e2e::FragmentCrcExpectation) -> bool
+pub fn rcp::e2e::FragmentCrcExpectation::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::e2e::FragmentCrcExpectation
 pub fn rcp::e2e::FragmentCrcExpectation::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::e2e::FragmentCrcExpectation
@@ -1189,12 +1189,12 @@ pub struct rcp::e2e::CombinedFragmentPayload(pub alloc::vec::Vec<u8>)
 impl rcp::e2e::CombinedFragmentPayload
 pub fn rcp::e2e::CombinedFragmentPayload::assemble(&[&[u8]]) -> Self
 impl core::clone::Clone for rcp::e2e::CombinedFragmentPayload
-pub fn rcp::e2e::CombinedFragmentPayload::clone(&self) -> rcp::e2e::CombinedFragmentPayload
+pub fn rcp::e2e::CombinedFragmentPayload::clone(&self) -> Self
 impl core::cmp::Eq for rcp::e2e::CombinedFragmentPayload
 impl core::cmp::PartialEq for rcp::e2e::CombinedFragmentPayload
-pub fn rcp::e2e::CombinedFragmentPayload::eq(&self, &rcp::e2e::CombinedFragmentPayload) -> bool
+pub fn rcp::e2e::CombinedFragmentPayload::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::e2e::CombinedFragmentPayload
-pub fn rcp::e2e::CombinedFragmentPayload::default() -> rcp::e2e::CombinedFragmentPayload
+pub fn rcp::e2e::CombinedFragmentPayload::default() -> Self
 impl core::fmt::Debug for rcp::e2e::CombinedFragmentPayload
 pub fn rcp::e2e::CombinedFragmentPayload::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::e2e::CombinedFragmentPayload
@@ -1220,10 +1220,10 @@ pub enum rcp::ep0::Ep0AccessKind
 pub rcp::ep0::Ep0AccessKind::Read
 pub rcp::ep0::Ep0AccessKind::Write
 impl core::clone::Clone for rcp::ep0::Ep0AccessKind
-pub fn rcp::ep0::Ep0AccessKind::clone(&self) -> rcp::ep0::Ep0AccessKind
+pub fn rcp::ep0::Ep0AccessKind::clone(&self) -> Self
 impl core::cmp::Eq for rcp::ep0::Ep0AccessKind
 impl core::cmp::PartialEq for rcp::ep0::Ep0AccessKind
-pub fn rcp::ep0::Ep0AccessKind::eq(&self, &rcp::ep0::Ep0AccessKind) -> bool
+pub fn rcp::ep0::Ep0AccessKind::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::ep0::Ep0AccessKind
 pub fn rcp::ep0::Ep0AccessKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::ep0::Ep0AccessKind
@@ -1239,10 +1239,10 @@ pub enum rcp::ep0::RequestRoute
 pub rcp::ep0::RequestRoute::DeviceEndpoint
 pub rcp::ep0::RequestRoute::Ep0
 impl core::clone::Clone for rcp::ep0::RequestRoute
-pub fn rcp::ep0::RequestRoute::clone(&self) -> rcp::ep0::RequestRoute
+pub fn rcp::ep0::RequestRoute::clone(&self) -> Self
 impl core::cmp::Eq for rcp::ep0::RequestRoute
 impl core::cmp::PartialEq for rcp::ep0::RequestRoute
-pub fn rcp::ep0::RequestRoute::eq(&self, &rcp::ep0::RequestRoute) -> bool
+pub fn rcp::ep0::RequestRoute::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::ep0::RequestRoute
 pub fn rcp::ep0::RequestRoute::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::ep0::RequestRoute
@@ -1271,10 +1271,10 @@ pub const rcp::evtgroup::EvtGroup::ALL: [rcp::evtgroup::EvtGroup; 3]
 pub fn rcp::evtgroup::EvtGroup::from_u8(u8) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::evtgroup::EvtGroup::to_u8(self) -> u8
 impl core::clone::Clone for rcp::evtgroup::EvtGroup
-pub fn rcp::evtgroup::EvtGroup::clone(&self) -> rcp::evtgroup::EvtGroup
+pub fn rcp::evtgroup::EvtGroup::clone(&self) -> Self
 impl core::cmp::Eq for rcp::evtgroup::EvtGroup
 impl core::cmp::PartialEq for rcp::evtgroup::EvtGroup
-pub fn rcp::evtgroup::EvtGroup::eq(&self, &rcp::evtgroup::EvtGroup) -> bool
+pub fn rcp::evtgroup::EvtGroup::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::evtgroup::EvtGroup
 pub fn rcp::evtgroup::EvtGroup::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::evtgroup::EvtGroup
@@ -1291,10 +1291,10 @@ pub rcp::evtgroup::EvtRow2Kind::ConfigWrite
 pub rcp::evtgroup::EvtRow2Kind::Plain
 pub rcp::evtgroup::EvtRow2Kind::Reserved
 impl core::clone::Clone for rcp::evtgroup::EvtRow2Kind
-pub fn rcp::evtgroup::EvtRow2Kind::clone(&self) -> rcp::evtgroup::EvtRow2Kind
+pub fn rcp::evtgroup::EvtRow2Kind::clone(&self) -> Self
 impl core::cmp::Eq for rcp::evtgroup::EvtRow2Kind
 impl core::cmp::PartialEq for rcp::evtgroup::EvtRow2Kind
-pub fn rcp::evtgroup::EvtRow2Kind::eq(&self, &rcp::evtgroup::EvtRow2Kind) -> bool
+pub fn rcp::evtgroup::EvtRow2Kind::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::evtgroup::EvtRow2Kind
 pub fn rcp::evtgroup::EvtRow2Kind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::evtgroup::EvtRow2Kind
@@ -1314,7 +1314,7 @@ pub rcp::faultinject::FaultRule::AfterNthCall(u64)
 pub rcp::faultinject::FaultRule::Always
 pub rcp::faultinject::FaultRule::OnNthCall(u64)
 impl core::clone::Clone for rcp::faultinject::FaultRule
-pub fn rcp::faultinject::FaultRule::clone(&self) -> rcp::faultinject::FaultRule
+pub fn rcp::faultinject::FaultRule::clone(&self) -> Self
 impl core::fmt::Debug for rcp::faultinject::FaultRule
 pub fn rcp::faultinject::FaultRule::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for rcp::faultinject::FaultRule
@@ -1329,7 +1329,7 @@ impl rcp::faultinject::FaultInjectEndpoint
 pub fn rcp::faultinject::FaultInjectEndpoint::call_count(&self) -> u64
 pub fn rcp::faultinject::FaultInjectEndpoint::clear(&self)
 pub fn rcp::faultinject::FaultInjectEndpoint::inject(&self, rcp::faultinject::FaultSpec)
-pub fn rcp::faultinject::FaultInjectEndpoint::new(alloc::sync::Arc<dyn rcp::mock::Endpoint>) -> Self
+pub fn rcp::faultinject::FaultInjectEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>) -> Self
 impl rcp::mock::Endpoint for rcp::faultinject::FaultInjectEndpoint
 pub fn rcp::faultinject::FaultInjectEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::faultinject::FaultInjectEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
@@ -1345,7 +1345,7 @@ pub struct rcp::faultinject::FaultSpec
 pub rcp::faultinject::FaultSpec::error: rcp::RcpError
 pub rcp::faultinject::FaultSpec::rule: rcp::faultinject::FaultRule
 impl core::clone::Clone for rcp::faultinject::FaultSpec
-pub fn rcp::faultinject::FaultSpec::clone(&self) -> rcp::faultinject::FaultSpec
+pub fn rcp::faultinject::FaultSpec::clone(&self) -> Self
 impl core::fmt::Debug for rcp::faultinject::FaultSpec
 pub fn rcp::faultinject::FaultSpec::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for rcp::faultinject::FaultSpec
@@ -1358,11 +1358,11 @@ impl core::panic::unwind_safe::UnwindSafe for rcp::faultinject::FaultSpec
 pub mod rcp::federation
 pub struct rcp::federation::FederationRouter
 impl rcp::federation::FederationRouter
-pub fn rcp::federation::FederationRouter::add_peer(&self, impl core::convert::Into<alloc::string::String>, alloc::sync::Arc<std::sync::poison::mutex::Mutex<rcp::discovery::DiscoveryCache>>)
+pub fn rcp::federation::FederationRouter::add_peer(&self, impl core::convert::Into<alloc::string::String>, alloc::rcs::arc::Arc<std::sync::poison::mutex::Mutex<rcp::discovery::DiscoveryCache>>)
 pub fn rcp::federation::FederationRouter::lookup_peer(&self, &str, rcp::avtp::StreamId) -> core::result::Result<rcp::discovery::DiscoveryCacheEntry, rcp::RcpError>
 pub fn rcp::federation::FederationRouter::new() -> Self
 pub fn rcp::federation::FederationRouter::peer_ids(&self) -> alloc::vec::Vec<alloc::string::String>
-pub fn rcp::federation::FederationRouter::remove_peer(&self, &str) -> core::option::Option<alloc::sync::Arc<std::sync::poison::mutex::Mutex<rcp::discovery::DiscoveryCache>>>
+pub fn rcp::federation::FederationRouter::remove_peer(&self, &str) -> core::option::Option<alloc::rcs::arc::Arc<std::sync::poison::mutex::Mutex<rcp::discovery::DiscoveryCache>>>
 impl core::default::Default for rcp::federation::FederationRouter
 pub fn rcp::federation::FederationRouter::default() -> Self
 impl !core::marker::Freeze for rcp::federation::FederationRouter
@@ -1379,7 +1379,7 @@ pub rcp::formal::CheckResult::passed: alloc::vec::Vec<&'static str>
 impl rcp::formal::CheckResult
 pub fn rcp::formal::CheckResult::all_passed(&self) -> bool
 impl core::default::Default for rcp::formal::CheckResult
-pub fn rcp::formal::CheckResult::default() -> rcp::formal::CheckResult
+pub fn rcp::formal::CheckResult::default() -> Self
 impl core::fmt::Debug for rcp::formal::CheckResult
 pub fn rcp::formal::CheckResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for rcp::formal::CheckResult
@@ -1395,11 +1395,11 @@ pub rcp::formal::Invariant::predicate: alloc::boxed::Box<(dyn core::ops::functio
 impl<S> rcp::formal::Invariant<S>
 pub fn rcp::formal::Invariant<S>::check(&self, &S) -> bool
 pub fn rcp::formal::Invariant<S>::new(&'static str, impl core::ops::function::Fn(&S) -> bool + core::marker::Send + core::marker::Sync + 'static) -> Self
-impl<S> core::marker::Freeze for rcp::formal::Invariant<S>
-impl<S> core::marker::Send for rcp::formal::Invariant<S>
-impl<S> core::marker::Sync for rcp::formal::Invariant<S>
-impl<S> core::marker::Unpin for rcp::formal::Invariant<S>
-impl<S> core::marker::UnsafeUnpin for rcp::formal::Invariant<S>
+impl<S> core::marker::Freeze for rcp::formal::Invariant<S> where alloc::boxed::Box<(dyn core::ops::function::Fn(&S) -> bool + core::marker::Sync + core::marker::Send)>: core::marker::Freeze
+impl<S> core::marker::Send for rcp::formal::Invariant<S> where alloc::boxed::Box<(dyn core::ops::function::Fn(&S) -> bool + core::marker::Sync + core::marker::Send)>: core::marker::Send
+impl<S> core::marker::Sync for rcp::formal::Invariant<S> where alloc::boxed::Box<(dyn core::ops::function::Fn(&S) -> bool + core::marker::Sync + core::marker::Send)>: core::marker::Sync
+impl<S> core::marker::Unpin for rcp::formal::Invariant<S> where alloc::boxed::Box<(dyn core::ops::function::Fn(&S) -> bool + core::marker::Sync + core::marker::Send)>: core::marker::Unpin
+impl<S> core::marker::UnsafeUnpin for rcp::formal::Invariant<S> where alloc::boxed::Box<(dyn core::ops::function::Fn(&S) -> bool + core::marker::Sync + core::marker::Send)>: core::marker::UnsafeUnpin
 impl<S> !core::panic::unwind_safe::RefUnwindSafe for rcp::formal::Invariant<S>
 impl<S> !core::panic::unwind_safe::UnwindSafe for rcp::formal::Invariant<S>
 pub fn rcp::formal::check_all<S>(&S, &[rcp::formal::Invariant<S>]) -> rcp::formal::CheckResult
@@ -1409,10 +1409,10 @@ pub enum rcp::fragment::FragmentAcceptOutcome
 pub rcp::fragment::FragmentAcceptOutcome::Complete
 pub rcp::fragment::FragmentAcceptOutcome::Continuing
 impl core::clone::Clone for rcp::fragment::FragmentAcceptOutcome
-pub fn rcp::fragment::FragmentAcceptOutcome::clone(&self) -> rcp::fragment::FragmentAcceptOutcome
+pub fn rcp::fragment::FragmentAcceptOutcome::clone(&self) -> Self
 impl core::cmp::Eq for rcp::fragment::FragmentAcceptOutcome
 impl core::cmp::PartialEq for rcp::fragment::FragmentAcceptOutcome
-pub fn rcp::fragment::FragmentAcceptOutcome::eq(&self, &rcp::fragment::FragmentAcceptOutcome) -> bool
+pub fn rcp::fragment::FragmentAcceptOutcome::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::fragment::FragmentAcceptOutcome
 pub fn rcp::fragment::FragmentAcceptOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::fragment::FragmentAcceptOutcome
@@ -1434,10 +1434,10 @@ pub fn rcp::fragment::FragmentReassemblyBuffer::new(u16) -> Self
 pub fn rcp::fragment::FragmentReassemblyBuffer::reset(&mut self)
 pub fn rcp::fragment::FragmentReassemblyBuffer::segment_refs(&self) -> alloc::vec::Vec<&[u8]>
 impl core::clone::Clone for rcp::fragment::FragmentReassemblyBuffer
-pub fn rcp::fragment::FragmentReassemblyBuffer::clone(&self) -> rcp::fragment::FragmentReassemblyBuffer
+pub fn rcp::fragment::FragmentReassemblyBuffer::clone(&self) -> Self
 impl core::cmp::Eq for rcp::fragment::FragmentReassemblyBuffer
 impl core::cmp::PartialEq for rcp::fragment::FragmentReassemblyBuffer
-pub fn rcp::fragment::FragmentReassemblyBuffer::eq(&self, &rcp::fragment::FragmentReassemblyBuffer) -> bool
+pub fn rcp::fragment::FragmentReassemblyBuffer::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::fragment::FragmentReassemblyBuffer
 pub fn rcp::fragment::FragmentReassemblyBuffer::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::fragment::FragmentReassemblyBuffer
@@ -1464,10 +1464,10 @@ pub fn rcp::gpio::GpioWriteSemantics::from_sub_opcode(u8) -> core::result::Resul
 pub fn rcp::gpio::GpioWriteSemantics::is_named(self) -> bool
 pub fn rcp::gpio::GpioWriteSemantics::to_sub_opcode(self) -> u8
 impl core::clone::Clone for rcp::gpio::GpioWriteSemantics
-pub fn rcp::gpio::GpioWriteSemantics::clone(&self) -> rcp::gpio::GpioWriteSemantics
+pub fn rcp::gpio::GpioWriteSemantics::clone(&self) -> Self
 impl core::cmp::Eq for rcp::gpio::GpioWriteSemantics
 impl core::cmp::PartialEq for rcp::gpio::GpioWriteSemantics
-pub fn rcp::gpio::GpioWriteSemantics::eq(&self, &rcp::gpio::GpioWriteSemantics) -> bool
+pub fn rcp::gpio::GpioWriteSemantics::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::gpio::GpioWriteSemantics
 pub fn rcp::gpio::GpioWriteSemantics::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::gpio::GpioWriteSemantics
@@ -1484,12 +1484,12 @@ impl rcp::gpio::GpioBitmask
 pub fn rcp::gpio::GpioBitmask::decode(&[u8]) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::gpio::GpioBitmask::encode(self) -> [u8; 4]
 impl core::clone::Clone for rcp::gpio::GpioBitmask
-pub fn rcp::gpio::GpioBitmask::clone(&self) -> rcp::gpio::GpioBitmask
+pub fn rcp::gpio::GpioBitmask::clone(&self) -> Self
 impl core::cmp::Eq for rcp::gpio::GpioBitmask
 impl core::cmp::PartialEq for rcp::gpio::GpioBitmask
-pub fn rcp::gpio::GpioBitmask::eq(&self, &rcp::gpio::GpioBitmask) -> bool
+pub fn rcp::gpio::GpioBitmask::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::gpio::GpioBitmask
-pub fn rcp::gpio::GpioBitmask::default() -> rcp::gpio::GpioBitmask
+pub fn rcp::gpio::GpioBitmask::default() -> Self
 impl core::fmt::Debug for rcp::gpio::GpioBitmask
 pub fn rcp::gpio::GpioBitmask::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::gpio::GpioBitmask
@@ -1506,12 +1506,12 @@ pub rcp::gpio::GpioFunctionalConfig::trigger: rcp::gpio::GpioTriggerConfig
 impl rcp::gpio::GpioFunctionalConfig
 pub fn rcp::gpio::GpioFunctionalConfig::layer_tag(&self) -> rcp::regmap::PerEpTypeFunctionalConfig
 impl core::clone::Clone for rcp::gpio::GpioFunctionalConfig
-pub fn rcp::gpio::GpioFunctionalConfig::clone(&self) -> rcp::gpio::GpioFunctionalConfig
+pub fn rcp::gpio::GpioFunctionalConfig::clone(&self) -> Self
 impl core::cmp::Eq for rcp::gpio::GpioFunctionalConfig
 impl core::cmp::PartialEq for rcp::gpio::GpioFunctionalConfig
-pub fn rcp::gpio::GpioFunctionalConfig::eq(&self, &rcp::gpio::GpioFunctionalConfig) -> bool
+pub fn rcp::gpio::GpioFunctionalConfig::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::gpio::GpioFunctionalConfig
-pub fn rcp::gpio::GpioFunctionalConfig::default() -> rcp::gpio::GpioFunctionalConfig
+pub fn rcp::gpio::GpioFunctionalConfig::default() -> Self
 impl core::fmt::Debug for rcp::gpio::GpioFunctionalConfig
 pub fn rcp::gpio::GpioFunctionalConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::gpio::GpioFunctionalConfig
@@ -1531,12 +1531,12 @@ impl rcp::gpio::GpioTriggerConfig
 pub fn rcp::gpio::GpioTriggerConfig::decode(&[u8]) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::gpio::GpioTriggerConfig::encode(self) -> [u8; 12]
 impl core::clone::Clone for rcp::gpio::GpioTriggerConfig
-pub fn rcp::gpio::GpioTriggerConfig::clone(&self) -> rcp::gpio::GpioTriggerConfig
+pub fn rcp::gpio::GpioTriggerConfig::clone(&self) -> Self
 impl core::cmp::Eq for rcp::gpio::GpioTriggerConfig
 impl core::cmp::PartialEq for rcp::gpio::GpioTriggerConfig
-pub fn rcp::gpio::GpioTriggerConfig::eq(&self, &rcp::gpio::GpioTriggerConfig) -> bool
+pub fn rcp::gpio::GpioTriggerConfig::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::gpio::GpioTriggerConfig
-pub fn rcp::gpio::GpioTriggerConfig::default() -> rcp::gpio::GpioTriggerConfig
+pub fn rcp::gpio::GpioTriggerConfig::default() -> Self
 impl core::fmt::Debug for rcp::gpio::GpioTriggerConfig
 pub fn rcp::gpio::GpioTriggerConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::gpio::GpioTriggerConfig
@@ -1553,12 +1553,12 @@ pub rcp::gpio::GpioTriggerSignals::changed: rcp::gpio::GpioBitmask
 pub rcp::gpio::GpioTriggerSignals::falling: rcp::gpio::GpioBitmask
 pub rcp::gpio::GpioTriggerSignals::rising: rcp::gpio::GpioBitmask
 impl core::clone::Clone for rcp::gpio::GpioTriggerSignals
-pub fn rcp::gpio::GpioTriggerSignals::clone(&self) -> rcp::gpio::GpioTriggerSignals
+pub fn rcp::gpio::GpioTriggerSignals::clone(&self) -> Self
 impl core::cmp::Eq for rcp::gpio::GpioTriggerSignals
 impl core::cmp::PartialEq for rcp::gpio::GpioTriggerSignals
-pub fn rcp::gpio::GpioTriggerSignals::eq(&self, &rcp::gpio::GpioTriggerSignals) -> bool
+pub fn rcp::gpio::GpioTriggerSignals::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::gpio::GpioTriggerSignals
-pub fn rcp::gpio::GpioTriggerSignals::default() -> rcp::gpio::GpioTriggerSignals
+pub fn rcp::gpio::GpioTriggerSignals::default() -> Self
 impl core::fmt::Debug for rcp::gpio::GpioTriggerSignals
 pub fn rcp::gpio::GpioTriggerSignals::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::gpio::GpioTriggerSignals
@@ -1581,10 +1581,10 @@ pub rcp::i2c::I2cRequest::Plain(rcp::i2c::I2cByteTransfer)
 impl rcp::i2c::I2cRequest
 pub fn rcp::i2c::I2cRequest::from_evt_sub_opcode(u8, &[u8]) -> core::result::Result<Self, rcp::RcpError>
 impl core::clone::Clone for rcp::i2c::I2cRequest
-pub fn rcp::i2c::I2cRequest::clone(&self) -> rcp::i2c::I2cRequest
+pub fn rcp::i2c::I2cRequest::clone(&self) -> Self
 impl core::cmp::Eq for rcp::i2c::I2cRequest
 impl core::cmp::PartialEq for rcp::i2c::I2cRequest
-pub fn rcp::i2c::I2cRequest::eq(&self, &rcp::i2c::I2cRequest) -> bool
+pub fn rcp::i2c::I2cRequest::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::i2c::I2cRequest
 pub fn rcp::i2c::I2cRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::i2c::I2cRequest
@@ -1606,10 +1606,10 @@ pub fn rcp::i2c::I2cSpeedMode::from_u8(u8) -> core::result::Result<Self, rcp::Rc
 pub fn rcp::i2c::I2cSpeedMode::is_ambiguous_high_speed_row(self) -> bool
 pub fn rcp::i2c::I2cSpeedMode::to_u8(self) -> u8
 impl core::clone::Clone for rcp::i2c::I2cSpeedMode
-pub fn rcp::i2c::I2cSpeedMode::clone(&self) -> rcp::i2c::I2cSpeedMode
+pub fn rcp::i2c::I2cSpeedMode::clone(&self) -> Self
 impl core::cmp::Eq for rcp::i2c::I2cSpeedMode
 impl core::cmp::PartialEq for rcp::i2c::I2cSpeedMode
-pub fn rcp::i2c::I2cSpeedMode::eq(&self, &rcp::i2c::I2cSpeedMode) -> bool
+pub fn rcp::i2c::I2cSpeedMode::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::i2c::I2cSpeedMode
 pub fn rcp::i2c::I2cSpeedMode::default() -> Self
 impl core::fmt::Debug for rcp::i2c::I2cSpeedMode
@@ -1629,12 +1629,12 @@ impl rcp::i2c::I2cByteTransfer
 pub fn rcp::i2c::I2cByteTransfer::decode(&[u8]) -> Self
 pub fn rcp::i2c::I2cByteTransfer::encode(&self) -> alloc::vec::Vec<u8>
 impl core::clone::Clone for rcp::i2c::I2cByteTransfer
-pub fn rcp::i2c::I2cByteTransfer::clone(&self) -> rcp::i2c::I2cByteTransfer
+pub fn rcp::i2c::I2cByteTransfer::clone(&self) -> Self
 impl core::cmp::Eq for rcp::i2c::I2cByteTransfer
 impl core::cmp::PartialEq for rcp::i2c::I2cByteTransfer
-pub fn rcp::i2c::I2cByteTransfer::eq(&self, &rcp::i2c::I2cByteTransfer) -> bool
+pub fn rcp::i2c::I2cByteTransfer::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::i2c::I2cByteTransfer
-pub fn rcp::i2c::I2cByteTransfer::default() -> rcp::i2c::I2cByteTransfer
+pub fn rcp::i2c::I2cByteTransfer::default() -> Self
 impl core::fmt::Debug for rcp::i2c::I2cByteTransfer
 pub fn rcp::i2c::I2cByteTransfer::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::i2c::I2cByteTransfer
@@ -1651,12 +1651,12 @@ impl rcp::i2c::I2cByteTransferResult
 pub fn rcp::i2c::I2cByteTransferResult::decode(&[u8]) -> Self
 pub fn rcp::i2c::I2cByteTransferResult::encode(&self) -> alloc::vec::Vec<u8>
 impl core::clone::Clone for rcp::i2c::I2cByteTransferResult
-pub fn rcp::i2c::I2cByteTransferResult::clone(&self) -> rcp::i2c::I2cByteTransferResult
+pub fn rcp::i2c::I2cByteTransferResult::clone(&self) -> Self
 impl core::cmp::Eq for rcp::i2c::I2cByteTransferResult
 impl core::cmp::PartialEq for rcp::i2c::I2cByteTransferResult
-pub fn rcp::i2c::I2cByteTransferResult::eq(&self, &rcp::i2c::I2cByteTransferResult) -> bool
+pub fn rcp::i2c::I2cByteTransferResult::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::i2c::I2cByteTransferResult
-pub fn rcp::i2c::I2cByteTransferResult::default() -> rcp::i2c::I2cByteTransferResult
+pub fn rcp::i2c::I2cByteTransferResult::default() -> Self
 impl core::fmt::Debug for rcp::i2c::I2cByteTransferResult
 pub fn rcp::i2c::I2cByteTransferResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::i2c::I2cByteTransferResult
@@ -1672,12 +1672,12 @@ pub rcp::i2c::I2cFunctionalConfig::speed_mode: rcp::i2c::I2cSpeedMode
 impl rcp::i2c::I2cFunctionalConfig
 pub fn rcp::i2c::I2cFunctionalConfig::layer_tag(&self) -> rcp::regmap::PerEpTypeFunctionalConfig
 impl core::clone::Clone for rcp::i2c::I2cFunctionalConfig
-pub fn rcp::i2c::I2cFunctionalConfig::clone(&self) -> rcp::i2c::I2cFunctionalConfig
+pub fn rcp::i2c::I2cFunctionalConfig::clone(&self) -> Self
 impl core::cmp::Eq for rcp::i2c::I2cFunctionalConfig
 impl core::cmp::PartialEq for rcp::i2c::I2cFunctionalConfig
-pub fn rcp::i2c::I2cFunctionalConfig::eq(&self, &rcp::i2c::I2cFunctionalConfig) -> bool
+pub fn rcp::i2c::I2cFunctionalConfig::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::i2c::I2cFunctionalConfig
-pub fn rcp::i2c::I2cFunctionalConfig::default() -> rcp::i2c::I2cFunctionalConfig
+pub fn rcp::i2c::I2cFunctionalConfig::default() -> Self
 impl core::fmt::Debug for rcp::i2c::I2cFunctionalConfig
 pub fn rcp::i2c::I2cFunctionalConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::i2c::I2cFunctionalConfig
@@ -1696,10 +1696,10 @@ pub rcp::iseled::IseledRequest::Plain(rcp::iseled::IseledFrame)
 impl rcp::iseled::IseledRequest
 pub fn rcp::iseled::IseledRequest::from_evt_sub_opcode(u8, rcp::iseled::IseledFrame) -> core::result::Result<Self, rcp::RcpError>
 impl core::clone::Clone for rcp::iseled::IseledRequest
-pub fn rcp::iseled::IseledRequest::clone(&self) -> rcp::iseled::IseledRequest
+pub fn rcp::iseled::IseledRequest::clone(&self) -> Self
 impl core::cmp::Eq for rcp::iseled::IseledRequest
 impl core::cmp::PartialEq for rcp::iseled::IseledRequest
-pub fn rcp::iseled::IseledRequest::eq(&self, &rcp::iseled::IseledRequest) -> bool
+pub fn rcp::iseled::IseledRequest::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::iseled::IseledRequest
 pub fn rcp::iseled::IseledRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::iseled::IseledRequest
@@ -1712,12 +1712,12 @@ impl core::panic::unwind_safe::RefUnwindSafe for rcp::iseled::IseledRequest
 impl core::panic::unwind_safe::UnwindSafe for rcp::iseled::IseledRequest
 pub struct rcp::iseled::IseledCollectedResponse(pub alloc::vec::Vec<rcp::iseled::IseledDeviceResponse>)
 impl core::clone::Clone for rcp::iseled::IseledCollectedResponse
-pub fn rcp::iseled::IseledCollectedResponse::clone(&self) -> rcp::iseled::IseledCollectedResponse
+pub fn rcp::iseled::IseledCollectedResponse::clone(&self) -> Self
 impl core::cmp::Eq for rcp::iseled::IseledCollectedResponse
 impl core::cmp::PartialEq for rcp::iseled::IseledCollectedResponse
-pub fn rcp::iseled::IseledCollectedResponse::eq(&self, &rcp::iseled::IseledCollectedResponse) -> bool
+pub fn rcp::iseled::IseledCollectedResponse::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::iseled::IseledCollectedResponse
-pub fn rcp::iseled::IseledCollectedResponse::default() -> rcp::iseled::IseledCollectedResponse
+pub fn rcp::iseled::IseledCollectedResponse::default() -> Self
 impl core::fmt::Debug for rcp::iseled::IseledCollectedResponse
 pub fn rcp::iseled::IseledCollectedResponse::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::iseled::IseledCollectedResponse
@@ -1732,12 +1732,12 @@ pub struct rcp::iseled::IseledDeviceResponse
 pub rcp::iseled::IseledDeviceResponse::chain_address: u8
 pub rcp::iseled::IseledDeviceResponse::data: alloc::vec::Vec<u8>
 impl core::clone::Clone for rcp::iseled::IseledDeviceResponse
-pub fn rcp::iseled::IseledDeviceResponse::clone(&self) -> rcp::iseled::IseledDeviceResponse
+pub fn rcp::iseled::IseledDeviceResponse::clone(&self) -> Self
 impl core::cmp::Eq for rcp::iseled::IseledDeviceResponse
 impl core::cmp::PartialEq for rcp::iseled::IseledDeviceResponse
-pub fn rcp::iseled::IseledDeviceResponse::eq(&self, &rcp::iseled::IseledDeviceResponse) -> bool
+pub fn rcp::iseled::IseledDeviceResponse::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::iseled::IseledDeviceResponse
-pub fn rcp::iseled::IseledDeviceResponse::default() -> rcp::iseled::IseledDeviceResponse
+pub fn rcp::iseled::IseledDeviceResponse::default() -> Self
 impl core::fmt::Debug for rcp::iseled::IseledDeviceResponse
 pub fn rcp::iseled::IseledDeviceResponse::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::iseled::IseledDeviceResponse
@@ -1758,12 +1758,12 @@ pub fn rcp::iseled::IseledFrame::decode_line(&[u8]) -> core::result::Result<Self
 pub fn rcp::iseled::IseledFrame::encode(&self) -> alloc::vec::Vec<u8>
 pub fn rcp::iseled::IseledFrame::encode_line(&self) -> alloc::vec::Vec<u8>
 impl core::clone::Clone for rcp::iseled::IseledFrame
-pub fn rcp::iseled::IseledFrame::clone(&self) -> rcp::iseled::IseledFrame
+pub fn rcp::iseled::IseledFrame::clone(&self) -> Self
 impl core::cmp::Eq for rcp::iseled::IseledFrame
 impl core::cmp::PartialEq for rcp::iseled::IseledFrame
-pub fn rcp::iseled::IseledFrame::eq(&self, &rcp::iseled::IseledFrame) -> bool
+pub fn rcp::iseled::IseledFrame::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::iseled::IseledFrame
-pub fn rcp::iseled::IseledFrame::default() -> rcp::iseled::IseledFrame
+pub fn rcp::iseled::IseledFrame::default() -> Self
 impl core::fmt::Debug for rcp::iseled::IseledFrame
 pub fn rcp::iseled::IseledFrame::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::iseled::IseledFrame
@@ -1779,12 +1779,12 @@ pub rcp::iseled::IseledFunctionalConfig::native_crc_enabled: bool
 impl rcp::iseled::IseledFunctionalConfig
 pub fn rcp::iseled::IseledFunctionalConfig::layer_tag(&self) -> rcp::regmap::PerEpTypeFunctionalConfig
 impl core::clone::Clone for rcp::iseled::IseledFunctionalConfig
-pub fn rcp::iseled::IseledFunctionalConfig::clone(&self) -> rcp::iseled::IseledFunctionalConfig
+pub fn rcp::iseled::IseledFunctionalConfig::clone(&self) -> Self
 impl core::cmp::Eq for rcp::iseled::IseledFunctionalConfig
 impl core::cmp::PartialEq for rcp::iseled::IseledFunctionalConfig
-pub fn rcp::iseled::IseledFunctionalConfig::eq(&self, &rcp::iseled::IseledFunctionalConfig) -> bool
+pub fn rcp::iseled::IseledFunctionalConfig::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::iseled::IseledFunctionalConfig
-pub fn rcp::iseled::IseledFunctionalConfig::default() -> rcp::iseled::IseledFunctionalConfig
+pub fn rcp::iseled::IseledFunctionalConfig::default() -> Self
 impl core::fmt::Debug for rcp::iseled::IseledFunctionalConfig
 pub fn rcp::iseled::IseledFunctionalConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::iseled::IseledFunctionalConfig
@@ -1806,14 +1806,14 @@ pub rcp::iso21434::Feasibility::High
 pub rcp::iso21434::Feasibility::Low
 pub rcp::iso21434::Feasibility::Medium
 impl core::clone::Clone for rcp::iso21434::Feasibility
-pub fn rcp::iso21434::Feasibility::clone(&self) -> rcp::iso21434::Feasibility
+pub fn rcp::iso21434::Feasibility::clone(&self) -> Self
 impl core::cmp::Eq for rcp::iso21434::Feasibility
 impl core::cmp::Ord for rcp::iso21434::Feasibility
-pub fn rcp::iso21434::Feasibility::cmp(&self, &rcp::iso21434::Feasibility) -> core::cmp::Ordering
+pub fn rcp::iso21434::Feasibility::cmp(&self, &Self) -> core::cmp::Ordering
 impl core::cmp::PartialEq for rcp::iso21434::Feasibility
-pub fn rcp::iso21434::Feasibility::eq(&self, &rcp::iso21434::Feasibility) -> bool
+pub fn rcp::iso21434::Feasibility::eq(&self, &Self) -> bool
 impl core::cmp::PartialOrd for rcp::iso21434::Feasibility
-pub fn rcp::iso21434::Feasibility::partial_cmp(&self, &rcp::iso21434::Feasibility) -> core::option::Option<core::cmp::Ordering>
+pub fn rcp::iso21434::Feasibility::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
 impl core::fmt::Debug for rcp::iso21434::Feasibility
 pub fn rcp::iso21434::Feasibility::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::fmt::Display for rcp::iso21434::Feasibility
@@ -1833,14 +1833,14 @@ pub rcp::iso21434::Impact::Moderate
 pub rcp::iso21434::Impact::Negligible
 pub rcp::iso21434::Impact::Severe
 impl core::clone::Clone for rcp::iso21434::Impact
-pub fn rcp::iso21434::Impact::clone(&self) -> rcp::iso21434::Impact
+pub fn rcp::iso21434::Impact::clone(&self) -> Self
 impl core::cmp::Eq for rcp::iso21434::Impact
 impl core::cmp::Ord for rcp::iso21434::Impact
-pub fn rcp::iso21434::Impact::cmp(&self, &rcp::iso21434::Impact) -> core::cmp::Ordering
+pub fn rcp::iso21434::Impact::cmp(&self, &Self) -> core::cmp::Ordering
 impl core::cmp::PartialEq for rcp::iso21434::Impact
-pub fn rcp::iso21434::Impact::eq(&self, &rcp::iso21434::Impact) -> bool
+pub fn rcp::iso21434::Impact::eq(&self, &Self) -> bool
 impl core::cmp::PartialOrd for rcp::iso21434::Impact
-pub fn rcp::iso21434::Impact::partial_cmp(&self, &rcp::iso21434::Impact) -> core::option::Option<core::cmp::Ordering>
+pub fn rcp::iso21434::Impact::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
 impl core::fmt::Debug for rcp::iso21434::Impact
 pub fn rcp::iso21434::Impact::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::fmt::Display for rcp::iso21434::Impact
@@ -1860,10 +1860,10 @@ pub rcp::iso21434::RiskLevel::High
 pub rcp::iso21434::RiskLevel::Low
 pub rcp::iso21434::RiskLevel::Medium
 impl core::clone::Clone for rcp::iso21434::RiskLevel
-pub fn rcp::iso21434::RiskLevel::clone(&self) -> rcp::iso21434::RiskLevel
+pub fn rcp::iso21434::RiskLevel::clone(&self) -> Self
 impl core::cmp::Eq for rcp::iso21434::RiskLevel
 impl core::cmp::PartialEq for rcp::iso21434::RiskLevel
-pub fn rcp::iso21434::RiskLevel::eq(&self, &rcp::iso21434::RiskLevel) -> bool
+pub fn rcp::iso21434::RiskLevel::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::iso21434::RiskLevel
 pub fn rcp::iso21434::RiskLevel::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::iso21434::RiskLevel
@@ -1883,7 +1883,7 @@ pub rcp::iso21434::Threat::impact: rcp::iso21434::Impact
 impl rcp::iso21434::Threat
 pub fn rcp::iso21434::Threat::risk_level(&self) -> rcp::iso21434::RiskLevel
 impl core::clone::Clone for rcp::iso21434::Threat
-pub fn rcp::iso21434::Threat::clone(&self) -> rcp::iso21434::Threat
+pub fn rcp::iso21434::Threat::clone(&self) -> Self
 impl core::fmt::Debug for rcp::iso21434::Threat
 pub fn rcp::iso21434::Threat::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for rcp::iso21434::Threat
@@ -1901,7 +1901,7 @@ impl rcp::l2::L2Transport
 pub fn rcp::l2::L2Transport::close(&self) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::l2::L2Transport::dest_mac(&self) -> [u8; 6]
 pub fn rcp::l2::L2Transport::local_stream(&self) -> rcp::avtp::StreamId
-pub fn rcp::l2::L2Transport::new(rcp::avtp::StreamId, alloc::sync::Arc<dyn rcp::l2::L2Socket>, [u8; 6], [u8; 6]) -> Self
+pub fn rcp::l2::L2Transport::new(rcp::avtp::StreamId, alloc::rcs::arc::Arc<dyn rcp::l2::L2Socket>, [u8; 6], [u8; 6]) -> Self
 pub fn rcp::l2::L2Transport::send_acf_abb(&self, &rcp::acf::AcfAbbMessage, u8, core::option::Option<core::time::Duration>) -> core::result::Result<rcp::acf::AcfAbbMessage, rcp::RcpError>
 pub fn rcp::l2::L2Transport::send_acf_gbb(&self, &rcp::acf::AcfGbbMessage, u8, core::option::Option<core::time::Duration>) -> core::result::Result<rcp::acf::AcfGbbMessage, rcp::RcpError>
 pub fn rcp::l2::L2Transport::src_mac(&self) -> [u8; 6]
@@ -1943,10 +1943,10 @@ pub enum rcp::lifecycle::LockPolicy
 pub rcp::lifecycle::LockPolicy::W
 pub rcp::lifecycle::LockPolicy::WStar
 impl core::clone::Clone for rcp::lifecycle::LockPolicy
-pub fn rcp::lifecycle::LockPolicy::clone(&self) -> rcp::lifecycle::LockPolicy
+pub fn rcp::lifecycle::LockPolicy::clone(&self) -> Self
 impl core::cmp::Eq for rcp::lifecycle::LockPolicy
 impl core::cmp::PartialEq for rcp::lifecycle::LockPolicy
-pub fn rcp::lifecycle::LockPolicy::eq(&self, &rcp::lifecycle::LockPolicy) -> bool
+pub fn rcp::lifecycle::LockPolicy::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::lifecycle::LockPolicy
 pub fn rcp::lifecycle::LockPolicy::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::lifecycle::LockPolicy
@@ -1969,10 +1969,10 @@ pub fn rcp::lifecycle::RcServerState::to_u8(self) -> u8
 impl rcp::lifecycle::RcServerState
 pub fn rcp::lifecycle::RcServerState::try_transition(self, Self, impl core::ops::function::FnOnce() -> bool) -> core::result::Result<Self, rcp::RcpError>
 impl core::clone::Clone for rcp::lifecycle::RcServerState
-pub fn rcp::lifecycle::RcServerState::clone(&self) -> rcp::lifecycle::RcServerState
+pub fn rcp::lifecycle::RcServerState::clone(&self) -> Self
 impl core::cmp::Eq for rcp::lifecycle::RcServerState
 impl core::cmp::PartialEq for rcp::lifecycle::RcServerState
-pub fn rcp::lifecycle::RcServerState::eq(&self, &rcp::lifecycle::RcServerState) -> bool
+pub fn rcp::lifecycle::RcServerState::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::lifecycle::RcServerState
 pub fn rcp::lifecycle::RcServerState::default() -> Self
 impl core::fmt::Debug for rcp::lifecycle::RcServerState
@@ -1995,10 +1995,10 @@ pub rcp::lifecycle::RegisterCategory::General
 pub rcp::lifecycle::RegisterCategory::HwConfig
 pub rcp::lifecycle::RegisterCategory::RcpConfig
 impl core::clone::Clone for rcp::lifecycle::RegisterCategory
-pub fn rcp::lifecycle::RegisterCategory::clone(&self) -> rcp::lifecycle::RegisterCategory
+pub fn rcp::lifecycle::RegisterCategory::clone(&self) -> Self
 impl core::cmp::Eq for rcp::lifecycle::RegisterCategory
 impl core::cmp::PartialEq for rcp::lifecycle::RegisterCategory
-pub fn rcp::lifecycle::RegisterCategory::eq(&self, &rcp::lifecycle::RegisterCategory) -> bool
+pub fn rcp::lifecycle::RegisterCategory::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::lifecycle::RegisterCategory
 pub fn rcp::lifecycle::RegisterCategory::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::lifecycle::RegisterCategory
@@ -2023,10 +2023,10 @@ pub rcp::lin::LinRequest::Plain(rcp::lin::LinFrameTransfer)
 impl rcp::lin::LinRequest
 pub fn rcp::lin::LinRequest::from_evt_sub_opcode(u8, &[u8]) -> core::result::Result<Self, rcp::RcpError>
 impl core::clone::Clone for rcp::lin::LinRequest
-pub fn rcp::lin::LinRequest::clone(&self) -> rcp::lin::LinRequest
+pub fn rcp::lin::LinRequest::clone(&self) -> Self
 impl core::cmp::Eq for rcp::lin::LinRequest
 impl core::cmp::PartialEq for rcp::lin::LinRequest
-pub fn rcp::lin::LinRequest::eq(&self, &rcp::lin::LinRequest) -> bool
+pub fn rcp::lin::LinRequest::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::lin::LinRequest
 pub fn rcp::lin::LinRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::lin::LinRequest
@@ -2044,12 +2044,12 @@ impl rcp::lin::LinFrameTransfer
 pub fn rcp::lin::LinFrameTransfer::decode(&[u8]) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::lin::LinFrameTransfer::encode(&self) -> alloc::vec::Vec<u8>
 impl core::clone::Clone for rcp::lin::LinFrameTransfer
-pub fn rcp::lin::LinFrameTransfer::clone(&self) -> rcp::lin::LinFrameTransfer
+pub fn rcp::lin::LinFrameTransfer::clone(&self) -> Self
 impl core::cmp::Eq for rcp::lin::LinFrameTransfer
 impl core::cmp::PartialEq for rcp::lin::LinFrameTransfer
-pub fn rcp::lin::LinFrameTransfer::eq(&self, &rcp::lin::LinFrameTransfer) -> bool
+pub fn rcp::lin::LinFrameTransfer::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::lin::LinFrameTransfer
-pub fn rcp::lin::LinFrameTransfer::default() -> rcp::lin::LinFrameTransfer
+pub fn rcp::lin::LinFrameTransfer::default() -> Self
 impl core::fmt::Debug for rcp::lin::LinFrameTransfer
 pub fn rcp::lin::LinFrameTransfer::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::lin::LinFrameTransfer
@@ -2066,12 +2066,12 @@ impl rcp::lin::LinFrameTransferResult
 pub fn rcp::lin::LinFrameTransferResult::decode(&[u8]) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::lin::LinFrameTransferResult::encode(&self) -> alloc::vec::Vec<u8>
 impl core::clone::Clone for rcp::lin::LinFrameTransferResult
-pub fn rcp::lin::LinFrameTransferResult::clone(&self) -> rcp::lin::LinFrameTransferResult
+pub fn rcp::lin::LinFrameTransferResult::clone(&self) -> Self
 impl core::cmp::Eq for rcp::lin::LinFrameTransferResult
 impl core::cmp::PartialEq for rcp::lin::LinFrameTransferResult
-pub fn rcp::lin::LinFrameTransferResult::eq(&self, &rcp::lin::LinFrameTransferResult) -> bool
+pub fn rcp::lin::LinFrameTransferResult::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::lin::LinFrameTransferResult
-pub fn rcp::lin::LinFrameTransferResult::default() -> rcp::lin::LinFrameTransferResult
+pub fn rcp::lin::LinFrameTransferResult::default() -> Self
 impl core::fmt::Debug for rcp::lin::LinFrameTransferResult
 pub fn rcp::lin::LinFrameTransferResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::lin::LinFrameTransferResult
@@ -2086,12 +2086,12 @@ pub struct rcp::lin::LinFunctionalConfig
 impl rcp::lin::LinFunctionalConfig
 pub fn rcp::lin::LinFunctionalConfig::layer_tag(&self) -> rcp::regmap::PerEpTypeFunctionalConfig
 impl core::clone::Clone for rcp::lin::LinFunctionalConfig
-pub fn rcp::lin::LinFunctionalConfig::clone(&self) -> rcp::lin::LinFunctionalConfig
+pub fn rcp::lin::LinFunctionalConfig::clone(&self) -> Self
 impl core::cmp::Eq for rcp::lin::LinFunctionalConfig
 impl core::cmp::PartialEq for rcp::lin::LinFunctionalConfig
-pub fn rcp::lin::LinFunctionalConfig::eq(&self, &rcp::lin::LinFunctionalConfig) -> bool
+pub fn rcp::lin::LinFunctionalConfig::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::lin::LinFunctionalConfig
-pub fn rcp::lin::LinFunctionalConfig::default() -> rcp::lin::LinFunctionalConfig
+pub fn rcp::lin::LinFunctionalConfig::default() -> Self
 impl core::fmt::Debug for rcp::lin::LinFunctionalConfig
 pub fn rcp::lin::LinFunctionalConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::lin::LinFunctionalConfig
@@ -2122,7 +2122,7 @@ impl core::panic::unwind_safe::UnwindSafe for rcp::loan::LoanPool
 pub struct rcp::loan::LoanPoolEndpoint
 impl rcp::loan::LoanPoolEndpoint
 pub fn rcp::loan::LoanPoolEndpoint::loan(&self, usize) -> core::result::Result<rcp::Loan, rcp::RcpError>
-pub fn rcp::loan::LoanPoolEndpoint::new(alloc::sync::Arc<dyn rcp::mock::Endpoint>, alloc::sync::Arc<rcp::loan::LoanPool>) -> Self
+pub fn rcp::loan::LoanPoolEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>, alloc::rcs::arc::Arc<rcp::loan::LoanPool>) -> Self
 pub fn rcp::loan::LoanPoolEndpoint::write_loaned(&self, rcp::Loan) -> core::result::Result<(), rcp::RcpError>
 impl rcp::mock::Endpoint for rcp::loan::LoanPoolEndpoint
 pub fn rcp::loan::LoanPoolEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
@@ -2146,10 +2146,10 @@ pub fn rcp::mdio::MdioAddressingMode::from_u8(u8) -> core::result::Result<Self, 
 pub fn rcp::mdio::MdioAddressingMode::is_unallocated_slot(self) -> bool
 pub fn rcp::mdio::MdioAddressingMode::to_u8(self) -> u8
 impl core::clone::Clone for rcp::mdio::MdioAddressingMode
-pub fn rcp::mdio::MdioAddressingMode::clone(&self) -> rcp::mdio::MdioAddressingMode
+pub fn rcp::mdio::MdioAddressingMode::clone(&self) -> Self
 impl core::cmp::Eq for rcp::mdio::MdioAddressingMode
 impl core::cmp::PartialEq for rcp::mdio::MdioAddressingMode
-pub fn rcp::mdio::MdioAddressingMode::eq(&self, &rcp::mdio::MdioAddressingMode) -> bool
+pub fn rcp::mdio::MdioAddressingMode::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::mdio::MdioAddressingMode
 pub fn rcp::mdio::MdioAddressingMode::default() -> Self
 impl core::fmt::Debug for rcp::mdio::MdioAddressingMode
@@ -2169,10 +2169,10 @@ pub rcp::mdio::MdioRequest::Plain(rcp::mdio::MdioTransfer)
 impl rcp::mdio::MdioRequest
 pub fn rcp::mdio::MdioRequest::from_evt_sub_opcode(u8, rcp::mdio::MdioTransfer) -> core::result::Result<Self, rcp::RcpError>
 impl core::clone::Clone for rcp::mdio::MdioRequest
-pub fn rcp::mdio::MdioRequest::clone(&self) -> rcp::mdio::MdioRequest
+pub fn rcp::mdio::MdioRequest::clone(&self) -> Self
 impl core::cmp::Eq for rcp::mdio::MdioRequest
 impl core::cmp::PartialEq for rcp::mdio::MdioRequest
-pub fn rcp::mdio::MdioRequest::eq(&self, &rcp::mdio::MdioRequest) -> bool
+pub fn rcp::mdio::MdioRequest::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::mdio::MdioRequest
 pub fn rcp::mdio::MdioRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::mdio::MdioRequest
@@ -2188,12 +2188,12 @@ pub rcp::mdio::MdioFunctionalConfig::addressing_mode: rcp::mdio::MdioAddressingM
 impl rcp::mdio::MdioFunctionalConfig
 pub fn rcp::mdio::MdioFunctionalConfig::layer_tag(&self) -> rcp::regmap::PerEpTypeFunctionalConfig
 impl core::clone::Clone for rcp::mdio::MdioFunctionalConfig
-pub fn rcp::mdio::MdioFunctionalConfig::clone(&self) -> rcp::mdio::MdioFunctionalConfig
+pub fn rcp::mdio::MdioFunctionalConfig::clone(&self) -> Self
 impl core::cmp::Eq for rcp::mdio::MdioFunctionalConfig
 impl core::cmp::PartialEq for rcp::mdio::MdioFunctionalConfig
-pub fn rcp::mdio::MdioFunctionalConfig::eq(&self, &rcp::mdio::MdioFunctionalConfig) -> bool
+pub fn rcp::mdio::MdioFunctionalConfig::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::mdio::MdioFunctionalConfig
-pub fn rcp::mdio::MdioFunctionalConfig::default() -> rcp::mdio::MdioFunctionalConfig
+pub fn rcp::mdio::MdioFunctionalConfig::default() -> Self
 impl core::fmt::Debug for rcp::mdio::MdioFunctionalConfig
 pub fn rcp::mdio::MdioFunctionalConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::mdio::MdioFunctionalConfig
@@ -2211,12 +2211,12 @@ impl rcp::mdio::MdioTransfer
 pub fn rcp::mdio::MdioTransfer::decode(&[u8]) -> Self
 pub fn rcp::mdio::MdioTransfer::encode(&self) -> alloc::vec::Vec<u8>
 impl core::clone::Clone for rcp::mdio::MdioTransfer
-pub fn rcp::mdio::MdioTransfer::clone(&self) -> rcp::mdio::MdioTransfer
+pub fn rcp::mdio::MdioTransfer::clone(&self) -> Self
 impl core::cmp::Eq for rcp::mdio::MdioTransfer
 impl core::cmp::PartialEq for rcp::mdio::MdioTransfer
-pub fn rcp::mdio::MdioTransfer::eq(&self, &rcp::mdio::MdioTransfer) -> bool
+pub fn rcp::mdio::MdioTransfer::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::mdio::MdioTransfer
-pub fn rcp::mdio::MdioTransfer::default() -> rcp::mdio::MdioTransfer
+pub fn rcp::mdio::MdioTransfer::default() -> Self
 impl core::fmt::Debug for rcp::mdio::MdioTransfer
 pub fn rcp::mdio::MdioTransfer::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::mdio::MdioTransfer
@@ -2233,12 +2233,12 @@ impl rcp::mdio::MdioTransferResult
 pub fn rcp::mdio::MdioTransferResult::decode(&[u8]) -> Self
 pub fn rcp::mdio::MdioTransferResult::encode(&self) -> alloc::vec::Vec<u8>
 impl core::clone::Clone for rcp::mdio::MdioTransferResult
-pub fn rcp::mdio::MdioTransferResult::clone(&self) -> rcp::mdio::MdioTransferResult
+pub fn rcp::mdio::MdioTransferResult::clone(&self) -> Self
 impl core::cmp::Eq for rcp::mdio::MdioTransferResult
 impl core::cmp::PartialEq for rcp::mdio::MdioTransferResult
-pub fn rcp::mdio::MdioTransferResult::eq(&self, &rcp::mdio::MdioTransferResult) -> bool
+pub fn rcp::mdio::MdioTransferResult::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::mdio::MdioTransferResult
-pub fn rcp::mdio::MdioTransferResult::default() -> rcp::mdio::MdioTransferResult
+pub fn rcp::mdio::MdioTransferResult::default() -> Self
 impl core::fmt::Debug for rcp::mdio::MdioTransferResult
 pub fn rcp::mdio::MdioTransferResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::mdio::MdioTransferResult
@@ -2272,7 +2272,7 @@ pub rcp::mdns::ServiceRecord::port: u16
 pub rcp::mdns::ServiceRecord::stream_id: rcp::avtp::StreamId
 pub rcp::mdns::ServiceRecord::txt: std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String>
 impl core::clone::Clone for rcp::mdns::ServiceRecord
-pub fn rcp::mdns::ServiceRecord::clone(&self) -> rcp::mdns::ServiceRecord
+pub fn rcp::mdns::ServiceRecord::clone(&self) -> Self
 impl core::fmt::Debug for rcp::mdns::ServiceRecord
 pub fn rcp::mdns::ServiceRecord::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for rcp::mdns::ServiceRecord
@@ -2285,7 +2285,7 @@ impl core::panic::unwind_safe::UnwindSafe for rcp::mdns::ServiceRecord
 pub mod rcp::mock
 pub struct rcp::mock::MockEndpoint
 impl rcp::mock::MockEndpoint
-pub fn rcp::mock::MockEndpoint::new(rcp::regmap::EndpointType, alloc::vec::Vec<u8>) -> alloc::sync::Arc<Self>
+pub fn rcp::mock::MockEndpoint::new(rcp::regmap::EndpointType, alloc::vec::Vec<u8>) -> alloc::rcs::arc::Arc<Self>
 impl rcp::mock::Endpoint for rcp::mock::MockEndpoint
 pub fn rcp::mock::MockEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::mock::MockEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
@@ -2302,8 +2302,8 @@ impl rcp::mock::RcServer
 pub fn rcp::mock::RcServer::general_registers(&self) -> rcp::regmap::GeneralRegisters
 pub fn rcp::mock::RcServer::handle_abb(&self, rcp::avtp::StreamId, &rcp::acf::AcfAbbMessage) -> core::result::Result<rcp::acf::AcfAbbMessage, rcp::RcpError>
 pub fn rcp::mock::RcServer::handle_ntscf_frame(&self, rcp::avtp::StreamId, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
-pub fn rcp::mock::RcServer::new(rcp::regmap::GeneralRegisters) -> alloc::sync::Arc<Self>
-pub fn rcp::mock::RcServer::register_endpoint(&self, rcp::avtp::StreamId, u16, alloc::sync::Arc<dyn rcp::mock::Endpoint>) -> core::result::Result<rcp::addressing::EndpointId, rcp::RcpError>
+pub fn rcp::mock::RcServer::new(rcp::regmap::GeneralRegisters) -> alloc::rcs::arc::Arc<Self>
+pub fn rcp::mock::RcServer::register_endpoint(&self, rcp::avtp::StreamId, u16, alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>) -> core::result::Result<rcp::addressing::EndpointId, rcp::RcpError>
 pub fn rcp::mock::RcServer::set_root_client(&self, core::option::Option<rcp::avtp::StreamId>)
 pub fn rcp::mock::RcServer::state(&self) -> rcp::lifecycle::RcServerState
 pub fn rcp::mock::RcServer::try_transition(&self, rcp::lifecycle::RcServerState, impl core::ops::function::FnOnce() -> bool) -> core::result::Result<(), rcp::RcpError>
@@ -2373,7 +2373,7 @@ pub fn rcp::observe::Metrics::errors(&self) -> u64
 pub fn rcp::observe::Metrics::latency_us(&self) -> u64
 pub fn rcp::observe::Metrics::mean_latency_us(&self) -> u64
 impl core::default::Default for rcp::observe::Metrics
-pub fn rcp::observe::Metrics::default() -> rcp::observe::Metrics
+pub fn rcp::observe::Metrics::default() -> Self
 impl core::fmt::Debug for rcp::observe::Metrics
 pub fn rcp::observe::Metrics::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl !core::marker::Freeze for rcp::observe::Metrics
@@ -2387,8 +2387,8 @@ pub struct rcp::observe::ObserveEndpoint
 impl rcp::observe::ObserveEndpoint
 pub fn rcp::observe::ObserveEndpoint::add_read_hook(&self, impl core::ops::function::Fn(u16, &core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>, core::time::Duration) + core::marker::Send + core::marker::Sync + 'static)
 pub fn rcp::observe::ObserveEndpoint::add_write_hook(&self, impl core::ops::function::Fn(&[u8], &core::result::Result<(), rcp::RcpError>, core::time::Duration) + core::marker::Send + core::marker::Sync + 'static)
-pub fn rcp::observe::ObserveEndpoint::metrics(&self) -> alloc::sync::Arc<rcp::observe::Metrics>
-pub fn rcp::observe::ObserveEndpoint::new(alloc::sync::Arc<dyn rcp::mock::Endpoint>) -> Self
+pub fn rcp::observe::ObserveEndpoint::metrics(&self) -> alloc::rcs::arc::Arc<rcp::observe::Metrics>
+pub fn rcp::observe::ObserveEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>) -> Self
 impl rcp::mock::Endpoint for rcp::observe::ObserveEndpoint
 pub fn rcp::observe::ObserveEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::observe::ObserveEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
@@ -2409,10 +2409,10 @@ pub rcp::powerstate::PowerMode::Unpowered
 impl rcp::powerstate::PowerMode
 pub fn rcp::powerstate::PowerMode::as_str(self) -> &'static str
 impl core::clone::Clone for rcp::powerstate::PowerMode
-pub fn rcp::powerstate::PowerMode::clone(&self) -> rcp::powerstate::PowerMode
+pub fn rcp::powerstate::PowerMode::clone(&self) -> Self
 impl core::cmp::Eq for rcp::powerstate::PowerMode
 impl core::cmp::PartialEq for rcp::powerstate::PowerMode
-pub fn rcp::powerstate::PowerMode::eq(&self, &rcp::powerstate::PowerMode) -> bool
+pub fn rcp::powerstate::PowerMode::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::powerstate::PowerMode
 pub fn rcp::powerstate::PowerMode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::powerstate::PowerMode
@@ -2428,10 +2428,10 @@ pub enum rcp::powerstate::StartupPath
 pub rcp::powerstate::StartupPath::Cold
 pub rcp::powerstate::StartupPath::Hot
 impl core::clone::Clone for rcp::powerstate::StartupPath
-pub fn rcp::powerstate::StartupPath::clone(&self) -> rcp::powerstate::StartupPath
+pub fn rcp::powerstate::StartupPath::clone(&self) -> Self
 impl core::cmp::Eq for rcp::powerstate::StartupPath
 impl core::cmp::PartialEq for rcp::powerstate::StartupPath
-pub fn rcp::powerstate::StartupPath::eq(&self, &rcp::powerstate::StartupPath) -> bool
+pub fn rcp::powerstate::StartupPath::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::powerstate::StartupPath
 pub fn rcp::powerstate::StartupPath::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::powerstate::StartupPath
@@ -2448,12 +2448,12 @@ pub rcp::powerstate::WakeUpHandshakeState::Acknowledged
 pub rcp::powerstate::WakeUpHandshakeState::Idle
 pub rcp::powerstate::WakeUpHandshakeState::RequestSent
 impl core::clone::Clone for rcp::powerstate::WakeUpHandshakeState
-pub fn rcp::powerstate::WakeUpHandshakeState::clone(&self) -> rcp::powerstate::WakeUpHandshakeState
+pub fn rcp::powerstate::WakeUpHandshakeState::clone(&self) -> Self
 impl core::cmp::Eq for rcp::powerstate::WakeUpHandshakeState
 impl core::cmp::PartialEq for rcp::powerstate::WakeUpHandshakeState
-pub fn rcp::powerstate::WakeUpHandshakeState::eq(&self, &rcp::powerstate::WakeUpHandshakeState) -> bool
+pub fn rcp::powerstate::WakeUpHandshakeState::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::powerstate::WakeUpHandshakeState
-pub fn rcp::powerstate::WakeUpHandshakeState::default() -> rcp::powerstate::WakeUpHandshakeState
+pub fn rcp::powerstate::WakeUpHandshakeState::default() -> Self
 impl core::fmt::Debug for rcp::powerstate::WakeUpHandshakeState
 pub fn rcp::powerstate::WakeUpHandshakeState::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::powerstate::WakeUpHandshakeState
@@ -2469,12 +2469,12 @@ pub struct rcp::powerstate::PowerModeGateInput
 pub rcp::powerstate::PowerModeGateInput::all_endpoints_idle: bool
 pub rcp::powerstate::PowerModeGateInput::no_pending_response: bool
 impl core::clone::Clone for rcp::powerstate::PowerModeGateInput
-pub fn rcp::powerstate::PowerModeGateInput::clone(&self) -> rcp::powerstate::PowerModeGateInput
+pub fn rcp::powerstate::PowerModeGateInput::clone(&self) -> Self
 impl core::cmp::Eq for rcp::powerstate::PowerModeGateInput
 impl core::cmp::PartialEq for rcp::powerstate::PowerModeGateInput
-pub fn rcp::powerstate::PowerModeGateInput::eq(&self, &rcp::powerstate::PowerModeGateInput) -> bool
+pub fn rcp::powerstate::PowerModeGateInput::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::powerstate::PowerModeGateInput
-pub fn rcp::powerstate::PowerModeGateInput::default() -> rcp::powerstate::PowerModeGateInput
+pub fn rcp::powerstate::PowerModeGateInput::default() -> Self
 impl core::fmt::Debug for rcp::powerstate::PowerModeGateInput
 pub fn rcp::powerstate::PowerModeGateInput::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::powerstate::PowerModeGateInput
@@ -2500,8 +2500,8 @@ pub mod rcp::proxy
 pub struct rcp::proxy::ProxyEndpoint
 impl rcp::proxy::ProxyEndpoint
 pub fn rcp::proxy::ProxyEndpoint::detach(&self)
-pub fn rcp::proxy::ProxyEndpoint::new(alloc::sync::Arc<dyn rcp::mock::Endpoint>) -> Self
-pub fn rcp::proxy::ProxyEndpoint::swap(&self, alloc::sync::Arc<dyn rcp::mock::Endpoint>)
+pub fn rcp::proxy::ProxyEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>) -> Self
+pub fn rcp::proxy::ProxyEndpoint::swap(&self, alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>)
 impl rcp::mock::Endpoint for rcp::proxy::ProxyEndpoint
 pub fn rcp::proxy::ProxyEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::proxy::ProxyEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
@@ -2518,10 +2518,10 @@ pub enum rcp::pwm::PwmInReadResolution
 pub rcp::pwm::PwmInReadResolution::Measured(rcp::pwm::PwmDurationPair)
 pub rcp::pwm::PwmInReadResolution::NoSignal
 impl core::clone::Clone for rcp::pwm::PwmInReadResolution
-pub fn rcp::pwm::PwmInReadResolution::clone(&self) -> rcp::pwm::PwmInReadResolution
+pub fn rcp::pwm::PwmInReadResolution::clone(&self) -> Self
 impl core::cmp::Eq for rcp::pwm::PwmInReadResolution
 impl core::cmp::PartialEq for rcp::pwm::PwmInReadResolution
-pub fn rcp::pwm::PwmInReadResolution::eq(&self, &rcp::pwm::PwmInReadResolution) -> bool
+pub fn rcp::pwm::PwmInReadResolution::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::pwm::PwmInReadResolution
 pub fn rcp::pwm::PwmInReadResolution::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::pwm::PwmInReadResolution
@@ -2539,10 +2539,10 @@ pub rcp::pwm::PwmInRequest::Plain(rcp::pwm::PwmInByteTransfer)
 impl rcp::pwm::PwmInRequest
 pub fn rcp::pwm::PwmInRequest::from_evt_sub_opcode(u8, &[u8]) -> core::result::Result<Self, rcp::RcpError>
 impl core::clone::Clone for rcp::pwm::PwmInRequest
-pub fn rcp::pwm::PwmInRequest::clone(&self) -> rcp::pwm::PwmInRequest
+pub fn rcp::pwm::PwmInRequest::clone(&self) -> Self
 impl core::cmp::Eq for rcp::pwm::PwmInRequest
 impl core::cmp::PartialEq for rcp::pwm::PwmInRequest
-pub fn rcp::pwm::PwmInRequest::eq(&self, &rcp::pwm::PwmInRequest) -> bool
+pub fn rcp::pwm::PwmInRequest::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::pwm::PwmInRequest
 pub fn rcp::pwm::PwmInRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::pwm::PwmInRequest
@@ -2557,12 +2557,12 @@ pub struct rcp::pwm::PwmDurationPair
 pub rcp::pwm::PwmDurationPair::active_duration: u32
 pub rcp::pwm::PwmDurationPair::period: u32
 impl core::clone::Clone for rcp::pwm::PwmDurationPair
-pub fn rcp::pwm::PwmDurationPair::clone(&self) -> rcp::pwm::PwmDurationPair
+pub fn rcp::pwm::PwmDurationPair::clone(&self) -> Self
 impl core::cmp::Eq for rcp::pwm::PwmDurationPair
 impl core::cmp::PartialEq for rcp::pwm::PwmDurationPair
-pub fn rcp::pwm::PwmDurationPair::eq(&self, &rcp::pwm::PwmDurationPair) -> bool
+pub fn rcp::pwm::PwmDurationPair::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::pwm::PwmDurationPair
-pub fn rcp::pwm::PwmDurationPair::default() -> rcp::pwm::PwmDurationPair
+pub fn rcp::pwm::PwmDurationPair::default() -> Self
 impl core::fmt::Debug for rcp::pwm::PwmDurationPair
 pub fn rcp::pwm::PwmDurationPair::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::pwm::PwmDurationPair
@@ -2580,12 +2580,12 @@ impl rcp::pwm::PwmInByteTransfer
 pub fn rcp::pwm::PwmInByteTransfer::decode(&[u8]) -> Self
 pub fn rcp::pwm::PwmInByteTransfer::encode(&self) -> alloc::vec::Vec<u8>
 impl core::clone::Clone for rcp::pwm::PwmInByteTransfer
-pub fn rcp::pwm::PwmInByteTransfer::clone(&self) -> rcp::pwm::PwmInByteTransfer
+pub fn rcp::pwm::PwmInByteTransfer::clone(&self) -> Self
 impl core::cmp::Eq for rcp::pwm::PwmInByteTransfer
 impl core::cmp::PartialEq for rcp::pwm::PwmInByteTransfer
-pub fn rcp::pwm::PwmInByteTransfer::eq(&self, &rcp::pwm::PwmInByteTransfer) -> bool
+pub fn rcp::pwm::PwmInByteTransfer::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::pwm::PwmInByteTransfer
-pub fn rcp::pwm::PwmInByteTransfer::default() -> rcp::pwm::PwmInByteTransfer
+pub fn rcp::pwm::PwmInByteTransfer::default() -> Self
 impl core::fmt::Debug for rcp::pwm::PwmInByteTransfer
 pub fn rcp::pwm::PwmInByteTransfer::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::pwm::PwmInByteTransfer
@@ -2601,12 +2601,12 @@ pub rcp::pwm::PwmInFunctionalConfig::no_signal_timeout: u32
 impl rcp::pwm::PwmInFunctionalConfig
 pub fn rcp::pwm::PwmInFunctionalConfig::layer_tag(&self) -> rcp::regmap::PerEpTypeFunctionalConfig
 impl core::clone::Clone for rcp::pwm::PwmInFunctionalConfig
-pub fn rcp::pwm::PwmInFunctionalConfig::clone(&self) -> rcp::pwm::PwmInFunctionalConfig
+pub fn rcp::pwm::PwmInFunctionalConfig::clone(&self) -> Self
 impl core::cmp::Eq for rcp::pwm::PwmInFunctionalConfig
 impl core::cmp::PartialEq for rcp::pwm::PwmInFunctionalConfig
-pub fn rcp::pwm::PwmInFunctionalConfig::eq(&self, &rcp::pwm::PwmInFunctionalConfig) -> bool
+pub fn rcp::pwm::PwmInFunctionalConfig::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::pwm::PwmInFunctionalConfig
-pub fn rcp::pwm::PwmInFunctionalConfig::default() -> rcp::pwm::PwmInFunctionalConfig
+pub fn rcp::pwm::PwmInFunctionalConfig::default() -> Self
 impl core::fmt::Debug for rcp::pwm::PwmInFunctionalConfig
 pub fn rcp::pwm::PwmInFunctionalConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::pwm::PwmInFunctionalConfig
@@ -2623,12 +2623,12 @@ pub rcp::pwm::PwmOutFunctionalConfig::target: rcp::pwm::PwmDurationPair
 impl rcp::pwm::PwmOutFunctionalConfig
 pub fn rcp::pwm::PwmOutFunctionalConfig::layer_tag(&self) -> rcp::regmap::PerEpTypeFunctionalConfig
 impl core::clone::Clone for rcp::pwm::PwmOutFunctionalConfig
-pub fn rcp::pwm::PwmOutFunctionalConfig::clone(&self) -> rcp::pwm::PwmOutFunctionalConfig
+pub fn rcp::pwm::PwmOutFunctionalConfig::clone(&self) -> Self
 impl core::cmp::Eq for rcp::pwm::PwmOutFunctionalConfig
 impl core::cmp::PartialEq for rcp::pwm::PwmOutFunctionalConfig
-pub fn rcp::pwm::PwmOutFunctionalConfig::eq(&self, &rcp::pwm::PwmOutFunctionalConfig) -> bool
+pub fn rcp::pwm::PwmOutFunctionalConfig::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::pwm::PwmOutFunctionalConfig
-pub fn rcp::pwm::PwmOutFunctionalConfig::default() -> rcp::pwm::PwmOutFunctionalConfig
+pub fn rcp::pwm::PwmOutFunctionalConfig::default() -> Self
 impl core::fmt::Debug for rcp::pwm::PwmOutFunctionalConfig
 pub fn rcp::pwm::PwmOutFunctionalConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::pwm::PwmOutFunctionalConfig
@@ -2646,7 +2646,7 @@ pub struct rcp::ratelimit::Config
 pub rcp::ratelimit::Config::burst: f64
 pub rcp::ratelimit::Config::rate: f64
 impl core::clone::Clone for rcp::ratelimit::Config
-pub fn rcp::ratelimit::Config::clone(&self) -> rcp::ratelimit::Config
+pub fn rcp::ratelimit::Config::clone(&self) -> Self
 impl core::fmt::Debug for rcp::ratelimit::Config
 pub fn rcp::ratelimit::Config::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for rcp::ratelimit::Config
@@ -2658,8 +2658,8 @@ impl core::panic::unwind_safe::RefUnwindSafe for rcp::ratelimit::Config
 impl core::panic::unwind_safe::UnwindSafe for rcp::ratelimit::Config
 pub struct rcp::ratelimit::RateLimitEndpoint
 impl rcp::ratelimit::RateLimitEndpoint
-pub fn rcp::ratelimit::RateLimitEndpoint::new(alloc::sync::Arc<dyn rcp::mock::Endpoint>, rcp::ratelimit::Config) -> Self
-pub fn rcp::ratelimit::RateLimitEndpoint::new_default(alloc::sync::Arc<dyn rcp::mock::Endpoint>) -> Self
+pub fn rcp::ratelimit::RateLimitEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>, rcp::ratelimit::Config) -> Self
+pub fn rcp::ratelimit::RateLimitEndpoint::new_default(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>) -> Self
 impl rcp::mock::Endpoint for rcp::ratelimit::RateLimitEndpoint
 pub fn rcp::ratelimit::RateLimitEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::ratelimit::RateLimitEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
@@ -2686,7 +2686,7 @@ impl rcp::record::Entry
 pub fn rcp::record::Entry::is_err(&self) -> bool
 pub fn rcp::record::Entry::timestamp(&self) -> std::time::SystemTime
 impl core::clone::Clone for rcp::record::Entry
-pub fn rcp::record::Entry::clone(&self) -> rcp::record::Entry
+pub fn rcp::record::Entry::clone(&self) -> Self
 impl core::fmt::Debug for rcp::record::Entry
 pub fn rcp::record::Entry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for rcp::record::Entry
@@ -2700,7 +2700,7 @@ pub struct rcp::record::RecordEndpoint
 impl rcp::record::RecordEndpoint
 pub fn rcp::record::RecordEndpoint::clear(&self)
 pub fn rcp::record::RecordEndpoint::entries(&self) -> alloc::vec::Vec<rcp::record::Entry>
-pub fn rcp::record::RecordEndpoint::new(alloc::sync::Arc<dyn rcp::mock::Endpoint>) -> Self
+pub fn rcp::record::RecordEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>) -> Self
 impl rcp::mock::Endpoint for rcp::record::RecordEndpoint
 pub fn rcp::record::RecordEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::record::RecordEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
@@ -2717,7 +2717,7 @@ pub struct rcp::redundancy::RedundancyEndpoint
 impl rcp::redundancy::RedundancyEndpoint
 pub fn rcp::redundancy::RedundancyEndpoint::failover_count(&self) -> u32
 pub fn rcp::redundancy::RedundancyEndpoint::has_secondary(&self) -> bool
-pub fn rcp::redundancy::RedundancyEndpoint::new(alloc::sync::Arc<dyn rcp::mock::Endpoint>, alloc::sync::Arc<dyn rcp::mock::Endpoint>) -> Self
+pub fn rcp::redundancy::RedundancyEndpoint::new(alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>, alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>) -> Self
 impl rcp::mock::Endpoint for rcp::redundancy::RedundancyEndpoint
 pub fn rcp::redundancy::RedundancyEndpoint::ep_type(&self) -> rcp::regmap::EndpointType
 pub fn rcp::redundancy::RedundancyEndpoint::read(&self, u16) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
@@ -2735,10 +2735,10 @@ pub rcp::regmap::ConfigLayer::CommonFunctional
 pub rcp::regmap::ConfigLayer::Generic
 pub rcp::regmap::ConfigLayer::PerTypeFunctional(rcp::regmap::EndpointType)
 impl core::clone::Clone for rcp::regmap::ConfigLayer
-pub fn rcp::regmap::ConfigLayer::clone(&self) -> rcp::regmap::ConfigLayer
+pub fn rcp::regmap::ConfigLayer::clone(&self) -> Self
 impl core::cmp::Eq for rcp::regmap::ConfigLayer
 impl core::cmp::PartialEq for rcp::regmap::ConfigLayer
-pub fn rcp::regmap::ConfigLayer::eq(&self, &rcp::regmap::ConfigLayer) -> bool
+pub fn rcp::regmap::ConfigLayer::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::regmap::ConfigLayer
 pub fn rcp::regmap::ConfigLayer::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::regmap::ConfigLayer
@@ -2769,10 +2769,10 @@ pub fn rcp::regmap::EndpointType::from_u8(u8) -> core::result::Result<Self, rcp:
 pub fn rcp::regmap::EndpointType::is_reserved(self) -> bool
 pub fn rcp::regmap::EndpointType::to_u8(self) -> u8
 impl core::clone::Clone for rcp::regmap::EndpointType
-pub fn rcp::regmap::EndpointType::clone(&self) -> rcp::regmap::EndpointType
+pub fn rcp::regmap::EndpointType::clone(&self) -> Self
 impl core::cmp::Eq for rcp::regmap::EndpointType
 impl core::cmp::PartialEq for rcp::regmap::EndpointType
-pub fn rcp::regmap::EndpointType::eq(&self, &rcp::regmap::EndpointType) -> bool
+pub fn rcp::regmap::EndpointType::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::regmap::EndpointType
 pub fn rcp::regmap::EndpointType::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::regmap::EndpointType
@@ -2794,12 +2794,12 @@ pub const rcp::regmap::CommonFunctionalConfig::LAYER: rcp::regmap::ConfigLayer
 pub fn rcp::regmap::CommonFunctionalConfig::decode(&[u8]) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::regmap::CommonFunctionalConfig::encode(&self) -> [u8; 3]
 impl core::clone::Clone for rcp::regmap::CommonFunctionalConfig
-pub fn rcp::regmap::CommonFunctionalConfig::clone(&self) -> rcp::regmap::CommonFunctionalConfig
+pub fn rcp::regmap::CommonFunctionalConfig::clone(&self) -> Self
 impl core::cmp::Eq for rcp::regmap::CommonFunctionalConfig
 impl core::cmp::PartialEq for rcp::regmap::CommonFunctionalConfig
-pub fn rcp::regmap::CommonFunctionalConfig::eq(&self, &rcp::regmap::CommonFunctionalConfig) -> bool
+pub fn rcp::regmap::CommonFunctionalConfig::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::regmap::CommonFunctionalConfig
-pub fn rcp::regmap::CommonFunctionalConfig::default() -> rcp::regmap::CommonFunctionalConfig
+pub fn rcp::regmap::CommonFunctionalConfig::default() -> Self
 impl core::fmt::Debug for rcp::regmap::CommonFunctionalConfig
 pub fn rcp::regmap::CommonFunctionalConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::regmap::CommonFunctionalConfig
@@ -2823,12 +2823,12 @@ pub fn rcp::regmap::EpByteBusIdMapEntry::decode(&[u8]) -> core::result::Result<S
 pub fn rcp::regmap::EpByteBusIdMapEntry::encode(&self) -> [u8; 4]
 pub fn rcp::regmap::EpByteBusIdMapEntry::is_end_of_table(&self) -> bool
 impl core::clone::Clone for rcp::regmap::EpByteBusIdMapEntry
-pub fn rcp::regmap::EpByteBusIdMapEntry::clone(&self) -> rcp::regmap::EpByteBusIdMapEntry
+pub fn rcp::regmap::EpByteBusIdMapEntry::clone(&self) -> Self
 impl core::cmp::Eq for rcp::regmap::EpByteBusIdMapEntry
 impl core::cmp::PartialEq for rcp::regmap::EpByteBusIdMapEntry
-pub fn rcp::regmap::EpByteBusIdMapEntry::eq(&self, &rcp::regmap::EpByteBusIdMapEntry) -> bool
+pub fn rcp::regmap::EpByteBusIdMapEntry::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::regmap::EpByteBusIdMapEntry
-pub fn rcp::regmap::EpByteBusIdMapEntry::default() -> rcp::regmap::EpByteBusIdMapEntry
+pub fn rcp::regmap::EpByteBusIdMapEntry::default() -> Self
 impl core::fmt::Debug for rcp::regmap::EpByteBusIdMapEntry
 pub fn rcp::regmap::EpByteBusIdMapEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::regmap::EpByteBusIdMapEntry
@@ -2880,12 +2880,12 @@ pub fn rcp::regmap::GeneralRegisters::claims_compound_wait_bundle(&self) -> bool
 pub fn rcp::regmap::GeneralRegisters::decode(&[u8]) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::regmap::GeneralRegisters::encode(&self) -> [u8; 65]
 impl core::clone::Clone for rcp::regmap::GeneralRegisters
-pub fn rcp::regmap::GeneralRegisters::clone(&self) -> rcp::regmap::GeneralRegisters
+pub fn rcp::regmap::GeneralRegisters::clone(&self) -> Self
 impl core::cmp::Eq for rcp::regmap::GeneralRegisters
 impl core::cmp::PartialEq for rcp::regmap::GeneralRegisters
-pub fn rcp::regmap::GeneralRegisters::eq(&self, &rcp::regmap::GeneralRegisters) -> bool
+pub fn rcp::regmap::GeneralRegisters::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::regmap::GeneralRegisters
-pub fn rcp::regmap::GeneralRegisters::default() -> rcp::regmap::GeneralRegisters
+pub fn rcp::regmap::GeneralRegisters::default() -> Self
 impl core::fmt::Debug for rcp::regmap::GeneralRegisters
 pub fn rcp::regmap::GeneralRegisters::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::regmap::GeneralRegisters
@@ -2911,12 +2911,12 @@ pub const rcp::regmap::HwPinMappingEntry::ENCODED_LEN: usize
 pub fn rcp::regmap::HwPinMappingEntry::decode(&[u8]) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::regmap::HwPinMappingEntry::encode(&self) -> [u8; 3]
 impl core::clone::Clone for rcp::regmap::HwPinMappingEntry
-pub fn rcp::regmap::HwPinMappingEntry::clone(&self) -> rcp::regmap::HwPinMappingEntry
+pub fn rcp::regmap::HwPinMappingEntry::clone(&self) -> Self
 impl core::cmp::Eq for rcp::regmap::HwPinMappingEntry
 impl core::cmp::PartialEq for rcp::regmap::HwPinMappingEntry
-pub fn rcp::regmap::HwPinMappingEntry::eq(&self, &rcp::regmap::HwPinMappingEntry) -> bool
+pub fn rcp::regmap::HwPinMappingEntry::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::regmap::HwPinMappingEntry
-pub fn rcp::regmap::HwPinMappingEntry::default() -> rcp::regmap::HwPinMappingEntry
+pub fn rcp::regmap::HwPinMappingEntry::default() -> Self
 impl core::fmt::Debug for rcp::regmap::HwPinMappingEntry
 pub fn rcp::regmap::HwPinMappingEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::regmap::HwPinMappingEntry
@@ -2942,10 +2942,10 @@ impl rcp::regmap::PerEpConfigBlock
 pub const rcp::regmap::PerEpConfigBlock::LAYER: rcp::regmap::ConfigLayer
 pub fn rcp::regmap::PerEpConfigBlock::new(rcp::regmap::EndpointType) -> Self
 impl core::clone::Clone for rcp::regmap::PerEpConfigBlock
-pub fn rcp::regmap::PerEpConfigBlock::clone(&self) -> rcp::regmap::PerEpConfigBlock
+pub fn rcp::regmap::PerEpConfigBlock::clone(&self) -> Self
 impl core::cmp::Eq for rcp::regmap::PerEpConfigBlock
 impl core::cmp::PartialEq for rcp::regmap::PerEpConfigBlock
-pub fn rcp::regmap::PerEpConfigBlock::eq(&self, &rcp::regmap::PerEpConfigBlock) -> bool
+pub fn rcp::regmap::PerEpConfigBlock::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::regmap::PerEpConfigBlock
 pub fn rcp::regmap::PerEpConfigBlock::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::regmap::PerEpConfigBlock
@@ -2963,10 +2963,10 @@ impl rcp::regmap::PerEpTypeFunctionalConfig
 pub fn rcp::regmap::PerEpTypeFunctionalConfig::layer(&self) -> rcp::regmap::ConfigLayer
 pub fn rcp::regmap::PerEpTypeFunctionalConfig::new(rcp::regmap::EndpointType) -> Self
 impl core::clone::Clone for rcp::regmap::PerEpTypeFunctionalConfig
-pub fn rcp::regmap::PerEpTypeFunctionalConfig::clone(&self) -> rcp::regmap::PerEpTypeFunctionalConfig
+pub fn rcp::regmap::PerEpTypeFunctionalConfig::clone(&self) -> Self
 impl core::cmp::Eq for rcp::regmap::PerEpTypeFunctionalConfig
 impl core::cmp::PartialEq for rcp::regmap::PerEpTypeFunctionalConfig
-pub fn rcp::regmap::PerEpTypeFunctionalConfig::eq(&self, &rcp::regmap::PerEpTypeFunctionalConfig) -> bool
+pub fn rcp::regmap::PerEpTypeFunctionalConfig::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::regmap::PerEpTypeFunctionalConfig
 pub fn rcp::regmap::PerEpTypeFunctionalConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::regmap::PerEpTypeFunctionalConfig
@@ -3011,12 +3011,12 @@ pub fn rcp::regmap::RequestStreamConfigEntry::decode(&[u8]) -> core::result::Res
 pub fn rcp::regmap::RequestStreamConfigEntry::encode(&self) -> [u8; 24]
 pub fn rcp::regmap::RequestStreamConfigEntry::flags_byte(&self) -> u8
 impl core::clone::Clone for rcp::regmap::RequestStreamConfigEntry
-pub fn rcp::regmap::RequestStreamConfigEntry::clone(&self) -> rcp::regmap::RequestStreamConfigEntry
+pub fn rcp::regmap::RequestStreamConfigEntry::clone(&self) -> Self
 impl core::cmp::Eq for rcp::regmap::RequestStreamConfigEntry
 impl core::cmp::PartialEq for rcp::regmap::RequestStreamConfigEntry
-pub fn rcp::regmap::RequestStreamConfigEntry::eq(&self, &rcp::regmap::RequestStreamConfigEntry) -> bool
+pub fn rcp::regmap::RequestStreamConfigEntry::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::regmap::RequestStreamConfigEntry
-pub fn rcp::regmap::RequestStreamConfigEntry::default() -> rcp::regmap::RequestStreamConfigEntry
+pub fn rcp::regmap::RequestStreamConfigEntry::default() -> Self
 impl core::fmt::Debug for rcp::regmap::RequestStreamConfigEntry
 pub fn rcp::regmap::RequestStreamConfigEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::regmap::RequestStreamConfigEntry
@@ -3048,12 +3048,12 @@ pub const rcp::regmap::ResponseStreamConfigEntry::ENCODED_LEN: usize
 pub fn rcp::regmap::ResponseStreamConfigEntry::decode(&[u8]) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::regmap::ResponseStreamConfigEntry::encode(&self) -> [u8; 10]
 impl core::clone::Clone for rcp::regmap::ResponseStreamConfigEntry
-pub fn rcp::regmap::ResponseStreamConfigEntry::clone(&self) -> rcp::regmap::ResponseStreamConfigEntry
+pub fn rcp::regmap::ResponseStreamConfigEntry::clone(&self) -> Self
 impl core::cmp::Eq for rcp::regmap::ResponseStreamConfigEntry
 impl core::cmp::PartialEq for rcp::regmap::ResponseStreamConfigEntry
-pub fn rcp::regmap::ResponseStreamConfigEntry::eq(&self, &rcp::regmap::ResponseStreamConfigEntry) -> bool
+pub fn rcp::regmap::ResponseStreamConfigEntry::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::regmap::ResponseStreamConfigEntry
-pub fn rcp::regmap::ResponseStreamConfigEntry::default() -> rcp::regmap::ResponseStreamConfigEntry
+pub fn rcp::regmap::ResponseStreamConfigEntry::default() -> Self
 impl core::fmt::Debug for rcp::regmap::ResponseStreamConfigEntry
 pub fn rcp::regmap::ResponseStreamConfigEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::regmap::ResponseStreamConfigEntry
@@ -3083,10 +3083,10 @@ pub fn rcp::regmap::SequencerStateEntry::decode(&[u8]) -> core::result::Result<S
 pub fn rcp::regmap::SequencerStateEntry::encode(&self) -> [u8; 2]
 pub fn rcp::regmap::SequencerStateEntry::power_on_default() -> Self
 impl core::clone::Clone for rcp::regmap::SequencerStateEntry
-pub fn rcp::regmap::SequencerStateEntry::clone(&self) -> rcp::regmap::SequencerStateEntry
+pub fn rcp::regmap::SequencerStateEntry::clone(&self) -> Self
 impl core::cmp::Eq for rcp::regmap::SequencerStateEntry
 impl core::cmp::PartialEq for rcp::regmap::SequencerStateEntry
-pub fn rcp::regmap::SequencerStateEntry::eq(&self, &rcp::regmap::SequencerStateEntry) -> bool
+pub fn rcp::regmap::SequencerStateEntry::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::regmap::SequencerStateEntry
 pub fn rcp::regmap::SequencerStateEntry::default() -> Self
 impl core::fmt::Debug for rcp::regmap::SequencerStateEntry
@@ -3116,12 +3116,12 @@ pub const rcp::regmap::TableDescriptor::ENCODED_LEN: usize
 pub fn rcp::regmap::TableDescriptor::decode(&[u8]) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::regmap::TableDescriptor::encode(&self) -> [u8; 4]
 impl core::clone::Clone for rcp::regmap::TableDescriptor
-pub fn rcp::regmap::TableDescriptor::clone(&self) -> rcp::regmap::TableDescriptor
+pub fn rcp::regmap::TableDescriptor::clone(&self) -> Self
 impl core::cmp::Eq for rcp::regmap::TableDescriptor
 impl core::cmp::PartialEq for rcp::regmap::TableDescriptor
-pub fn rcp::regmap::TableDescriptor::eq(&self, &rcp::regmap::TableDescriptor) -> bool
+pub fn rcp::regmap::TableDescriptor::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::regmap::TableDescriptor
-pub fn rcp::regmap::TableDescriptor::default() -> rcp::regmap::TableDescriptor
+pub fn rcp::regmap::TableDescriptor::default() -> Self
 impl core::fmt::Debug for rcp::regmap::TableDescriptor
 pub fn rcp::regmap::TableDescriptor::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::regmap::TableDescriptor
@@ -3173,12 +3173,12 @@ pub rcp::relay::BackPressurePolicy::Block
 pub rcp::relay::BackPressurePolicy::DropNewest
 pub rcp::relay::BackPressurePolicy::DropOldest
 impl core::clone::Clone for rcp::relay::BackPressurePolicy
-pub fn rcp::relay::BackPressurePolicy::clone(&self) -> rcp::relay::BackPressurePolicy
+pub fn rcp::relay::BackPressurePolicy::clone(&self) -> Self
 impl core::cmp::Eq for rcp::relay::BackPressurePolicy
 impl core::cmp::PartialEq for rcp::relay::BackPressurePolicy
-pub fn rcp::relay::BackPressurePolicy::eq(&self, &rcp::relay::BackPressurePolicy) -> bool
+pub fn rcp::relay::BackPressurePolicy::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::relay::BackPressurePolicy
-pub fn rcp::relay::BackPressurePolicy::default() -> rcp::relay::BackPressurePolicy
+pub fn rcp::relay::BackPressurePolicy::default() -> Self
 impl core::fmt::Debug for rcp::relay::BackPressurePolicy
 pub fn rcp::relay::BackPressurePolicy::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::relay::BackPressurePolicy
@@ -3196,10 +3196,10 @@ pub rcp::relay::Error::NotConnected
 pub rcp::relay::Error::PayloadTooLarge
 pub rcp::relay::Error::Timeout
 impl core::clone::Clone for rcp::relay::Error
-pub fn rcp::relay::Error::clone(&self) -> rcp::relay::Error
+pub fn rcp::relay::Error::clone(&self) -> Self
 impl core::cmp::Eq for rcp::relay::Error
 impl core::cmp::PartialEq for rcp::relay::Error
-pub fn rcp::relay::Error::eq(&self, &rcp::relay::Error) -> bool
+pub fn rcp::relay::Error::eq(&self, &Self) -> bool
 impl core::error::Error for rcp::relay::Error
 impl core::fmt::Debug for rcp::relay::Error
 pub fn rcp::relay::Error::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
@@ -3221,10 +3221,10 @@ pub rcp::relay::Protocol::Mqtt = 4
 pub rcp::relay::Protocol::Rcp = 5
 pub rcp::relay::Protocol::Someip = 6
 impl core::clone::Clone for rcp::relay::Protocol
-pub fn rcp::relay::Protocol::clone(&self) -> rcp::relay::Protocol
+pub fn rcp::relay::Protocol::clone(&self) -> Self
 impl core::cmp::Eq for rcp::relay::Protocol
 impl core::cmp::PartialEq for rcp::relay::Protocol
-pub fn rcp::relay::Protocol::eq(&self, &rcp::relay::Protocol) -> bool
+pub fn rcp::relay::Protocol::eq(&self, &Self) -> bool
 impl core::convert::From<rcp::relay::Protocol> for i32
 pub fn i32::from(rcp::relay::Protocol) -> i32
 impl core::convert::TryFrom<i32> for rcp::relay::Protocol
@@ -3254,7 +3254,7 @@ pub fn rcp::relay::Context::background() -> Self
 pub fn rcp::relay::Context::done(&self) -> bool
 pub fn rcp::relay::Context::with_timeout(core::time::Duration) -> Self
 impl core::clone::Clone for rcp::relay::Context
-pub fn rcp::relay::Context::clone(&self) -> rcp::relay::Context
+pub fn rcp::relay::Context::clone(&self) -> Self
 impl core::default::Default for rcp::relay::Context
 pub fn rcp::relay::Context::default() -> Self
 impl core::fmt::Debug for rcp::relay::Context
@@ -3277,7 +3277,7 @@ pub rcp::relay::Message::version: rcp::relay::Version
 impl rcp::relay::Message
 pub fn rcp::relay::Message::new(rcp::relay::Protocol, impl core::convert::Into<alloc::string::String>, alloc::vec::Vec<u8>) -> Self
 impl core::clone::Clone for rcp::relay::Message
-pub fn rcp::relay::Message::clone(&self) -> rcp::relay::Message
+pub fn rcp::relay::Message::clone(&self) -> Self
 impl core::fmt::Debug for rcp::relay::Message
 pub fn rcp::relay::Message::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl serde_core::ser::Serialize for rcp::relay::Message
@@ -3297,9 +3297,9 @@ pub rcp::relay::SubscriberOptions::channel_depth: usize
 impl rcp::relay::SubscriberOptions
 pub fn rcp::relay::SubscriberOptions::chan_depth(&self, usize) -> usize
 impl core::clone::Clone for rcp::relay::SubscriberOptions
-pub fn rcp::relay::SubscriberOptions::clone(&self) -> rcp::relay::SubscriberOptions
+pub fn rcp::relay::SubscriberOptions::clone(&self) -> Self
 impl core::default::Default for rcp::relay::SubscriberOptions
-pub fn rcp::relay::SubscriberOptions::default() -> rcp::relay::SubscriberOptions
+pub fn rcp::relay::SubscriberOptions::default() -> Self
 impl core::fmt::Debug for rcp::relay::SubscriberOptions
 pub fn rcp::relay::SubscriberOptions::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for rcp::relay::SubscriberOptions
@@ -3314,12 +3314,12 @@ pub rcp::relay::Version::major: i32
 pub rcp::relay::Version::minor: i32
 pub rcp::relay::Version::patch: i32
 impl core::clone::Clone for rcp::relay::Version
-pub fn rcp::relay::Version::clone(&self) -> rcp::relay::Version
+pub fn rcp::relay::Version::clone(&self) -> Self
 impl core::cmp::Eq for rcp::relay::Version
 impl core::cmp::PartialEq for rcp::relay::Version
-pub fn rcp::relay::Version::eq(&self, &rcp::relay::Version) -> bool
+pub fn rcp::relay::Version::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::relay::Version
-pub fn rcp::relay::Version::default() -> rcp::relay::Version
+pub fn rcp::relay::Version::default() -> Self
 impl core::fmt::Debug for rcp::relay::Version
 pub fn rcp::relay::Version::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::fmt::Display for rcp::relay::Version
@@ -3349,10 +3349,10 @@ pub enum rcp::request::E2eFailureScope
 pub rcp::request::E2eFailureScope::DropRequest
 pub rcp::request::E2eFailureScope::LatchStream
 impl core::clone::Clone for rcp::request::E2eFailureScope
-pub fn rcp::request::E2eFailureScope::clone(&self) -> rcp::request::E2eFailureScope
+pub fn rcp::request::E2eFailureScope::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::E2eFailureScope
 impl core::cmp::PartialEq for rcp::request::E2eFailureScope
-pub fn rcp::request::E2eFailureScope::eq(&self, &rcp::request::E2eFailureScope) -> bool
+pub fn rcp::request::E2eFailureScope::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::request::E2eFailureScope
 pub fn rcp::request::E2eFailureScope::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::request::E2eFailureScope
@@ -3373,14 +3373,14 @@ pub rcp::request::ExecutionPriorityTier::Standard
 pub rcp::request::ExecutionPriorityTier::Timed
 pub rcp::request::ExecutionPriorityTier::Triggered
 impl core::clone::Clone for rcp::request::ExecutionPriorityTier
-pub fn rcp::request::ExecutionPriorityTier::clone(&self) -> rcp::request::ExecutionPriorityTier
+pub fn rcp::request::ExecutionPriorityTier::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::ExecutionPriorityTier
 impl core::cmp::Ord for rcp::request::ExecutionPriorityTier
-pub fn rcp::request::ExecutionPriorityTier::cmp(&self, &rcp::request::ExecutionPriorityTier) -> core::cmp::Ordering
+pub fn rcp::request::ExecutionPriorityTier::cmp(&self, &Self) -> core::cmp::Ordering
 impl core::cmp::PartialEq for rcp::request::ExecutionPriorityTier
-pub fn rcp::request::ExecutionPriorityTier::eq(&self, &rcp::request::ExecutionPriorityTier) -> bool
+pub fn rcp::request::ExecutionPriorityTier::eq(&self, &Self) -> bool
 impl core::cmp::PartialOrd for rcp::request::ExecutionPriorityTier
-pub fn rcp::request::ExecutionPriorityTier::partial_cmp(&self, &rcp::request::ExecutionPriorityTier) -> core::option::Option<core::cmp::Ordering>
+pub fn rcp::request::ExecutionPriorityTier::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
 impl core::fmt::Debug for rcp::request::ExecutionPriorityTier
 pub fn rcp::request::ExecutionPriorityTier::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::request::ExecutionPriorityTier
@@ -3400,10 +3400,10 @@ impl rcp::request::OverflowOutcome
 pub fn rcp::request::OverflowOutcome::drives_safestate(&self) -> bool
 pub fn rcp::request::OverflowOutcome::is_overflow(&self) -> bool
 impl core::clone::Clone for rcp::request::OverflowOutcome
-pub fn rcp::request::OverflowOutcome::clone(&self) -> rcp::request::OverflowOutcome
+pub fn rcp::request::OverflowOutcome::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::OverflowOutcome
 impl core::cmp::PartialEq for rcp::request::OverflowOutcome
-pub fn rcp::request::OverflowOutcome::eq(&self, &rcp::request::OverflowOutcome) -> bool
+pub fn rcp::request::OverflowOutcome::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::request::OverflowOutcome
 pub fn rcp::request::OverflowOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::request::OverflowOutcome
@@ -3435,10 +3435,10 @@ pub fn rcp::request::RequestKind::is_safety_tagged(self) -> bool
 pub fn rcp::request::RequestKind::to_gbb_message_timestamp(self, u64) -> core::result::Result<u64, rcp::RcpError>
 pub fn rcp::request::RequestKind::to_u8(self) -> u8
 impl core::clone::Clone for rcp::request::RequestKind
-pub fn rcp::request::RequestKind::clone(&self) -> rcp::request::RequestKind
+pub fn rcp::request::RequestKind::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::RequestKind
 impl core::cmp::PartialEq for rcp::request::RequestKind
-pub fn rcp::request::RequestKind::eq(&self, &rcp::request::RequestKind) -> bool
+pub fn rcp::request::RequestKind::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::request::RequestKind
 pub fn rcp::request::RequestKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::request::RequestKind
@@ -3474,10 +3474,10 @@ pub rcp::request::RequestLifecycleGuardInput::Triggered::endpoint_busy: bool
 pub rcp::request::RequestLifecycleGuardInput::Triggered::occurrences_so_far: u16
 pub rcp::request::RequestLifecycleGuardInput::Triggered::repeat: rcp::request::TriggerRepeatCount
 impl core::clone::Clone for rcp::request::RequestLifecycleGuardInput
-pub fn rcp::request::RequestLifecycleGuardInput::clone(&self) -> rcp::request::RequestLifecycleGuardInput
+pub fn rcp::request::RequestLifecycleGuardInput::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::RequestLifecycleGuardInput
 impl core::cmp::PartialEq for rcp::request::RequestLifecycleGuardInput
-pub fn rcp::request::RequestLifecycleGuardInput::eq(&self, &rcp::request::RequestLifecycleGuardInput) -> bool
+pub fn rcp::request::RequestLifecycleGuardInput::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::request::RequestLifecycleGuardInput
 pub fn rcp::request::RequestLifecycleGuardInput::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::request::RequestLifecycleGuardInput
@@ -3497,10 +3497,10 @@ pub rcp::request::RequestLifecycleState::UnderExecution
 impl rcp::request::RequestLifecycleState
 pub fn rcp::request::RequestLifecycleState::try_transition(self, Self, &rcp::request::RequestLifecycleGuardInput) -> core::result::Result<Self, rcp::RcpError>
 impl core::clone::Clone for rcp::request::RequestLifecycleState
-pub fn rcp::request::RequestLifecycleState::clone(&self) -> rcp::request::RequestLifecycleState
+pub fn rcp::request::RequestLifecycleState::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::RequestLifecycleState
 impl core::cmp::PartialEq for rcp::request::RequestLifecycleState
-pub fn rcp::request::RequestLifecycleState::eq(&self, &rcp::request::RequestLifecycleState) -> bool
+pub fn rcp::request::RequestLifecycleState::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::request::RequestLifecycleState
 pub fn rcp::request::RequestLifecycleState::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::request::RequestLifecycleState
@@ -3517,10 +3517,10 @@ pub rcp::request::SafeStateAction::ForceHiZAllPins
 pub rcp::request::SafeStateAction::ForceSequencerState(rcp::request::CompoundGateConfig)
 pub rcp::request::SafeStateAction::None
 impl core::clone::Clone for rcp::request::SafeStateAction
-pub fn rcp::request::SafeStateAction::clone(&self) -> rcp::request::SafeStateAction
+pub fn rcp::request::SafeStateAction::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::SafeStateAction
 impl core::cmp::PartialEq for rcp::request::SafeStateAction
-pub fn rcp::request::SafeStateAction::eq(&self, &rcp::request::SafeStateAction) -> bool
+pub fn rcp::request::SafeStateAction::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::request::SafeStateAction
 pub fn rcp::request::SafeStateAction::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::request::SafeStateAction
@@ -3536,10 +3536,10 @@ pub enum rcp::request::SafeStateMechanism
 pub rcp::request::SafeStateMechanism::HiZAllPins
 pub rcp::request::SafeStateMechanism::SequencerDriven(rcp::request::CompoundGateConfig)
 impl core::clone::Clone for rcp::request::SafeStateMechanism
-pub fn rcp::request::SafeStateMechanism::clone(&self) -> rcp::request::SafeStateMechanism
+pub fn rcp::request::SafeStateMechanism::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::SafeStateMechanism
 impl core::cmp::PartialEq for rcp::request::SafeStateMechanism
-pub fn rcp::request::SafeStateMechanism::eq(&self, &rcp::request::SafeStateMechanism) -> bool
+pub fn rcp::request::SafeStateMechanism::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::request::SafeStateMechanism
 pub fn rcp::request::SafeStateMechanism::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::request::SafeStateMechanism
@@ -3559,10 +3559,10 @@ impl rcp::request::SequenceEnforcementOutcome
 pub fn rcp::request::SequenceEnforcementOutcome::drives_safestate(&self) -> bool
 pub fn rcp::request::SequenceEnforcementOutcome::is_rejected(&self) -> bool
 impl core::clone::Clone for rcp::request::SequenceEnforcementOutcome
-pub fn rcp::request::SequenceEnforcementOutcome::clone(&self) -> rcp::request::SequenceEnforcementOutcome
+pub fn rcp::request::SequenceEnforcementOutcome::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::SequenceEnforcementOutcome
 impl core::cmp::PartialEq for rcp::request::SequenceEnforcementOutcome
-pub fn rcp::request::SequenceEnforcementOutcome::eq(&self, &rcp::request::SequenceEnforcementOutcome) -> bool
+pub fn rcp::request::SequenceEnforcementOutcome::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::request::SequenceEnforcementOutcome
 pub fn rcp::request::SequenceEnforcementOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::request::SequenceEnforcementOutcome
@@ -3581,10 +3581,10 @@ impl rcp::request::TriggerRepeatCount
 pub fn rcp::request::TriggerRepeatCount::from_u16(u16) -> Self
 pub fn rcp::request::TriggerRepeatCount::to_u16(self) -> u16
 impl core::clone::Clone for rcp::request::TriggerRepeatCount
-pub fn rcp::request::TriggerRepeatCount::clone(&self) -> rcp::request::TriggerRepeatCount
+pub fn rcp::request::TriggerRepeatCount::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::TriggerRepeatCount
 impl core::cmp::PartialEq for rcp::request::TriggerRepeatCount
-pub fn rcp::request::TriggerRepeatCount::eq(&self, &rcp::request::TriggerRepeatCount) -> bool
+pub fn rcp::request::TriggerRepeatCount::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::request::TriggerRepeatCount
 pub fn rcp::request::TriggerRepeatCount::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::request::TriggerRepeatCount
@@ -3598,12 +3598,12 @@ impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::TriggerRepeatCoun
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::TriggerRepeatCount
 pub struct rcp::request::ClearTransactionNum(pub u8)
 impl core::clone::Clone for rcp::request::ClearTransactionNum
-pub fn rcp::request::ClearTransactionNum::clone(&self) -> rcp::request::ClearTransactionNum
+pub fn rcp::request::ClearTransactionNum::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::ClearTransactionNum
 impl core::cmp::PartialEq for rcp::request::ClearTransactionNum
-pub fn rcp::request::ClearTransactionNum::eq(&self, &rcp::request::ClearTransactionNum) -> bool
+pub fn rcp::request::ClearTransactionNum::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::request::ClearTransactionNum
-pub fn rcp::request::ClearTransactionNum::default() -> rcp::request::ClearTransactionNum
+pub fn rcp::request::ClearTransactionNum::default() -> Self
 impl core::fmt::Debug for rcp::request::ClearTransactionNum
 pub fn rcp::request::ClearTransactionNum::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::request::ClearTransactionNum
@@ -3619,12 +3619,12 @@ pub struct rcp::request::CompoundExecDelays
 pub rcp::request::CompoundExecDelays::cmp_exec_delay: u32
 pub rcp::request::CompoundExecDelays::cmpw_exec_delay: u32
 impl core::clone::Clone for rcp::request::CompoundExecDelays
-pub fn rcp::request::CompoundExecDelays::clone(&self) -> rcp::request::CompoundExecDelays
+pub fn rcp::request::CompoundExecDelays::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::CompoundExecDelays
 impl core::cmp::PartialEq for rcp::request::CompoundExecDelays
-pub fn rcp::request::CompoundExecDelays::eq(&self, &rcp::request::CompoundExecDelays) -> bool
+pub fn rcp::request::CompoundExecDelays::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::request::CompoundExecDelays
-pub fn rcp::request::CompoundExecDelays::default() -> rcp::request::CompoundExecDelays
+pub fn rcp::request::CompoundExecDelays::default() -> Self
 impl core::fmt::Debug for rcp::request::CompoundExecDelays
 pub fn rcp::request::CompoundExecDelays::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::request::CompoundExecDelays
@@ -3640,12 +3640,12 @@ pub struct rcp::request::CompoundGateConfig
 pub rcp::request::CompoundGateConfig::sequencer_num: u8
 pub rcp::request::CompoundGateConfig::start_state: rcp::request::SequencerState
 impl core::clone::Clone for rcp::request::CompoundGateConfig
-pub fn rcp::request::CompoundGateConfig::clone(&self) -> rcp::request::CompoundGateConfig
+pub fn rcp::request::CompoundGateConfig::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::CompoundGateConfig
 impl core::cmp::PartialEq for rcp::request::CompoundGateConfig
-pub fn rcp::request::CompoundGateConfig::eq(&self, &rcp::request::CompoundGateConfig) -> bool
+pub fn rcp::request::CompoundGateConfig::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::request::CompoundGateConfig
-pub fn rcp::request::CompoundGateConfig::default() -> rcp::request::CompoundGateConfig
+pub fn rcp::request::CompoundGateConfig::default() -> Self
 impl core::fmt::Debug for rcp::request::CompoundGateConfig
 pub fn rcp::request::CompoundGateConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::request::CompoundGateConfig
@@ -3661,10 +3661,10 @@ pub struct rcp::request::PendingRequestKey
 pub rcp::request::PendingRequestKey::arrival_seq: u64
 pub rcp::request::PendingRequestKey::kind: rcp::request::RequestKind
 impl core::clone::Clone for rcp::request::PendingRequestKey
-pub fn rcp::request::PendingRequestKey::clone(&self) -> rcp::request::PendingRequestKey
+pub fn rcp::request::PendingRequestKey::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::PendingRequestKey
 impl core::cmp::PartialEq for rcp::request::PendingRequestKey
-pub fn rcp::request::PendingRequestKey::eq(&self, &rcp::request::PendingRequestKey) -> bool
+pub fn rcp::request::PendingRequestKey::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::request::PendingRequestKey
 pub fn rcp::request::PendingRequestKey::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::request::PendingRequestKey
@@ -3685,10 +3685,10 @@ pub fn rcp::request::SequencerBank::new(u8) -> Self
 pub fn rcp::request::SequencerBank::read(&self, u8) -> core::result::Result<rcp::request::SequencerState, rcp::RcpError>
 pub fn rcp::request::SequencerBank::svr_sequencers_max(&self) -> u8
 impl core::clone::Clone for rcp::request::SequencerBank
-pub fn rcp::request::SequencerBank::clone(&self) -> rcp::request::SequencerBank
+pub fn rcp::request::SequencerBank::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::SequencerBank
 impl core::cmp::PartialEq for rcp::request::SequencerBank
-pub fn rcp::request::SequencerBank::eq(&self, &rcp::request::SequencerBank) -> bool
+pub fn rcp::request::SequencerBank::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::request::SequencerBank
 pub fn rcp::request::SequencerBank::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::request::SequencerBank
@@ -3701,12 +3701,12 @@ impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::SequencerBank
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::SequencerBank
 pub struct rcp::request::SequencerState(pub u8)
 impl core::clone::Clone for rcp::request::SequencerState
-pub fn rcp::request::SequencerState::clone(&self) -> rcp::request::SequencerState
+pub fn rcp::request::SequencerState::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::SequencerState
 impl core::cmp::PartialEq for rcp::request::SequencerState
-pub fn rcp::request::SequencerState::eq(&self, &rcp::request::SequencerState) -> bool
+pub fn rcp::request::SequencerState::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::request::SequencerState
-pub fn rcp::request::SequencerState::default() -> rcp::request::SequencerState
+pub fn rcp::request::SequencerState::default() -> Self
 impl core::fmt::Debug for rcp::request::SequencerState
 pub fn rcp::request::SequencerState::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::request::SequencerState
@@ -3720,12 +3720,12 @@ impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::SequencerState
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::SequencerState
 pub struct rcp::request::TimedExecutionTime(pub rcp::timestamp::AvtpTimestamp)
 impl core::clone::Clone for rcp::request::TimedExecutionTime
-pub fn rcp::request::TimedExecutionTime::clone(&self) -> rcp::request::TimedExecutionTime
+pub fn rcp::request::TimedExecutionTime::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::TimedExecutionTime
 impl core::cmp::PartialEq for rcp::request::TimedExecutionTime
-pub fn rcp::request::TimedExecutionTime::eq(&self, &rcp::request::TimedExecutionTime) -> bool
+pub fn rcp::request::TimedExecutionTime::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::request::TimedExecutionTime
-pub fn rcp::request::TimedExecutionTime::default() -> rcp::request::TimedExecutionTime
+pub fn rcp::request::TimedExecutionTime::default() -> Self
 impl core::fmt::Debug for rcp::request::TimedExecutionTime
 pub fn rcp::request::TimedExecutionTime::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::request::TimedExecutionTime
@@ -3739,12 +3739,12 @@ impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::TimedExecutionTim
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::TimedExecutionTime
 pub struct rcp::request::TriggerExecDelay(pub u32)
 impl core::clone::Clone for rcp::request::TriggerExecDelay
-pub fn rcp::request::TriggerExecDelay::clone(&self) -> rcp::request::TriggerExecDelay
+pub fn rcp::request::TriggerExecDelay::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::TriggerExecDelay
 impl core::cmp::PartialEq for rcp::request::TriggerExecDelay
-pub fn rcp::request::TriggerExecDelay::eq(&self, &rcp::request::TriggerExecDelay) -> bool
+pub fn rcp::request::TriggerExecDelay::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::request::TriggerExecDelay
-pub fn rcp::request::TriggerExecDelay::default() -> rcp::request::TriggerExecDelay
+pub fn rcp::request::TriggerExecDelay::default() -> Self
 impl core::fmt::Debug for rcp::request::TriggerExecDelay
 pub fn rcp::request::TriggerExecDelay::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::request::TriggerExecDelay
@@ -3791,7 +3791,7 @@ pub fn rcp::request::try_force_cancel_single(&mut rcp::request::RequestLifecycle
 pub mod rcp::shmem
 pub struct rcp::shmem::InProcChannel
 impl rcp::shmem::InProcChannel
-pub fn rcp::shmem::InProcChannel::new() -> alloc::sync::Arc<Self>
+pub fn rcp::shmem::InProcChannel::new() -> alloc::rcs::arc::Arc<Self>
 impl core::default::Default for rcp::shmem::InProcChannel
 pub fn rcp::shmem::InProcChannel::default() -> Self
 impl rcp::shmem::ShmChannel for rcp::shmem::InProcChannel
@@ -3808,7 +3808,7 @@ pub struct rcp::shmem::ShmBridge
 impl rcp::shmem::ShmBridge
 pub fn rcp::shmem::ShmBridge::close(&self) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::shmem::ShmBridge::local_stream(&self) -> rcp::avtp::StreamId
-pub fn rcp::shmem::ShmBridge::new(rcp::avtp::StreamId, alloc::sync::Arc<dyn rcp::shmem::ShmChannel>, alloc::sync::Arc<dyn rcp::shmem::ShmChannel>) -> Self
+pub fn rcp::shmem::ShmBridge::new(rcp::avtp::StreamId, alloc::rcs::arc::Arc<dyn rcp::shmem::ShmChannel>, alloc::rcs::arc::Arc<dyn rcp::shmem::ShmChannel>) -> Self
 pub fn rcp::shmem::ShmBridge::send_acf_abb(&self, &rcp::acf::AcfAbbMessage, u8, core::option::Option<core::time::Duration>) -> core::result::Result<rcp::acf::AcfAbbMessage, rcp::RcpError>
 pub fn rcp::shmem::ShmBridge::send_acf_gbb(&self, &rcp::acf::AcfGbbMessage, u8, core::option::Option<core::time::Duration>) -> core::result::Result<rcp::acf::AcfGbbMessage, rcp::RcpError>
 impl core::marker::Freeze for rcp::shmem::ShmBridge
@@ -3831,7 +3831,7 @@ pub rcp::sim::SimCall::Read::read_size: u16
 pub rcp::sim::SimCall::Write
 pub rcp::sim::SimCall::Write::payload: alloc::vec::Vec<u8>
 impl core::clone::Clone for rcp::sim::SimCall
-pub fn rcp::sim::SimCall::clone(&self) -> rcp::sim::SimCall
+pub fn rcp::sim::SimCall::clone(&self) -> Self
 impl core::fmt::Debug for rcp::sim::SimCall
 pub fn rcp::sim::SimCall::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for rcp::sim::SimCall
@@ -3846,7 +3846,7 @@ impl rcp::sim::SimEndpoint
 pub fn rcp::sim::SimEndpoint::calls(&self) -> alloc::vec::Vec<rcp::sim::SimCall>
 pub fn rcp::sim::SimEndpoint::clear_calls(&self)
 pub fn rcp::sim::SimEndpoint::close(&self)
-pub fn rcp::sim::SimEndpoint::new(rcp::regmap::EndpointType) -> alloc::sync::Arc<Self>
+pub fn rcp::sim::SimEndpoint::new(rcp::regmap::EndpointType) -> alloc::rcs::arc::Arc<Self>
 pub fn rcp::sim::SimEndpoint::queue_read_response(&self, core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>)
 pub fn rcp::sim::SimEndpoint::queue_write_response(&self, core::result::Result<(), rcp::RcpError>)
 impl rcp::mock::Endpoint for rcp::sim::SimEndpoint
@@ -3875,10 +3875,10 @@ pub fn rcp::spi::SpiChannelSelect::from_sub_opcode(u8) -> core::result::Result<S
 pub fn rcp::spi::SpiChannelSelect::is_named(self) -> bool
 pub fn rcp::spi::SpiChannelSelect::to_sub_opcode(self) -> u8
 impl core::clone::Clone for rcp::spi::SpiChannelSelect
-pub fn rcp::spi::SpiChannelSelect::clone(&self) -> rcp::spi::SpiChannelSelect
+pub fn rcp::spi::SpiChannelSelect::clone(&self) -> Self
 impl core::cmp::Eq for rcp::spi::SpiChannelSelect
 impl core::cmp::PartialEq for rcp::spi::SpiChannelSelect
-pub fn rcp::spi::SpiChannelSelect::eq(&self, &rcp::spi::SpiChannelSelect) -> bool
+pub fn rcp::spi::SpiChannelSelect::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::spi::SpiChannelSelect
 pub fn rcp::spi::SpiChannelSelect::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::spi::SpiChannelSelect
@@ -3896,12 +3896,12 @@ impl rcp::spi::SpiByteTransfer
 pub fn rcp::spi::SpiByteTransfer::decode(&[u8]) -> Self
 pub fn rcp::spi::SpiByteTransfer::encode(&self) -> alloc::vec::Vec<u8>
 impl core::clone::Clone for rcp::spi::SpiByteTransfer
-pub fn rcp::spi::SpiByteTransfer::clone(&self) -> rcp::spi::SpiByteTransfer
+pub fn rcp::spi::SpiByteTransfer::clone(&self) -> Self
 impl core::cmp::Eq for rcp::spi::SpiByteTransfer
 impl core::cmp::PartialEq for rcp::spi::SpiByteTransfer
-pub fn rcp::spi::SpiByteTransfer::eq(&self, &rcp::spi::SpiByteTransfer) -> bool
+pub fn rcp::spi::SpiByteTransfer::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::spi::SpiByteTransfer
-pub fn rcp::spi::SpiByteTransfer::default() -> rcp::spi::SpiByteTransfer
+pub fn rcp::spi::SpiByteTransfer::default() -> Self
 impl core::fmt::Debug for rcp::spi::SpiByteTransfer
 pub fn rcp::spi::SpiByteTransfer::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::spi::SpiByteTransfer
@@ -3918,12 +3918,12 @@ impl rcp::spi::SpiByteTransferResult
 pub fn rcp::spi::SpiByteTransferResult::decode(&[u8]) -> Self
 pub fn rcp::spi::SpiByteTransferResult::encode(&self) -> alloc::vec::Vec<u8>
 impl core::clone::Clone for rcp::spi::SpiByteTransferResult
-pub fn rcp::spi::SpiByteTransferResult::clone(&self) -> rcp::spi::SpiByteTransferResult
+pub fn rcp::spi::SpiByteTransferResult::clone(&self) -> Self
 impl core::cmp::Eq for rcp::spi::SpiByteTransferResult
 impl core::cmp::PartialEq for rcp::spi::SpiByteTransferResult
-pub fn rcp::spi::SpiByteTransferResult::eq(&self, &rcp::spi::SpiByteTransferResult) -> bool
+pub fn rcp::spi::SpiByteTransferResult::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::spi::SpiByteTransferResult
-pub fn rcp::spi::SpiByteTransferResult::default() -> rcp::spi::SpiByteTransferResult
+pub fn rcp::spi::SpiByteTransferResult::default() -> Self
 impl core::fmt::Debug for rcp::spi::SpiByteTransferResult
 pub fn rcp::spi::SpiByteTransferResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::spi::SpiByteTransferResult
@@ -3936,12 +3936,12 @@ impl core::panic::unwind_safe::RefUnwindSafe for rcp::spi::SpiByteTransferResult
 impl core::panic::unwind_safe::UnwindSafe for rcp::spi::SpiByteTransferResult
 pub struct rcp::spi::SpiChannelConfigSlot
 impl core::clone::Clone for rcp::spi::SpiChannelConfigSlot
-pub fn rcp::spi::SpiChannelConfigSlot::clone(&self) -> rcp::spi::SpiChannelConfigSlot
+pub fn rcp::spi::SpiChannelConfigSlot::clone(&self) -> Self
 impl core::cmp::Eq for rcp::spi::SpiChannelConfigSlot
 impl core::cmp::PartialEq for rcp::spi::SpiChannelConfigSlot
-pub fn rcp::spi::SpiChannelConfigSlot::eq(&self, &rcp::spi::SpiChannelConfigSlot) -> bool
+pub fn rcp::spi::SpiChannelConfigSlot::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::spi::SpiChannelConfigSlot
-pub fn rcp::spi::SpiChannelConfigSlot::default() -> rcp::spi::SpiChannelConfigSlot
+pub fn rcp::spi::SpiChannelConfigSlot::default() -> Self
 impl core::fmt::Debug for rcp::spi::SpiChannelConfigSlot
 pub fn rcp::spi::SpiChannelConfigSlot::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::spi::SpiChannelConfigSlot
@@ -3958,10 +3958,10 @@ impl rcp::spi::SpiCompoundWaitStatus
 pub fn rcp::spi::SpiCompoundWaitStatus::decode(&[u8]) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::spi::SpiCompoundWaitStatus::encode(self) -> [u8; 4]
 impl core::clone::Clone for rcp::spi::SpiCompoundWaitStatus
-pub fn rcp::spi::SpiCompoundWaitStatus::clone(&self) -> rcp::spi::SpiCompoundWaitStatus
+pub fn rcp::spi::SpiCompoundWaitStatus::clone(&self) -> Self
 impl core::cmp::Eq for rcp::spi::SpiCompoundWaitStatus
 impl core::cmp::PartialEq for rcp::spi::SpiCompoundWaitStatus
-pub fn rcp::spi::SpiCompoundWaitStatus::eq(&self, &rcp::spi::SpiCompoundWaitStatus) -> bool
+pub fn rcp::spi::SpiCompoundWaitStatus::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::spi::SpiCompoundWaitStatus
 pub fn rcp::spi::SpiCompoundWaitStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::spi::SpiCompoundWaitStatus
@@ -3978,12 +3978,12 @@ pub rcp::spi::SpiFunctionalConfig::channels: [rcp::spi::SpiChannelConfigSlot; 6]
 impl rcp::spi::SpiFunctionalConfig
 pub fn rcp::spi::SpiFunctionalConfig::layer_tag(&self) -> rcp::regmap::PerEpTypeFunctionalConfig
 impl core::clone::Clone for rcp::spi::SpiFunctionalConfig
-pub fn rcp::spi::SpiFunctionalConfig::clone(&self) -> rcp::spi::SpiFunctionalConfig
+pub fn rcp::spi::SpiFunctionalConfig::clone(&self) -> Self
 impl core::cmp::Eq for rcp::spi::SpiFunctionalConfig
 impl core::cmp::PartialEq for rcp::spi::SpiFunctionalConfig
-pub fn rcp::spi::SpiFunctionalConfig::eq(&self, &rcp::spi::SpiFunctionalConfig) -> bool
+pub fn rcp::spi::SpiFunctionalConfig::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::spi::SpiFunctionalConfig
-pub fn rcp::spi::SpiFunctionalConfig::default() -> rcp::spi::SpiFunctionalConfig
+pub fn rcp::spi::SpiFunctionalConfig::default() -> Self
 impl core::fmt::Debug for rcp::spi::SpiFunctionalConfig
 pub fn rcp::spi::SpiFunctionalConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::spi::SpiFunctionalConfig
@@ -4000,10 +4000,10 @@ impl rcp::spi::SpiStatus
 pub fn rcp::spi::SpiStatus::decode(&[u8]) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::spi::SpiStatus::encode(self) -> [u8; 20]
 impl core::clone::Clone for rcp::spi::SpiStatus
-pub fn rcp::spi::SpiStatus::clone(&self) -> rcp::spi::SpiStatus
+pub fn rcp::spi::SpiStatus::clone(&self) -> Self
 impl core::cmp::Eq for rcp::spi::SpiStatus
 impl core::cmp::PartialEq for rcp::spi::SpiStatus
-pub fn rcp::spi::SpiStatus::eq(&self, &rcp::spi::SpiStatus) -> bool
+pub fn rcp::spi::SpiStatus::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::spi::SpiStatus
 pub fn rcp::spi::SpiStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::spi::SpiStatus
@@ -4026,10 +4026,10 @@ pub enum rcp::timestamp::TimestampMeaning
 pub rcp::timestamp::TimestampMeaning::Timed
 pub rcp::timestamp::TimestampMeaning::Untimed
 impl core::clone::Clone for rcp::timestamp::TimestampMeaning
-pub fn rcp::timestamp::TimestampMeaning::clone(&self) -> rcp::timestamp::TimestampMeaning
+pub fn rcp::timestamp::TimestampMeaning::clone(&self) -> Self
 impl core::cmp::Eq for rcp::timestamp::TimestampMeaning
 impl core::cmp::PartialEq for rcp::timestamp::TimestampMeaning
-pub fn rcp::timestamp::TimestampMeaning::eq(&self, &rcp::timestamp::TimestampMeaning) -> bool
+pub fn rcp::timestamp::TimestampMeaning::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::timestamp::TimestampMeaning
 pub fn rcp::timestamp::TimestampMeaning::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::hash::Hash for rcp::timestamp::TimestampMeaning
@@ -4053,16 +4053,16 @@ pub fn rcp::timestamp::AvtpTimestamp::semantics(self) -> rcp::timestamp::Timesta
 pub fn rcp::timestamp::AvtpTimestamp::to_u32(self) -> u32
 pub fn rcp::timestamp::AvtpTimestamp::wrapping_delta(self, Self) -> i64
 impl core::clone::Clone for rcp::timestamp::AvtpTimestamp
-pub fn rcp::timestamp::AvtpTimestamp::clone(&self) -> rcp::timestamp::AvtpTimestamp
+pub fn rcp::timestamp::AvtpTimestamp::clone(&self) -> Self
 impl core::cmp::Eq for rcp::timestamp::AvtpTimestamp
 impl core::cmp::PartialEq for rcp::timestamp::AvtpTimestamp
-pub fn rcp::timestamp::AvtpTimestamp::eq(&self, &rcp::timestamp::AvtpTimestamp) -> bool
+pub fn rcp::timestamp::AvtpTimestamp::eq(&self, &Self) -> bool
 impl core::convert::From<rcp::timestamp::AvtpTimestamp> for u32
 pub fn u32::from(rcp::timestamp::AvtpTimestamp) -> u32
 impl core::convert::From<u32> for rcp::timestamp::AvtpTimestamp
 pub fn rcp::timestamp::AvtpTimestamp::from(u32) -> Self
 impl core::default::Default for rcp::timestamp::AvtpTimestamp
-pub fn rcp::timestamp::AvtpTimestamp::default() -> rcp::timestamp::AvtpTimestamp
+pub fn rcp::timestamp::AvtpTimestamp::default() -> Self
 impl core::fmt::Debug for rcp::timestamp::AvtpTimestamp
 pub fn rcp::timestamp::AvtpTimestamp::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::hash::Hash for rcp::timestamp::AvtpTimestamp
@@ -4086,16 +4086,16 @@ pub fn rcp::timestamp::MessageTimestamp::semantics(self) -> rcp::timestamp::Time
 pub fn rcp::timestamp::MessageTimestamp::to_u64(self) -> u64
 pub fn rcp::timestamp::MessageTimestamp::wrapping_delta(self, Self) -> i64
 impl core::clone::Clone for rcp::timestamp::MessageTimestamp
-pub fn rcp::timestamp::MessageTimestamp::clone(&self) -> rcp::timestamp::MessageTimestamp
+pub fn rcp::timestamp::MessageTimestamp::clone(&self) -> Self
 impl core::cmp::Eq for rcp::timestamp::MessageTimestamp
 impl core::cmp::PartialEq for rcp::timestamp::MessageTimestamp
-pub fn rcp::timestamp::MessageTimestamp::eq(&self, &rcp::timestamp::MessageTimestamp) -> bool
+pub fn rcp::timestamp::MessageTimestamp::eq(&self, &Self) -> bool
 impl core::convert::From<rcp::timestamp::MessageTimestamp> for u64
 pub fn u64::from(rcp::timestamp::MessageTimestamp) -> u64
 impl core::convert::From<u64> for rcp::timestamp::MessageTimestamp
 pub fn rcp::timestamp::MessageTimestamp::from(u64) -> Self
 impl core::default::Default for rcp::timestamp::MessageTimestamp
-pub fn rcp::timestamp::MessageTimestamp::default() -> rcp::timestamp::MessageTimestamp
+pub fn rcp::timestamp::MessageTimestamp::default() -> Self
 impl core::fmt::Debug for rcp::timestamp::MessageTimestamp
 pub fn rcp::timestamp::MessageTimestamp::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::hash::Hash for rcp::timestamp::MessageTimestamp
@@ -4114,7 +4114,7 @@ pub struct rcp::tlstransport::TlsBridge
 impl rcp::tlstransport::TlsBridge
 pub fn rcp::tlstransport::TlsBridge::close(&self) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::tlstransport::TlsBridge::local_stream(&self) -> rcp::avtp::StreamId
-pub fn rcp::tlstransport::TlsBridge::new(rcp::avtp::StreamId, alloc::sync::Arc<dyn rcp::tlstransport::TlsStream>) -> core::result::Result<Self, rcp::RcpError>
+pub fn rcp::tlstransport::TlsBridge::new(rcp::avtp::StreamId, alloc::rcs::arc::Arc<dyn rcp::tlstransport::TlsStream>) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::tlstransport::TlsBridge::send_acf_abb(&self, &rcp::acf::AcfAbbMessage, u8, core::option::Option<core::time::Duration>) -> core::result::Result<rcp::acf::AcfAbbMessage, rcp::RcpError>
 pub fn rcp::tlstransport::TlsBridge::send_acf_gbb(&self, &rcp::acf::AcfGbbMessage, u8, core::option::Option<core::time::Duration>) -> core::result::Result<rcp::acf::AcfGbbMessage, rcp::RcpError>
 impl core::marker::Freeze for rcp::tlstransport::TlsBridge
@@ -4136,10 +4136,10 @@ pub rcp::uart::UartReadCompletionReason::Both
 pub rcp::uart::UartReadCompletionReason::ReadSizeReached
 pub rcp::uart::UartReadCompletionReason::TimedOut
 impl core::clone::Clone for rcp::uart::UartReadCompletionReason
-pub fn rcp::uart::UartReadCompletionReason::clone(&self) -> rcp::uart::UartReadCompletionReason
+pub fn rcp::uart::UartReadCompletionReason::clone(&self) -> Self
 impl core::cmp::Eq for rcp::uart::UartReadCompletionReason
 impl core::cmp::PartialEq for rcp::uart::UartReadCompletionReason
-pub fn rcp::uart::UartReadCompletionReason::eq(&self, &rcp::uart::UartReadCompletionReason) -> bool
+pub fn rcp::uart::UartReadCompletionReason::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::uart::UartReadCompletionReason
 pub fn rcp::uart::UartReadCompletionReason::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::uart::UartReadCompletionReason
@@ -4158,10 +4158,10 @@ pub rcp::uart::UartRequest::Write(rcp::uart::UartTxQueue)
 impl rcp::uart::UartRequest
 pub fn rcp::uart::UartRequest::from_evt_sub_opcode(u8, bool, &[u8]) -> core::result::Result<Self, rcp::RcpError>
 impl core::clone::Clone for rcp::uart::UartRequest
-pub fn rcp::uart::UartRequest::clone(&self) -> rcp::uart::UartRequest
+pub fn rcp::uart::UartRequest::clone(&self) -> Self
 impl core::cmp::Eq for rcp::uart::UartRequest
 impl core::cmp::PartialEq for rcp::uart::UartRequest
-pub fn rcp::uart::UartRequest::eq(&self, &rcp::uart::UartRequest) -> bool
+pub fn rcp::uart::UartRequest::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::uart::UartRequest
 pub fn rcp::uart::UartRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::uart::UartRequest
@@ -4178,12 +4178,12 @@ pub rcp::uart::UartFunctionalConfig::tx: rcp::uart::UartTxQueueConfig
 impl rcp::uart::UartFunctionalConfig
 pub fn rcp::uart::UartFunctionalConfig::layer_tag(&self) -> rcp::regmap::PerEpTypeFunctionalConfig
 impl core::clone::Clone for rcp::uart::UartFunctionalConfig
-pub fn rcp::uart::UartFunctionalConfig::clone(&self) -> rcp::uart::UartFunctionalConfig
+pub fn rcp::uart::UartFunctionalConfig::clone(&self) -> Self
 impl core::cmp::Eq for rcp::uart::UartFunctionalConfig
 impl core::cmp::PartialEq for rcp::uart::UartFunctionalConfig
-pub fn rcp::uart::UartFunctionalConfig::eq(&self, &rcp::uart::UartFunctionalConfig) -> bool
+pub fn rcp::uart::UartFunctionalConfig::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::uart::UartFunctionalConfig
-pub fn rcp::uart::UartFunctionalConfig::default() -> rcp::uart::UartFunctionalConfig
+pub fn rcp::uart::UartFunctionalConfig::default() -> Self
 impl core::fmt::Debug for rcp::uart::UartFunctionalConfig
 pub fn rcp::uart::UartFunctionalConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::uart::UartFunctionalConfig
@@ -4201,12 +4201,12 @@ impl rcp::uart::UartRxQueue
 pub fn rcp::uart::UartRxQueue::decode(&[u8]) -> Self
 pub fn rcp::uart::UartRxQueue::encode(&self) -> alloc::vec::Vec<u8>
 impl core::clone::Clone for rcp::uart::UartRxQueue
-pub fn rcp::uart::UartRxQueue::clone(&self) -> rcp::uart::UartRxQueue
+pub fn rcp::uart::UartRxQueue::clone(&self) -> Self
 impl core::cmp::Eq for rcp::uart::UartRxQueue
 impl core::cmp::PartialEq for rcp::uart::UartRxQueue
-pub fn rcp::uart::UartRxQueue::eq(&self, &rcp::uart::UartRxQueue) -> bool
+pub fn rcp::uart::UartRxQueue::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::uart::UartRxQueue
-pub fn rcp::uart::UartRxQueue::default() -> rcp::uart::UartRxQueue
+pub fn rcp::uart::UartRxQueue::default() -> Self
 impl core::fmt::Debug for rcp::uart::UartRxQueue
 pub fn rcp::uart::UartRxQueue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::uart::UartRxQueue
@@ -4221,12 +4221,12 @@ pub struct rcp::uart::UartRxQueueConfig
 pub rcp::uart::UartRxQueueConfig::read_size: rcp::acf::ReadSizeOrSegment
 pub rcp::uart::UartRxQueueConfig::uart_timeout: u32
 impl core::clone::Clone for rcp::uart::UartRxQueueConfig
-pub fn rcp::uart::UartRxQueueConfig::clone(&self) -> rcp::uart::UartRxQueueConfig
+pub fn rcp::uart::UartRxQueueConfig::clone(&self) -> Self
 impl core::cmp::Eq for rcp::uart::UartRxQueueConfig
 impl core::cmp::PartialEq for rcp::uart::UartRxQueueConfig
-pub fn rcp::uart::UartRxQueueConfig::eq(&self, &rcp::uart::UartRxQueueConfig) -> bool
+pub fn rcp::uart::UartRxQueueConfig::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::uart::UartRxQueueConfig
-pub fn rcp::uart::UartRxQueueConfig::default() -> rcp::uart::UartRxQueueConfig
+pub fn rcp::uart::UartRxQueueConfig::default() -> Self
 impl core::fmt::Debug for rcp::uart::UartRxQueueConfig
 pub fn rcp::uart::UartRxQueueConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::uart::UartRxQueueConfig
@@ -4244,12 +4244,12 @@ impl rcp::uart::UartTxQueue
 pub fn rcp::uart::UartTxQueue::decode(&[u8]) -> Self
 pub fn rcp::uart::UartTxQueue::encode(&self) -> alloc::vec::Vec<u8>
 impl core::clone::Clone for rcp::uart::UartTxQueue
-pub fn rcp::uart::UartTxQueue::clone(&self) -> rcp::uart::UartTxQueue
+pub fn rcp::uart::UartTxQueue::clone(&self) -> Self
 impl core::cmp::Eq for rcp::uart::UartTxQueue
 impl core::cmp::PartialEq for rcp::uart::UartTxQueue
-pub fn rcp::uart::UartTxQueue::eq(&self, &rcp::uart::UartTxQueue) -> bool
+pub fn rcp::uart::UartTxQueue::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::uart::UartTxQueue
-pub fn rcp::uart::UartTxQueue::default() -> rcp::uart::UartTxQueue
+pub fn rcp::uart::UartTxQueue::default() -> Self
 impl core::fmt::Debug for rcp::uart::UartTxQueue
 pub fn rcp::uart::UartTxQueue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rcp::uart::UartTxQueue
@@ -4262,12 +4262,12 @@ impl core::panic::unwind_safe::RefUnwindSafe for rcp::uart::UartTxQueue
 impl core::panic::unwind_safe::UnwindSafe for rcp::uart::UartTxQueue
 pub struct rcp::uart::UartTxQueueConfig
 impl core::clone::Clone for rcp::uart::UartTxQueueConfig
-pub fn rcp::uart::UartTxQueueConfig::clone(&self) -> rcp::uart::UartTxQueueConfig
+pub fn rcp::uart::UartTxQueueConfig::clone(&self) -> Self
 impl core::cmp::Eq for rcp::uart::UartTxQueueConfig
 impl core::cmp::PartialEq for rcp::uart::UartTxQueueConfig
-pub fn rcp::uart::UartTxQueueConfig::eq(&self, &rcp::uart::UartTxQueueConfig) -> bool
+pub fn rcp::uart::UartTxQueueConfig::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::uart::UartTxQueueConfig
-pub fn rcp::uart::UartTxQueueConfig::default() -> rcp::uart::UartTxQueueConfig
+pub fn rcp::uart::UartTxQueueConfig::default() -> Self
 impl core::fmt::Debug for rcp::uart::UartTxQueueConfig
 pub fn rcp::uart::UartTxQueueConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::uart::UartTxQueueConfig
@@ -4286,10 +4286,10 @@ pub enum rcp::udp::ResolvedEndpoint
 pub rcp::udp::ResolvedEndpoint::Device(rcp::addressing::EndpointId)
 pub rcp::udp::ResolvedEndpoint::Ep0
 impl core::clone::Clone for rcp::udp::ResolvedEndpoint
-pub fn rcp::udp::ResolvedEndpoint::clone(&self) -> rcp::udp::ResolvedEndpoint
+pub fn rcp::udp::ResolvedEndpoint::clone(&self) -> Self
 impl core::cmp::Eq for rcp::udp::ResolvedEndpoint
 impl core::cmp::PartialEq for rcp::udp::ResolvedEndpoint
-pub fn rcp::udp::ResolvedEndpoint::eq(&self, &rcp::udp::ResolvedEndpoint) -> bool
+pub fn rcp::udp::ResolvedEndpoint::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::udp::ResolvedEndpoint
 pub fn rcp::udp::ResolvedEndpoint::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::udp::ResolvedEndpoint
@@ -4320,8 +4320,8 @@ pub struct rcp::udp::UdpRcServer
 impl rcp::udp::UdpRcServer
 pub fn rcp::udp::UdpRcServer::discovery_claim(&self) -> core::option::Option<rcp::discovery::DiscoveryClaim>
 pub fn rcp::udp::UdpRcServer::local_stream(&self) -> rcp::avtp::StreamId
-pub fn rcp::udp::UdpRcServer::new(rcp::avtp::StreamId, alloc::sync::Arc<dyn rcp::udp::UdpSocket>, alloc::sync::Arc<rcp::mock::RcServer>) -> Self
-pub fn rcp::udp::UdpRcServer::rc_server(&self) -> &alloc::sync::Arc<rcp::mock::RcServer>
+pub fn rcp::udp::UdpRcServer::new(rcp::avtp::StreamId, alloc::rcs::arc::Arc<dyn rcp::udp::UdpSocket>, alloc::rcs::arc::Arc<rcp::mock::RcServer>) -> Self
+pub fn rcp::udp::UdpRcServer::rc_server(&self) -> &alloc::rcs::arc::Arc<rcp::mock::RcServer>
 pub fn rcp::udp::UdpRcServer::serve_one(&self, core::option::Option<core::time::Duration>, u8, std::time::Instant, core::time::Duration) -> core::result::Result<(), rcp::RcpError>
 impl !core::marker::Freeze for rcp::udp::UdpRcServer
 impl core::marker::Send for rcp::udp::UdpRcServer
@@ -4334,7 +4334,7 @@ pub struct rcp::udp::UdpTransport
 impl rcp::udp::UdpTransport
 pub fn rcp::udp::UdpTransport::close(&self) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::udp::UdpTransport::local_stream(&self) -> rcp::avtp::StreamId
-pub fn rcp::udp::UdpTransport::new(rcp::avtp::StreamId, alloc::sync::Arc<dyn rcp::udp::UdpSocket>, core::net::socket_addr::SocketAddr) -> Self
+pub fn rcp::udp::UdpTransport::new(rcp::avtp::StreamId, alloc::rcs::arc::Arc<dyn rcp::udp::UdpSocket>, core::net::socket_addr::SocketAddr) -> Self
 pub fn rcp::udp::UdpTransport::send_acf_abb(&self, &rcp::acf::AcfAbbMessage, u8, core::option::Option<core::time::Duration>) -> core::result::Result<rcp::acf::AcfAbbMessage, rcp::RcpError>
 pub fn rcp::udp::UdpTransport::send_acf_gbb(&self, &rcp::acf::AcfGbbMessage, u8, core::option::Option<core::time::Duration>) -> core::result::Result<rcp::acf::AcfGbbMessage, rcp::RcpError>
 impl core::marker::Freeze for rcp::udp::UdpTransport
@@ -4362,12 +4362,12 @@ pub const rcp::wakeup::SleepCmdRequest::DISCRIMINANT: u8
 pub fn rcp::wakeup::SleepCmdRequest::decode(&[u8]) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::wakeup::SleepCmdRequest::encode(self) -> [u8; 1]
 impl core::clone::Clone for rcp::wakeup::SleepCmdRequest
-pub fn rcp::wakeup::SleepCmdRequest::clone(&self) -> rcp::wakeup::SleepCmdRequest
+pub fn rcp::wakeup::SleepCmdRequest::clone(&self) -> Self
 impl core::cmp::Eq for rcp::wakeup::SleepCmdRequest
 impl core::cmp::PartialEq for rcp::wakeup::SleepCmdRequest
-pub fn rcp::wakeup::SleepCmdRequest::eq(&self, &rcp::wakeup::SleepCmdRequest) -> bool
+pub fn rcp::wakeup::SleepCmdRequest::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::wakeup::SleepCmdRequest
-pub fn rcp::wakeup::SleepCmdRequest::default() -> rcp::wakeup::SleepCmdRequest
+pub fn rcp::wakeup::SleepCmdRequest::default() -> Self
 impl core::fmt::Debug for rcp::wakeup::SleepCmdRequest
 pub fn rcp::wakeup::SleepCmdRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::wakeup::SleepCmdRequest
@@ -4384,12 +4384,12 @@ impl rcp::wakeup::WakeSourcePinMask
 pub fn rcp::wakeup::WakeSourcePinMask::decode(&[u8]) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::wakeup::WakeSourcePinMask::encode(self) -> [u8; 4]
 impl core::clone::Clone for rcp::wakeup::WakeSourcePinMask
-pub fn rcp::wakeup::WakeSourcePinMask::clone(&self) -> rcp::wakeup::WakeSourcePinMask
+pub fn rcp::wakeup::WakeSourcePinMask::clone(&self) -> Self
 impl core::cmp::Eq for rcp::wakeup::WakeSourcePinMask
 impl core::cmp::PartialEq for rcp::wakeup::WakeSourcePinMask
-pub fn rcp::wakeup::WakeSourcePinMask::eq(&self, &rcp::wakeup::WakeSourcePinMask) -> bool
+pub fn rcp::wakeup::WakeSourcePinMask::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::wakeup::WakeSourcePinMask
-pub fn rcp::wakeup::WakeSourcePinMask::default() -> rcp::wakeup::WakeSourcePinMask
+pub fn rcp::wakeup::WakeSourcePinMask::default() -> Self
 impl core::fmt::Debug for rcp::wakeup::WakeSourcePinMask
 pub fn rcp::wakeup::WakeSourcePinMask::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::wakeup::WakeSourcePinMask
@@ -4406,12 +4406,12 @@ pub rcp::wakeup::WakeSourceSignals::fired: rcp::wakeup::WakeSourcePinMask
 impl rcp::wakeup::WakeSourceSignals
 pub fn rcp::wakeup::WakeSourceSignals::any_fired(self) -> bool
 impl core::clone::Clone for rcp::wakeup::WakeSourceSignals
-pub fn rcp::wakeup::WakeSourceSignals::clone(&self) -> rcp::wakeup::WakeSourceSignals
+pub fn rcp::wakeup::WakeSourceSignals::clone(&self) -> Self
 impl core::cmp::Eq for rcp::wakeup::WakeSourceSignals
 impl core::cmp::PartialEq for rcp::wakeup::WakeSourceSignals
-pub fn rcp::wakeup::WakeSourceSignals::eq(&self, &rcp::wakeup::WakeSourceSignals) -> bool
+pub fn rcp::wakeup::WakeSourceSignals::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::wakeup::WakeSourceSignals
-pub fn rcp::wakeup::WakeSourceSignals::default() -> rcp::wakeup::WakeSourceSignals
+pub fn rcp::wakeup::WakeSourceSignals::default() -> Self
 impl core::fmt::Debug for rcp::wakeup::WakeSourceSignals
 pub fn rcp::wakeup::WakeSourceSignals::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::wakeup::WakeSourceSignals
@@ -4428,12 +4428,12 @@ pub rcp::wakeup::WakeupFunctionalConfig::trigger: rcp::wakeup::WakeupTriggerConf
 impl rcp::wakeup::WakeupFunctionalConfig
 pub fn rcp::wakeup::WakeupFunctionalConfig::layer_tag(&self) -> rcp::regmap::PerEpTypeFunctionalConfig
 impl core::clone::Clone for rcp::wakeup::WakeupFunctionalConfig
-pub fn rcp::wakeup::WakeupFunctionalConfig::clone(&self) -> rcp::wakeup::WakeupFunctionalConfig
+pub fn rcp::wakeup::WakeupFunctionalConfig::clone(&self) -> Self
 impl core::cmp::Eq for rcp::wakeup::WakeupFunctionalConfig
 impl core::cmp::PartialEq for rcp::wakeup::WakeupFunctionalConfig
-pub fn rcp::wakeup::WakeupFunctionalConfig::eq(&self, &rcp::wakeup::WakeupFunctionalConfig) -> bool
+pub fn rcp::wakeup::WakeupFunctionalConfig::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::wakeup::WakeupFunctionalConfig
-pub fn rcp::wakeup::WakeupFunctionalConfig::default() -> rcp::wakeup::WakeupFunctionalConfig
+pub fn rcp::wakeup::WakeupFunctionalConfig::default() -> Self
 impl core::fmt::Debug for rcp::wakeup::WakeupFunctionalConfig
 pub fn rcp::wakeup::WakeupFunctionalConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::wakeup::WakeupFunctionalConfig
@@ -4451,12 +4451,12 @@ impl rcp::wakeup::WakeupTriggerConfig
 pub fn rcp::wakeup::WakeupTriggerConfig::decode(&[u8]) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::wakeup::WakeupTriggerConfig::encode(self) -> [u8; 4]
 impl core::clone::Clone for rcp::wakeup::WakeupTriggerConfig
-pub fn rcp::wakeup::WakeupTriggerConfig::clone(&self) -> rcp::wakeup::WakeupTriggerConfig
+pub fn rcp::wakeup::WakeupTriggerConfig::clone(&self) -> Self
 impl core::cmp::Eq for rcp::wakeup::WakeupTriggerConfig
 impl core::cmp::PartialEq for rcp::wakeup::WakeupTriggerConfig
-pub fn rcp::wakeup::WakeupTriggerConfig::eq(&self, &rcp::wakeup::WakeupTriggerConfig) -> bool
+pub fn rcp::wakeup::WakeupTriggerConfig::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::wakeup::WakeupTriggerConfig
-pub fn rcp::wakeup::WakeupTriggerConfig::default() -> rcp::wakeup::WakeupTriggerConfig
+pub fn rcp::wakeup::WakeupTriggerConfig::default() -> Self
 impl core::fmt::Debug for rcp::wakeup::WakeupTriggerConfig
 pub fn rcp::wakeup::WakeupTriggerConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::wakeup::WakeupTriggerConfig
@@ -4481,10 +4481,10 @@ impl rcp::watchdog::StreamWatchdogOutcome
 pub fn rcp::watchdog::StreamWatchdogOutcome::drives_safestate(&self) -> bool
 pub fn rcp::watchdog::StreamWatchdogOutcome::watchdog_overflowed(&self) -> bool
 impl core::clone::Clone for rcp::watchdog::StreamWatchdogOutcome
-pub fn rcp::watchdog::StreamWatchdogOutcome::clone(&self) -> rcp::watchdog::StreamWatchdogOutcome
+pub fn rcp::watchdog::StreamWatchdogOutcome::clone(&self) -> Self
 impl core::cmp::Eq for rcp::watchdog::StreamWatchdogOutcome
 impl core::cmp::PartialEq for rcp::watchdog::StreamWatchdogOutcome
-pub fn rcp::watchdog::StreamWatchdogOutcome::eq(&self, &rcp::watchdog::StreamWatchdogOutcome) -> bool
+pub fn rcp::watchdog::StreamWatchdogOutcome::eq(&self, &Self) -> bool
 impl core::fmt::Debug for rcp::watchdog::StreamWatchdogOutcome
 pub fn rcp::watchdog::StreamWatchdogOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::watchdog::StreamWatchdogOutcome
@@ -4502,12 +4502,12 @@ pub fn rcp::watchdog::StreamWatchdogState::last_reset_tick(&self) -> u64
 pub fn rcp::watchdog::StreamWatchdogState::new(u64) -> Self
 pub fn rcp::watchdog::StreamWatchdogState::reset_on_request(self, u64) -> Self
 impl core::clone::Clone for rcp::watchdog::StreamWatchdogState
-pub fn rcp::watchdog::StreamWatchdogState::clone(&self) -> rcp::watchdog::StreamWatchdogState
+pub fn rcp::watchdog::StreamWatchdogState::clone(&self) -> Self
 impl core::cmp::Eq for rcp::watchdog::StreamWatchdogState
 impl core::cmp::PartialEq for rcp::watchdog::StreamWatchdogState
-pub fn rcp::watchdog::StreamWatchdogState::eq(&self, &rcp::watchdog::StreamWatchdogState) -> bool
+pub fn rcp::watchdog::StreamWatchdogState::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::watchdog::StreamWatchdogState
-pub fn rcp::watchdog::StreamWatchdogState::default() -> rcp::watchdog::StreamWatchdogState
+pub fn rcp::watchdog::StreamWatchdogState::default() -> Self
 impl core::fmt::Debug for rcp::watchdog::StreamWatchdogState
 pub fn rcp::watchdog::StreamWatchdogState::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::watchdog::StreamWatchdogState
@@ -4521,12 +4521,12 @@ impl core::panic::unwind_safe::RefUnwindSafe for rcp::watchdog::StreamWatchdogSt
 impl core::panic::unwind_safe::UnwindSafe for rcp::watchdog::StreamWatchdogState
 pub struct rcp::watchdog::StreamWatchdogTimeout(pub u16)
 impl core::clone::Clone for rcp::watchdog::StreamWatchdogTimeout
-pub fn rcp::watchdog::StreamWatchdogTimeout::clone(&self) -> rcp::watchdog::StreamWatchdogTimeout
+pub fn rcp::watchdog::StreamWatchdogTimeout::clone(&self) -> Self
 impl core::cmp::Eq for rcp::watchdog::StreamWatchdogTimeout
 impl core::cmp::PartialEq for rcp::watchdog::StreamWatchdogTimeout
-pub fn rcp::watchdog::StreamWatchdogTimeout::eq(&self, &rcp::watchdog::StreamWatchdogTimeout) -> bool
+pub fn rcp::watchdog::StreamWatchdogTimeout::eq(&self, &Self) -> bool
 impl core::default::Default for rcp::watchdog::StreamWatchdogTimeout
-pub fn rcp::watchdog::StreamWatchdogTimeout::default() -> rcp::watchdog::StreamWatchdogTimeout
+pub fn rcp::watchdog::StreamWatchdogTimeout::default() -> Self
 impl core::fmt::Debug for rcp::watchdog::StreamWatchdogTimeout
 pub fn rcp::watchdog::StreamWatchdogTimeout::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rcp::watchdog::StreamWatchdogTimeout
@@ -4579,9 +4579,9 @@ pub fn rcp::RcpError::is_relay_timeout(&self) -> bool
 pub fn rcp::RcpError::is_tc18_error_code(&self) -> bool
 pub fn rcp::RcpError::tc18_wire_code(&self) -> core::option::Option<u8>
 impl core::clone::Clone for rcp::RcpError
-pub fn rcp::RcpError::clone(&self) -> rcp::RcpError
+pub fn rcp::RcpError::clone(&self) -> Self
 impl core::cmp::PartialEq for rcp::RcpError
-pub fn rcp::RcpError::eq(&self, &rcp::RcpError) -> bool
+pub fn rcp::RcpError::eq(&self, &Self) -> bool
 impl core::convert::From<&rcp::RcpError> for rcp::capi::CError
 pub fn rcp::capi::CError::from(&rcp::RcpError) -> Self
 impl core::error::Error for rcp::RcpError
@@ -4615,6 +4615,6 @@ impl !core::panic::unwind_safe::RefUnwindSafe for rcp::Loan
 impl !core::panic::unwind_safe::UnwindSafe for rcp::Loan
 pub const rcp::RELAY_SPEC_VERSION: &str
 pub const rcp::SPEC_VERSION: &str
-pub fn rcp::adapt(alloc::sync::Arc<rcp::mock::RcServer>) -> alloc::boxed::Box<dyn rcp::relay::Caller>
+pub fn rcp::adapt(alloc::rcs::arc::Arc<rcp::mock::RcServer>) -> alloc::boxed::Box<dyn rcp::relay::Caller>
 pub fn rcp::from_message(&rcp::relay::Message) -> core::result::Result<(rcp::avtp::StreamId, rcp::acf::AcfAbbMessage), rcp::RcpError>
 pub fn rcp::to_message(rcp::avtp::StreamId, &rcp::acf::AcfAbbMessage) -> rcp::relay::Message

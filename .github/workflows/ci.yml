@@ -120,7 +120,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          # Pinned: rustdoc JSON rendering drifts between nightlies, which
+          # changes the snapshot text without any real API change. Keep in
+          # sync with PUBLIC_API_TOOLCHAIN in scripts/api-snapshot-check.sh.
+          toolchain: nightly-2026-10-21
       - uses: Swatinem/rust-cache@v2
       - name: install cargo-public-api
         run: cargo install cargo-public-api --locked
