@@ -20,3 +20,6 @@
 #     tests either.
 
 udp::tests::std_udp_socket  # std::net::UdpSocket (SOCK_DGRAM): Miri's socket shim only supports SOCK_STREAM ("socket: type 0x2 is unsupported")
+udp::tests::udp_avtp_socket  # UdpAvtpTransport over std::net::UdpSocket (SOCK_DGRAM): same Miri socket-shim limitation as above
+tsn::tests::udp_socket_  # SoPriority on a std::net::UdpSocket (SOCK_DGRAM): same Miri socket-shim limitation as above
+l2::tests::l2_avtp_open_fails  # L2AvtpTransport::open -> getifaddrs()/AF_PACKET socket(): foreign calls Miri does not shim on Linux

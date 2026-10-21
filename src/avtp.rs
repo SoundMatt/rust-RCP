@@ -159,6 +159,12 @@
 
 use crate::RcpError;
 
+mod transport;
+pub(crate) use transport::{deadline_done, poll_slice, remaining};
+pub use transport::{
+    request_acf_abb, request_acf_gbb, AvtpTransport, LoopbackTransport, AVTP_MAX_FRAME_LEN,
+};
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 /// AVTPDU `subtype` value identifying an NTSCF-headed PDU.

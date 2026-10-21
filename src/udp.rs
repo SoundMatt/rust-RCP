@@ -12,6 +12,22 @@
 //fusa:req REQ-UDP-012
 //fusa:req REQ-UDP-013
 //fusa:req REQ-UDP-014
+//fusa:req REQ-UDP-015
+//fusa:req REQ-UDP-016
+//fusa:req REQ-UDP-017
+//fusa:req REQ-UDP-018
+//fusa:req REQ-UDP-019
+//fusa:req REQ-UDP-020
+//fusa:req REQ-UDP-021
+//fusa:req REQ-UDP-022
+//fusa:req REQ-UDP-023
+//fusa:req REQ-UDP-024
+//fusa:req REQ-UDP-025
+//fusa:req REQ-UDP-026
+//fusa:req REQ-UDP-027
+//fusa:req REQ-UDP-028
+//fusa:req REQ-UDP-029
+//fusa:req REQ-UDP-030
 
 //! UDP unicast transport for the TC18 AVTPDU/ACF wire format.
 //!
@@ -89,15 +105,33 @@
 //! no counterpart when an AVTPDU is instead carried directly at layer 2
 //! with EtherType `0x22F0` — see [`crate::l2`], added alongside this item
 //! as the other, equally-supported transport option TC18 §10.1 names.
+//!
+//! # [`UdpAvtpTransport`] — the shared [`AvtpTransport`] over UDP (issue #205)
+//!
+//! [`UdpAvtpTransport`] is the port of c-RCP's
+//! `rcp_udp_avtp_transport_dial()`/`_bind()` (`c-RCP/include/rcp/udp.h:
+//! 204-226`, `c-RCP/src/udp.c:103-377`): an [`AvtpTransport`] that
+//! applies/strips the Annex J sequence number transparently. Dial mode
+//! connects to one fixed peer (the kernel discards datagrams from anyone
+//! else); bind mode starts with no peer and learns it from every received
+//! datagram (`udp.c:250`), returning [`RcpError::Busy`] from
+//! [`AvtpTransport::send_frame`] until one has arrived. Its receive loop
+//! polls in 20 ms slices so [`AvtpTransport::close`] from another thread
+//! unblocks it, skips transient socket errors and datagrams too short to
+//! carry the Annex J sequence number (`udp.c:235-245`), and drops
+//! (returning [`RcpError::Busy`]) a datagram too large for the caller's
+//! buffer. [`UdpTransport`]'s `send_acf_abb`/`send_acf_gbb` are now thin
+//! wrappers over [`crate::avtp::request_acf_abb`]/
+//! [`crate::avtp::request_acf_gbb`]; [`UdpRcServer`] is unchanged.
 
-use std::net::SocketAddr;
+use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::acf::{self, AcfAbbMessage, AcfGbbMessage, ByteMessageInfo};
 use crate::addressing::{EndpointId, EndpointTable};
-use crate::avtp::{self, StreamId};
+use crate::avtp::{self, AvtpTransport, StreamId, AVTP_MAX_FRAME_LEN};
 use crate::discovery::{self, DiscoveryAccessKind, DiscoveryClaim};
 use crate::ep0::{self, RequestRoute};
 use crate::mock::RcServer;
@@ -259,6 +293,267 @@ impl UdpSocket for StdUdpSocket {
     }
 }
 
+// ── UdpAvtpTransport ─────────────────────────────────────────────────────────
+
+/// Mutable state guarded by one lock, as c-RCP's `mu` guards
+/// `closed`/`peer`/`has_peer`/`send_seq`/`recv_seq` (`udp.c:108-122`).
+struct UdpAvtpState {
+    closed: bool,
+    peer: Option<SocketAddr>,
+    send_seq: u32,
+    recv_seq: Option<u32>,
+}
+
+/// The shared [`AvtpTransport`] over a real UDP/IPv4 socket — port of
+/// c-RCP's `rcp_udp_avtp_transport_t` (`c-RCP/src/udp.c:103-377`). See
+/// this module's doc comment, "[`UdpAvtpTransport`] — the shared
+/// [`AvtpTransport`] over UDP".
+///
+/// c-RCP returns a non-NULL transport whose `rcp_udp_avtp_transport_ok()`
+/// is false on a socket/connect/bind failure; the constructors here return
+/// `Err(RcpError::Other(_))` instead (the rust idiom for the same
+/// distinction). Hosts are IPv4 dotted-quad strings, as c-RCP's
+/// `inet_pton(AF_INET, ...)` requires.
+//fusa:req REQ-UDP-015
+//fusa:req REQ-UDP-016
+pub struct UdpAvtpTransport {
+    socket: std::net::UdpSocket,
+    bound_mode: bool,
+    time_sync_supported: bool,
+    state: Mutex<UdpAvtpState>,
+}
+
+impl UdpAvtpTransport {
+    fn from_socket(socket: std::net::UdpSocket, bound_mode: bool, tss: bool) -> Self {
+        UdpAvtpTransport {
+            socket,
+            bound_mode,
+            time_sync_supported: tss,
+            state: Mutex::new(UdpAvtpState {
+                closed: false,
+                peer: None,
+                send_seq: 0,
+                recv_seq: None,
+            }),
+        }
+    }
+
+    fn lock(&self) -> std::sync::MutexGuard<'_, UdpAvtpState> {
+        self.state.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Connect a UDP socket to `host:port` (`rcp_udp_avtp_transport_dial()`,
+    /// `udp.c:296-324`). `host` must be an IPv4 address.
+    //fusa:req REQ-UDP-015
+    //fusa:req REQ-UDP-026
+    pub fn dial(host: &str, port: u16, time_sync_supported: bool) -> Result<Self, RcpError> {
+        let ip: Ipv4Addr = host
+            .parse()
+            .map_err(|_| RcpError::Other(format!("udp: dial: invalid IPv4 host {host:?}")))?;
+        let socket = std::net::UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0))
+            .map_err(|e| RcpError::Other(format!("udp: dial: socket: {e}")))?;
+        socket
+            .connect((ip, port))
+            .map_err(|e| RcpError::Other(format!("udp: dial: connect {ip}:{port}: {e}")))?;
+        Ok(Self::from_socket(socket, false, time_sync_supported))
+    }
+
+    /// Bind a UDP socket to `addr:port` (`rcp_udp_avtp_transport_bind()`,
+    /// `udp.c:329-358`); an empty `addr` binds `INADDR_ANY`, port `0` lets
+    /// the OS pick one (see [`Self::local_port`]).
+    //fusa:req REQ-UDP-016
+    //fusa:req REQ-UDP-026
+    pub fn bind(addr: &str, port: u16, time_sync_supported: bool) -> Result<Self, RcpError> {
+        let ip: Ipv4Addr = if addr.is_empty() {
+            Ipv4Addr::UNSPECIFIED
+        } else {
+            addr.parse()
+                .map_err(|_| RcpError::Other(format!("udp: bind: invalid IPv4 addr {addr:?}")))?
+        };
+        let socket = std::net::UdpSocket::bind((ip, port))
+            .map_err(|e| RcpError::Other(format!("udp: bind {ip}:{port}: {e}")))?;
+        Ok(Self::from_socket(socket, true, time_sync_supported))
+    }
+
+    /// [`Self::dial`] on [`ANNEX_J_CONTROL_PORT`] (`udp.c:360-366`).
+    //fusa:req REQ-UDP-029
+    pub fn dial_default_port(host: &str, time_sync_supported: bool) -> Result<Self, RcpError> {
+        Self::dial(host, ANNEX_J_CONTROL_PORT, time_sync_supported)
+    }
+
+    /// [`Self::bind`] on [`ANNEX_J_CONTROL_PORT`] (`udp.c:368-374`).
+    //fusa:req REQ-UDP-029
+    pub fn bind_default_port(addr: &str, time_sync_supported: bool) -> Result<Self, RcpError> {
+        Self::bind(addr, ANNEX_J_CONTROL_PORT, time_sync_supported)
+    }
+
+    /// The local address this transport's socket is bound to
+    /// (`rcp_udp_avtp_transport_addr_string()`, `udp.c:393-410`).
+    //fusa:req REQ-UDP-017
+    pub fn local_addr(&self) -> Result<SocketAddr, RcpError> {
+        self.socket
+            .local_addr()
+            .map_err(|e| RcpError::Other(format!("udp: local_addr: {e}")))
+    }
+
+    /// The local port this transport's socket is bound to, or `0` if it
+    /// cannot be read (`rcp_udp_avtp_transport_port()`, `udp.c:383-391`).
+    //fusa:req REQ-UDP-017
+    pub fn local_port(&self) -> u16 {
+        self.local_addr().map(|a| a.port()).unwrap_or(0)
+    }
+
+    /// The Annex J sequence number of the most recently received datagram,
+    /// `0` before any (`rcp_udp_avtp_transport_last_recv_seq()`,
+    /// `udp.c:412-421`).
+    //fusa:req REQ-UDP-030
+    pub fn last_recv_seq(&self) -> u32 {
+        self.lock().recv_seq.unwrap_or(0)
+    }
+
+    /// A second handle to this transport's own socket (`try_clone`), e.g.
+    /// for [`crate::tsn::TsnTransport`]'s `SO_PRIORITY` tagging — the rust
+    /// counterpart of handing c-RCP's `rcp_tsn_avtp_transport_new()` the
+    /// transport's socket fd.
+    //fusa:req REQ-UDP-017
+    pub fn try_clone_socket(&self) -> Result<std::net::UdpSocket, RcpError> {
+        self.socket
+            .try_clone()
+            .map_err(|e| RcpError::Other(format!("udp: try_clone: {e}")))
+    }
+}
+
+impl AvtpTransport for UdpAvtpTransport {
+    /// Prepend this transport's own monotonically-incrementing Annex J
+    /// sequence number and send (`udp_avtp_send()`, `udp.c:131-176`).
+    /// Bind mode targets the learned peer and returns `Err(Busy)` before
+    /// one is known; any socket error is `Err(Closed)`.
+    ///
+    /// c-RCP parity (`c-RCP/src/udp.c:154-157`): the sequence number is
+    /// consumed even when the send then fails with `Busy` (no peer learned
+    /// yet), so the first datagram a bound transport actually emits need
+    /// not carry sequence number 0.
+    //fusa:req REQ-UDP-018
+    //fusa:req REQ-UDP-020
+    //fusa:req REQ-UDP-021
+    //fusa:req REQ-UDP-024
+    //fusa:req REQ-UDP-027
+    fn send_frame(&self, frame: &[u8]) -> Result<(), RcpError> {
+        let (dest, seq) = {
+            let mut st = self.lock();
+            if st.closed {
+                return Err(RcpError::Closed);
+            }
+            let seq = st.send_seq;
+            st.send_seq = st.send_seq.wrapping_add(1);
+            (st.peer, seq)
+        };
+        let sent = if self.bound_mode {
+            let dest = dest.ok_or(RcpError::Busy)?;
+            self.socket
+                .send_to(&encode_annex_j_udp_payload(seq, frame), dest)
+        } else {
+            self.socket.send(&encode_annex_j_udp_payload(seq, frame))
+        };
+        sent.map(|_| ()).map_err(|_| RcpError::Closed)
+    }
+
+    /// Poll for one datagram until `deadline` (`udp_avtp_recv()`,
+    /// `udp.c:184-271`): transient socket errors and datagrams shorter than
+    /// the Annex J sequence number are skipped; in bind mode the sender
+    /// becomes the peer; a datagram larger than `buf` is dropped and
+    /// `Err(Busy)` returned.
+    //fusa:req REQ-UDP-018
+    //fusa:req REQ-UDP-019
+    //fusa:req REQ-UDP-022
+    //fusa:req REQ-UDP-023
+    //fusa:req REQ-UDP-024
+    //fusa:req REQ-UDP-025
+    //fusa:req REQ-UDP-028
+    //fusa:req REQ-UDP-030
+    fn recv_frame(&self, deadline: Option<Instant>, buf: &mut [u8]) -> Result<usize, RcpError> {
+        let mut tmp = vec![0u8; 4 + AVTP_MAX_FRAME_LEN];
+        loop {
+            if self.lock().closed {
+                return Err(RcpError::Closed);
+            }
+            if avtp::deadline_done(deadline) {
+                return Err(RcpError::Timeout);
+            }
+            if self
+                .socket
+                .set_read_timeout(Some(avtp::poll_slice(deadline)))
+                .is_err()
+            {
+                continue;
+            }
+            // Poll slice elapsed, or a transient recv error (e.g. a
+            // connected socket's ICMP port-unreachable): keep polling.
+            let Ok((n, from)) = self.socket.recv_from(&mut tmp) else {
+                continue;
+            };
+            // Too short to carry the Annex J sequence number: dropped.
+            let Ok((seq, payload)) = decode_annex_j_udp_payload(&tmp[..n]) else {
+                continue;
+            };
+            {
+                let mut st = self.lock();
+                if self.bound_mode {
+                    st.peer = Some(from);
+                }
+                st.recv_seq = Some(seq);
+            }
+            let dst = buf.get_mut(..payload.len()).ok_or(RcpError::Busy)?;
+            dst.copy_from_slice(payload);
+            return Ok(payload.len());
+        }
+    }
+
+    /// Raise the closed flag; the socket itself is closed on drop
+    /// (`udp_avtp_close()`, `udp.c:275-283`).
+    //fusa:req REQ-UDP-024
+    //fusa:req REQ-UDP-025
+    fn close(&self) -> Result<(), RcpError> {
+        self.lock().closed = true;
+        Ok(())
+    }
+
+    //fusa:req REQ-UDP-026
+    fn time_sync_supported(&self) -> bool {
+        self.time_sync_supported
+    }
+}
+
+/// [`UdpTransport`]'s compatibility adapter: one [`UdpSocket`] plus a fixed
+/// remote, as an [`AvtpTransport`]. A receive is a single
+/// [`UdpSocket::recv_from`] call whose error is returned unchanged — this
+/// wrapper's historical behavior.
+struct UdpSocketLink<'a> {
+    socket: &'a dyn UdpSocket,
+    remote: SocketAddr,
+}
+
+impl AvtpTransport for UdpSocketLink<'_> {
+    fn send_frame(&self, frame: &[u8]) -> Result<(), RcpError> {
+        self.socket.send_to(frame, self.remote).map(|_| ())
+    }
+
+    fn recv_frame(&self, deadline: Option<Instant>, buf: &mut [u8]) -> Result<usize, RcpError> {
+        let (frame, _) = self.socket.recv_from(avtp::remaining(deadline))?;
+        let dst = buf.get_mut(..frame.len()).ok_or(RcpError::Busy)?;
+        dst.copy_from_slice(&frame);
+        Ok(frame.len())
+    }
+
+    fn close(&self) -> Result<(), RcpError> {
+        Ok(())
+    }
+
+    fn time_sync_supported(&self) -> bool {
+        false
+    }
+}
+
 // ── UdpTransport ─────────────────────────────────────────────────────────────
 
 /// RCP-over-UDP transport, addressed by `local_stream`
@@ -292,6 +587,13 @@ impl UdpTransport {
         self.local_stream
     }
 
+    fn link(&self) -> UdpSocketLink<'_> {
+        UdpSocketLink {
+            socket: self.socket.as_ref(),
+            remote: self.remote,
+        }
+    }
+
     /// Send an ACF_ABB request wrapped in an NTSCF frame addressed under
     /// `local_stream`, and decode the ACF_ABB response, verifying it
     /// echoes the request's `byte_bus_id`
@@ -308,17 +610,7 @@ impl UdpTransport {
         sequence_num: u8,
         timeout: Option<Duration>,
     ) -> Result<AcfAbbMessage, RcpError> {
-        if timeout == Some(Duration::ZERO) {
-            return Err(RcpError::Timeout);
-        }
-        let payload = acf::encode_acf_abb(msg)?;
-        let frame = avtp::encode_ntscf_frame(self.local_stream, sequence_num, &payload)?;
-        self.socket.send_to(&frame, self.remote)?;
-        let (resp_frame, _) = self.socket.recv_from(timeout)?;
-        let (_, resp_payload) = avtp::decode_ntscf_frame(&resp_frame)?;
-        let resp = acf::decode_acf_abb(resp_payload)?;
-        acf::verify_echo_back(&msg.info, &resp.info)?;
-        Ok(resp)
+        avtp::request_acf_abb(&self.link(), self.local_stream, msg, sequence_num, timeout)
     }
 
     /// Same as [`Self::send_acf_abb`], for an ACF_GBB request/response pair.
@@ -331,17 +623,7 @@ impl UdpTransport {
         sequence_num: u8,
         timeout: Option<Duration>,
     ) -> Result<AcfGbbMessage, RcpError> {
-        if timeout == Some(Duration::ZERO) {
-            return Err(RcpError::Timeout);
-        }
-        let payload = acf::encode_acf_gbb(msg)?;
-        let frame = avtp::encode_ntscf_frame(self.local_stream, sequence_num, &payload)?;
-        self.socket.send_to(&frame, self.remote)?;
-        let (resp_frame, _) = self.socket.recv_from(timeout)?;
-        let (_, resp_payload) = avtp::decode_ntscf_frame(&resp_frame)?;
-        let resp = acf::decode_acf_gbb(resp_payload)?;
-        acf::verify_echo_back(&msg.info, &resp.info)?;
-        Ok(resp)
+        avtp::request_acf_gbb(&self.link(), self.local_stream, msg, sequence_num, timeout)
     }
 
     /// No-op, matching this module's pre-Milestone-9 behavior.
@@ -1334,5 +1616,222 @@ mod tests {
             assert!(resp.info.err);
             assert_eq!(resp.payload, vec![15]); // INVALID_PARAMETER = 15
         }
+    }
+
+    // ── UdpAvtpTransport (real loopback sockets; `udp_avtp_socket_` prefix
+    //    is listed in scripts/miri-skips.txt — Miri has no SOCK_DGRAM) ────
+
+    fn secs(n: u64) -> Option<Instant> {
+        Some(Instant::now() + Duration::from_secs(n))
+    }
+
+    fn bound_and_dialed() -> (UdpAvtpTransport, UdpAvtpTransport) {
+        let server = UdpAvtpTransport::bind("127.0.0.1", 0, false).unwrap();
+        let client = UdpAvtpTransport::dial("127.0.0.1", server.local_port(), true).unwrap();
+        (server, client)
+    }
+
+    #[test]
+    //fusa:test REQ-UDP-015
+    //fusa:test REQ-UDP-016
+    //fusa:test REQ-UDP-017
+    //fusa:test REQ-UDP-018
+    //fusa:test REQ-UDP-019
+    //fusa:test REQ-UDP-021
+    //fusa:test REQ-UDP-026
+    //fusa:test REQ-UDP-027
+    fn udp_avtp_socket_dial_bind_round_trip_and_peer_learning() {
+        let (server, client) = bound_and_dialed();
+        assert!(client.time_sync_supported());
+        assert!(!server.time_sync_supported());
+        assert_ne!(server.local_port(), 0);
+        assert_eq!(
+            server.local_addr().unwrap().ip(),
+            std::net::IpAddr::V4(Ipv4Addr::LOCALHOST)
+        );
+
+        client.send_frame(&[0x82, 1, 2, 3]).unwrap();
+        let mut buf = [0u8; 64];
+        let n = server.recv_frame(secs(5), &mut buf).unwrap();
+        assert_eq!(&buf[..n], &[0x82, 1, 2, 3]);
+        assert_eq!(server.last_recv_seq(), 0);
+
+        // The bound side learned the client's address and replies to it.
+        server.send_frame(&[0xAA]).unwrap();
+        let n = client.recv_frame(secs(5), &mut buf).unwrap();
+        assert_eq!(&buf[..n], &[0xAA]);
+
+        // The client's own per-connection counter advances on the wire.
+        client.send_frame(&[]).unwrap();
+        assert_eq!(server.recv_frame(secs(5), &mut buf).unwrap(), 0);
+        assert_eq!(server.last_recv_seq(), 1);
+    }
+
+    #[test]
+    //fusa:test REQ-UDP-020
+    //fusa:test REQ-UDP-027
+    fn udp_avtp_socket_bound_send_before_peer_is_busy_and_consumes_a_seq() {
+        let server = UdpAvtpTransport::bind("127.0.0.1", 0, false).unwrap();
+        assert_eq!(server.send_frame(&[1]), Err(RcpError::Busy));
+        let raw = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+        raw.send_to(&[0, 0, 0, 9, 0x55], ("127.0.0.1", server.local_port()))
+            .unwrap();
+        let mut buf = [0u8; 8];
+        assert_eq!(server.recv_frame(secs(5), &mut buf).unwrap(), 1);
+        assert_eq!(server.last_recv_seq(), 9);
+        server.send_frame(&[2]).unwrap();
+        let mut wire = [0u8; 16];
+        raw.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        let (n, _) = raw.recv_from(&mut wire).unwrap();
+        // c-RCP parity: the Busy send above consumed sequence number 0.
+        assert_eq!(&wire[..n], &[0, 0, 0, 1, 2]);
+    }
+
+    #[test]
+    //fusa:test REQ-UDP-022
+    fn udp_avtp_socket_recv_times_out_at_the_deadline() {
+        let server = UdpAvtpTransport::bind("", 0, false).unwrap();
+        let mut buf = [0u8; 8];
+        let start = Instant::now();
+        let deadline = Some(Instant::now() + Duration::from_millis(50));
+        assert_eq!(
+            server.recv_frame(deadline, &mut buf),
+            Err(RcpError::Timeout)
+        );
+        assert!(start.elapsed() >= Duration::from_millis(50));
+    }
+
+    #[test]
+    //fusa:test REQ-UDP-023
+    fn udp_avtp_socket_too_small_buffer_is_busy_and_drops_the_datagram() {
+        let (server, client) = bound_and_dialed();
+        client.send_frame(&[1, 2, 3, 4]).unwrap();
+        let mut small = [0u8; 2];
+        assert_eq!(server.recv_frame(secs(5), &mut small), Err(RcpError::Busy));
+        // Dropped, not retrievable afterward.
+        let mut buf = [0u8; 8];
+        let soon = Some(Instant::now() + Duration::from_millis(50));
+        assert_eq!(server.recv_frame(soon, &mut buf), Err(RcpError::Timeout));
+    }
+
+    #[test]
+    //fusa:test REQ-UDP-024
+    fn udp_avtp_socket_closed_send_and_recv_return_closed() {
+        let (server, client) = bound_and_dialed();
+        client.close().unwrap();
+        client.close().unwrap();
+        assert_eq!(client.send_frame(&[1]), Err(RcpError::Closed));
+        let mut buf = [0u8; 8];
+        assert_eq!(client.recv_frame(None, &mut buf), Err(RcpError::Closed));
+        server.close().unwrap();
+        assert_eq!(server.recv_frame(None, &mut buf), Err(RcpError::Closed));
+    }
+
+    #[test]
+    //fusa:test REQ-UDP-025
+    fn udp_avtp_socket_close_unblocks_a_concurrent_recv() {
+        let server = Arc::new(UdpAvtpTransport::bind("127.0.0.1", 0, false).unwrap());
+        let s2 = Arc::clone(&server);
+        let h = std::thread::spawn(move || {
+            let mut buf = [0u8; 8];
+            s2.recv_frame(None, &mut buf)
+        });
+        std::thread::sleep(Duration::from_millis(50));
+        server.close().unwrap();
+        assert_eq!(h.join().unwrap(), Err(RcpError::Closed));
+    }
+
+    #[test]
+    //fusa:test REQ-UDP-028
+    //fusa:test REQ-UDP-030
+    fn udp_avtp_socket_skips_datagrams_shorter_than_the_annex_j_seq() {
+        let server = UdpAvtpTransport::bind("127.0.0.1", 0, false).unwrap();
+        assert_eq!(server.last_recv_seq(), 0);
+        let raw = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+        let dest = ("127.0.0.1", server.local_port());
+        raw.send_to(&[1, 2, 3], dest).unwrap(); // not Annex J: skipped
+        raw.send_to(&[0, 0, 1, 0, 0x82], dest).unwrap();
+        let mut buf = [0u8; 8];
+        assert_eq!(server.recv_frame(secs(5), &mut buf).unwrap(), 1);
+        assert_eq!(buf[0], 0x82);
+        assert_eq!(server.last_recv_seq(), 0x100);
+    }
+
+    #[test]
+    //fusa:test REQ-UDP-028
+    fn udp_avtp_socket_dial_skips_transient_connection_refused_errors() {
+        // Dial a port nobody listens on: the send's ICMP port-unreachable
+        // surfaces as a transient recv error on some platforms, which must
+        // be skipped (udp.c:235) — the call still ends in Timeout.
+        let unused = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+        let port = unused.local_addr().unwrap().port();
+        drop(unused);
+        let client = UdpAvtpTransport::dial("127.0.0.1", port, false).unwrap();
+        client.send_frame(&[1]).unwrap();
+        let mut buf = [0u8; 8];
+        let soon = Some(Instant::now() + Duration::from_millis(80));
+        assert_eq!(client.recv_frame(soon, &mut buf), Err(RcpError::Timeout));
+    }
+
+    #[test]
+    //fusa:test REQ-UDP-015
+    //fusa:test REQ-UDP-016
+    //fusa:test REQ-UDP-017
+    //fusa:test REQ-UDP-029
+    fn udp_avtp_socket_constructors_reject_bad_addresses_and_default_to_17221() {
+        assert!(matches!(
+            UdpAvtpTransport::dial("not-an-ip", 1, false),
+            Err(RcpError::Other(_))
+        ));
+        assert!(matches!(
+            UdpAvtpTransport::dial("::1", 1, false),
+            Err(RcpError::Other(_))
+        ));
+        assert!(matches!(
+            UdpAvtpTransport::bind("bogus", 0, false),
+            Err(RcpError::Other(_))
+        ));
+        // Binding an address this host does not own fails at bind().
+        assert!(matches!(
+            UdpAvtpTransport::bind("192.0.2.1", 0, false),
+            Err(RcpError::Other(_))
+        ));
+        let d = UdpAvtpTransport::dial_default_port("127.0.0.1", false).unwrap();
+        let peer = d.try_clone_socket().unwrap().peer_addr().unwrap();
+        assert_eq!(peer.port(), ANNEX_J_CONTROL_PORT);
+        // The control port may already be taken on a shared CI host; only
+        // assert the port when the bind itself succeeds.
+        if let Ok(b) = UdpAvtpTransport::bind_default_port("127.0.0.1", false) {
+            assert_eq!(b.local_port(), ANNEX_J_CONTROL_PORT);
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-UDP-003
+    fn udp_transport_wrapper_maps_an_oversized_response_to_busy() {
+        struct Huge;
+        impl UdpSocket for Huge {
+            fn send_to(&self, buf: &[u8], _a: SocketAddr) -> Result<usize, RcpError> {
+                Ok(buf.len())
+            }
+            fn recv_from(&self, _t: Option<Duration>) -> Result<(Vec<u8>, SocketAddr), RcpError> {
+                Ok((
+                    vec![0u8; AVTP_MAX_FRAME_LEN + 1],
+                    "127.0.0.1:1".parse().unwrap(),
+                ))
+            }
+        }
+        let t = UdpTransport::new(
+            local_stream(),
+            Arc::new(Huge),
+            "127.0.0.1:1".parse().unwrap(),
+        );
+        assert_eq!(
+            t.send_acf_abb(&request(1), 0, None).unwrap_err(),
+            RcpError::Busy
+        );
+        let link = t.link();
+        assert!(link.close().is_ok());
+        assert!(!link.time_sync_supported());
     }
 }

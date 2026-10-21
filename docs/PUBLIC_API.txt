@@ -525,6 +525,21 @@ impl core::marker::Unpin for rcp::avtp::TscfFallback
 impl core::marker::UnsafeUnpin for rcp::avtp::TscfFallback
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::avtp::TscfFallback
 impl core::panic::unwind_safe::UnwindSafe for rcp::avtp::TscfFallback
+pub struct rcp::avtp::LoopbackTransport
+impl rcp::avtp::LoopbackTransport
+pub fn rcp::avtp::LoopbackTransport::new(bool, usize) -> Self
+impl rcp::avtp::AvtpTransport for rcp::avtp::LoopbackTransport
+pub fn rcp::avtp::LoopbackTransport::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::avtp::LoopbackTransport::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::avtp::LoopbackTransport::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::avtp::LoopbackTransport::time_sync_supported(&self) -> bool
+impl !core::marker::Freeze for rcp::avtp::LoopbackTransport
+impl core::marker::Send for rcp::avtp::LoopbackTransport
+impl core::marker::Sync for rcp::avtp::LoopbackTransport
+impl core::marker::Unpin for rcp::avtp::LoopbackTransport
+impl core::marker::UnsafeUnpin for rcp::avtp::LoopbackTransport
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::avtp::LoopbackTransport
+impl core::panic::unwind_safe::UnwindSafe for rcp::avtp::LoopbackTransport
 pub struct rcp::avtp::NtscfHeader
 pub rcp::avtp::NtscfHeader::ntscf_data_length: u16
 pub rcp::avtp::NtscfHeader::sequence_num: u8
@@ -616,12 +631,48 @@ impl core::marker::Unpin for rcp::avtp::TscfHeader
 impl core::marker::UnsafeUnpin for rcp::avtp::TscfHeader
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::avtp::TscfHeader
 impl core::panic::unwind_safe::UnwindSafe for rcp::avtp::TscfHeader
+pub const rcp::avtp::AVTP_MAX_FRAME_LEN: usize
 pub const rcp::avtp::NTSCF_DATA_LENGTH_MAX: u16
 pub const rcp::avtp::NTSCF_HEADER_LEN: usize
 pub const rcp::avtp::NTSCF_SUBTYPE: u8
 pub const rcp::avtp::TSCF_DATA_LENGTH_MAX: u16
 pub const rcp::avtp::TSCF_HEADER_LEN: usize
 pub const rcp::avtp::TSCF_SUBTYPE: u8
+pub trait rcp::avtp::AvtpTransport: core::marker::Send + core::marker::Sync
+pub fn rcp::avtp::AvtpTransport::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::avtp::AvtpTransport::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::avtp::AvtpTransport::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::avtp::AvtpTransport::time_sync_supported(&self) -> bool
+impl rcp::avtp::AvtpTransport for rcp::avtp::LoopbackTransport
+pub fn rcp::avtp::LoopbackTransport::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::avtp::LoopbackTransport::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::avtp::LoopbackTransport::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::avtp::LoopbackTransport::time_sync_supported(&self) -> bool
+impl rcp::avtp::AvtpTransport for rcp::l2::L2AvtpTransport
+pub fn rcp::l2::L2AvtpTransport::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::l2::L2AvtpTransport::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::l2::L2AvtpTransport::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::l2::L2AvtpTransport::time_sync_supported(&self) -> bool
+impl rcp::avtp::AvtpTransport for rcp::shmem::ShmemAvtpTransport
+pub fn rcp::shmem::ShmemAvtpTransport::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::shmem::ShmemAvtpTransport::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::shmem::ShmemAvtpTransport::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::shmem::ShmemAvtpTransport::time_sync_supported(&self) -> bool
+impl rcp::avtp::AvtpTransport for rcp::udp::UdpAvtpTransport
+pub fn rcp::udp::UdpAvtpTransport::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::time_sync_supported(&self) -> bool
+impl<T: rcp::avtp::AvtpTransport + ?core::marker::Sized> rcp::avtp::AvtpTransport for alloc::rcs::arc::Arc<T>
+pub fn alloc::rcs::arc::Arc<T>::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn alloc::rcs::arc::Arc<T>::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn alloc::rcs::arc::Arc<T>::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn alloc::rcs::arc::Arc<T>::time_sync_supported(&self) -> bool
+impl<T: rcp::avtp::AvtpTransport> rcp::avtp::AvtpTransport for rcp::tsn::TsnTransport<T>
+pub fn rcp::tsn::TsnTransport<T>::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::tsn::TsnTransport<T>::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::tsn::TsnTransport<T>::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::tsn::TsnTransport<T>::time_sync_supported(&self) -> bool
 pub fn rcp::avtp::build_stream_id([u8; 6], u16) -> u64
 pub fn rcp::avtp::decode_ntscf_frame(&[u8]) -> core::result::Result<(rcp::avtp::NtscfHeader, &[u8]), rcp::RcpError>
 pub fn rcp::avtp::decode_ntscf_header(&[u8]) -> core::result::Result<rcp::avtp::NtscfHeader, rcp::RcpError>
@@ -634,6 +685,8 @@ pub fn rcp::avtp::encode_tscf_header(&rcp::avtp::TscfHeader) -> core::result::Re
 pub fn rcp::avtp::extend_timestamp(u32, u64) -> u64
 pub fn rcp::avtp::parse_stream_id(u64) -> ([u8; 6], u16)
 pub fn rcp::avtp::peek_subtype(&[u8]) -> core::result::Result<u8, rcp::RcpError>
+pub fn rcp::avtp::request_acf_abb(&dyn rcp::avtp::AvtpTransport, rcp::avtp::StreamId, &rcp::acf::AcfAbbMessage, u8, core::option::Option<core::time::Duration>) -> core::result::Result<rcp::acf::AcfAbbMessage, rcp::RcpError>
+pub fn rcp::avtp::request_acf_gbb(&dyn rcp::avtp::AvtpTransport, rcp::avtp::StreamId, &rcp::acf::AcfGbbMessage, u8, core::option::Option<core::time::Duration>) -> core::result::Result<rcp::acf::AcfGbbMessage, rcp::RcpError>
 pub fn rcp::avtp::select_header_variant(&[u8], rcp::avtp::TimeSyncCapability, rcp::avtp::TscfFallback) -> core::result::Result<rcp::avtp::HeaderSelection, rcp::RcpError>
 pub fn rcp::avtp::should_drop_tscf(bool, u8, rcp::avtp::TscfFallback) -> bool
 pub fn rcp::avtp::tscf_reserved_all_zero(&rcp::avtp::TscfHeader) -> bool
@@ -2015,6 +2068,24 @@ impl core::panic::unwind_safe::UnwindSafe for rcp::iso21434::Threat
 pub fn rcp::iso21434::filter_by_risk(&[rcp::iso21434::Threat], rcp::iso21434::RiskLevel) -> alloc::vec::Vec<&rcp::iso21434::Threat>
 pub fn rcp::iso21434::risk_level(rcp::iso21434::Feasibility, rcp::iso21434::Impact) -> rcp::iso21434::RiskLevel
 pub mod rcp::l2
+pub struct rcp::l2::L2AvtpTransport
+impl rcp::l2::L2AvtpTransport
+pub fn rcp::l2::L2AvtpTransport::dst_mac(&self) -> [u8; 6]
+pub fn rcp::l2::L2AvtpTransport::local_mac(&self) -> [u8; 6]
+pub fn rcp::l2::L2AvtpTransport::new(alloc::rcs::arc::Arc<dyn rcp::l2::L2Socket>, [u8; 6], [u8; 6], bool) -> Self
+pub fn rcp::l2::L2AvtpTransport::open(&str, [u8; 6], bool) -> core::result::Result<Self, rcp::RcpError>
+impl rcp::avtp::AvtpTransport for rcp::l2::L2AvtpTransport
+pub fn rcp::l2::L2AvtpTransport::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::l2::L2AvtpTransport::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::l2::L2AvtpTransport::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::l2::L2AvtpTransport::time_sync_supported(&self) -> bool
+impl !core::marker::Freeze for rcp::l2::L2AvtpTransport
+impl core::marker::Send for rcp::l2::L2AvtpTransport
+impl core::marker::Sync for rcp::l2::L2AvtpTransport
+impl core::marker::Unpin for rcp::l2::L2AvtpTransport
+impl core::marker::UnsafeUnpin for rcp::l2::L2AvtpTransport
+impl !core::panic::unwind_safe::RefUnwindSafe for rcp::l2::L2AvtpTransport
+impl !core::panic::unwind_safe::UnwindSafe for rcp::l2::L2AvtpTransport
 pub struct rcp::l2::L2Transport
 impl rcp::l2::L2Transport
 pub fn rcp::l2::L2Transport::close(&self) -> core::result::Result<(), rcp::RcpError>
@@ -2024,7 +2095,7 @@ pub fn rcp::l2::L2Transport::new(rcp::avtp::StreamId, alloc::rcs::arc::Arc<dyn r
 pub fn rcp::l2::L2Transport::send_acf_abb(&self, &rcp::acf::AcfAbbMessage, u8, core::option::Option<core::time::Duration>) -> core::result::Result<rcp::acf::AcfAbbMessage, rcp::RcpError>
 pub fn rcp::l2::L2Transport::send_acf_gbb(&self, &rcp::acf::AcfGbbMessage, u8, core::option::Option<core::time::Duration>) -> core::result::Result<rcp::acf::AcfGbbMessage, rcp::RcpError>
 pub fn rcp::l2::L2Transport::src_mac(&self) -> [u8; 6]
-impl core::marker::Freeze for rcp::l2::L2Transport
+impl !core::marker::Freeze for rcp::l2::L2Transport
 impl core::marker::Send for rcp::l2::L2Transport
 impl core::marker::Sync for rcp::l2::L2Transport
 impl core::marker::Unpin for rcp::l2::L2Transport
@@ -2040,6 +2111,8 @@ pub fn rcp::l2::RawEthernetSocket::fmt(&self, &mut core::fmt::Formatter<'_>) -> 
 impl rcp::l2::L2Socket for rcp::l2::RawEthernetSocket
 pub fn rcp::l2::RawEthernetSocket::recv(&self, core::option::Option<core::time::Duration>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::l2::RawEthernetSocket::send(&self, &[u8]) -> core::result::Result<usize, rcp::RcpError>
+impl rcp::tsn::SoPriority for rcp::l2::RawEthernetSocket
+pub fn rcp::l2::RawEthernetSocket::set_so_priority(&self, u8) -> core::result::Result<(), rcp::RcpError>
 impl core::marker::Freeze for rcp::l2::RawEthernetSocket
 impl core::marker::Send for rcp::l2::RawEthernetSocket
 impl core::marker::Sync for rcp::l2::RawEthernetSocket
@@ -4487,12 +4560,26 @@ impl core::marker::Unpin for rcp::shmem::ShmBridge
 impl core::marker::UnsafeUnpin for rcp::shmem::ShmBridge
 impl !core::panic::unwind_safe::RefUnwindSafe for rcp::shmem::ShmBridge
 impl !core::panic::unwind_safe::UnwindSafe for rcp::shmem::ShmBridge
+pub struct rcp::shmem::ShmemAvtpTransport
+impl rcp::avtp::AvtpTransport for rcp::shmem::ShmemAvtpTransport
+pub fn rcp::shmem::ShmemAvtpTransport::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::shmem::ShmemAvtpTransport::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::shmem::ShmemAvtpTransport::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::shmem::ShmemAvtpTransport::time_sync_supported(&self) -> bool
+impl core::marker::Freeze for rcp::shmem::ShmemAvtpTransport
+impl core::marker::Send for rcp::shmem::ShmemAvtpTransport
+impl core::marker::Sync for rcp::shmem::ShmemAvtpTransport
+impl core::marker::Unpin for rcp::shmem::ShmemAvtpTransport
+impl core::marker::UnsafeUnpin for rcp::shmem::ShmemAvtpTransport
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::shmem::ShmemAvtpTransport
+impl core::panic::unwind_safe::UnwindSafe for rcp::shmem::ShmemAvtpTransport
 pub trait rcp::shmem::ShmChannel: core::marker::Send + core::marker::Sync
 pub fn rcp::shmem::ShmChannel::read(&self, core::option::Option<core::time::Duration>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::shmem::ShmChannel::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
 impl rcp::shmem::ShmChannel for rcp::shmem::InProcChannel
 pub fn rcp::shmem::InProcChannel::read(&self, core::option::Option<core::time::Duration>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::shmem::InProcChannel::write(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::shmem::shmem_avtp_pair_new(bool, usize) -> (rcp::shmem::ShmemAvtpTransport, rcp::shmem::ShmemAvtpTransport)
 pub mod rcp::sim
 pub enum rcp::sim::SimCall
 pub rcp::sim::SimCall::Read
@@ -4798,6 +4885,75 @@ pub trait rcp::tlstransport::TlsStream: core::marker::Send + core::marker::Sync
 pub fn rcp::tlstransport::TlsStream::peer_verified(&self) -> bool
 pub fn rcp::tlstransport::TlsStream::read_to_vec(&self, core::option::Option<core::time::Duration>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::tlstransport::TlsStream::write_all(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub mod rcp::tsn
+pub struct rcp::tsn::TsnConfig
+pub rcp::tsn::TsnConfig::cycle_ns: i32
+pub rcp::tsn::TsnConfig::pcp_map: rcp::tsn::TsnPcpMap
+pub rcp::tsn::TsnConfig::vlan_id: i32
+impl core::clone::Clone for rcp::tsn::TsnConfig
+pub fn rcp::tsn::TsnConfig::clone(&self) -> Self
+impl core::cmp::Eq for rcp::tsn::TsnConfig
+impl core::cmp::PartialEq for rcp::tsn::TsnConfig
+pub fn rcp::tsn::TsnConfig::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::tsn::TsnConfig
+pub fn rcp::tsn::TsnConfig::default() -> Self
+impl core::fmt::Debug for rcp::tsn::TsnConfig
+pub fn rcp::tsn::TsnConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::tsn::TsnConfig
+impl core::marker::StructuralPartialEq for rcp::tsn::TsnConfig
+impl core::marker::Freeze for rcp::tsn::TsnConfig
+impl core::marker::Send for rcp::tsn::TsnConfig
+impl core::marker::Sync for rcp::tsn::TsnConfig
+impl core::marker::Unpin for rcp::tsn::TsnConfig
+impl core::marker::UnsafeUnpin for rcp::tsn::TsnConfig
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::tsn::TsnConfig
+impl core::panic::unwind_safe::UnwindSafe for rcp::tsn::TsnConfig
+pub struct rcp::tsn::TsnPcpMap
+pub rcp::tsn::TsnPcpMap::pcp: [u8; 7]
+impl core::clone::Clone for rcp::tsn::TsnPcpMap
+pub fn rcp::tsn::TsnPcpMap::clone(&self) -> Self
+impl core::cmp::Eq for rcp::tsn::TsnPcpMap
+impl core::cmp::PartialEq for rcp::tsn::TsnPcpMap
+pub fn rcp::tsn::TsnPcpMap::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::tsn::TsnPcpMap
+pub fn rcp::tsn::TsnPcpMap::default() -> Self
+impl core::fmt::Debug for rcp::tsn::TsnPcpMap
+pub fn rcp::tsn::TsnPcpMap::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::tsn::TsnPcpMap
+impl core::marker::StructuralPartialEq for rcp::tsn::TsnPcpMap
+impl core::marker::Freeze for rcp::tsn::TsnPcpMap
+impl core::marker::Send for rcp::tsn::TsnPcpMap
+impl core::marker::Sync for rcp::tsn::TsnPcpMap
+impl core::marker::Unpin for rcp::tsn::TsnPcpMap
+impl core::marker::UnsafeUnpin for rcp::tsn::TsnPcpMap
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::tsn::TsnPcpMap
+impl core::panic::unwind_safe::UnwindSafe for rcp::tsn::TsnPcpMap
+pub struct rcp::tsn::TsnTransport<T: rcp::avtp::AvtpTransport>
+impl<T: rcp::avtp::AvtpTransport> rcp::tsn::TsnTransport<T>
+pub fn rcp::tsn::TsnTransport<T>::config(&self) -> &rcp::tsn::TsnConfig
+pub fn rcp::tsn::TsnTransport<T>::inner(&self) -> &T
+pub fn rcp::tsn::TsnTransport<T>::new(T, core::option::Option<alloc::rcs::arc::Arc<dyn rcp::tsn::SoPriority>>, rcp::tsn::TsnConfig) -> Self
+impl<T: rcp::avtp::AvtpTransport> rcp::avtp::AvtpTransport for rcp::tsn::TsnTransport<T>
+pub fn rcp::tsn::TsnTransport<T>::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::tsn::TsnTransport<T>::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::tsn::TsnTransport<T>::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::tsn::TsnTransport<T>::time_sync_supported(&self) -> bool
+impl<T> core::marker::Freeze for rcp::tsn::TsnTransport<T> where T: core::marker::Freeze
+impl<T> core::marker::Send for rcp::tsn::TsnTransport<T>
+impl<T> core::marker::Sync for rcp::tsn::TsnTransport<T>
+impl<T> core::marker::Unpin for rcp::tsn::TsnTransport<T> where T: core::marker::Unpin
+impl<T> core::marker::UnsafeUnpin for rcp::tsn::TsnTransport<T> where T: core::marker::UnsafeUnpin
+impl<T> !core::panic::unwind_safe::RefUnwindSafe for rcp::tsn::TsnTransport<T>
+impl<T> !core::panic::unwind_safe::UnwindSafe for rcp::tsn::TsnTransport<T>
+pub trait rcp::tsn::SoPriority: core::marker::Send + core::marker::Sync
+pub fn rcp::tsn::SoPriority::set_so_priority(&self, u8) -> core::result::Result<(), rcp::RcpError>
+impl rcp::tsn::SoPriority for rcp::l2::RawEthernetSocket
+pub fn rcp::l2::RawEthernetSocket::set_so_priority(&self, u8) -> core::result::Result<(), rcp::RcpError>
+impl rcp::tsn::SoPriority for std::net::udp::UdpSocket
+pub fn std::net::udp::UdpSocket::set_so_priority(&self, u8) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::tsn::classify_frame(&[u8]) -> rcp::request::ExecutionPriorityTier
+pub fn rcp::tsn::default_pcp_map() -> rcp::tsn::TsnPcpMap
+pub fn rcp::tsn::pcp_for(&rcp::tsn::TsnPcpMap, rcp::request::ExecutionPriorityTier) -> u8
 pub mod rcp::uart
 pub enum rcp::uart::UartReadCompletionReason
 pub rcp::uart::UartReadCompletionReason::Both
@@ -4984,6 +5140,28 @@ impl core::marker::Unpin for rcp::udp::StdUdpSocket
 impl core::marker::UnsafeUnpin for rcp::udp::StdUdpSocket
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::udp::StdUdpSocket
 impl core::panic::unwind_safe::UnwindSafe for rcp::udp::StdUdpSocket
+pub struct rcp::udp::UdpAvtpTransport
+impl rcp::udp::UdpAvtpTransport
+pub fn rcp::udp::UdpAvtpTransport::bind(&str, u16, bool) -> core::result::Result<Self, rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::bind_default_port(&str, bool) -> core::result::Result<Self, rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::dial(&str, u16, bool) -> core::result::Result<Self, rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::dial_default_port(&str, bool) -> core::result::Result<Self, rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::last_recv_seq(&self) -> u32
+pub fn rcp::udp::UdpAvtpTransport::local_addr(&self) -> core::result::Result<core::net::socket_addr::SocketAddr, rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::local_port(&self) -> u16
+pub fn rcp::udp::UdpAvtpTransport::try_clone_socket(&self) -> core::result::Result<std::net::udp::UdpSocket, rcp::RcpError>
+impl rcp::avtp::AvtpTransport for rcp::udp::UdpAvtpTransport
+pub fn rcp::udp::UdpAvtpTransport::close(&self) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::recv_frame(&self, core::option::Option<std::time::Instant>, &mut [u8]) -> core::result::Result<usize, rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::send_frame(&self, &[u8]) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::udp::UdpAvtpTransport::time_sync_supported(&self) -> bool
+impl !core::marker::Freeze for rcp::udp::UdpAvtpTransport
+impl core::marker::Send for rcp::udp::UdpAvtpTransport
+impl core::marker::Sync for rcp::udp::UdpAvtpTransport
+impl core::marker::Unpin for rcp::udp::UdpAvtpTransport
+impl core::marker::UnsafeUnpin for rcp::udp::UdpAvtpTransport
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::udp::UdpAvtpTransport
+impl core::panic::unwind_safe::UnwindSafe for rcp::udp::UdpAvtpTransport
 pub struct rcp::udp::UdpRcServer
 impl rcp::udp::UdpRcServer
 pub fn rcp::udp::UdpRcServer::discovery_claim(&self) -> core::option::Option<rcp::discovery::DiscoveryClaim>
