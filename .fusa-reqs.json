@@ -8774,7 +8774,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "tc18",
+      "status": "partial"
     },
     {
       "id": "REQ-SRVCFG-002",
@@ -8783,16 +8785,20 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "tc18",
+      "status": "partial"
     },
     {
       "id": "REQ-MOCKSRV-011",
       "title": "dispatch_message routes an in-process request through dispatch_frame",
-      "text": "RcServer::dispatch_message shall frame one AcfAbbMessage as a one-member NTSCF AVTPDU under the caller stream_id (clamping read_size_segment to 12 bits, Err(PayloadTooLarge) for a payload beyond one ACF message), dispatch it through RcServer::dispatch_frame, and return the decoded response, an err = 1 non-Acknowledge response as the matching RcpError, and no response as Err(RcpError::NotConnected).",
+      "text": "RcServer::dispatch_message shall frame one AcfAbbMessage as a one-member NTSCF AVTPDU under the caller stream_id with the in-process client's own sequence_num for that stream (one free-running counter per request stream, assigned under the core lock that also covers the dispatch, so calls on other streams open no gap and concurrent calls on one stream are gated in assignment order) (clamping read_size_segment to 12 bits, Err(PayloadTooLarge) for a payload beyond one ACF message), dispatch it through RcServer::dispatch_frame, and return the decoded response, an err = 1 non-Acknowledge response as the matching RcpError, and no response as Err(RcpError::NotConnected).",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "internal",
+      "status": "implemented"
     },
     {
       "id": "REQ-UDP-015",
@@ -8812,7 +8818,9 @@
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "scope": "internal",
+      "status": "implemented"
     }
   ]
 }

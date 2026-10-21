@@ -239,8 +239,15 @@ const EVT_ACKNOWLEDGE: Evt = Evt {
 };
 
 /// A response header exactly as c-RCP's `rcp_acf_build_*_response()`
-/// helpers pack it: `op = 0`, `rsp = 1`, every other field zero except the
-/// ones given.
+/// helpers pack it: `op = RCP_ACF_OP_NONE`, `rsp = 1`, every other field
+/// zero except the ones given.
+///
+/// c-RCP parity: `RCP_ACF_OP_NONE` encodes as the write sense, `op = 1`
+/// on the wire (`c-RCP/include/rcp/acf.h:205-225`), so every one of these
+/// responses carries `op = 1` whatever the request's `op` was. TC18 RC5
+/// §11.3 Table 17 (TC18-11.3-003) has the response mirror the request's
+/// `op`. Proven against c-RCP's real builders by
+/// `testdata/c_rcp_server_response_golden.txt`.
 fn crcp_response(
     byte_bus_id: u16,
     transaction_num: u8,
@@ -253,6 +260,7 @@ fn crcp_response(
             byte_bus_id,
             transaction_num,
             evt,
+            op: true,
             rsp: true,
             err,
             ..ByteMessageInfo::default()
@@ -265,6 +273,15 @@ fn crcp_response(
 /// `rcp_acf_build_error_response()` (`c-RCP/src/acf.c:298`): `evt = 0`,
 /// `err = 1`, the Table 30 code as the one-byte payload. `None` for an
 /// error with no wire code.
+///
+/// c-RCP parity: `c-RCP/src/acf.c:298-315` always writes `evt = 0`,
+/// `op = RCP_ACF_OP_NONE` (wire `op = 1`, see [`crcp_response`]),
+/// `rsp = 1`, `err = 1`, whatever the
+/// request carried. TC18 RC5 §11.3 Table 17 (TC18-11.3-003) says a
+/// response mirrors the originating request's `op`, and this crate's
+/// execution-path `build_error_response` copies `evt`/`op` from the
+/// request; the store/gate paths that use this builder copy c-RCP
+/// instead.
 fn wire_error_response(byte_bus_id: u16, transaction_num: u8, error: &RcpError) -> Option<Vec<u8>> {
     let code = error.tc18_wire_code()?;
     crcp_response(
@@ -1115,6 +1132,13 @@ fn decode_chained_into(req: &mut PendingRequest, frame: &[u8]) -> Result<(), Opt
 }
 
 /// `kind_is_gated_by_ep_enable()` (`c-RCP/src/server.c:703`).
+///
+/// c-RCP parity: `c-RCP/src/server.c:690-712` excludes Standard and
+/// Cancellation requests, which reach the store only through the TSCF
+/// presentation-time gate, so a stored TSCF-gated Standard request runs
+/// on an endpoint whose `ep_enable` is 0. TC18 RC5 §12.3.1.3
+/// (TC18-12.3.1.3-002) says a disabled endpoint executes only config
+/// requests and keeps operational ones stored until it is enabled.
 fn kind_is_gated_by_ep_enable(kind: SchedKind) -> bool {
     !matches!(kind, SchedKind::Standard | SchedKind::Cancellation)
 }
@@ -1521,6 +1545,11 @@ struct ServerCore {
     discovery_claim: Option<DiscoveryClaim>,
     discovery_timeout: Duration,
     time_sync_supported: bool,
+    /// The in-process client's next request `sequence_num` per request
+    /// stream (keyed by `stream_id`) for [`RcServer::dispatch_message`].
+    /// Held under the core lock so a number is assigned and gated in one
+    /// critical section.
+    message_seq: HashMap<u64, u8>,
 }
 
 impl ServerCore {
@@ -1538,6 +1567,7 @@ impl ServerCore {
             discovery_claim: None,
             discovery_timeout: discovery::DISCOVERY_TIME_OUT,
             time_sync_supported: false,
+            message_seq: HashMap::new(),
         }
     }
 
@@ -1611,9 +1641,6 @@ pub struct RcServer {
     /// Free-running NTSCF `sequence_num` for [`Self::handle_ntscf_frame`]'s
     /// response frames (this server's own simplification).
     sequence_num: AtomicU32,
-    /// The in-process client's request `sequence_num` for
-    /// [`Self::dispatch_message`].
-    message_seq: AtomicU32,
     core: Mutex<ServerCore>,
 }
 
@@ -1631,7 +1658,6 @@ impl RcServer {
             endpoint_impls: Mutex::new(HashMap::new()),
             next_endpoint_id: AtomicU32::new(0),
             sequence_num: AtomicU32::new(0),
-            message_seq: AtomicU32::new(0),
             core: Mutex::new(ServerCore::new()),
         })
     }
@@ -2042,6 +2068,19 @@ impl RcServer {
         self.broadcast_locked(&mut core, request_stream_index)
     }
 
+    /// [`Self::broadcast_safe_state`] with the core lock held.
+    ///
+    /// c-RCP parity: `rcp_mock_server_broadcast_safe_state()`
+    /// (`c-RCP/src/mock.c:3739-3781`) purges only non-safety requests
+    /// (`rcp_server_endpoint_watchdog_purge`, `c-RCP/src/server.c:1022`)
+    /// for every safe-state cause (sequence gap, storage overflow,
+    /// watchdog), and for an EP_ID_config row naming an unconfigured
+    /// request stream falls back to the unscoped `find_slot()`
+    /// (`mock.c:3770-3777`, [`unscoped_store_key`]), which may purge a
+    /// slot on another stream. TC18 RC5 defines the keep-0x8F / clear-0x0F
+    /// rule only for a watchdog overflow (§11.2.2.2, TC18-11.2.2.2-006),
+    /// and request storage is per request stream (§11.2.3.2,
+    /// TC18-11.2.3.2-001).
     fn broadcast_locked(&self, core: &mut ServerCore, request_stream_index: u8) -> usize {
         if request_stream_index == 0 {
             return 0;
@@ -2066,6 +2105,17 @@ impl RcServer {
     /// The once-per-frame sequence gate (`frame_seq_gate_admits()`,
     /// `c-RCP/src/mock.c:3038-3066`): latches the sequence cause and enters
     /// safe state when the evaluation says so, regardless of acceptance.
+    ///
+    /// c-RCP parity: `c-RCP/src/mock.c:3055-3061` broadcasts safe state on
+    /// `enter_safe_state` even when the frame is accepted (a forward gap
+    /// with ordering still held), and then still dispatches the gapped
+    /// frame. The gap test itself follows TC18 RC5 §12.7.7 Table 24
+    /// (TC18-12.7.7-001) `rx_seq_safestate_enable`: "bring all endpoints
+    /// to safety state if Sequence_Nr has no single increment". c-RCP's
+    /// reaction diverges from that text: it purges only the non-safety
+    /// requests of the endpoints EP_ID_config binds to this one request
+    /// stream ([`Self::broadcast_safe_state`]), not all endpoints, and
+    /// it does not drive any endpoint to a safety state. Copied as is.
     //fusa:req REQ-E2E-028
     //fusa:req REQ-E2E-029
     fn frame_seq_gate_admits(&self, core: &mut ServerCore, stream: StreamId, seq: u8) -> bool {
@@ -2118,6 +2168,17 @@ impl RcServer {
     //fusa:req REQ-MOCK-029
     //fusa:req REQ-MOCKSRV-008
     pub fn dispatch_frame(&self, frame: &[u8], peer: &Peer) -> FrameDispatch {
+        let mut core = self.core.lock().unwrap();
+        self.dispatch_frame_locked(&mut core, frame, peer)
+    }
+
+    /// [`Self::dispatch_frame`] with the core lock already held.
+    fn dispatch_frame_locked(
+        &self,
+        core: &mut ServerCore,
+        frame: &[u8],
+        peer: &Peer,
+    ) -> FrameDispatch {
         let (hdr, acf) = match decode_ntscf_frame(frame) {
             Ok(decoded) => decoded,
             Err(e) => return FrameDispatch::failed(e),
@@ -2138,8 +2199,7 @@ impl RcServer {
         if ranges.len() > MAX_FRAME_MEMBERS {
             ranges.truncate(MAX_FRAME_MEMBERS - 1);
         }
-        let mut core = self.core.lock().unwrap();
-        if !self.frame_seq_gate_admits(&mut core, stream, hdr.sequence_num) {
+        if !self.frame_seq_gate_admits(core, stream, hdr.sequence_num) {
             dispatch.members = ranges
                 .iter()
                 .map(|_| member(DispatchResult::SeqError, 0, None))
@@ -2148,14 +2208,8 @@ impl RcServer {
         }
         let mut chain = ChainState::default();
         for (i, range) in ranges.into_iter().enumerate() {
-            let m = self.dispatch_in_frame(
-                &mut core,
-                &mut chain,
-                i,
-                stream,
-                &acf[range],
-                peer.received_at,
-            );
+            let m =
+                self.dispatch_in_frame(core, &mut chain, i, stream, &acf[range], peer.received_at);
             dispatch.members.push(m);
         }
         dispatch
@@ -2428,7 +2482,7 @@ impl RcServer {
     //fusa:req REQ-MOCKSRV-005
     //fusa:req REQ-MOCKSRV-006
     //fusa:req REQ-MOCKSRV-007
-    pub fn handle_abb(
+    pub(crate) fn handle_abb(
         &self,
         stream_id: StreamId,
         request: &AcfAbbMessage,
@@ -2524,8 +2578,11 @@ impl RcServer {
     /// [`Self::dispatch_frame`] — the path [`mod@crate::adapt`] and the CLI use.
     ///
     /// The request is framed as a one-member NTSCF AVTPDU under
-    /// `stream_id` with this server's own in-process request
-    /// `sequence_num`. A `read_size_segment` wider than the 12-bit wire
+    /// `stream_id` with the in-process client's own request
+    /// `sequence_num` for that stream: one free-running counter per request
+    /// stream (wrapping mod 256), assigned under the core lock that also
+    /// covers the dispatch, so streams never share a counter and concurrent
+    /// callers on one stream are gated in assignment order. A `read_size_segment` wider than the 12-bit wire
     /// field is clamped to its maximum; a payload too large for one ACF
     /// message is `Err(RcpError::PayloadTooLarge)`. Returns the decoded
     /// response; an `err = 1` (non-Acknowledge) response becomes the
@@ -2548,9 +2605,20 @@ impl RcServer {
             .0
             .min(READ_SIZE_SEGMENT_12BIT_MAX);
         let body = encode_acf_abb(&request)?;
-        let seq = self.message_seq.fetch_add(1, Ordering::SeqCst) as u8; // safe: free-running, wraps mod 256 by design
+        // One counter per request stream, assigned and dispatched under
+        // the same core lock: interleaving streams cannot open a gap on
+        // either, and concurrent callers on one stream reach the sequence
+        // gate in the order their numbers were assigned.
+        let mut core = self.core.lock().unwrap();
+        let next = core.message_seq.entry(stream_id.to_u64()).or_insert(0);
+        let seq = *next;
         let frame = encode_ntscf_frame(stream_id, seq, &body)?;
-        message_from_dispatch(self.dispatch_frame(&frame, &Peer::stream(stream_id)))
+        *next = next.wrapping_add(1);
+        message_from_dispatch(self.dispatch_frame_locked(
+            &mut core,
+            &frame,
+            &Peer::stream(stream_id),
+        ))
     }
 }
 
@@ -2656,6 +2724,10 @@ fn discovery_configure(
 /// any stream — c-RCP's unscoped `find_slot()` fallback for an
 /// EP_ID_config row naming an unconfigured request stream
 /// (`c-RCP/src/mock.c:3770-3776`).
+///
+/// c-RCP parity: this crosses request streams, which TC18 RC5's
+/// per-stream request storage (§11.2.3.2, TC18-11.2.3.2-001) does not
+/// allow; copied for the misconfigured case only, as c-RCP does.
 fn unscoped_store_key(core: &ServerCore, byte_bus_id: u16) -> Option<StoreKey> {
     if route_byte_bus_id(byte_bus_id) == RequestRoute::Ep0 {
         return Some(StoreKey::Ep0);
@@ -2726,6 +2798,15 @@ fn reject_unowned_sequencer(
 /// case (`c-RCP/src/mock.c:1290-1300`, `:1394-1424`): `UNSUPPORTED_CMD` is
 /// an unconditional Error Response (TC18 §13.5.1 "err-response"); every
 /// other code an Acknowledge-rejected response, only if `evt[3]` asked.
+///
+/// c-RCP parity: `c-RCP/src/mock.c:1290-1300` and `:1394-1424` answer
+/// every admission rejection other than `UNSUPPORTED_CMD` with an
+/// Acknowledge-rejected response (`evt = 0xF`, `err = 1`,
+/// `c-RCP/src/acf.c:338`), and send nothing when the request did not set
+/// `evt[3]`. TC18 RC5 §12.9.1 (TC18-12.9.1-009) says a request that could
+/// not be executed for any reason gets an `err = 1` error response unless
+/// suppressed via EP_GENERIC_config; it does not make that depend on
+/// `evt[3]`.
 //fusa:req REQ-SRV-022
 //fusa:req REQ-ACF-033
 fn admission_reject_response(

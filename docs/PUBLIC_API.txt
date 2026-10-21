@@ -2662,7 +2662,6 @@ pub fn rcp::server::RcServer::drain_endpoint(&self, rcp::avtp::StreamId, u16) ->
 pub fn rcp::server::RcServer::endpoint_queue_len(&self, rcp::avtp::StreamId, u16) -> usize
 pub fn rcp::server::RcServer::ep_id_map(&self) -> alloc::vec::Vec<rcp::regmap::EpByteBusIdMapEntry>
 pub fn rcp::server::RcServer::general_registers(&self) -> rcp::regmap::GeneralRegisters
-pub fn rcp::server::RcServer::handle_abb(&self, rcp::avtp::StreamId, &rcp::acf::AcfAbbMessage) -> core::result::Result<rcp::acf::AcfAbbMessage, rcp::RcpError>
 pub fn rcp::server::RcServer::handle_ntscf_frame(&self, rcp::avtp::StreamId, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::server::RcServer::last_watchdog_kick(&self, u8) -> core::option::Option<std::time::Instant>
 pub fn rcp::server::RcServer::new(rcp::regmap::GeneralRegisters) -> alloc::rcs::arc::Arc<Self>
@@ -4809,7 +4808,6 @@ pub fn rcp::server::RcServer::drain_endpoint(&self, rcp::avtp::StreamId, u16) ->
 pub fn rcp::server::RcServer::endpoint_queue_len(&self, rcp::avtp::StreamId, u16) -> usize
 pub fn rcp::server::RcServer::ep_id_map(&self) -> alloc::vec::Vec<rcp::regmap::EpByteBusIdMapEntry>
 pub fn rcp::server::RcServer::general_registers(&self) -> rcp::regmap::GeneralRegisters
-pub fn rcp::server::RcServer::handle_abb(&self, rcp::avtp::StreamId, &rcp::acf::AcfAbbMessage) -> core::result::Result<rcp::acf::AcfAbbMessage, rcp::RcpError>
 pub fn rcp::server::RcServer::handle_ntscf_frame(&self, rcp::avtp::StreamId, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::server::RcServer::last_watchdog_kick(&self, u8) -> core::option::Option<std::time::Instant>
 pub fn rcp::server::RcServer::new(rcp::regmap::GeneralRegisters) -> alloc::rcs::arc::Arc<Self>

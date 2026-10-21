@@ -243,8 +243,8 @@ pub fn parse_endpoint_id(id: &str) -> Result<(StreamId, u16), RcpError> {
 ///
 /// Every other `ByteMessageInfo` field this binding has no `Message`-level
 /// analog for (`evt`, `hs`, `cs`, `transaction_num`, `ms`, `pad`, `mtv`) is
-/// left at its zero default; [`crate::mock::RcServer::handle_abb`]'s
-/// dispatch logic does not consult any of them.
+/// left at its zero default; [`crate::mock::RcServer::dispatch_message`]'s
+/// endpoint execution does not consult any of them.
 //fusa:req REQ-ADAPT-007
 pub fn from_message(msg: &Message) -> Result<(StreamId, AcfAbbMessage), RcpError> {
     let (stream_id, byte_bus_id) = parse_endpoint_id(&msg.id)?;
