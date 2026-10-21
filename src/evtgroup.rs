@@ -44,9 +44,9 @@
 //! still-unbuilt per-[`crate::regmap::EndpointType`] shape, and the same
 //! "list the named slots without inventing the missing one" discipline
 //! [`crate::gpio::GpioWriteSemantics::Unnamed8th`] and
-//! [`crate::i2c::I2cSpeedMode::HighSpeedRowA`]/
-//! [`crate::i2c::I2cSpeedMode::HighSpeedRowB`] already followed for their
-//! own unconfirmed slots. [`classify_evt_sub_opcode`] is this half of the
+//! [`crate::i2c::I2cSpeedMode::HighSpeedRowA`] (TC18 Table 49's
+//! duplicated `i2c_mode` value 3) already followed for their own
+//! unconfirmed slots. [`classify_evt_sub_opcode`] is this half of the
 //! module's one function touching [`crate::acf::Evt::sub_opcode`] directly:
 //! it validates the field's 3-bit range (mirroring every other
 //! `sub_opcode` consumer's own bounds check, e.g.

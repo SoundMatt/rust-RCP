@@ -3440,11 +3440,13 @@
     {
       "id": "REQ-I2C-001",
       "title": "I2cSpeedMode round-trips through to_u8/from_u8 for all five values",
-      "text": "I2cSpeedMode::to_u8/I2cSpeedMode::from_u8 round-trip every one of the five i2c_mode speed presets (Standard, Fast, FastPlus, HighSpeedRowA, HighSpeedRowB), covering the full 0..=4 wire-value range this crate assigns them",
+      "text": "I2cSpeedMode::to_u8/I2cSpeedMode::from_u8 round-trip every one of the five i2c_mode speed presets (Standard, Fast, FastPlus, HighSpeedRowA, UltraFast), covering the full 0..=4 wire-value range, byte-identical to c-RCP's rcp_ep_i2c_mode_t (RCP_EP_I2C_MODE_STANDARD..RCP_EP_I2C_MODE_ULTRA_FAST, c-RCP include/rcp/ep_i2c.h:246-258)",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a713.7.7.2 Table 49 (i2c functional configuration), TC18.txt L5225-5231 (i2c_mode, 0x0007, values 0-4 with a duplicated \"3:\" high-speed labeling; 4 = Ultra-fast mode 5 Mbit/s)",
+      "tc18_master_id": "TC18-13.7.7.2-001"
     },
     {
       "id": "REQ-I2C-002",
@@ -3457,12 +3459,14 @@
     },
     {
       "id": "REQ-I2C-003",
-      "title": "I2cSpeedMode::is_ambiguous_high_speed_row flags exactly the two unresolved high-speed rows",
-      "text": "I2cSpeedMode::is_ambiguous_high_speed_row returns true only for HighSpeedRowA/HighSpeedRowB, the two adjacent high-speed i2c_mode rows this crate's spec-extraction pass flags as unresolved pending errata rather than silently assigning either a specific named speed, and false for the three unambiguous presets (Standard/Fast/FastPlus); I2cSpeedMode::default() resolves to Standard, which is not an ambiguous row",
+      "title": "I2cSpeedMode::is_ambiguous_high_speed_row flags exactly the duplicated i2c_mode value 3",
+      "text": "I2cSpeedMode::is_ambiguous_high_speed_row returns true only for HighSpeedRowA (i2c_mode wire value 3, which TC18 Table 49 lists twice as High-speed mode 1.7 Mbit/s and 3.4 Mbit/s and which this crate flags as unresolved pending errata rather than silently assigning either rate), and false for the four unambiguous presets (Standard/Fast/FastPlus and UltraFast, value 4, Table 49's distinct Ultra-fast mode 5 Mbit/s row); I2cSpeedMode::default() resolves to Standard, which is not an ambiguous row",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a713.7.7.2 Table 49 (i2c functional configuration), TC18.txt L5225-5231 (i2c_mode, 0x0007, values 0-4 with a duplicated \"3:\" high-speed labeling; 4 = Ultra-fast mode 5 Mbit/s)",
+      "tc18_master_id": "TC18-13.7.7.2-001"
     },
     {
       "id": "REQ-I2C-004",
@@ -5490,25 +5494,29 @@
     {
       "id": "REQ-CONF-003",
       "title": "ACF_ABB message golden vector",
-      "text": "conformance::golden::ACF_ABB_GOLDEN_BYTES is a frozen literal byte array; acf::encode_acf_abb(conformance::golden::acf_abb_fields()) must equal it, and acf::decode_acf_abb of it must recover acf_abb_fields() unchanged",
+      "text": "conformance::golden::ACF_ABB_GOLDEN_BYTES is a frozen literal byte array whose 12 octets are derived by hand, field by field, from TC18 v0.5.1_RC \u00a711.2.1 Figure 7 / Table 4 (the method of c-RCP tests/test_acf.c:45-130), not captured from this crate's own encoder, and its derivation table is re-checked by independent per-field shift arithmetic; acf::encode_acf_abb(conformance::golden::acf_abb_fields()) must equal it, and acf::decode_acf_abb of it must recover acf_abb_fields() unchanged",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a711.2.1 Figure 7 (\"ABB message standard request\") / Table 4 (\"Usage of ABB message for standard requests\"), TC18.txt L1208-1236",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-CONF-004",
       "title": "ACF_GBB message golden vector with non-zero message_timestamp",
-      "text": "conformance::golden::ACF_GBB_GOLDEN_BYTES is a frozen literal byte array for an AcfGbbMessage whose message_timestamp is non-zero; acf::encode_acf_gbb(conformance::golden::acf_gbb_fields()) must equal it, and acf::decode_acf_gbb of it must recover acf_gbb_fields() unchanged",
+      "text": "conformance::golden::ACF_GBB_GOLDEN_BYTES is a frozen literal byte array for an AcfGbbMessage whose message_timestamp is non-zero, whose 20 octets are derived by hand, field by field, from TC18 v0.5.1_RC \u00a711.2.1 Figure 7 / Table 4 plus \u00a711.3 Table 17's 64-bit message_timestamp after the header (the method of c-RCP tests/test_acf.c:45-130), not captured from this crate's own encoder, and its derivation table is re-checked by independent per-field shift arithmetic; acf::encode_acf_gbb(conformance::golden::acf_gbb_fields()) must equal it, and acf::decode_acf_gbb of it must recover acf_gbb_fields() unchanged",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a711.2.1 Figure 7 (\"ABB message standard request\") / Table 4 (\"Usage of ABB message for standard requests\"), TC18.txt L1208-1236",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-CONF-005",
       "title": "Composed NTSCF+ACF_ABB frame golden vector",
-      "text": "conformance::golden::NTSCF_ACF_ABB_FRAME_GOLDEN_BYTES is a frozen literal byte array combining ntscf_header_fields() and the encoded acf_abb_fields() message via avtp::encode_ntscf_frame; its 24 octets are the concatenation of the spec-derived NTSCF_GOLDEN_BYTES (TC18 v0.5.1_RC \u00a711.1 Figure 6, p.22) and ACF_ABB_GOLDEN_BYTES (TC18 \u00a711.2.1 Figure 7 / Table 4, p.24), with nothing between them because Figure 6 places acf_payload_data immediately after stream_id; encoding must equal it, and avtp::decode_ntscf_frame of it must split back into the original header and ACF_ABB payload bytes",
+      "text": "conformance::golden::NTSCF_ACF_ABB_FRAME_GOLDEN_BYTES is a frozen literal byte array combining ntscf_header_fields() and the encoded acf_abb_fields() message via avtp::encode_ntscf_frame; its 24 octets are the concatenation of the hand-derived NTSCF_GOLDEN_BYTES (TC18 v0.5.1_RC \u00a711.1 Figure 6, p.22) and the hand-derived ACF_ABB_GOLDEN_BYTES (TC18 \u00a711.2.1 Figure 7 / Table 4, p.24; see REQ-CONF-003), with nothing between them because Figure 6 places acf_payload_data immediately after stream_id; encoding must equal it, and avtp::decode_ntscf_frame of it must split back into the original header and ACF_ABB payload bytes",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -5522,6 +5530,17 @@
       "level": "HLR",
       "asil": "ASIL-B",
       "verificationMethod": "test"
+    },
+    {
+      "id": "REQ-CONF-007",
+      "title": "ACF_ABB/ACF_GBB/NTSCF+ACF_ABB golden vectors are byte-identical to c-RCP's encoders",
+      "text": "conformance::c_rcp_crosscheck's byte constants, the verbatim output of SoundMatt/c-RCP's rcp_acf_encode_abb, rcp_acf_encode_gbb and rcp_avtp_encode_ntscf (commit a4f3a1f30cc49b5fc6cd52da8fab8e990d8871bb) for the same logical field values as conformance::golden's vectors, must equal ACF_ABB_GOLDEN_BYTES, ACF_GBB_GOLDEN_BYTES and NTSCF_ACF_ABB_FRAME_GOLDEN_BYTES respectively, and this crate's acf::encode_acf_abb/acf::encode_acf_gbb/avtp::encode_ntscf_frame must reproduce those c-RCP bytes for those field values",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "\u00a711.2.1 Figure 7 (\"ABB message standard request\") / Table 4 (\"Usage of ABB message for standard requests\"), TC18.txt L1208-1236",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-CRC-012",
@@ -5972,11 +5991,13 @@
     {
       "id": "REQ-I2C-009",
       "title": "I2cSpeedMode::to_u8 encodes each speed preset as its i2c_mode wire byte",
-      "text": "I2cSpeedMode::to_u8 encodes each of the five I2C speed presets (including the two adjacent high-speed rows this crate's spec-extraction pass could not distinguish) as its i2c_mode wire byte value 0..=4.",
+      "text": "I2cSpeedMode::to_u8 encodes each of the five I2C speed presets as its TC18 Table 49 i2c_mode wire byte value: Standard = 0, Fast = 1, FastPlus = 2, HighSpeedRowA = 3 (the duplicated, unresolved high-speed value) and UltraFast = 4, matching c-RCP's rcp_ep_i2c_mode_t (include/rcp/ep_i2c.h:246-258).",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
-      "verificationMethod": "test"
+      "verificationMethod": "test",
+      "tc18": "\u00a713.7.7.2 Table 49 (i2c functional configuration), TC18.txt L5225-5231 (i2c_mode, 0x0007, values 0-4 with a duplicated \"3:\" high-speed labeling; 4 = Ultra-fast mode 5 Mbit/s)",
+      "tc18_master_id": "TC18-13.7.7.2-001"
     },
     {
       "id": "REQ-I2C-010",

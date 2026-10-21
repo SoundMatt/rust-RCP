@@ -172,9 +172,8 @@
 //! [`UartReadCompletionReason::Both`], for exactly that simultaneous case,
 //! rather than this crate guessing that size-reached or timed-out takes
 //! priority — mirroring [`crate::gpio::GpioWriteSemantics::Unnamed8th`]'s
-//! and [`crate::i2c::I2cSpeedMode::HighSpeedRowA`]/
-//! [`crate::i2c::I2cSpeedMode::HighSpeedRowB`]'s own treatment of unresolved
-//! enum slots. Relatedly, this module does not treat a zero `read_size` or a
+//! and [`crate::i2c::I2cSpeedMode::HighSpeedRowA`]'s (TC18 Table 49's
+//! duplicated `i2c_mode` value 3) own treatment of unresolved enum slots. Relatedly, this module does not treat a zero `read_size` or a
 //! zero `uart_timeout` as a "this threshold is disabled" sentinel — no such
 //! convention is stated by the checklist text, and this crate does not
 //! invent unconfirmed sentinel conventions (see [`crate::acf`]'s own
