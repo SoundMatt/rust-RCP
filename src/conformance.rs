@@ -4,6 +4,7 @@
 //fusa:req REQ-CONF-004
 //fusa:req REQ-CONF-005
 //fusa:req REQ-CONF-006
+//fusa:req REQ-CONF-007
 
 //! Conformance test vectors — `ROADMAP.md` Milestone 10's last checklist
 //! item, "Conformance test vectors / interop verification against at least
@@ -33,7 +34,13 @@
 //!    tautology — they could only ever detect drift away from whatever
 //!    the encoder happened to do first, never that the encoder was wrong
 //!    to begin with. That is exactly how the NTSCF/TSCF header defects
-//!    fixed in `v4.0.0` survived: the golden vectors certified them.
+//!    fixed in `v4.0.0` survived: the golden vectors certified them. The
+//!    ACF_ABB/ACF_GBB vectors were the last two still documented as
+//!    encoder-captured (issue #153); they now carry the same octet-by-octet
+//!    derivation tables against TC18 §11.2.1 Figure 7 / Table 4 (the method
+//!    of c-RCP's `tests/test_acf.c:45-130`), and are additionally
+//!    cross-checked byte-for-byte against c-RCP's own encoder — see
+//!    [`c_rcp_crosscheck`].
 //! 2. **Interop cross-check against go-RCP** — this crate's one sibling
 //!    x-RCP implementation that has, per its own `ROADMAP.md` item 59 ("TC18
 //!    Conformance Cutover & RELAY Re-Certification"), also uplifted to a
@@ -205,12 +212,14 @@
 //! the public API surface entirely, so it needs no `docs/SEMVER.md` tier
 //! entry and no `docs/PUBLIC_API.txt` regeneration.
 
-/// Self-referential wire-format golden vectors: this crate's own current
-/// `avtp`/`acf` encoders' output for a fixed, documented set of logical
-/// field values, frozen as literal byte arrays. See this module's doc
-/// comment for why literal freezing (rather than recomputing the expected
-/// bytes from the encoder under test) is what makes these a genuine
-/// regression check rather than a tautology.
+/// Wire-format golden vectors for a fixed, documented set of logical field
+/// values, frozen as literal byte arrays. Every array is derived by hand,
+/// field by field, from the TC18 v0.5.1_RC figure its doc comment names
+/// (never captured from this crate's own encoder), and the ACF/NTSCF ones
+/// are cross-checked against c-RCP's encoder in [`super::c_rcp_crosscheck`].
+/// See this module's doc comment for why literal freezing (rather than
+/// recomputing the expected bytes from the encoder under test) is what
+/// makes these a genuine regression check rather than a tautology.
 pub mod golden {
     /// Sender MAC / unique-id suffix pair used to build the `stream_id` for
     /// the NTSCF-headed vectors below ([`ntscf_header_fields`]).
@@ -345,9 +354,31 @@ pub mod golden {
         }
     }
 
-    /// Golden bytes for [`acf_abb_fields`], captured from
-    /// `acf::encode_acf_abb`. Never recompute — see this module's doc
-    /// comment.
+    /// Golden bytes for [`acf_abb_fields`], derived by hand from **OPEN
+    /// Alliance TC18 v0.5.1_RC §11.2.1 Figure 7 "ABB message standard
+    /// request" / Table 4, page 24-25** (catalog `TC18-11.2.1-004`/`-005`),
+    /// using the same octet-by-octet method as c-RCP's
+    /// `tests/test_acf.c:45-130` (e.g. its "`(0x0E << 1) | 0 = 0x1C`"
+    /// octet-0 derivation). Never recompute this array by calling the
+    /// encoder — see this module's doc comment. Cross-checked byte-for-byte
+    /// against c-RCP's `rcp_acf_encode_abb` in
+    /// [`super::c_rcp_crosscheck::C_RCP_ACF_ABB_BYTES`].
+    ///
+    /// Length: 8-octet `byte_message_info` + 4-octet payload = 12 octets,
+    /// already quadlet-aligned, so `pad` = 0 and `acf_msg_length` = 12 / 4
+    /// = 3 quadlets.
+    ///
+    /// | octet | value  | Figure 7 / Table 4 field(s) |
+    /// |-------|--------|-----------------------------|
+    /// | 0     | `0x1C` | `acf_msg_type` = `0x0E` (bits 7:1) → `0x0E << 1`; `acf_msg_length[8]` = 0 (bit 0) |
+    /// | 1     | `0x03` | `acf_msg_length[7:0]` = 3 quadlets |
+    /// | 2     | `0x00` | `pad` = 0 (7:6), `mtv` = 0 (5), `rsv` = 00 (4:3), `byte_bus_id[10:8]` = 0 (2:0) |
+    /// | 3     | `0x05` | `byte_bus_id[7:0]` = `0x05` |
+    /// | 4     | `0x80` | `evt` = `ack`(1) `sub_opcode`(000) = `0x8` (7:4) → `0x8 << 4`; `rsv` = 00 (3:2), `hs` = 0 (1), `cs` = 0 (0) |
+    /// | 5     | `0x11` | `transaction_num` = `0x11` |
+    /// | 6     | `0x40` | `op` = 0 (7), `rsp` = 1 (6) → `1 << 6`, `err` = 0 (5), `ms` = 0 (4), `read_size[11:8]` = 0 (3:0) |
+    /// | 7     | `0x04` | `read_size[7:0]` = 4 |
+    /// | 8..12 | `DE AD BE EF` | payload, no pad octets |
     pub const ACF_ABB_GOLDEN_BYTES: [u8; 12] = [
         0x1C, 0x03, 0x00, 0x05, 0x80, 0x11, 0x40, 0x04, 0xDE, 0xAD, 0xBE, 0xEF,
     ];
@@ -390,11 +421,33 @@ pub mod golden {
         }
     }
 
-    /// Golden bytes for [`acf_gbb_fields`], captured from
-    /// `acf::encode_acf_gbb`. Never recompute — see this module's doc
-    /// comment. Note the trailing two `0x00` octets: this vector's `pad`
-    /// count (2) is real, encoded padding — not present in the pre-TC18
-    /// -reconciliation layout this array used to pin.
+    /// Golden bytes for [`acf_gbb_fields`], derived by hand from **OPEN
+    /// Alliance TC18 v0.5.1_RC §11.2.1 Figure 7 / Table 4** (the shared
+    /// `byte_message_info` layout, catalog `TC18-11.2.1-005`) plus §11.3
+    /// Table 17's ACF_GBB rule — "`0x0D` - GBB message, with" a 64-bit
+    /// `message_timestamp` immediately after the 8-octet header — using the
+    /// same octet-by-octet method as c-RCP's `tests/test_acf.c:45-130`.
+    /// Never recompute — see this module's doc comment. Cross-checked
+    /// byte-for-byte against c-RCP's `rcp_acf_encode_gbb` in
+    /// [`super::c_rcp_crosscheck::C_RCP_ACF_GBB_BYTES`].
+    ///
+    /// Length: 8-octet header + 8-octet `message_timestamp` + 2-octet
+    /// payload = 18 octets; rounding up to a whole quadlet needs `pad` = 2
+    /// trailing zero octets → 20 octets → `acf_msg_length` = 5 quadlets.
+    ///
+    /// | octet  | value  | Figure 7 / Table 4 / Table 17 field(s) |
+    /// |--------|--------|----------------------------------------|
+    /// | 0      | `0x1A` | `acf_msg_type` = `0x0D` (bits 7:1) → `0x0D << 1`; `acf_msg_length[8]` = 0 (bit 0) |
+    /// | 1      | `0x05` | `acf_msg_length[7:0]` = 5 quadlets |
+    /// | 2      | `0xA0` | `pad` = 2 (7:6) → `0b10 << 6` = `0x80`; `mtv` = 1 (5) → `0x20`; `rsv` = 00; `byte_bus_id[10:8]` = 0 |
+    /// | 3      | `0x05` | `byte_bus_id[7:0]` = `0x05` |
+    /// | 4      | `0x00` | `evt` = `0x0` (7:4), `rsv` = 00, `hs` = 0, `cs` = 0 |
+    /// | 5      | `0x12` | `transaction_num` = `0x12` |
+    /// | 6      | `0xC0` | `op` = 1 (7) → `0x80`; `rsp` = 1 (6) → `0x40`; `err` = 0, `ms` = 0, `segment_num[11:8]` = 0 |
+    /// | 7      | `0x00` | `segment_num[7:0]` = 0 |
+    /// | 8..16  | `01 02 .. 08` | `message_timestamp` = `0x0102030405060708`, big-endian |
+    /// | 16..18 | `CA FE` | payload |
+    /// | 18..20 | `00 00` | the 2 `pad` octets (trail the payload) |
     pub const ACF_GBB_GOLDEN_BYTES: [u8; 20] = [
         0x1A, 0x05, 0xA0, 0x05, 0x00, 0x12, 0xC0, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
         0x08, 0xCA, 0xFE, 0x00, 0x00,
@@ -409,10 +462,12 @@ pub mod golden {
     /// message alone. Never recompute — see this module's doc comment.
     ///
     /// It is the concatenation, by construction, of
-    /// [`NTSCF_GOLDEN_BYTES`] (12 octets, derived from TC18 v0.5.1_RC
+    /// [`NTSCF_GOLDEN_BYTES`] (12 octets, hand-derived from TC18 v0.5.1_RC
     /// §11.1 Figure 6, p.22) and [`ACF_ABB_GOLDEN_BYTES`] (12 octets,
-    /// derived from TC18 §11.2.1 Figure 7 / Table 4, p.24) — 24 octets
-    /// total. Figure 6 places `acf_payload_data` immediately after
+    /// hand-derived from TC18 §11.2.1 Figure 7 / Table 4, p.24 — see that
+    /// constant's own derivation table) — 24 octets total, byte-identical
+    /// to c-RCP's `rcp_avtp_encode_ntscf` output in
+    /// [`super::c_rcp_crosscheck::C_RCP_NTSCF_ACF_ABB_FRAME_BYTES`]. Figure 6 places `acf_payload_data` immediately after
     /// `stream_id`, so there is nothing between the two halves; the
     /// header's `ntscf_data_length` (12) is exactly the ACF half's length.
     pub const NTSCF_ACF_ABB_FRAME_GOLDEN_BYTES: [u8; 24] = [
@@ -420,6 +475,59 @@ pub mod golden {
         0x82, 0x80, 0x0C, 0x07, 0x02, 0x42, 0xAC, 0x11, 0x00, 0x02, 0x00, 0x07,
         // ACF_ABB message (TC18 Figure 7 / Table 4, p.24)
         0x1C, 0x03, 0x00, 0x05, 0x80, 0x11, 0x40, 0x04, 0xDE, 0xAD, 0xBE, 0xEF,
+    ];
+}
+
+/// c-RCP interop cross-check bytes (issue #153). Each constant here is the
+/// verbatim output of c-RCP's own encoders (`SoundMatt/c-RCP` at commit
+/// `a4f3a1f30cc49b5fc6cd52da8fab8e990d8871bb`, `librcp.a` built out of tree
+/// with `cmake -S c-RCP -B /tmp/crcp-build`), fed the same logical field
+/// values as [`super::golden`]'s vectors by a small standalone C harness
+/// (not committed — this crate has no C build dependency):
+///
+/// ```c
+/// rcp_acf_byte_message_info_t abb = {0};
+/// abb.byte_bus_id = 0x005; abb.evt = 0x8; /* ack=1, sub_opcode=0 */
+/// abb.transaction_num = 0x11; abb.op = RCP_ACF_OP_READ; /* wire op=0 */
+/// abb.rsp = 1; abb.read_size_or_segment_num = 0x04;
+/// rcp_acf_encode_abb(&abb, (uint8_t[]){0xDE,0xAD,0xBE,0xEF}, 4);
+///
+/// rcp_acf_gbb_header_t gbb = {0};
+/// gbb.info.mtv = RCP_ACF_MTV_VALID; gbb.info.byte_bus_id = 0x005;
+/// gbb.info.transaction_num = 0x12; gbb.info.op = RCP_ACF_OP_WRITE; /* wire op=1 */
+/// gbb.info.rsp = 1; gbb.message_timestamp = 0x0102030405060708ULL;
+/// rcp_acf_encode_gbb(&gbb, (uint8_t[]){0xCA,0xFE}, 2);
+///
+/// rcp_avtp_ntscf_header_t nh = { .sv = 1, .version = 0, .sequence_num = 0x07,
+///     .stream_id = { {0x02,0x42,0xAC,0x11,0x00,0x02}, 0x0007 } };
+/// rcp_avtp_encode_ntscf(&nh, abb_bytes, 12);
+/// ```
+///
+/// Unlike [`super::go_rcp_crosscheck`], the result is **byte-identical**
+/// at every vector, and [`tests::golden_vectors_are_byte_identical_to_c_rcp`]
+/// pins that agreement. Because the golden arrays themselves are
+/// hand-derived from the TC18 figures, this is independent evidence from a
+/// second implementation, not a re-capture of this crate's own encoder.
+pub mod c_rcp_crosscheck {
+    /// c-RCP `rcp_acf_encode_abb` output for [`super::golden::acf_abb_fields`]'s values.
+    //fusa:req REQ-CONF-007
+    pub const C_RCP_ACF_ABB_BYTES: [u8; 12] = [
+        0x1C, 0x03, 0x00, 0x05, 0x80, 0x11, 0x40, 0x04, 0xDE, 0xAD, 0xBE, 0xEF,
+    ];
+
+    /// c-RCP `rcp_acf_encode_gbb` output for [`super::golden::acf_gbb_fields`]'s values.
+    //fusa:req REQ-CONF-007
+    pub const C_RCP_ACF_GBB_BYTES: [u8; 20] = [
+        0x1A, 0x05, 0xA0, 0x05, 0x00, 0x12, 0xC0, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x08, 0xCA, 0xFE, 0x00, 0x00,
+    ];
+
+    /// c-RCP `rcp_avtp_encode_ntscf` output for [`super::golden::ntscf_header_fields`]
+    /// carrying [`C_RCP_ACF_ABB_BYTES`] as its payload.
+    //fusa:req REQ-CONF-007
+    pub const C_RCP_NTSCF_ACF_ABB_FRAME_BYTES: [u8; 24] = [
+        0x82, 0x80, 0x0C, 0x07, 0x02, 0x42, 0xAC, 0x11, 0x00, 0x02, 0x00, 0x07, 0x1C, 0x03, 0x00,
+        0x05, 0x80, 0x11, 0x40, 0x04, 0xDE, 0xAD, 0xBE, 0xEF,
     ];
 }
 
@@ -524,7 +632,7 @@ pub mod go_rcp_crosscheck {
 // ─────────────────────────────────────────────────────────────────────────────
 #[cfg(test)]
 mod tests {
-    use super::{go_rcp_crosscheck, golden};
+    use super::{c_rcp_crosscheck, go_rcp_crosscheck, golden};
     use crate::acf;
     use crate::avtp::{self, StreamId};
 
@@ -623,6 +731,122 @@ mod tests {
         assert_eq!(payload, abb_bytes.as_slice());
         let decoded_abb = acf::decode_acf_abb(payload).unwrap();
         assert_eq!(decoded_abb, golden::acf_abb_fields());
+    }
+
+    // ── Hand-derivation tables (issue #153) ───────────────────────────────
+
+    /// Packs Figure 7 / Table 4's `byte_message_info` fields with explicit
+    /// per-field shifts, independently of `acf::encode_byte_message_info`,
+    /// so the golden arrays' derivation tables are checked as arithmetic
+    /// rather than trusted as prose.
+    #[allow(clippy::too_many_arguments)]
+    fn hand_pack_info(
+        msg_type: u8,
+        quadlets: u16,
+        pad: u8,
+        mtv: u8,
+        bbid: u16,
+        evt: u8,
+        hs: u8,
+        cs: u8,
+        tn: u8,
+        op: u8,
+        rsp: u8,
+        err: u8,
+        ms: u8,
+        rs: u16,
+    ) -> [u8; 8] {
+        [
+            (msg_type << 1) | ((quadlets >> 8) as u8 & 0x1),
+            (quadlets & 0xFF) as u8,
+            (pad << 6) | (mtv << 5) | ((bbid >> 8) as u8 & 0x7),
+            (bbid & 0xFF) as u8,
+            (evt << 4) | (hs << 1) | cs,
+            tn,
+            (op << 7) | (rsp << 6) | (err << 5) | (ms << 4) | ((rs >> 8) as u8 & 0xF),
+            (rs & 0xFF) as u8,
+        ]
+    }
+
+    #[test]
+    //fusa:test REQ-CONF-003
+    fn acf_abb_golden_bytes_match_hand_derivation_table() {
+        // ACF_ABB_GOLDEN_BYTES' table: type 0x0E, 3 quadlets, pad 0, mtv 0,
+        // bbid 0x005, evt 0x8 (ack), tn 0x11, op 0, rsp 1, read_size 4.
+        let mut expected =
+            hand_pack_info(0x0E, 3, 0, 0, 0x005, 0x8, 0, 0, 0x11, 0, 1, 0, 0, 4).to_vec();
+        expected.extend_from_slice(&[0xDE, 0xAD, 0xBE, 0xEF]);
+        assert_eq!(expected.len() % 4, 0);
+        assert_eq!(expected.len() / 4, 3);
+        assert_eq!(expected, golden::ACF_ABB_GOLDEN_BYTES);
+        // Spot-check the derivation rows exactly as c-RCP's
+        // tests/test_acf.c does for its own vectors.
+        assert_eq!(
+            golden::ACF_ABB_GOLDEN_BYTES[0],
+            (acf::ACF_ABB_MSG_TYPE << 1)
+        );
+        assert_eq!(golden::ACF_ABB_GOLDEN_BYTES[4], 0x8 << 4);
+        assert_eq!(golden::ACF_ABB_GOLDEN_BYTES[6], 1 << 6);
+    }
+
+    #[test]
+    //fusa:test REQ-CONF-004
+    fn acf_gbb_golden_bytes_match_hand_derivation_table() {
+        // ACF_GBB_GOLDEN_BYTES' table: type 0x0D, 5 quadlets, pad 2,
+        // mtv 1, bbid 0x005, evt 0, tn 0x12, op 1, rsp 1, segment 0.
+        let mut expected =
+            hand_pack_info(0x0D, 5, 2, 1, 0x005, 0x0, 0, 0, 0x12, 1, 1, 0, 0, 0).to_vec();
+        expected.extend_from_slice(&0x0102_0304_0506_0708u64.to_be_bytes());
+        expected.extend_from_slice(&[0xCA, 0xFE]);
+        expected.extend_from_slice(&[0x00, 0x00]); // pad = 2 trailing octets
+        assert_eq!(expected.len(), 5 * 4);
+        assert_eq!(expected, golden::ACF_GBB_GOLDEN_BYTES);
+        assert_eq!(
+            golden::ACF_GBB_GOLDEN_BYTES[0],
+            (acf::ACF_GBB_MSG_TYPE << 1)
+        );
+        assert_eq!(golden::ACF_GBB_GOLDEN_BYTES[2], (2 << 6) | (1 << 5));
+    }
+
+    #[test]
+    //fusa:test REQ-CONF-005
+    fn ntscf_acf_abb_frame_golden_bytes_are_the_two_hand_derived_halves() {
+        let mut expected = golden::NTSCF_GOLDEN_BYTES.to_vec();
+        expected.extend_from_slice(&golden::ACF_ABB_GOLDEN_BYTES);
+        assert_eq!(expected, golden::NTSCF_ACF_ABB_FRAME_GOLDEN_BYTES);
+    }
+
+    // ── c-RCP interop cross-check (issue #153) ──────────────────────────
+
+    #[test]
+    //fusa:test REQ-CONF-007
+    fn golden_vectors_are_byte_identical_to_c_rcp() {
+        assert_eq!(
+            c_rcp_crosscheck::C_RCP_ACF_ABB_BYTES,
+            golden::ACF_ABB_GOLDEN_BYTES
+        );
+        assert_eq!(
+            c_rcp_crosscheck::C_RCP_ACF_GBB_BYTES,
+            golden::ACF_GBB_GOLDEN_BYTES
+        );
+        assert_eq!(
+            c_rcp_crosscheck::C_RCP_NTSCF_ACF_ABB_FRAME_BYTES,
+            golden::NTSCF_ACF_ABB_FRAME_GOLDEN_BYTES
+        );
+        // And this crate's encoder reproduces c-RCP's bytes directly.
+        assert_eq!(
+            acf::encode_acf_abb(&golden::acf_abb_fields()).unwrap(),
+            c_rcp_crosscheck::C_RCP_ACF_ABB_BYTES
+        );
+        assert_eq!(
+            acf::encode_acf_gbb(&golden::acf_gbb_fields()).unwrap(),
+            c_rcp_crosscheck::C_RCP_ACF_GBB_BYTES
+        );
+        let sid = StreamId::new(golden::SENDER_MAC_1, golden::UNIQUE_ID_1);
+        assert_eq!(
+            avtp::encode_ntscf_frame(sid, 0x07, &c_rcp_crosscheck::C_RCP_ACF_ABB_BYTES).unwrap(),
+            c_rcp_crosscheck::C_RCP_NTSCF_ACF_ABB_FRAME_BYTES
+        );
     }
 
     // ── go-RCP interop cross-check ──────────────────────────────────────

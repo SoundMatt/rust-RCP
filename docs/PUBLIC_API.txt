@@ -1772,8 +1772,8 @@ impl core::panic::unwind_safe::UnwindSafe for rcp::i2c::I2cRequest
 pub rcp::i2c::I2cSpeedMode::Fast = 1
 pub rcp::i2c::I2cSpeedMode::FastPlus = 2
 pub rcp::i2c::I2cSpeedMode::HighSpeedRowA = 3
-pub rcp::i2c::I2cSpeedMode::HighSpeedRowB = 4
 pub rcp::i2c::I2cSpeedMode::Standard = 0
+pub rcp::i2c::I2cSpeedMode::UltraFast = 4
 impl rcp::i2c::I2cSpeedMode
 pub fn rcp::i2c::I2cSpeedMode::from_u8(u8) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::i2c::I2cSpeedMode::is_ambiguous_high_speed_row(self) -> bool
