@@ -84,7 +84,7 @@
 //! [`NtscfHeader`] with an already-encoded [`crate::acf::AcfAbbMessage`]/
 //! [`crate::acf::AcfGbbMessage`] payload (or any other bytes a caller
 //! supplies) into one transportable frame, and split one back apart. This
-//! is the piece that lets a transport (`crate::udp`, `crate::tlstransport`)
+//! is the piece that lets a transport (`crate::udp`, `crate::shmem`)
 //! stop calling the legacy `crate::wire` frame encoder/decoder — deleted by
 //! this same milestone item, since nothing else in the crate constructed
 //! its 16-byte frame — in favor of the real TC18 wire format built here and

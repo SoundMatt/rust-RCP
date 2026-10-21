@@ -65,14 +65,14 @@
     },
     {
       "id": "FM-006",
-      "function": "TLS mutual authentication",
-      "failure_mode": "Unverified peer accepted as TLS bridge endpoint",
+      "function": "Link-layer authentication (MACsec, IEEE 802.1AE) secure-channel selection",
+      "failure_mode": "A request stream carrying safety-relevant requests is left on rx_secure_channel_index 0 (no security / MACsec uncontrolled port), or the deployment does not enforce MACsec on the link at all",
       "effect": "Man-in-the-middle can inject or observe commands",
       "severity": "S2",
-      "cause": "REQUIRE_MUTUAL_AUTH check bypassed or constant changed to false",
-      "detection": "TlsBridge::new() rejects unverified peers with NotConnected",
-      "mitigation": "REQ-TLS-002 enforces peer_verified() at construction time",
-      "residual_risk": "low"
+      "cause": "Deployment omits the link-layer MACsec control TC18 delegates to it, or misconfigures the per-stream secure-channel index",
+      "detection": "RequestStreamConfigEntry::rx_secure_channel_index is wire-readable/writable (REQ-RMAP-015), so an integrator or configuring client can verify which MACsec channel each stream is bound to; enforcement itself is outside this library",
+      "mitigation": "Deployment-level control: MACsec enforced by the deployment (c-RCP parity: c-RCP ROADMAP.md:104 tls.h/tls.c DEPRECATE disposition, include/rcp/authz.h:45, HARA.md SG-007, tara.json TS-004). rust-RCP's former tlstransport TLS bridge (REQ-TLS-002, now retired) was removed by issue #211; REQ-RMAP-015 exposes the secure-channel selector",
+      "residual_risk": "medium"
     },
     {
       "id": "FM-007",

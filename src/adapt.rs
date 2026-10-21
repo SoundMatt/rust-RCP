@@ -25,7 +25,7 @@
 //!
 //! - [`Adapter`]/[`AdaptEndpoint`] — the generic "convert an external
 //!   message format to/from RCP" decorator layer, structurally the same
-//!   kind of wrapper `ratelimit`/`proxy`/etc. are — was retargeted in
+//!   kind of wrapper `ratelimit`/`faultinject`/etc. are — was retargeted in
 //!   Milestone 9 onto [`crate::mock::Endpoint`] in place of `Controller`.
 //!   Since `Endpoint` has no single `send`-shaped call (only distinct
 //!   `read`/`write` verbs), [`AdaptEndpoint::send_msg`] models one external

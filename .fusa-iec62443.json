@@ -8,7 +8,7 @@
       "id": "T-001",
       "category": "spoofing",
       "description": "Attacker forges zone-controller identity to inject commands",
-      "countermeasures": ["REQ-AUTHZ-005", "REQ-TLS-002"],
+      "countermeasures": ["REQ-AUTHZ-005", "REQ-RMAP-015"],
       "residual_risk": "low"
     },
     {
@@ -43,12 +43,12 @@
       "id": "T-006",
       "category": "information-disclosure",
       "description": "Attacker monitors command bus to extract vehicle state",
-      "countermeasures": ["REQ-TLS-004"],
-      "residual_risk": "medium"
+      "countermeasures": ["REQ-RMAP-015"],
+      "residual_risk": "medium — confidentiality on the wire depends entirely on link-layer MACsec (IEEE 802.1AE) enforced by the deployment; this library implements no encryption of its own and only exposes the per-stream secure-channel selector register (REQ-RMAP-015, rx_secure_channel_index). c-RCP parity: c-RCP ROADMAP.md:104 tls.h/tls.c DEPRECATE disposition, include/rcp/authz.h:45, tara.json TS-004; rust-RCP's former tlstransport bridge (REQ-TLS-*, now retired) was removed by issue #211"
     }
   ],
   "security_controls": [
-    { "id": "SC-001", "name": "Mutual TLS", "requirement": "REQ-TLS-002", "sl_provided": "SL-2" },
+    { "id": "SC-001", "name": "Link-layer authentication (MACsec, IEEE 802.1AE) — deployment-level control; this library exposes only the per-stream secure-channel selector (c-RCP parity: c-RCP ROADMAP.md:104, include/rcp/authz.h:45; TLS bridge removed by issue #211)", "requirement": "REQ-RMAP-015", "sl_provided": "SL-1" },
     { "id": "SC-002", "name": "CRC-32 (TC18 safe-point) integrity", "requirement": "REQ-CRC-004", "sl_provided": "SL-1" },
     { "id": "SC-003", "name": "Monotonic sequence check (not yet dispatch-wired)", "requirement": "REQ-SEQENF-003", "sl_provided": "SL-1" },
     { "id": "SC-004", "name": "Command ACL", "requirement": "REQ-AUTHZ-005", "sl_provided": "SL-2" },

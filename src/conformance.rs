@@ -180,7 +180,7 @@
 //! crate rather than a benign implementation difference: TC18 §12.2 lists
 //! "NTSCF header processing" as the first of exactly four mandatory
 //! features, every transport in this crate (`udp`, `l2`, `shmem`,
-//! `tlstransport`, `mock`) frames unconditionally through it, and until
+//! `mock`) frames unconditionally through it, and until
 //! `v4.0.0` every frame this crate produced carried three fabricated
 //! reserved octets, `sequence_num` and `ntscf_data_length` transposed,
 //! and — for TSCF — an invented `subtype`. Nothing this crate emitted
