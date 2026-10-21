@@ -316,7 +316,9 @@ fn round_trip(
     }
     let frame = super::encode_ntscf_frame(local_stream, sequence_num, acf_payload)?;
     transport.send_frame(&frame)?;
-    let deadline = timeout.map(|d| Instant::now() + d);
+    // `checked_add`: a timeout too large to add to `Instant::now()` (e.g.
+    // `Duration::MAX`) means no deadline rather than an overflow panic.
+    let deadline = timeout.and_then(|d| Instant::now().checked_add(d));
     let mut buf = vec![0u8; AVTP_MAX_FRAME_LEN];
     let n = transport.recv_frame(deadline, &mut buf)?;
     buf.truncate(n);

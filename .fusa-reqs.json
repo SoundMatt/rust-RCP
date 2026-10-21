@@ -5668,6 +5668,30 @@
       "verificationMethod": "test"
     },
     {
+      "id": "REQ-L2-014",
+      "title": "RawEthernetSocket recv ignores its own transmitted copies and non-AVTP frames",
+      "text": "RawEthernetSocket's recv() shall ignore (continue waiting past) any frame the underlying raw socket reports as this same socket's own locally-transmitted outgoing copy (sll_pkttype == PACKET_OUTGOING) rather than a frame genuinely received from the wire, and any frame too short to be, or not marked with EtherType 0x22F0 as, an AVTP-over-Ethernet frame, returning only such genuinely received AVTP frames to the caller within a single overall timeout (mirrors c-RCP REQ-L2-007, src/l2.c:226-238)",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§10.1 (\"an AVTPDU is marked by an EtherType value of 0x22F0\")",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-L2-015",
+      "title": "L2AvtpTransport (and so L2Transport) admits only responses addressed to this host or to a group address",
+      "text": "L2AvtpTransport::recv_frame, and so L2Transport::send_acf_abb/send_acf_gbb, shall drop and re-poll past, within the caller's single overall timeout, every received frame that is too short or not EtherType 0x22F0, whose source MAC is this transport's own src_mac (its own transmission looped back), or whose destination MAC is a unicast address other than this transport's src_mac (every group, i.e. multicast or broadcast, destination is admitted regardless of dest_mac, group filtering being left to the kernel as in c-RCP src/l2.c:186-250); Err(RcpError::Timeout) is returned once the timeout elapses with no admitted frame",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "tc18": "§10.1 (\"an AVTPDU is marked by an EtherType value of 0x22F0\")",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
       "id": "REQ-CLI-010",
       "title": "serve --udp <bind-ip> [--port <n>] [--stream <hex>] [--max-requests <n>] runs UdpRcServer over a real StdUdpSocket",
       "text": "The CLI must, when invoked with serve --udp <bind-ip>, bind a real rcp::udp::StdUdpSocket to <bind-ip>:--port (default rcp::udp::ANNEX_J_CONTROL_PORT) and dispatch inbound requests through rcp::udp::UdpRcServer::serve_one against a fresh RcServer, stopping after --max-requests requests have been served if given (default: unbounded, until a fatal socket error), exiting 3 on a bind or fatal serve error",
