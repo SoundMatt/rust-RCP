@@ -100,8 +100,7 @@
 //! of [`RequestKind`]'s nine values onto the already-built per-kind check
 //! that hop composes ([`check_compound_gate`] for Compound/CompoundWait,
 //! [`is_timed_request_ready`] for Timed, [`check_chain_continuation`] for
-//! Chained, [`should_count_trigger_occurrence`]/
-//! [`is_trigger_repeat_exhausted`] for Triggered), plus
+//! Chained, [`TriggeredRuntime::fire_ready`] for Triggered), plus
 //! [`try_force_cancel_all`]/[`try_force_cancel_non_safestate`]/
 //! [`try_force_cancel_single`], the cancellation trio's own type-specific
 //! behavior: forcing a *target* request straight to
@@ -232,11 +231,12 @@
 //!   established "special value gets a named variant, not a silently-folded
 //!   number" precedent. See "Provenance note: the infinite-repeat sentinel"
 //!   below.
-//! - [`should_count_trigger_occurrence`] — the "runs independent of
-//!   endpoint busy/idle state" rule, turned into a pure, testable predicate
-//!   following this module's own `advance_sequencer_if_still_in_start_state`
-//!   precedent. See "Provenance note: busy/idle independence as a
-//!   caller-supplied parameter" below.
+//! - [`should_count_trigger_occurrence`] — c-RCP's occurrence-matching
+//!   rule (`c-RCP/include/rcp/request.h:291-303`): an occurrence counts
+//!   only when its `(source_ep, signal_nr)` pair matches the request's own
+//!   [`TriggeredStep::trigger_source_ep`]/[`TriggeredStep::trigger_signal_nr`],
+//!   independent of the target endpoint's busy/idle state. See
+//!   "Provenance note: busy/idle independence" below.
 //! - [`check_chain_continuation`] — the `cs`-bit abort-on-predecessor-error
 //!   rule: whether a chained request's next link runs, given the already
 //!   decoded [`crate::acf::ByteMessageInfo::cs`] flag for that link and
@@ -365,7 +365,8 @@
 //!   added. [`SequencerBank::check_compound_gate`] is the new bank-backed
 //!   alternative that composes the free functions instead of replacing
 //!   them. Triggered execution's own busy/idle independence needs no such
-//!   state at all; see [`should_count_trigger_occurrence`] above.
+//!   state at all; see [`should_count_trigger_occurrence`] above (an
+//!   occurrence's own `(source_ep, signal_nr)` match, c-RCP parity).
 //! - Wiring [`SequencerBank`], [`select_next_pending_request`],
 //!   [`RequestLifecycleState::try_transition`], or any of the below into an
 //!   actual decoder or dispatch loop. [`select_next_pending_request`]
@@ -459,9 +460,9 @@
 //!   execution actually proceed now that it has been selected") is where
 //!   [`check_chain_continuation`] (Chained — whether *this* link runs,
 //!   given the preceding link's own outcome) and
-//!   [`should_count_trigger_occurrence`]/[`is_trigger_repeat_exhausted`]
-//!   (Triggered — whether this occurrence still counts toward a
-//!   not-yet-exhausted repeat budget) are composed.
+//!   [`TriggeredRuntime::fire_ready`] (Triggered — c-RCP's
+//!   `rcp_triggered_tick()` fire predicate: started, threshold reached,
+//!   `trigger_exec_delay` elapsed, endpoint idle) is composed.
 //! - `UnderExecution` -> `Finalized` is unconditional for every
 //!   [`RequestKind`] — no checklist wording anywhere in this crate's
 //!   roadmap text names a rule for whether a request that has already
@@ -655,20 +656,19 @@
 //! `Finite(0xFFFF)` directly; [`TriggerRepeatCount::from_u16`] is the
 //! intended construction path from any raw wire value.
 //!
-//! ## Provenance note: busy/idle independence as a caller-supplied parameter
+//! ## Provenance note: busy/idle independence
 //!
-//! `ROADMAP.md`'s checklist bullet states that Triggered's occurrence
-//! counting runs independent of the target endpoint's busy/idle state, but
-//! this crate has no unified endpoint busy/idle state type yet — none of
-//! the six endpoint-type modules Milestone 4 built (`gpio`, `spi`, `i2c`,
-//! `uart`, `pwm`, `adc`) expose one, and building one is out of scope for
-//! this item. [`should_count_trigger_occurrence`] therefore takes the
-//! endpoint's busy/idle state as a plain caller-supplied `bool` parameter
-//! it deliberately ignores — mirroring [`SequencerState`]'s own
-//! caller-supplied-rather-than-read precedent above — so the independence
-//! rule is expressed as a real, testable function signature rather than a
-//! comment, without inventing the endpoint-state type this crate does not
-//! yet have.
+//! Earlier revisions of this module modelled the "counts independent of
+//! the target endpoint's busy/idle state" rule as an always-`true`
+//! predicate over a deliberately-ignored `endpoint_busy` flag. It now
+//! mirrors c-RCP (`c-RCP/src/request.c:515-525`,
+//! `rcp_triggered_runtime_record_occurrence()`): occurrence counting takes
+//! the observed `(source_ep, signal_nr)` pair and counts it only when it
+//! matches the request's own [`TriggeredStep`] selection, with no busy/idle
+//! input at all — the independence rule is now structural (the counter has
+//! no such parameter). Only the fire transition
+//! ([`TriggeredRuntime::tick`]/[`TriggeredRuntime::fire_ready`]) is gated
+//! on `endpoint_idle`, exactly as c-RCP's `rcp_triggered_tick()` is.
 //!
 //! [`crate::gpio::GpioTriggerConfig`]/[`crate::gpio::GpioTriggerSignals`]/
 //! [`crate::gpio::evaluate_gpio_triggers`] are a separate, narrower,
@@ -800,9 +800,7 @@
 //! bullet, not yet built. [`check_clear_non_safestate_cancellation`]
 //! therefore takes "is this request safe-state-related" as a plain
 //! caller-supplied `bool` parameter, mirroring [`SequencerState`]'s own
-//! caller-supplied-rather-than-read precedent above and
-//! [`should_count_trigger_occurrence`]'s own caller-supplied-`bool`
-//! precedent, rather than this module reading or inventing the not-yet-built
+//! caller-supplied-rather-than-read precedent above, rather than this module reading or inventing the not-yet-built
 //! safe-state machinery's own state.
 //!
 //! ## Provenance note: `clear_transaction_num`'s width and matching field
@@ -1084,8 +1082,8 @@
 //! ## Provenance note: watchdog overflow as a caller-supplied boolean, not
 //! real timer state
 //!
-//! Mirrors [`should_count_trigger_occurrence`]'s own busy/idle `bool`
-//! parameter and [`check_compound_bundle_claim`]'s own three
+//! Mirrors [`TriggeredRuntime::tick`]'s own caller-supplied
+//! `endpoint_idle` parameter and [`check_compound_bundle_claim`]'s own three
 //! caller-supplied facts: this crate has no not-yet-built real watchdog
 //! timer/timeout-tracking machinery yet (`ROADMAP.md`'s own next,
 //! still-unchecked "Per-stream safety config" bullet's job — see this
@@ -1156,13 +1154,14 @@
 //!   ([`OverflowOutcome::OverflowNoSafestate`]), mirroring
 //!   [`crate::watchdog::StreamWatchdogOutcome`]'s own three-variant
 //!   "no event / event, no consequence / event, with consequence" shape.
-//! - [`SequenceEnforcementOutcome`] / [`evaluate_rx_enforce_seq`] —
-//!   `rx_enforce_seq`/`rx_seq_safestate_enable`: whether a candidate
-//!   request's sequence number must strictly exceed the last accepted one
-//!   before being queued at all, and whether a violation also drives the
-//!   stream to safe state. See "Provenance note: the enforced sequence
-//!   number's own wire field and width" below for why the sequence number
-//!   itself is a caller-supplied, unsourced `u32`.
+//! - [`SequenceTracker`] / [`SequenceEnforcementOutcome`] /
+//!   [`evaluate_rx_enforce_seq`] — `rx_enforce_seq`/
+//!   `rx_seq_safestate_enable`, ported from c-RCP's
+//!   `rcp_e2e_seq_evaluate()` (`c-RCP/src/e2e.c:516`): a stateful
+//!   per-stream tracker over the AVTPDU's 8-bit `sequence_num`, accepting a
+//!   forward distance of 1..=127 mod 256 and flagging safe state on *any*
+//!   discontinuity (even an accepted one). See "Provenance note: the
+//!   enforced sequence number's own wire field and width" below.
 //! - [`SafeStateAction`] / [`resolve_safe_state_action`] — the unifying
 //!   composition every "...`_enable`" outcome type above funnels into:
 //!   given "should this stream enter safe state right now" (any of
@@ -1207,22 +1206,14 @@
 //! ## Provenance note: the enforced sequence number's own wire field and
 //! width
 //!
-//! `ROADMAP.md`'s checklist bullet names `rx_enforce_seq` only as
-//! "monotonically increasing sequence numbers," without stating which
-//! already-decoded field carries that sequence number. At the time this
-//! item was written, this crate had a second, not obviously equivalent
-//! candidate besides the one named below: `crate::e2e`'s own `seqNum` (a
-//! `u32` from the CRC-16 + replay-guard frame `ROADMAP.md`'s own Satellite
-//! Package Disposition table separately REPLACE-dispositioned) — since
-//! removed outright by Milestone 9's `e2e` REPLACE cutover, leaving
-//! [`crate::acf::ByteMessageInfo::transaction_num`] (a `u8`, but named for
-//! matching a response to its request, not for detecting gaps/reordering)
-//! as this crate's only remaining decoded candidate. Per Guiding Principle
-//! 5 this item does not guess which one `rx_enforce_seq` actually means.
-//! [`evaluate_rx_enforce_seq`] instead takes `last_accepted_seq`/
-//! `candidate_seq` as plain caller-supplied `u32` values, wide enough to
-//! hold either existing candidate without truncation, flagged here for
-//! reconciliation against real TC18 behavior once that field is settled.
+//! The enforced sequence number is the AVTPDU header's own 8-bit
+//! `sequence_num` ([`crate::avtp`]), matching c-RCP's
+//! `rcp_e2e_seq_tracker_t` (`c-RCP/include/rcp/e2e.h:802-811`), which is
+//! fed once per received frame by `frame_seq_gate_admits()`
+//! (`c-RCP/src/mock.c:3038`). An earlier revision of this module took a
+//! caller-supplied `u32` and compared strictly-greater with no wraparound,
+//! so the 255 -> 0 wrap was rejected; [`SequenceTracker::evaluate`] now uses
+//! c-RCP's RFC 1982 serial-number window instead.
 //!
 //! ## `CRC_ERROR` error path (`ROADMAP.md` Milestone 6, "`CRC_ERROR` error
 //! path" bullet)
@@ -1298,6 +1289,10 @@
 //! time both existed, which remains the accurate history even though only
 //! `CrcError` is still constructible today.
 
+use crate::acf::{
+    decode_acf_gbb, encode_acf_gbb, AcfGbbMessage, ByteMessageInfo, Evt, ACF_ABB_HEADER_LEN,
+    ACF_GBB_HEADER_LEN, ACF_GBB_MSG_TYPE,
+};
 use crate::regmap::SequencerStateEntry;
 use crate::timestamp::AvtpTimestamp;
 use crate::RcpError;
@@ -1490,6 +1485,674 @@ impl RequestKind {
         let low_56 = message_timestamp & 0x00FF_FFFF_FFFF_FFFF;
         Ok(low_56 | ((self.to_u8() as u64) << 56))
     }
+}
+
+// ── Conditional-request wire codecs (ACF_GBB, mtv = 0) ──────────────────────
+//
+// Ported from c-RCP `src/request.c:85-1058`. Every conditional request is an
+// ACF_GBB message with `mtv = 0` whose 8-byte `message_timestamp` region is
+// repurposed: octet 0 is the `request_type` opcode, octets 1..7 the kind's
+// own sub-fields (big endian). Encoders build the frame through
+// [`crate::acf::encode_acf_gbb`] (which, unlike c-RCP's `rcp_acf_encode_gbb`,
+// never zeroes the timestamp region for `mtv = 0`, so no separate raw-header
+// builder is needed); the header carries `op = 1`, `rsp = err = ms = hs = 0`
+// and `read_size_segment = 0`, exactly as c-RCP's zero-initialised
+// `rcp_acf_byte_message_info_t` + `RCP_ACF_OP_NONE` packs it.
+
+/// The infinite-repetition sentinel for a compound/compound-wait request's
+/// `cmp_repetitions`/`cmpw_repetitions` sub-field (all-ones). Mirrors c-RCP's
+/// `RCP_COMPOUND_REPEAT_INFINITE` (`c-RCP/include/rcp/request.h:590`).
+//fusa:req REQ-CMP-010
+pub const COMPOUND_REPEAT_INFINITE: u16 = 0xFFFF;
+
+/// The largest encodable Timed `presentation_time` (48 bits). Mirrors
+/// `RCP_TIMED_PRESENTATION_TIME_MAX` (`c-RCP/include/rcp/request.h:1020`).
+//fusa:req REQ-TIMED-003
+pub const TIMED_PRESENTATION_TIME_MAX: u64 = 0x0000_FFFF_FFFF_FFFF;
+
+/// Why a conditional-request frame failed to decode. One shared enum for
+/// every request kind; the variants are the union of c-RCP's per-kind
+/// `rcp_compound_errc_t`/`rcp_triggered_errc_t`/`rcp_chained_errc_t`/
+/// `rcp_timed_errc_t`/`rcp_cancel_errc_t` failure modes
+/// (`c-RCP/include/rcp/request.h`), with c-RCP's own messages.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+//fusa:req REQ-CMP-033
+pub enum RequestCodecError {
+    /// Shorter than the ACF_GBB fixed header, or than its own declared
+    /// `acf_msg_length`/`pad`.
+    #[error("rcp/request: frame too short")]
+    ShortFrame,
+    /// `acf_msg_type` is not ACF_GBB.
+    #[error("rcp/request: unexpected ACF message type")]
+    BadMsgType,
+    /// `mtv` is set, so `message_timestamp` is a real timestamp, not a
+    /// repurposed sub-field region.
+    #[error("rcp/request: message_timestamp not repurposed")]
+    NotRepurposed,
+    /// The `request_type` opcode is not one the called decoder recognizes.
+    #[error("rcp/request: unrecognized request_type")]
+    UnknownType,
+    /// A reserved sub-field octet carries a set bit.
+    #[error("rcp/request: reserved sub-field octet is not zero")]
+    ReservedNonzero,
+    /// `evt[2:0]`, `hs` or `cs` is set on a cancellation request.
+    #[error("rcp/request: evt[2:0], hs, or cs is not zero")]
+    EvtHsCsNonzero,
+    /// `hs` or `cs` is set on a Timed request.
+    #[error("rcp/request: hs/cs must be clear on a timed request")]
+    UnsupportedCmd,
+}
+
+impl RequestCodecError {
+    /// The wire error an RC Server sends back for a conditional request
+    /// that failed to decode: always `None` (no response at all).
+    ///
+    /// c-RCP parity: `rcp_server_endpoint_admit()` returns
+    /// `RCP_SERVER_ADMIT_REJECTED` without setting `*out_error` when a
+    /// compound/compound-wait/triggered/timed/chained body fails to decode
+    /// (`c-RCP/src/server.c:458-512`), and `apply_cancellation()` silently
+    /// ignores a clear-single that fails to decode (`c-RCP/src/mock.c:1198`),
+    /// so nothing is sent to the client. TC18 RC5 expects an error response
+    /// (e.g. Table 10/14's "rejected with error code = UNSUPPORTED_CMD", or
+    /// INVALID_PARAMETER for a malformed field, as issue #193 notes). This
+    /// crate copies c-RCP's no-response behaviour for interop.
+    //fusa:req REQ-CMP-033
+    pub fn response_error(self) -> Option<RcpError> {
+        None
+    }
+}
+
+/// The opcode-class predicates c-RCP's decoders test against.
+fn is_compound_or_wait(kind: RequestKind) -> bool {
+    matches!(
+        kind,
+        RequestKind::Compound
+            | RequestKind::SafetyCompound
+            | RequestKind::CompoundWait
+            | RequestKind::SafetyCompoundWait
+    )
+}
+
+fn is_triggered(kind: RequestKind) -> bool {
+    matches!(kind, RequestKind::Triggered | RequestKind::SafetyTriggered)
+}
+
+/// `request_type` byte of a repurposed `message_timestamp`.
+fn ts_request_type(ts: u64) -> u8 {
+    (ts >> 56) as u8
+}
+
+/// Decode `b` as an ACF_GBB message and require `mtv == 0`, mapping every
+/// failure onto c-RCP's `rcp_acf_decode_gbb()` error set
+/// (`c-RCP/src/acf.c:484-512`): a too-short frame, an inconsistent
+/// `acf_msg_length`/`pad` or a truncated payload are all
+/// [`RequestCodecError::ShortFrame`].
+fn decode_repurposed_gbb(b: &[u8]) -> Result<AcfGbbMessage, RequestCodecError> {
+    if b.len() < ACF_GBB_HEADER_LEN {
+        return Err(RequestCodecError::ShortFrame);
+    }
+    if b[0] >> 1 != ACF_GBB_MSG_TYPE {
+        return Err(RequestCodecError::BadMsgType);
+    }
+    let msg = decode_acf_gbb(b).map_err(|_| RequestCodecError::ShortFrame)?;
+    if msg.info.mtv {
+        return Err(RequestCodecError::NotRepurposed);
+    }
+    Ok(msg)
+}
+
+/// Build a repurposed ACF_GBB frame (`mtv = 0`, `op = 1`).
+fn encode_repurposed_gbb(
+    byte_bus_id: u16,
+    evt: Evt,
+    cs: bool,
+    transaction_num: u8,
+    ts: u64,
+    payload: &[u8],
+) -> Result<Vec<u8>, RcpError> {
+    encode_acf_gbb(&AcfGbbMessage {
+        info: ByteMessageInfo {
+            byte_bus_id,
+            evt,
+            cs,
+            transaction_num,
+            op: true,
+            ..ByteMessageInfo::default()
+        },
+        message_timestamp: ts,
+        payload: payload.to_vec(),
+    })
+}
+
+/// True iff `evt[2:0]`, `hs` or `cs` is nonzero — the cancellation decoders'
+/// shared header rule (TC18 Tables 13-15).
+fn evt_hs_cs_nonzero(info: &ByteMessageInfo) -> bool {
+    info.evt.sub_opcode & 0x07 != 0 || info.hs || info.cs
+}
+
+/// Read just the repurposed `request_type` opcode byte from a received
+/// ACF_GBB frame, so a caller can dispatch to the right decoder without a
+/// full decode first.
+///
+/// Returns [`RequestCodecError::ShortFrame`] if `b` is shorter than the
+/// ACF_GBB header, [`RequestCodecError::BadMsgType`] if `b[0] >> 1` is not
+/// ACF_GBB, and [`RequestCodecError::NotRepurposed`] if `mtv` is set; it
+/// does not validate `acf_msg_length`. Mirrors
+/// `rcp_compound_peek_request_type()` (`c-RCP/src/request.c:85-101`).
+/// Never panics for any input.
+//fusa:req REQ-CMP-030
+pub fn peek_request_type(b: &[u8]) -> Result<u8, RequestCodecError> {
+    if b.len() < ACF_GBB_HEADER_LEN {
+        return Err(RequestCodecError::ShortFrame);
+    }
+    if b[0] >> 1 != ACF_GBB_MSG_TYPE {
+        return Err(RequestCodecError::BadMsgType);
+    }
+    if (b[2] >> 5) & 0x1 != 0 {
+        return Err(RequestCodecError::NotRepurposed);
+    }
+    Ok(b[ACF_ABB_HEADER_LEN])
+}
+
+// ── Compound / compound-wait (0x0F/0x8F, 0x0B/0x8B) ─────────────────────────
+
+/// A compound/compound-wait request's five wire sub-fields, in wire order
+/// after the leading opcode octet: `cmp_start_state` (offset 1),
+/// `cmp_next_state` (offset 2), `cmp_sequencer` (offset 3),
+/// `cmp_exec_delay` (offsets 4..5, BE) and `cmp_repetitions` (offsets 6..7,
+/// BE) — the `cmpw_*` fields of a compound-wait request share the identical
+/// layout. Mirrors c-RCP's `rcp_compound_step_t`
+/// (`c-RCP/include/rcp/request.h:597-609`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+//fusa:req REQ-CMP-010
+pub struct CompoundStep {
+    /// The sequencer state this step requires (`0` = any state).
+    pub start_state: u8,
+    /// The state this step advances the sequencer to (`0` = stay).
+    pub next_state: u8,
+    /// Which sequencer this step targets.
+    pub sequencer_index: u8,
+    /// `cmp_exec_delay`/`cmpw_exec_delay`, in multiples of the endpoint's
+    /// configured `ep_delay_time` — not milliseconds.
+    pub exec_delay: u16,
+    /// `cmp_repetitions`/`cmpw_repetitions`: remaining repetitions;
+    /// [`COMPOUND_REPEAT_INFINITE`] means never decrement — see
+    /// [`complete_repetition`].
+    pub repeat_count: u16,
+}
+
+impl CompoundStep {
+    fn pack(&self, request_type: u8) -> u64 {
+        (u64::from(request_type) << 56)
+            | (u64::from(self.start_state) << 48)
+            | (u64::from(self.next_state) << 40)
+            | (u64::from(self.sequencer_index) << 32)
+            | (u64::from(self.exec_delay) << 16)
+            | u64::from(self.repeat_count)
+    }
+
+    fn unpack(ts: u64) -> Self {
+        Self {
+            start_state: (ts >> 48) as u8,
+            next_state: (ts >> 40) as u8,
+            sequencer_index: (ts >> 32) as u8,
+            exec_delay: (ts >> 16) as u16,
+            repeat_count: ts as u16,
+        }
+    }
+}
+
+/// A decoded (or to-be-encoded) compound / compound-wait request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+//fusa:req REQ-CMP-010
+pub struct CompoundRequest {
+    /// One of [`RequestKind::Compound`], [`RequestKind::SafetyCompound`],
+    /// [`RequestKind::CompoundWait`], [`RequestKind::SafetyCompoundWait`].
+    pub request_type: RequestKind,
+    /// The addressed endpoint's 11-bit `byte_bus_id`.
+    pub byte_bus_id: u16,
+    /// The repurposed sub-fields.
+    pub step: CompoundStep,
+    /// The ACF header's own `evt` (a compound-wait request's §13.5.1
+    /// comparison mode; `0` for a plain compound request).
+    pub evt: Evt,
+    /// The request's `transaction_num`.
+    pub transaction_num: u8,
+    /// The request's opaque payload (a compound-wait request's comparison
+    /// target).
+    pub payload: Vec<u8>,
+}
+
+/// Encode a compound / compound-wait request.
+///
+/// Returns `Err(RcpError::InvalidParameter)` if `req.request_type` is not a
+/// compound or compound-wait kind, and `Err(RcpError::InvalidSize)` if the
+/// payload exceeds the ACF 9-bit quadlet range or `byte_bus_id` exceeds 11
+/// bits. Mirrors `rcp_compound_encode_request()`
+/// (`c-RCP/src/request.c:186-200`), which returns a NULL frame in those
+/// cases. Never panics for any input.
+//fusa:req REQ-CMP-010
+//fusa:req REQ-CMP-026
+//fusa:req REQ-CMP-031
+//fusa:req REQ-CMP-032
+pub fn encode_compound_request(req: &CompoundRequest) -> Result<Vec<u8>, RcpError> {
+    if !is_compound_or_wait(req.request_type) {
+        return Err(RcpError::InvalidParameter);
+    }
+    encode_repurposed_gbb(
+        req.byte_bus_id,
+        req.evt,
+        false,
+        req.transaction_num,
+        req.step.pack(req.request_type.to_u8()),
+        &req.payload,
+    )
+}
+
+/// Decode a compound / compound-wait request.
+///
+/// Fails with [`RequestCodecError::ShortFrame`], [`RequestCodecError::BadMsgType`],
+/// [`RequestCodecError::NotRepurposed`], or [`RequestCodecError::UnknownType`]
+/// (opcode is not `0x0F`/`0x8F`/`0x0B`/`0x8B`). `hs`/`cs` and every
+/// sub-field value are accepted unvalidated, exactly as
+/// `rcp_compound_decode_request()` (`c-RCP/src/request.c:208-238`) does.
+/// Never panics for any input.
+//fusa:req REQ-CMP-011
+//fusa:req REQ-CMP-012
+//fusa:req REQ-CMP-013
+//fusa:req REQ-CMP-014
+//fusa:req REQ-CMP-015
+//fusa:req REQ-CMP-027
+pub fn decode_compound_request(b: &[u8]) -> Result<CompoundRequest, RequestCodecError> {
+    let msg = decode_repurposed_gbb(b)?;
+    let request_type = RequestKind::from_u8(ts_request_type(msg.message_timestamp))
+        .ok()
+        .filter(|k| is_compound_or_wait(*k))
+        .ok_or(RequestCodecError::UnknownType)?;
+    Ok(CompoundRequest {
+        request_type,
+        byte_bus_id: msg.info.byte_bus_id,
+        step: CompoundStep::unpack(msg.message_timestamp),
+        evt: msg.info.evt,
+        transaction_num: msg.info.transaction_num,
+        payload: msg.payload,
+    })
+}
+
+// ── Triggered (0x0E/0x8E) codec ──────────────────────────────────────────────
+
+impl TriggeredStep {
+    fn pack(&self, request_type: u8) -> u64 {
+        (u64::from(request_type) << 56)
+            | (u64::from(self.trigger_source_ep) << 48)
+            | (u64::from(self.trigger_signal_nr) << 40)
+            | (u64::from(self.trigger_threshold) << 32)
+            | (u64::from(self.exec_delay) << 16)
+            | u64::from(self.repeat_count)
+    }
+
+    fn unpack(ts: u64) -> Self {
+        Self {
+            trigger_source_ep: (ts >> 48) as u8,
+            trigger_signal_nr: (ts >> 40) as u8,
+            trigger_threshold: (ts >> 32) as u8,
+            exec_delay: (ts >> 16) as u16,
+            repeat_count: ts as u16,
+        }
+    }
+}
+
+/// A decoded (or to-be-encoded) triggered request. c-RCP's triggered codec
+/// carries no `evt` of its own: it encodes `evt = 0` and does not surface
+/// the decoded value (`c-RCP/src/request.c:431-503`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+//fusa:req REQ-TRIG-014
+pub struct TriggeredRequest {
+    /// [`RequestKind::Triggered`] or [`RequestKind::SafetyTriggered`].
+    pub request_type: RequestKind,
+    /// The addressed endpoint's 11-bit `byte_bus_id`.
+    pub byte_bus_id: u16,
+    /// The repurposed trigger-selection sub-fields.
+    pub step: TriggeredStep,
+    /// The request's `transaction_num`.
+    pub transaction_num: u8,
+    /// The request's opaque payload.
+    pub payload: Vec<u8>,
+}
+
+/// Encode a triggered request. Returns `Err(RcpError::InvalidParameter)` if
+/// `req.request_type` is not a triggered kind and `Err(RcpError::InvalidSize)`
+/// for an oversized payload / out-of-range `byte_bus_id`. Mirrors
+/// `rcp_triggered_encode_request()` (`c-RCP/src/request.c:431-472`). Never
+/// panics for any input.
+//fusa:req REQ-TRIG-014
+//fusa:req REQ-TRIG-015
+pub fn encode_triggered_request(req: &TriggeredRequest) -> Result<Vec<u8>, RcpError> {
+    if !is_triggered(req.request_type) {
+        return Err(RcpError::InvalidParameter);
+    }
+    encode_repurposed_gbb(
+        req.byte_bus_id,
+        Evt::default(),
+        false,
+        req.transaction_num,
+        req.step.pack(req.request_type.to_u8()),
+        &req.payload,
+    )
+}
+
+/// Decode a triggered request: same failure modes as
+/// [`decode_compound_request`], with [`RequestCodecError::UnknownType`] for
+/// any opcode other than `0x0E`/`0x8E`. Mirrors
+/// `rcp_triggered_decode_request()` (`c-RCP/src/request.c:477-503`). Never
+/// panics for any input.
+//fusa:req REQ-TRIG-006
+//fusa:req REQ-TRIG-007
+//fusa:req REQ-TRIG-016
+pub fn decode_triggered_request(b: &[u8]) -> Result<TriggeredRequest, RequestCodecError> {
+    let msg = decode_repurposed_gbb(b)?;
+    let request_type = RequestKind::from_u8(ts_request_type(msg.message_timestamp))
+        .ok()
+        .filter(|k| is_triggered(*k))
+        .ok_or(RequestCodecError::UnknownType)?;
+    Ok(TriggeredRequest {
+        request_type,
+        byte_bus_id: msg.info.byte_bus_id,
+        step: TriggeredStep::unpack(msg.message_timestamp),
+        transaction_num: msg.info.transaction_num,
+        payload: msg.payload,
+    })
+}
+
+// ── Chained (0x01) codec ─────────────────────────────────────────────────────
+
+/// A decoded (or to-be-encoded) chained-request member: `request_type
+/// 0x01`, octets 1..3 reserved, `chain_exec_delay` at octets 4..5 (BE),
+/// octets 6..7 reserved; the ACF header's `cs` bit is this member's
+/// abort-on-predecessor-error selector.
+#[derive(Debug, Clone, PartialEq, Eq)]
+//fusa:req REQ-CHAIN-004
+pub struct ChainedMember {
+    /// The addressed endpoint's 11-bit `byte_bus_id`.
+    pub byte_bus_id: u16,
+    /// `chain_exec_delay`, in multiples of the endpoint's `ep_delay_time`,
+    /// measured from the predecessor's finalization.
+    pub chain_exec_delay: u16,
+    /// The `cs` bit: `true` = abort this member if its predecessor errored.
+    pub cs: bool,
+    /// The member's `transaction_num`.
+    pub transaction_num: u8,
+    /// The member's opaque payload.
+    pub payload: Vec<u8>,
+}
+
+/// Encode a chained-request member, leaving every reserved octet zero.
+/// Returns `Err(RcpError::InvalidSize)` for an oversized payload /
+/// out-of-range `byte_bus_id`. Mirrors `rcp_chained_encode_member()`
+/// (`c-RCP/src/request.c:580-626`). Never panics for any input.
+//fusa:req REQ-CHAIN-004
+//fusa:req REQ-CHAIN-013
+pub fn encode_chained_member(member: &ChainedMember) -> Result<Vec<u8>, RcpError> {
+    let ts = (u64::from(RequestKind::Chained.to_u8()) << 56)
+        | (u64::from(member.chain_exec_delay) << 16);
+    encode_repurposed_gbb(
+        member.byte_bus_id,
+        Evt::default(),
+        member.cs,
+        member.transaction_num,
+        ts,
+        &member.payload,
+    )
+}
+
+/// Decode a chained-request member: [`RequestCodecError::UnknownType`] for an
+/// opcode other than `0x01`, [`RequestCodecError::ReservedNonzero`] if any
+/// of octets 1..3 or 6..7 is nonzero, otherwise the same failure modes as
+/// [`decode_compound_request`]. `hs`/`evt` are accepted unvalidated, as in
+/// `rcp_chained_decode_member()` (`c-RCP/src/request.c:631-661`). Never
+/// panics for any input.
+//fusa:req REQ-CHAIN-005
+//fusa:req REQ-CHAIN-006
+//fusa:req REQ-CHAIN-007
+//fusa:req REQ-CHAIN-012
+pub fn decode_chained_member(b: &[u8]) -> Result<ChainedMember, RequestCodecError> {
+    let msg = decode_repurposed_gbb(b)?;
+    let ts = msg.message_timestamp;
+    if ts_request_type(ts) != RequestKind::Chained.to_u8() {
+        return Err(RequestCodecError::UnknownType);
+    }
+    if ts & 0x00FF_FFFF_0000_FFFF != 0 {
+        return Err(RequestCodecError::ReservedNonzero);
+    }
+    Ok(ChainedMember {
+        byte_bus_id: msg.info.byte_bus_id,
+        chain_exec_delay: (ts >> 16) as u16,
+        cs: msg.info.cs,
+        transaction_num: msg.info.transaction_num,
+        payload: msg.payload,
+    })
+}
+
+// ── Timed (0x0A) codec ───────────────────────────────────────────────────────
+
+/// A decoded (or to-be-encoded) NTSCF timed request: `request_type 0x0A`,
+/// octet 1 reserved, a 48-bit big-endian `presentation_time` (gPTP
+/// nanoseconds mod 2^48) at octets 2..7.
+#[derive(Debug, Clone, PartialEq, Eq)]
+//fusa:req REQ-TIMED-003
+pub struct TimedRequest {
+    /// The addressed endpoint's 11-bit `byte_bus_id`.
+    pub byte_bus_id: u16,
+    /// The 48-bit presentation time (`0..=TIMED_PRESENTATION_TIME_MAX`).
+    pub presentation_time: u64,
+    /// The request's `transaction_num`.
+    pub transaction_num: u8,
+    /// The request's opaque payload.
+    pub payload: Vec<u8>,
+}
+
+/// Encode a timed request with `hs`/`cs` clear and the reserved octet zero.
+/// Returns `Err(RcpError::InvalidParameter)` when `presentation_time`
+/// exceeds [`TIMED_PRESENTATION_TIME_MAX`] (never silently truncated) and
+/// `Err(RcpError::InvalidSize)` for an oversized payload / out-of-range
+/// `byte_bus_id`. Mirrors `rcp_timed_encode_request()`
+/// (`c-RCP/src/request.c:731-776`). Never panics for any input.
+//fusa:req REQ-TIMED-003
+pub fn encode_timed_request(req: &TimedRequest) -> Result<Vec<u8>, RcpError> {
+    if req.presentation_time > TIMED_PRESENTATION_TIME_MAX {
+        return Err(RcpError::InvalidParameter);
+    }
+    let ts = (u64::from(RequestKind::Timed.to_u8()) << 56) | req.presentation_time;
+    encode_repurposed_gbb(
+        req.byte_bus_id,
+        Evt::default(),
+        false,
+        req.transaction_num,
+        ts,
+        &req.payload,
+    )
+}
+
+/// Decode a timed request: [`RequestCodecError::UnknownType`] for an opcode
+/// other than `0x0A`, [`RequestCodecError::ReservedNonzero`] if octet 1 is
+/// nonzero, [`RequestCodecError::UnsupportedCmd`] if `hs` or `cs` is set
+/// (checked in that order), otherwise the same failure modes as
+/// [`decode_compound_request`]. `evt` is accepted unvalidated. Mirrors
+/// `rcp_timed_decode_request()` (`c-RCP/src/request.c:806-837`). Never
+/// panics for any input.
+//fusa:req REQ-TIMED-004
+//fusa:req REQ-TIMED-005
+//fusa:req REQ-TIMED-009
+//fusa:req REQ-TIMED-010
+pub fn decode_timed_request(b: &[u8]) -> Result<TimedRequest, RequestCodecError> {
+    let msg = decode_repurposed_gbb(b)?;
+    let ts = msg.message_timestamp;
+    if ts_request_type(ts) != RequestKind::Timed.to_u8() {
+        return Err(RequestCodecError::UnknownType);
+    }
+    if (ts >> 48) as u8 != 0 {
+        return Err(RequestCodecError::ReservedNonzero);
+    }
+    if msg.info.hs || msg.info.cs {
+        return Err(RequestCodecError::UnsupportedCmd);
+    }
+    Ok(TimedRequest {
+        byte_bus_id: msg.info.byte_bus_id,
+        presentation_time: ts & TIMED_PRESENTATION_TIME_MAX,
+        transaction_num: msg.info.transaction_num,
+        payload: msg.payload,
+    })
+}
+
+// ── Cancellation (0x05/0x06/0x07) codecs ─────────────────────────────────────
+
+/// A decoded (or to-be-encoded) clear-all (`0x05`) or clear-non-safestate
+/// (`0x06`) request: no sub-fields of its own, a fixed 16-byte frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+//fusa:req REQ-CMP-016
+//fusa:req REQ-CANCEL-016
+pub struct ClearRequest {
+    /// The addressed endpoint's 11-bit `byte_bus_id`.
+    pub byte_bus_id: u16,
+    /// The cancellation request's own `transaction_num`.
+    pub transaction_num: u8,
+}
+
+/// A decoded (or to-be-encoded) clear-single (`0x07`) request:
+/// `clear_transaction_num` at octet 3, every other sub-field octet reserved.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+//fusa:req REQ-CANCEL-005
+pub struct ClearSingleRequest {
+    /// The addressed endpoint's 11-bit `byte_bus_id`.
+    pub byte_bus_id: u16,
+    /// The `transaction_num` of the queued request to cancel.
+    pub clear_transaction_num: u8,
+    /// The cancellation request's own `transaction_num`.
+    pub transaction_num: u8,
+}
+
+/// Encode a clear-non-safestate request (opcode `0x06`, 7 zero sub-field
+/// octets). Returns `Err(RcpError::InvalidSize)` only for an out-of-range
+/// `byte_bus_id`. Mirrors `rcp_compound_encode_clear_non_safestate()`
+/// (`c-RCP/src/request.c:243-249`). Never panics for any input.
+//fusa:req REQ-CMP-016
+pub fn encode_clear_non_safestate(req: &ClearRequest) -> Result<Vec<u8>, RcpError> {
+    let ts = u64::from(RequestKind::ClearNonSafestate.to_u8()) << 56;
+    encode_repurposed_gbb(
+        req.byte_bus_id,
+        Evt::default(),
+        false,
+        req.transaction_num,
+        ts,
+        &[],
+    )
+}
+
+/// Decode a clear-non-safestate request: [`RequestCodecError::UnknownType`]
+/// unless the opcode is `0x06`, [`RequestCodecError::ReservedNonzero`] if any
+/// trailing octet is set, [`RequestCodecError::EvtHsCsNonzero`] if
+/// `evt[2:0]`/`hs`/`cs` is set (in that order). Mirrors
+/// `rcp_compound_decode_clear_non_safestate()` (`c-RCP/src/request.c:255-291`).
+/// Never panics for any input.
+//fusa:req REQ-CMP-017
+//fusa:req REQ-CMP-018
+//fusa:req REQ-CMP-028
+//fusa:req REQ-CMP-029
+pub fn decode_clear_non_safestate(b: &[u8]) -> Result<ClearRequest, RequestCodecError> {
+    decode_clear_no_subfields(b, RequestKind::ClearNonSafestate)
+}
+
+/// Encode a clear-all request (opcode `0x05`, 7 zero sub-field octets).
+/// Returns `Err(RcpError::InvalidSize)` only for an out-of-range
+/// `byte_bus_id`. Mirrors `rcp_cancel_encode_clear_all()`
+/// (`c-RCP/src/request.c:955-960`). Never panics for any input.
+//fusa:req REQ-CANCEL-016
+pub fn encode_clear_all(req: &ClearRequest) -> Result<Vec<u8>, RcpError> {
+    let ts = u64::from(RequestKind::ClearAll.to_u8()) << 56;
+    encode_repurposed_gbb(
+        req.byte_bus_id,
+        Evt::default(),
+        false,
+        req.transaction_num,
+        ts,
+        &[],
+    )
+}
+
+/// Decode a clear-all request: same rules as [`decode_clear_non_safestate`]
+/// for opcode `0x05`. Mirrors `rcp_cancel_decode_clear_all()`
+/// (`c-RCP/src/request.c:966-1001`). Never panics for any input.
+//fusa:req REQ-CANCEL-013
+//fusa:req REQ-CANCEL-014
+//fusa:req REQ-CANCEL-017
+pub fn decode_clear_all(b: &[u8]) -> Result<ClearRequest, RequestCodecError> {
+    decode_clear_no_subfields(b, RequestKind::ClearAll)
+}
+
+fn decode_clear_no_subfields(
+    b: &[u8],
+    kind: RequestKind,
+) -> Result<ClearRequest, RequestCodecError> {
+    let msg = decode_repurposed_gbb(b)?;
+    let ts = msg.message_timestamp;
+    if ts_request_type(ts) != kind.to_u8() {
+        return Err(RequestCodecError::UnknownType);
+    }
+    if ts & 0x00FF_FFFF_FFFF_FFFF != 0 {
+        return Err(RequestCodecError::ReservedNonzero);
+    }
+    if evt_hs_cs_nonzero(&msg.info) {
+        return Err(RequestCodecError::EvtHsCsNonzero);
+    }
+    Ok(ClearRequest {
+        byte_bus_id: msg.info.byte_bus_id,
+        transaction_num: msg.info.transaction_num,
+    })
+}
+
+/// Encode a clear-single request. Returns `Err(RcpError::InvalidSize)` only
+/// for an out-of-range `byte_bus_id`. Mirrors
+/// `rcp_cancel_encode_clear_single()` (`c-RCP/src/request.c:1006-1017`).
+/// Never panics for any input.
+//fusa:req REQ-CANCEL-005
+pub fn encode_clear_single(req: &ClearSingleRequest) -> Result<Vec<u8>, RcpError> {
+    let ts = (u64::from(RequestKind::ClearSingle.to_u8()) << 56)
+        | (u64::from(req.clear_transaction_num) << 32);
+    encode_repurposed_gbb(
+        req.byte_bus_id,
+        Evt::default(),
+        false,
+        req.transaction_num,
+        ts,
+        &[],
+    )
+}
+
+/// Decode a clear-single request: [`RequestCodecError::UnknownType`] unless
+/// the opcode is `0x07`, [`RequestCodecError::ReservedNonzero`] if any of
+/// octets 1..2 or 4..7 is set, [`RequestCodecError::EvtHsCsNonzero`] if
+/// `evt[2:0]`/`hs`/`cs` is set. Mirrors `rcp_cancel_decode_clear_single()`
+/// (`c-RCP/src/request.c:1022-1058`). Never panics for any input.
+//fusa:req REQ-CANCEL-006
+//fusa:req REQ-CANCEL-007
+//fusa:req REQ-CANCEL-015
+pub fn decode_clear_single(b: &[u8]) -> Result<ClearSingleRequest, RequestCodecError> {
+    let msg = decode_repurposed_gbb(b)?;
+    let ts = msg.message_timestamp;
+    if ts_request_type(ts) != RequestKind::ClearSingle.to_u8() {
+        return Err(RequestCodecError::UnknownType);
+    }
+    if ts & 0x00FF_FF00_FFFF_FFFF != 0 {
+        return Err(RequestCodecError::ReservedNonzero);
+    }
+    if evt_hs_cs_nonzero(&msg.info) {
+        return Err(RequestCodecError::EvtHsCsNonzero);
+    }
+    Ok(ClearSingleRequest {
+        byte_bus_id: msg.info.byte_bus_id,
+        clear_transaction_num: (ts >> 32) as u8,
+        transaction_num: msg.info.transaction_num,
+    })
 }
 
 // ── Sequencer gating ─────────────────────────────────────────────────────────
@@ -1686,6 +2349,49 @@ pub fn advance_sequencer_if_still_in_start_state(
 //fusa:req REQ-SEQ-001
 pub struct SequencerBank {
     states: Vec<SequencerState>,
+    /// Per-sequencer owner (TC18 §12.7.10 Table 28 `Request_stream_index`),
+    /// index-parallel with `states`; [`SEQUENCER_OWNER_UNCLAIMED`] by
+    /// default. Mirrors c-RCP's `rcp_sequencer_table_t.owner[]`
+    /// (`c-RCP/include/rcp/request_sequencer.h`).
+    owners: Vec<u8>,
+}
+
+/// The reserved "no client has claimed this sequencer" owner value — the
+/// 1-based `request_stream_index` convention's `0` sentinel. An unclaimed
+/// sequencer permits no client at all (fail-closed), mirroring c-RCP's
+/// `RCP_SEQUENCER_OWNER_UNCLAIMED` (`c-RCP/include/rcp/request_sequencer.h`).
+//fusa:req REQ-SEQ-013
+pub const SEQUENCER_OWNER_UNCLAIMED: u8 = 0;
+
+/// The three-way outcome of a sequencer access check — c-RCP's
+/// `rcp_sequencer_access_errc_t` (`c-RCP/include/rcp/request_sequencer.h`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+//fusa:req REQ-WIREERR-005
+pub enum SequencerAccess {
+    /// The index is valid and its owner equals the requester.
+    Permitted,
+    /// The index does not address a configured sequencer.
+    Unknown,
+    /// The index is valid, but the sequencer is unclaimed or owned by a
+    /// different request stream.
+    Denied,
+}
+
+impl SequencerAccess {
+    /// The TC18 wire error a Response frame carries for this outcome:
+    /// `None` for [`Self::Permitted`] (nothing to report),
+    /// [`RcpError::SequencerNotKnown`] (code 2) for [`Self::Unknown`], and
+    /// [`RcpError::UnauthorizedAccess`] (code 3) for [`Self::Denied`].
+    /// Mirrors `rcp_sequencer_wire_error()`
+    /// (`c-RCP/src/request_sequencer.c:143-157`).
+    //fusa:req REQ-WIREERR-005
+    pub fn wire_error(self) -> Option<RcpError> {
+        match self {
+            Self::Permitted => None,
+            Self::Unknown => Some(RcpError::SequencerNotKnown),
+            Self::Denied => Some(RcpError::UnauthorizedAccess),
+        }
+    }
 }
 
 impl SequencerBank {
@@ -1705,6 +2411,88 @@ impl SequencerBank {
         let power_on_state = SequencerState(SequencerStateEntry::power_on_default().seq_state);
         Self {
             states: vec![power_on_state; svr_sequencers_max as usize],
+            owners: vec![SEQUENCER_OWNER_UNCLAIMED; svr_sequencers_max as usize],
+        }
+    }
+
+    /// Read `sequencer_num`'s owner (`Request_stream_index`). Returns
+    /// `Err(RcpError::SequencerNotKnown)` for an out-of-bounds index.
+    /// Mirrors `rcp_sequencer_get_owner()`
+    /// (`c-RCP/src/request_sequencer.c:94-100`). Never panics for any input.
+    //fusa:req REQ-SEQ-013
+    pub fn owner(&self, sequencer_num: u8) -> Result<u8, RcpError> {
+        check_sequencer_num_in_bounds(sequencer_num, self.svr_sequencers_max())?;
+        Ok(self.owners[sequencer_num as usize])
+    }
+
+    /// Overwrite `sequencer_num`'s owner ([`SEQUENCER_OWNER_UNCLAIMED`]
+    /// releases it). A pure mechanism with no authorization check of its
+    /// own, exactly like `rcp_sequencer_set_owner()`
+    /// (`c-RCP/src/request_sequencer.c:102-108`). Returns
+    /// `Err(RcpError::SequencerNotKnown)` for an out-of-bounds index, leaving
+    /// the bank unchanged. Never panics for any input.
+    //fusa:req REQ-SEQ-013
+    pub fn set_owner(&mut self, sequencer_num: u8, owner: u8) -> Result<(), RcpError> {
+        check_sequencer_num_in_bounds(sequencer_num, self.svr_sequencers_max())?;
+        self.owners[sequencer_num as usize] = owner;
+        Ok(())
+    }
+
+    /// The three-way access decision for `requester_stream_index` touching
+    /// `sequencer_num`: [`SequencerAccess::Unknown`] for an out-of-bounds
+    /// index (checked first — there is no owner to consult),
+    /// [`SequencerAccess::Denied`] for an unclaimed sequencer (fail-closed)
+    /// or one owned by a different stream, [`SequencerAccess::Permitted`]
+    /// otherwise. Mirrors `rcp_sequencer_access_check()`
+    /// (`c-RCP/src/request_sequencer.c:128-140`). Never panics for any input.
+    //fusa:req REQ-SEQ-013
+    //fusa:req REQ-WIREERR-005
+    pub fn access_check(&self, sequencer_num: u8, requester_stream_index: u8) -> SequencerAccess {
+        let Ok(owner) = self.owner(sequencer_num) else {
+            return SequencerAccess::Unknown;
+        };
+        if owner == SEQUENCER_OWNER_UNCLAIMED || owner != requester_stream_index {
+            SequencerAccess::Denied
+        } else {
+            SequencerAccess::Permitted
+        }
+    }
+
+    /// True iff [`Self::access_check`] is [`SequencerAccess::Permitted`]
+    /// (`rcp_sequencer_access_permitted()`,
+    /// `c-RCP/src/request_sequencer.c:110-116`).
+    //fusa:req REQ-SEQ-013
+    pub fn access_permitted(&self, sequencer_num: u8, requester_stream_index: u8) -> bool {
+        self.access_check(sequencer_num, requester_stream_index) == SequencerAccess::Permitted
+    }
+
+    /// The admission-time ownership gate for a compound/compound-wait
+    /// request naming `step.sequencer_index`, submitted on the request
+    /// stream `requester_stream_index` (1-based; `0` if unresolved).
+    ///
+    /// Mirrors c-RCP's dispatch-side check (`c-RCP/src/mock.c:1649-1676`):
+    /// skipped entirely (`Ok(())`) when this bank has no sequencers at all
+    /// (the distinct "compound operations unsupported" case); otherwise
+    /// returns [`SequencerAccess::wire_error`] of [`Self::access_check`] as
+    /// the error — `Err(RcpError::SequencerNotKnown)` for an unknown index,
+    /// `Err(RcpError::UnauthorizedAccess)` for a sequencer this stream does
+    /// not own. Never panics for any input.
+    //fusa:req REQ-SEQ-013
+    //fusa:req REQ-WIREERR-005
+    pub fn check_compound_admission(
+        &self,
+        step: &CompoundStep,
+        requester_stream_index: u8,
+    ) -> Result<(), RcpError> {
+        if self.states.is_empty() {
+            return Ok(());
+        }
+        match self
+            .access_check(step.sequencer_index, requester_stream_index)
+            .wire_error()
+        {
+            None => Ok(()),
+            Some(e) => Err(e),
         }
     }
 
@@ -1903,22 +2691,172 @@ pub fn is_trigger_repeat_exhausted(
     }
 }
 
-// ── Triggered (0x0E): busy/idle-independent occurrence counting ─────────────
+// ── Triggered (0x0E/0x8E): trigger selection, occurrence counting, fire ─────
 
-/// Whether a trigger event should count as a trigger occurrence for a
-/// Triggered request: always `true`, regardless of `endpoint_busy` — the
-/// property this checklist bullet names as running "independent of endpoint
-/// busy/idle state", distinguishing Triggered from the sequencer-gated
-/// compound/compound-wait kinds this module also models. Never panics for
-/// any input.
+/// The infinite-repetition sentinel for a triggered request's
+/// `trigger_repetitions` sub-field — the all-ones value of the 2-octet field,
+/// identical in meaning to [`COMPOUND_REPEAT_INFINITE`]. Mirrors c-RCP's
+/// `RCP_TRIGGERED_REPEAT_INFINITE` (`c-RCP/include/rcp/request.h:782`).
+//fusa:req REQ-TRIG-014
+pub const TRIGGERED_REPEAT_INFINITE: u16 = 0xFFFF;
+
+/// A triggered request's five wire sub-fields, in wire order after the
+/// leading `request_type` opcode octet of the repurposed `message_timestamp`
+/// region: `trigger_source_ep` (offset 1), `trigger_signal_nr` (offset 2),
+/// `trigger_threshold` (offset 3), `trigger_exec_delay` (offsets 4..5, big
+/// endian) and `trigger_repetitions` (offsets 6..7, big endian).
 ///
-/// See this module's doc comment "Provenance note: busy/idle independence
-/// as a caller-supplied parameter" for why `endpoint_busy` is taken (and
-/// deliberately ignored) rather than omitted outright.
+/// Mirrors c-RCP's `rcp_triggered_step_t`
+/// (`c-RCP/include/rcp/request.h:784-798`) field for field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+//fusa:req REQ-TRIG-014
+pub struct TriggeredStep {
+    /// The endpoint whose trigger signal this request waits on.
+    pub trigger_source_ep: u8,
+    /// Which of that endpoint's trigger signals (endpoint-defined numbering).
+    pub trigger_signal_nr: u8,
+    /// Occurrences that must *precede* execution: `0` fires on the first
+    /// occurrence, `N` on the `N+1`th — see [`TriggeredRuntime::threshold_reached`].
+    pub trigger_threshold: u8,
+    /// `trigger_exec_delay`, counted in multiples of the addressed
+    /// endpoint's configured `ep_delay_time` — not milliseconds.
+    pub exec_delay: u16,
+    /// `trigger_repetitions`: remaining repetitions;
+    /// [`TRIGGERED_REPEAT_INFINITE`] means never decrement — see
+    /// [`complete_repetition`].
+    pub repeat_count: u16,
+}
+
+impl TriggeredStep {
+    /// True iff `elapsed >= self.exec_delay`, both in multiples of the
+    /// endpoint's configured `ep_delay_time`. Mirrors
+    /// `rcp_triggered_exec_delay_elapsed()` (`c-RCP/src/request.c:535-538`).
+    /// Never panics for any input.
+    //fusa:req REQ-TRIG-011
+    pub fn exec_delay_elapsed(&self, elapsed: u32) -> bool {
+        elapsed >= u32::from(self.exec_delay)
+    }
+}
+
+/// Whether one observed trigger occurrence — emitted by endpoint
+/// `source_ep` as its own trigger signal number `signal_nr` — counts toward
+/// `step`'s request: true iff `source_ep == step.trigger_source_ep` *and*
+/// `signal_nr == step.trigger_signal_nr`.
+///
+/// A request waiting on one endpoint's trigger signal is never advanced by
+/// a different endpoint's, nor by a different signal number of the same
+/// endpoint (`c-RCP/include/rcp/request.h:291-303`). Takes no busy/idle
+/// input at all: occurrence counting is independent of the target
+/// endpoint's state by construction (TC18 §12.9.3); only the fire
+/// transition ([`TriggeredRuntime::tick`]) is gated on `endpoint_idle`.
+/// Never panics for any input.
 //fusa:req REQ-TRIG-005
-pub fn should_count_trigger_occurrence(endpoint_busy: bool) -> bool {
-    let _ = endpoint_busy;
-    true
+pub fn should_count_trigger_occurrence(step: &TriggeredStep, source_ep: u8, signal_nr: u8) -> bool {
+    source_ep == step.trigger_source_ep && signal_nr == step.trigger_signal_nr
+}
+
+/// One triggered request's own runtime (not wire-carried) state: how many
+/// matching trigger occurrences have been observed since entering
+/// "started". Mirrors c-RCP's `rcp_triggered_runtime_t`
+/// (`c-RCP/include/rcp/request.h:835-838`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+//fusa:req REQ-TRIG-008
+pub struct TriggeredRuntime {
+    /// Matching occurrences recorded since the last [`Self::enter_started`].
+    pub occurrence_count: u32,
+    /// Whether this request is in its "started" (counting) state.
+    pub started: bool,
+}
+
+impl TriggeredRuntime {
+    /// Reset to `occurrence_count == 0`, `started == true` — the "entering
+    /// started" transition (`rcp_triggered_runtime_enter_started()`,
+    /// `c-RCP/src/request.c:508-512`).
+    //fusa:req REQ-TRIG-008
+    pub fn enter_started(&mut self) {
+        self.occurrence_count = 0;
+        self.started = true;
+    }
+
+    /// Record one observed trigger occurrence. Increments
+    /// [`Self::occurrence_count`] and returns `true` iff [`Self::started`]
+    /// and [`should_count_trigger_occurrence`] holds for `(source_ep,
+    /// signal_nr)`; otherwise leaves `self` unchanged and returns `false`.
+    /// Mirrors `rcp_triggered_runtime_record_occurrence()`
+    /// (`c-RCP/src/request.c:515-525`); the counter wraps like c-RCP's
+    /// `uint32_t` increment rather than panicking. Never panics for any
+    /// input.
+    //fusa:req REQ-TRIG-009
+    pub fn record_occurrence(
+        &mut self,
+        step: &TriggeredStep,
+        source_ep: u8,
+        signal_nr: u8,
+    ) -> bool {
+        if !self.started || !should_count_trigger_occurrence(step, source_ep, signal_nr) {
+            return false;
+        }
+        self.occurrence_count = self.occurrence_count.wrapping_add(1);
+        true
+    }
+
+    /// True iff `occurrence_count > step.trigger_threshold` — a threshold of
+    /// `0` is satisfied by one occurrence, `N` by `N+1`
+    /// (`rcp_triggered_threshold_reached()`, `c-RCP/src/request.c:528-532`).
+    //fusa:req REQ-TRIG-010
+    pub fn threshold_reached(&self, step: &TriggeredStep) -> bool {
+        self.occurrence_count > u32::from(step.trigger_threshold)
+    }
+
+    /// The non-mutating half of [`Self::tick`]: true iff [`Self::started`],
+    /// [`Self::threshold_reached`], [`TriggeredStep::exec_delay_elapsed`]
+    /// and `endpoint_idle` all hold. Never panics for any input.
+    //fusa:req REQ-TRIG-012
+    pub fn fire_ready(&self, step: &TriggeredStep, elapsed: u32, endpoint_idle: bool) -> bool {
+        self.started
+            && self.threshold_reached(step)
+            && step.exec_delay_elapsed(elapsed)
+            && endpoint_idle
+    }
+
+    /// The fire transition: when [`Self::fire_ready`] holds, resets `self`
+    /// (`occurrence_count = 0`, `started = false`) and returns `true`;
+    /// otherwise leaves `self` unchanged and returns `false`. Advances no
+    /// sequencer — a triggered request has none. Mirrors
+    /// `rcp_triggered_tick()` (`c-RCP/src/request.c:542-553`).
+    //fusa:req REQ-TRIG-012
+    //fusa:req REQ-TRIG-013
+    pub fn tick(&mut self, step: &TriggeredStep, elapsed: u32, endpoint_idle: bool) -> bool {
+        if !self.fire_ready(step, elapsed, endpoint_idle) {
+            return false;
+        }
+        self.occurrence_count = 0;
+        self.started = false;
+        true
+    }
+}
+
+/// Apply the end-of-execution repetition rule to a compound, compound-wait
+/// or triggered request's `repeat_count` (`cmp_repetitions`/
+/// `cmpw_repetitions`/`trigger_repetitions`): the infinite sentinel
+/// (`0xFFFF`) is never decremented and the request stays stored; `0` means
+/// this execution was the last and the request is removed; anything else
+/// is decremented by one and the request stays stored for re-arming.
+///
+/// Returns `true` iff the request stays in the endpoint's request storage
+/// (re-arm), `false` iff it must be removed. Mirrors
+/// `rcp_server_endpoint_complete()`'s repetition step
+/// (`c-RCP/src/server.c:875-883`). Never panics for any input.
+//fusa:req REQ-CMP-034
+pub fn complete_repetition(repeat_count: &mut u16) -> bool {
+    match *repeat_count {
+        COMPOUND_REPEAT_INFINITE => true,
+        0 => false,
+        _ => {
+            *repeat_count -= 1;
+            true
+        }
+    }
 }
 
 // ── Chained (0x01): cs-bit abort-on-predecessor-error semantics ─────────────
@@ -2289,19 +3227,20 @@ pub enum RequestLifecycleGuardInput {
         /// against.
         svr_sequencers_max: u8,
     },
-    /// [`RequestKind::Triggered`]: [`should_count_trigger_occurrence`] and
-    /// [`is_trigger_repeat_exhausted`] together gate the `Started` ->
-    /// `UnderExecution` hop.
+    /// [`RequestKind::Triggered`]: [`TriggeredRuntime::fire_ready`] (c-RCP's
+    /// `rcp_triggered_tick()` predicate, `c-RCP/src/request.c:542-553`)
+    /// gates the `Started` -> `UnderExecution` hop.
     Triggered {
-        /// The target endpoint's busy/idle state — deliberately
-        /// non-gating (see [`should_count_trigger_occurrence`]), carried
-        /// here only so this hop composes that function rather than
-        /// bypassing it.
-        endpoint_busy: bool,
-        /// This request's own configured repeat count.
-        repeat: TriggerRepeatCount,
-        /// Trigger occurrences already counted for this request.
-        occurrences_so_far: u16,
+        /// This request's own decoded trigger selection.
+        step: TriggeredStep,
+        /// This request's own occurrence-counting runtime state.
+        runtime: TriggeredRuntime,
+        /// Elapsed time since the request was armed, in multiples of the
+        /// endpoint's `ep_delay_time`.
+        elapsed: u32,
+        /// Whether the target endpoint is idle — gates only the fire
+        /// transition, never occurrence counting.
+        endpoint_idle: bool,
     },
     /// [`RequestKind::Compound`]: [`check_compound_gate`] gates the
     /// `Pending` -> `Started` hop.
@@ -2325,7 +3264,7 @@ pub enum RequestLifecycleGuardInput {
 /// [`RcpError::ChainAborted`] from [`check_chain_continuation`] — or a
 /// fresh [`RcpError::RequestRejected`] for the two hop guards this item
 /// composes from a plain `bool`-returning check ([`is_timed_request_ready`],
-/// the Triggered repeat-exhaustion check) rather than one that already
+/// [`TriggeredRuntime::fire_ready`]) rather than one that already
 /// constructs its own [`RcpError`]. Every `(to, input)` pair not named
 /// below — including `to == `[`RequestLifecycleState::Finalized`] and
 /// every [`RequestLifecycleGuardInput::Standard`]/`ClearAll`/
@@ -2375,17 +3314,16 @@ fn request_lifecycle_transition_guard(
         (
             RequestLifecycleState::UnderExecution,
             RequestLifecycleGuardInput::Triggered {
-                endpoint_busy,
-                repeat,
-                occurrences_so_far,
+                step,
+                runtime,
+                elapsed,
+                endpoint_idle,
             },
         ) => {
-            if should_count_trigger_occurrence(*endpoint_busy)
-                && is_trigger_repeat_exhausted(*occurrences_so_far, *repeat)
-            {
-                Err(RcpError::RequestRejected)
-            } else {
+            if runtime.fire_ready(step, *elapsed, *endpoint_idle) {
                 Ok(())
+            } else {
+                Err(RcpError::RequestRejected)
             }
         }
         _ => Ok(()),
@@ -2815,68 +3753,133 @@ pub fn evaluate_request_storage_overflow(
 
 // ── Per-stream safety config: rx_enforce_seq / rx_seq_safestate_enable ──────
 
-/// The result of evaluating a candidate request's sequence number against
-/// `rx_enforce_seq`/`rx_seq_safestate_enable`: see
-/// [`evaluate_rx_enforce_seq`].
+/// The result of evaluating one received frame's AVTPDU `sequence_num`
+/// against a stream's [`SequenceTracker`] and its
+/// `rx_enforce_seq`/`rx_seq_safestate_enable` configuration: see
+/// [`SequenceTracker::evaluate`]. Mirrors c-RCP's `rcp_e2e_seq_result_t`
+/// (`c-RCP/include/rcp/e2e.h:816-822`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 //fusa:req REQ-SEQENF-001
-pub enum SequenceEnforcementOutcome {
-    /// Enforcement is disabled, or the candidate sequence number strictly
-    /// exceeds the last accepted one: queue the request.
-    Accepted,
-    /// Enforcement is enabled and violated, and `rx_seq_safestate_enable`
-    /// is `false` — reject the request, no safe-state consequence.
-    RejectedNoSafestate,
-    /// Enforcement is enabled and violated, and `rx_seq_safestate_enable`
-    /// is `true` — reject the request and drive every endpoint on this
-    /// stream to safe state.
-    RejectedSafestate,
+pub struct SequenceEnforcementOutcome {
+    /// The frame's requests may be filed for execution.
+    pub accept: bool,
+    /// `sequence_num` did not advance by exactly one from the previously
+    /// accepted value (never `true` on a stream's first frame).
+    pub discontinuity: bool,
+    /// `discontinuity && rx_seq_safestate_enable`: drive every endpoint on
+    /// this stream to its safe state.
+    pub enter_safe_state: bool,
 }
 
 impl SequenceEnforcementOutcome {
-    /// True for either rejected variant. Never panics for any input.
+    /// True iff the frame is rejected (`!accept`). Never panics.
     //fusa:req REQ-SEQENF-002
     pub fn is_rejected(&self) -> bool {
-        !matches!(self, Self::Accepted)
+        !self.accept
     }
 
-    /// True only for [`Self::RejectedSafestate`]. Never panics for any
-    /// input.
+    /// True iff this outcome drives the stream to safe state
+    /// (`enter_safe_state`) — independent of [`Self::is_rejected`]: an
+    /// accepted frame with a gap still drives safe state. Never panics.
     //fusa:req REQ-SEQENF-002
     pub fn drives_safestate(&self) -> bool {
-        matches!(self, Self::RejectedSafestate)
+        self.enter_safe_state
     }
 }
 
-/// The full `rx_enforce_seq`/`rx_seq_safestate_enable` rule: whether
-/// `candidate_seq` may be queued for execution at all, and whether a
-/// violation also drives the stream's endpoints to safe state.
+/// Caller-owned per-request-stream sequence tracker: the "previously
+/// accepted request on this stream" state TC18 §12.7.7 Table 24's
+/// `rx_enforce_seq`/`rx_seq_safestate_enable` are defined against. One
+/// instance per configured request stream; call [`Self::evaluate`] once per
+/// received frame (not once per ACF message inside it), as c-RCP's
+/// `frame_seq_gate_admits()` does (`c-RCP/src/mock.c:3038`).
 ///
-/// Returns [`SequenceEnforcementOutcome::Accepted`] when `rx_enforce_seq`
-/// is `false` (an unconditional exemption), or when `candidate_seq` is
-/// strictly greater than `last_accepted_seq`. Otherwise (enforcement
-/// enabled and `candidate_seq` does not strictly increase) returns
-/// [`SequenceEnforcementOutcome::RejectedSafestate`] or
-/// [`SequenceEnforcementOutcome::RejectedNoSafestate`], selected by
-/// `rx_seq_safestate_enable`. Never panics for any input. See this
-/// module's doc comment "Provenance note: the enforced sequence number's
-/// own wire field and width" for why `last_accepted_seq`/`candidate_seq`
-/// are plain caller-supplied `u32` values.
+/// Mirrors c-RCP's `rcp_e2e_seq_tracker_t`
+/// (`c-RCP/include/rcp/e2e.h:802-811`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+//fusa:req REQ-E2E-028
+pub struct SequenceTracker {
+    has_prev: bool,
+    prev_seq: u8,
+}
+
+impl SequenceTracker {
+    /// A fresh tracker with no previously accepted frame
+    /// (`rcp_e2e_seq_tracker_init()`).
+    //fusa:req REQ-E2E-028
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The last accepted `sequence_num`, or `None` before the first frame.
+    //fusa:req REQ-E2E-028
+    pub fn prev_seq(&self) -> Option<u8> {
+        self.has_prev.then_some(self.prev_seq)
+    }
+
+    /// Evaluate one received frame's 8-bit AVTPDU `sequence_num`.
+    ///
+    /// The first frame on a stream always accepts and is never a
+    /// discontinuity. Afterwards, with `fwd = seq.wrapping_sub(prev_seq)`
+    /// (forward distance mod 256): `accept = !rx_enforce_seq || (1..=127)
+    /// .contains(&fwd)` (RFC 1982 serial-number window, so 255 -> 0 is a
+    /// genuine advance); `discontinuity = fwd != 1`; `enter_safe_state =
+    /// discontinuity && rx_seq_safestate_enable`. The tracked value advances
+    /// only on accept, so a rejected (stale/replayed) frame never drags the
+    /// reference point backward. Mirrors `rcp_e2e_seq_evaluate()`
+    /// (`c-RCP/src/e2e.c:516-555`). Never panics for any input.
+    ///
+    /// c-RCP parity: `c-RCP/src/e2e.c:543-544` raises `enter_safe_state` on
+    /// *any* discontinuity — a forward gap (an accepted frame), a duplicate
+    /// or a reorder alike, and regardless of `rx_enforce_seq` — treating
+    /// `rx_seq_safestate_enable` as an independent bit. TC18 RC5 §12.7.7
+    /// Table 24 describes a single `rx_enforce_sequence` bit ("1b: stream
+    /// is blocked upon out of order reception and Safe state will be
+    /// entered"), i.e. safe state only on an out-of-order *rejection*. This
+    /// crate copies c-RCP's behaviour for byte-for-byte interop.
+    //fusa:req REQ-E2E-028
+    //fusa:req REQ-E2E-029
+    pub fn evaluate(
+        &mut self,
+        rx_enforce_seq: bool,
+        rx_seq_safestate_enable: bool,
+        seq: u8,
+    ) -> SequenceEnforcementOutcome {
+        if !self.has_prev {
+            self.has_prev = true;
+            self.prev_seq = seq;
+            return SequenceEnforcementOutcome {
+                accept: true,
+                discontinuity: false,
+                enter_safe_state: false,
+            };
+        }
+        let fwd_distance = seq.wrapping_sub(self.prev_seq);
+        let accept = !rx_enforce_seq || (1..=127).contains(&fwd_distance);
+        let discontinuity = fwd_distance != 1;
+        if accept {
+            self.prev_seq = seq;
+        }
+        SequenceEnforcementOutcome {
+            accept,
+            discontinuity,
+            enter_safe_state: discontinuity && rx_seq_safestate_enable,
+        }
+    }
+}
+
+/// The full `rx_enforce_seq`/`rx_seq_safestate_enable` rule as a free
+/// function over a stream's [`SequenceTracker`]: identical to
+/// [`SequenceTracker::evaluate`] (`rcp_e2e_seq_evaluate()`,
+/// `c-RCP/src/e2e.c:516`). Never panics for any input.
 //fusa:req REQ-SEQENF-003
 pub fn evaluate_rx_enforce_seq(
-    last_accepted_seq: u32,
-    candidate_seq: u32,
+    tracker: &mut SequenceTracker,
     rx_enforce_seq: bool,
     rx_seq_safestate_enable: bool,
+    seq: u8,
 ) -> SequenceEnforcementOutcome {
-    if !rx_enforce_seq || candidate_seq > last_accepted_seq {
-        return SequenceEnforcementOutcome::Accepted;
-    }
-    if rx_seq_safestate_enable {
-        SequenceEnforcementOutcome::RejectedSafestate
-    } else {
-        SequenceEnforcementOutcome::RejectedNoSafestate
-    }
+    tracker.evaluate(rx_enforce_seq, rx_seq_safestate_enable, seq)
 }
 
 // ── Per-stream safety config: the unifying safe-state action ────────────────
@@ -3818,13 +4821,668 @@ mod tests {
         }
     }
 
-    // ── should_count_trigger_occurrence ───────────────────────────────────────
+    // ── should_count_trigger_occurrence / TriggeredRuntime ────────────────────
+
+    fn trig_step() -> TriggeredStep {
+        TriggeredStep {
+            trigger_source_ep: 3,
+            trigger_signal_nr: 2,
+            trigger_threshold: 1,
+            exec_delay: 5,
+            repeat_count: 0,
+        }
+    }
 
     #[test]
     //fusa:test REQ-TRIG-005
-    fn should_count_trigger_occurrence_is_always_true_regardless_of_busy_state() {
-        assert!(should_count_trigger_occurrence(true));
-        assert!(should_count_trigger_occurrence(false));
+    fn should_count_trigger_occurrence_requires_matching_source_ep_and_signal_nr() {
+        let step = trig_step();
+        assert!(should_count_trigger_occurrence(&step, 3, 2));
+        assert!(!should_count_trigger_occurrence(&step, 4, 2));
+        assert!(!should_count_trigger_occurrence(&step, 3, 1));
+        assert!(!should_count_trigger_occurrence(&step, 2, 3));
+    }
+
+    /// Mirrors the c-RCP harness's `rcp_triggered_*` sequence (golden output
+    /// recorded from `librcp.a`: rec_unstarted 0, rec_wrong_ep 0,
+    /// rec_wrong_sig 0, rec_match 1 count=1, thr_after_1 0, tick_after_1 0,
+    /// thr_after_2 1, tick_delay4 0, tick_busy 0, tick_ok 1 count=0
+    /// started=0).
+    #[test]
+    //fusa:test REQ-TRIG-008
+    //fusa:test REQ-TRIG-009
+    //fusa:test REQ-TRIG-010
+    //fusa:test REQ-TRIG-011
+    //fusa:test REQ-TRIG-012
+    //fusa:test REQ-TRIG-013
+    fn triggered_runtime_matches_c_rcp_occurrence_threshold_and_fire_sequence() {
+        let s = trig_step();
+        let mut rt = TriggeredRuntime::default();
+        assert!(!rt.record_occurrence(&s, 3, 2), "not started");
+        rt.enter_started();
+        assert_eq!(
+            rt,
+            TriggeredRuntime {
+                occurrence_count: 0,
+                started: true
+            }
+        );
+        assert!(!rt.record_occurrence(&s, 4, 2), "wrong ep");
+        assert!(!rt.record_occurrence(&s, 3, 1), "wrong signal");
+        assert!(rt.record_occurrence(&s, 3, 2));
+        assert_eq!(rt.occurrence_count, 1);
+        assert!(!rt.threshold_reached(&s), "threshold 1 needs 2 occurrences");
+        assert!(!rt.tick(&s, 100, true));
+        assert!(rt.record_occurrence(&s, 3, 2));
+        assert!(rt.threshold_reached(&s));
+        assert!(!s.exec_delay_elapsed(4));
+        assert!(s.exec_delay_elapsed(5));
+        assert!(!rt.tick(&s, 4, true), "delay not elapsed");
+        assert!(!rt.tick(&s, 5, false), "endpoint busy");
+        assert_eq!(rt.occurrence_count, 2, "held ticks leave runtime unchanged");
+        assert!(rt.tick(&s, 5, true));
+        assert_eq!(
+            rt,
+            TriggeredRuntime {
+                occurrence_count: 0,
+                started: false
+            }
+        );
+        assert!(
+            !rt.record_occurrence(&s, 3, 2),
+            "fired request stops counting"
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-TRIG-010
+    fn triggered_threshold_zero_fires_on_first_occurrence() {
+        let s = TriggeredStep {
+            trigger_threshold: 0,
+            ..trig_step()
+        };
+        let mut rt = TriggeredRuntime::default();
+        rt.enter_started();
+        assert!(!rt.threshold_reached(&s));
+        rt.record_occurrence(&s, 3, 2);
+        assert!(rt.threshold_reached(&s));
+    }
+
+    // ── complete_repetition ───────────────────────────────────────────────────
+
+    #[test]
+    //fusa:test REQ-CMP-034
+    fn complete_repetition_mirrors_c_rcp_infinite_zero_and_decrement_rules() {
+        let mut inf = COMPOUND_REPEAT_INFINITE;
+        assert!(complete_repetition(&mut inf));
+        assert_eq!(inf, 0xFFFF);
+        assert_eq!(TRIGGERED_REPEAT_INFINITE, COMPOUND_REPEAT_INFINITE);
+        let mut last = 0u16;
+        assert!(!complete_repetition(&mut last));
+        assert_eq!(last, 0);
+        let mut two = 2u16;
+        assert!(complete_repetition(&mut two));
+        assert_eq!(two, 1);
+        assert!(complete_repetition(&mut two));
+        assert_eq!(two, 0);
+        assert!(!complete_repetition(&mut two));
+    }
+
+    // ── Conditional-request wire codecs: c-RCP golden vectors ─────────────────
+    //
+    // Every hex vector below was produced by a C harness linked against
+    // c-RCP's real `librcp.a` (`rcp_*_encode_*`), and every expected decode
+    // error by running c-RCP's own `rcp_*_decode_*` over the same bytes.
+
+    fn unhex(s: &str) -> Vec<u8> {
+        (0..s.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap())
+            .collect()
+    }
+
+    const V_COMPOUND_1: &str = "1a054123005a80000f0203011234ffffdeadbe00";
+    const V_COMPOUND_WAIT_SAFETY_2: &str = "1a0407ff900080008b0100ff00000007";
+    const V_TRIGGERED_1: &str = "1a06c005000980000e030204000a00010102030405000000";
+    const V_TRIGGERED_SAFETY_2: &str = "1a04000000ff80008effffffffffffff";
+    const V_CHAINED_1: &str = "1a05c0420107800001000000beef0000aa000000";
+    const V_CHAINED_2: &str = "1a040001000080000100000000000000";
+    const V_TIMED_1: &str = "1a058010000380000a00123456789abc09080000";
+    const V_TIMED_2: &str = "1a040000008080000a00ffffffffffff";
+    const V_CLEAR_NON_SAFESTATE: &str = "1a040055001180000600000000000000";
+    const V_CLEAR_ALL: &str = "1a040066002280000500000000000000";
+    const V_CLEAR_SINGLE: &str = "1a04007700338000070000ab00000000";
+
+    fn compound_1() -> CompoundRequest {
+        CompoundRequest {
+            request_type: RequestKind::Compound,
+            byte_bus_id: 0x123,
+            step: CompoundStep {
+                start_state: 2,
+                next_state: 3,
+                sequencer_index: 1,
+                exec_delay: 0x1234,
+                repeat_count: 0xFFFF,
+            },
+            evt: Evt::default(),
+            transaction_num: 0x5A,
+            payload: vec![0xDE, 0xAD, 0xBE],
+        }
+    }
+
+    fn compound_wait_safety_2() -> CompoundRequest {
+        CompoundRequest {
+            request_type: RequestKind::SafetyCompoundWait,
+            byte_bus_id: 0x7FF,
+            step: CompoundStep {
+                start_state: 1,
+                next_state: 0,
+                sequencer_index: 255,
+                exec_delay: 0,
+                repeat_count: 7,
+            },
+            evt: Evt {
+                ack: true,
+                sub_opcode: 1,
+            },
+            transaction_num: 0,
+            payload: vec![],
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-CMP-010
+    //fusa:test REQ-CMP-015
+    //fusa:test REQ-CMP-026
+    //fusa:test REQ-CMP-027
+    fn compound_codec_matches_c_rcp_golden_vectors_both_ways() {
+        for (req, hex) in [
+            (compound_1(), V_COMPOUND_1),
+            (compound_wait_safety_2(), V_COMPOUND_WAIT_SAFETY_2),
+        ] {
+            assert_eq!(encode_compound_request(&req).unwrap(), unhex(hex));
+            assert_eq!(decode_compound_request(&unhex(hex)).unwrap(), req);
+        }
+        for kind in [
+            RequestKind::Compound,
+            RequestKind::CompoundWait,
+            RequestKind::SafetyCompound,
+        ] {
+            let req = CompoundRequest {
+                request_type: kind,
+                ..compound_1()
+            };
+            let frame = encode_compound_request(&req).unwrap();
+            assert_eq!(peek_request_type(&frame), Ok(kind.to_u8()));
+            assert_eq!(decode_compound_request(&frame).unwrap(), req);
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-CMP-031
+    //fusa:test REQ-CMP-032
+    fn compound_encode_rejects_non_compound_kinds_and_oversized_payload() {
+        for kind in [
+            RequestKind::Triggered,
+            RequestKind::Chained,
+            RequestKind::Timed,
+            RequestKind::ClearAll,
+            RequestKind::Standard,
+        ] {
+            let req = CompoundRequest {
+                request_type: kind,
+                ..compound_1()
+            };
+            assert_eq!(
+                encode_compound_request(&req),
+                Err(RcpError::InvalidParameter)
+            );
+        }
+        // RCP_ACF_GBB_MAX_PAYLOAD = 511 * 4 - 16 = 2028: accepted; one more is not.
+        let max = CompoundRequest {
+            payload: vec![0; 2028],
+            ..compound_1()
+        };
+        assert!(encode_compound_request(&max).is_ok());
+        let over = CompoundRequest {
+            payload: vec![0; 2029],
+            ..compound_1()
+        };
+        assert_eq!(encode_compound_request(&over), Err(RcpError::InvalidSize));
+    }
+
+    #[test]
+    //fusa:test REQ-CMP-011
+    //fusa:test REQ-CMP-012
+    //fusa:test REQ-CMP-013
+    //fusa:test REQ-CMP-014
+    fn compound_decode_errors_match_c_rcp() {
+        use RequestCodecError::*;
+        let cases = [
+            ("1a054123005a80000f0203011234ff", ShortFrame),
+            ("1a054123005a80000f0203011234ffffdeadbe", ShortFrame),
+            ("1c054123005a80000f0203011234ffffdeadbe00", BadMsgType),
+            ("1a056123005a80000f0203011234ffffdeadbe00", NotRepurposed),
+            (V_TRIGGERED_1, UnknownType),
+        ];
+        for (hex, err) in cases {
+            assert_eq!(decode_compound_request(&unhex(hex)), Err(err), "{hex}");
+        }
+        // hs is not validated by c-RCP's compound decoder.
+        assert!(
+            decode_compound_request(&unhex("1a054123025a80000f0203011234ffffdeadbe00")).is_ok()
+        );
+        // acf_msg_length shorter than the GBB header is a short frame too.
+        let mut bad_len = unhex(V_COMPOUND_1);
+        bad_len[1] = 0x03;
+        assert_eq!(decode_compound_request(&bad_len), Err(ShortFrame));
+    }
+
+    #[test]
+    //fusa:test REQ-CMP-030
+    fn peek_request_type_matches_c_rcp() {
+        assert_eq!(peek_request_type(&unhex(V_CLEAR_SINGLE)), Ok(0x07));
+        assert_eq!(
+            peek_request_type(&unhex("1a04207700338000070000ab00000000")),
+            Err(RequestCodecError::NotRepurposed)
+        );
+        assert_eq!(
+            peek_request_type(&unhex("1c04007700338000070000ab00000000")),
+            Err(RequestCodecError::BadMsgType)
+        );
+        assert_eq!(
+            peek_request_type(&unhex(V_CLEAR_SINGLE)[..15]),
+            Err(RequestCodecError::ShortFrame)
+        );
+    }
+
+    fn triggered_1() -> TriggeredRequest {
+        TriggeredRequest {
+            request_type: RequestKind::Triggered,
+            byte_bus_id: 5,
+            step: TriggeredStep {
+                trigger_source_ep: 3,
+                trigger_signal_nr: 2,
+                trigger_threshold: 4,
+                exec_delay: 10,
+                repeat_count: 1,
+            },
+            transaction_num: 9,
+            payload: vec![1, 2, 3, 4, 5],
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-TRIG-007
+    //fusa:test REQ-TRIG-014
+    //fusa:test REQ-TRIG-015
+    fn triggered_codec_matches_c_rcp_golden_vectors_both_ways() {
+        let t2 = TriggeredRequest {
+            request_type: RequestKind::SafetyTriggered,
+            byte_bus_id: 0,
+            step: TriggeredStep {
+                trigger_source_ep: 0xFF,
+                trigger_signal_nr: 0xFF,
+                trigger_threshold: 0xFF,
+                exec_delay: 0xFFFF,
+                repeat_count: 0xFFFF,
+            },
+            transaction_num: 0xFF,
+            payload: vec![],
+        };
+        for (req, hex) in [(triggered_1(), V_TRIGGERED_1), (t2, V_TRIGGERED_SAFETY_2)] {
+            assert_eq!(encode_triggered_request(&req).unwrap(), unhex(hex));
+            assert_eq!(decode_triggered_request(&unhex(hex)).unwrap(), req);
+        }
+        let bad = TriggeredRequest {
+            request_type: RequestKind::Compound,
+            ..triggered_1()
+        };
+        assert_eq!(
+            encode_triggered_request(&bad),
+            Err(RcpError::InvalidParameter)
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-TRIG-006
+    //fusa:test REQ-TRIG-007
+    //fusa:test REQ-TRIG-016
+    fn triggered_decode_errors_match_c_rcp() {
+        use RequestCodecError::*;
+        for (hex, err) in [
+            (
+                "1a06e005000980000e030204000a00010102030405000000",
+                NotRepurposed,
+            ),
+            (V_COMPOUND_1, UnknownType),
+            ("1a06c005000980000e03", ShortFrame),
+            (
+                "1c06c005000980000e030204000a00010102030405000000",
+                BadMsgType,
+            ),
+        ] {
+            assert_eq!(decode_triggered_request(&unhex(hex)), Err(err), "{hex}");
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-CHAIN-004
+    //fusa:test REQ-CHAIN-007
+    //fusa:test REQ-CHAIN-013
+    fn chained_codec_matches_c_rcp_golden_vectors_both_ways() {
+        let m1 = ChainedMember {
+            byte_bus_id: 0x42,
+            chain_exec_delay: 0xBEEF,
+            cs: true,
+            transaction_num: 7,
+            payload: vec![0xAA],
+        };
+        let m2 = ChainedMember {
+            byte_bus_id: 1,
+            chain_exec_delay: 0,
+            cs: false,
+            transaction_num: 0,
+            payload: vec![],
+        };
+        for (m, hex) in [(m1.clone(), V_CHAINED_1), (m2, V_CHAINED_2)] {
+            assert_eq!(encode_chained_member(&m).unwrap(), unhex(hex));
+            assert_eq!(decode_chained_member(&unhex(hex)).unwrap(), m);
+        }
+        let over = ChainedMember {
+            payload: vec![0; 2029],
+            ..m1
+        };
+        assert_eq!(encode_chained_member(&over), Err(RcpError::InvalidSize));
+    }
+
+    #[test]
+    //fusa:test REQ-CHAIN-005
+    //fusa:test REQ-CHAIN-006
+    //fusa:test REQ-CHAIN-012
+    fn chained_decode_errors_match_c_rcp() {
+        use RequestCodecError::*;
+        for (hex, err) in [
+            ("1a05e0420107800001000000beef0000aa000000", NotRepurposed),
+            (V_TIMED_1, UnknownType),
+            ("1a05c0420107800001010000beef0000aa000000", ReservedNonzero),
+            ("1a05c0420107800001000000beef0080aa000000", ReservedNonzero),
+            ("1a05c04201", ShortFrame),
+        ] {
+            assert_eq!(decode_chained_member(&unhex(hex)), Err(err), "{hex}");
+        }
+        assert!(decode_chained_member(&unhex("1a05c0420307800001000000beef0000aa000000")).is_ok());
+    }
+
+    #[test]
+    //fusa:test REQ-TIMED-003
+    //fusa:test REQ-TIMED-005
+    fn timed_codec_matches_c_rcp_golden_vectors_both_ways() {
+        let t1 = TimedRequest {
+            byte_bus_id: 0x10,
+            presentation_time: 0x0000_1234_5678_9ABC,
+            transaction_num: 3,
+            payload: vec![9, 8],
+        };
+        let t2 = TimedRequest {
+            byte_bus_id: 0,
+            presentation_time: TIMED_PRESENTATION_TIME_MAX,
+            transaction_num: 0x80,
+            payload: vec![],
+        };
+        for (req, hex) in [(t1.clone(), V_TIMED_1), (t2, V_TIMED_2)] {
+            assert_eq!(encode_timed_request(&req).unwrap(), unhex(hex));
+            assert_eq!(decode_timed_request(&unhex(hex)).unwrap(), req);
+        }
+        let too_big = TimedRequest {
+            presentation_time: TIMED_PRESENTATION_TIME_MAX + 1,
+            ..t1
+        };
+        assert_eq!(
+            encode_timed_request(&too_big),
+            Err(RcpError::InvalidParameter)
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-TIMED-004
+    //fusa:test REQ-TIMED-005
+    //fusa:test REQ-TIMED-009
+    //fusa:test REQ-TIMED-010
+    fn timed_decode_errors_match_c_rcp() {
+        use RequestCodecError::*;
+        for (hex, err) in [
+            ("1a05a010000380000a00123456789abc09080000", NotRepurposed),
+            (V_CHAINED_1, UnknownType),
+            ("1a058010000380000a10123456789abc09080000", ReservedNonzero),
+            ("1a058010020380000a00123456789abc09080000", UnsupportedCmd),
+            ("1a058010010380000a00123456789abc09080000", UnsupportedCmd),
+            ("1a0580", ShortFrame),
+            ("1c058010000380000a00123456789abc09080000", BadMsgType),
+        ] {
+            assert_eq!(decode_timed_request(&unhex(hex)), Err(err), "{hex}");
+        }
+        // evt is not validated by c-RCP's timed decoder.
+        assert!(decode_timed_request(&unhex("1a058010100380000a00123456789abc09080000")).is_ok());
+    }
+
+    #[test]
+    //fusa:test REQ-CMP-016
+    //fusa:test REQ-CMP-017
+    //fusa:test REQ-CANCEL-005
+    //fusa:test REQ-CANCEL-007
+    //fusa:test REQ-CANCEL-016
+    fn cancellation_codecs_match_c_rcp_golden_vectors_both_ways() {
+        let cns = ClearRequest {
+            byte_bus_id: 0x55,
+            transaction_num: 0x11,
+        };
+        assert_eq!(
+            encode_clear_non_safestate(&cns).unwrap(),
+            unhex(V_CLEAR_NON_SAFESTATE)
+        );
+        assert_eq!(
+            decode_clear_non_safestate(&unhex(V_CLEAR_NON_SAFESTATE)),
+            Ok(cns)
+        );
+        let ca = ClearRequest {
+            byte_bus_id: 0x66,
+            transaction_num: 0x22,
+        };
+        assert_eq!(encode_clear_all(&ca).unwrap(), unhex(V_CLEAR_ALL));
+        assert_eq!(decode_clear_all(&unhex(V_CLEAR_ALL)), Ok(ca));
+        let cs = ClearSingleRequest {
+            byte_bus_id: 0x77,
+            clear_transaction_num: 0xAB,
+            transaction_num: 0x33,
+        };
+        assert_eq!(encode_clear_single(&cs).unwrap(), unhex(V_CLEAR_SINGLE));
+        assert_eq!(decode_clear_single(&unhex(V_CLEAR_SINGLE)), Ok(cs));
+        let bad_bus = ClearRequest {
+            byte_bus_id: 0x800,
+            transaction_num: 0,
+        };
+        assert_eq!(encode_clear_all(&bad_bus), Err(RcpError::InvalidSize));
+    }
+
+    #[test]
+    //fusa:test REQ-CMP-018
+    //fusa:test REQ-CMP-028
+    //fusa:test REQ-CMP-029
+    //fusa:test REQ-CANCEL-006
+    //fusa:test REQ-CANCEL-013
+    //fusa:test REQ-CANCEL-014
+    //fusa:test REQ-CANCEL-015
+    //fusa:test REQ-CANCEL-017
+    fn cancellation_decode_errors_match_c_rcp() {
+        use RequestCodecError::*;
+        type Dec = fn(&[u8]) -> Result<(), RequestCodecError>;
+        let cns: Dec = |b| decode_clear_non_safestate(b).map(|_| ());
+        let ca: Dec = |b| decode_clear_all(b).map(|_| ());
+        let csg: Dec = |b| decode_clear_single(b).map(|_| ());
+        let cases: [(Dec, &str, Result<(), RequestCodecError>); 21] = [
+            (cns, "1a042055001180000600000000000000", Err(NotRepurposed)),
+            (cns, V_CLEAR_ALL, Err(UnknownType)),
+            (
+                cns,
+                "1a040055001180000600000000000001",
+                Err(ReservedNonzero),
+            ),
+            (cns, "1a040055101180000600000000000000", Err(EvtHsCsNonzero)),
+            (cns, "1a040055801180000600000000000000", Ok(())),
+            (cns, "1a040055021180000600000000000000", Err(EvtHsCsNonzero)),
+            (cns, "1a040055011180000600000000000000", Err(EvtHsCsNonzero)),
+            (cns, "1a0400", Err(ShortFrame)),
+            (ca, V_CLEAR_NON_SAFESTATE, Err(UnknownType)),
+            (ca, "1a040066002280000501000000000000", Err(ReservedNonzero)),
+            (ca, "1a040066102280000500000000000000", Err(EvtHsCsNonzero)),
+            (ca, "1a040066802280000500000000000000", Ok(())),
+            (ca, "1a040066012280000500000000000000", Err(EvtHsCsNonzero)),
+            (ca, "1a042066002280000500000000000000", Err(NotRepurposed)),
+            (ca, "1c040066002280000500000000000000", Err(BadMsgType)),
+            (csg, V_CLEAR_ALL, Err(UnknownType)),
+            (
+                csg,
+                "1a04007700338000070001ab00000000",
+                Err(ReservedNonzero),
+            ),
+            (
+                csg,
+                "1a04007700338000070000ab01000000",
+                Err(ReservedNonzero),
+            ),
+            (csg, "1a04007702338000070000ab00000000", Err(EvtHsCsNonzero)),
+            (csg, "1a04007780338000070000ab00000000", Ok(())),
+            (csg, "1a04207700338000070000ab00000000", Err(NotRepurposed)),
+        ];
+        for (dec, hex, expected) in cases {
+            assert_eq!(dec(&unhex(hex)), expected, "{hex}");
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-CMP-033
+    fn request_codec_errors_have_distinct_messages_and_send_no_response() {
+        use RequestCodecError::*;
+        let all = [
+            ShortFrame,
+            BadMsgType,
+            NotRepurposed,
+            UnknownType,
+            ReservedNonzero,
+            EvtHsCsNonzero,
+            UnsupportedCmd,
+        ];
+        let msgs: std::collections::HashSet<String> = all.iter().map(|e| e.to_string()).collect();
+        assert_eq!(msgs.len(), all.len());
+        for e in all {
+            assert!(e.to_string().starts_with("rcp/request: "));
+            // c-RCP parity: a conditional request that fails to decode gets
+            // no error response at all.
+            assert_eq!(e.response_error(), None);
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-CMP-011
+    //fusa:test REQ-TRIG-016
+    //fusa:test REQ-CHAIN-005
+    //fusa:test REQ-TIMED-004
+    //fusa:test REQ-CANCEL-017
+    fn conditional_decoders_never_panic_on_truncations_of_every_vector() {
+        for hex in [
+            V_COMPOUND_1,
+            V_TRIGGERED_1,
+            V_CHAINED_1,
+            V_TIMED_1,
+            V_CLEAR_NON_SAFESTATE,
+            V_CLEAR_ALL,
+            V_CLEAR_SINGLE,
+        ] {
+            let b = unhex(hex);
+            for n in 0..=b.len() {
+                let p = &b[..n];
+                let _ = peek_request_type(p);
+                let _ = decode_compound_request(p);
+                let _ = decode_triggered_request(p);
+                let _ = decode_chained_member(p);
+                let _ = decode_timed_request(p);
+                let _ = decode_clear_non_safestate(p);
+                let _ = decode_clear_all(p);
+                let _ = decode_clear_single(p);
+            }
+        }
+    }
+
+    // ── SequencerBank ownership (REQ-SEQ-013 / REQ-WIREERR-005) ──────────────
+
+    /// Golden table from c-RCP's real `rcp_sequencer_access_check()` /
+    /// `rcp_sequencer_wire_error()` over a 3-sequencer table with owner[1]=2,
+    /// owner[2]=0xFF, owner[0] unclaimed, for idx 0..4 x requester 0..3.
+    #[test]
+    //fusa:test REQ-SEQ-013
+    //fusa:test REQ-WIREERR-005
+    fn sequencer_access_check_matches_c_rcp_golden_table() {
+        let mut bank = SequencerBank::new(3);
+        assert_eq!(bank.owner(0), Ok(SEQUENCER_OWNER_UNCLAIMED));
+        bank.set_owner(1, 2).unwrap();
+        bank.set_owner(2, 0xFF).unwrap();
+        assert_eq!(bank.set_owner(3, 1), Err(RcpError::SequencerNotKnown));
+        assert_eq!(bank.owner(3), Err(RcpError::SequencerNotKnown));
+        for idx in 0u8..4 {
+            for req in 0u8..3 {
+                let (expected, wire) = match (idx, req) {
+                    (3, _) => (SequencerAccess::Unknown, Some(2u8)),
+                    (1, 2) => (SequencerAccess::Permitted, None),
+                    _ => (SequencerAccess::Denied, Some(3u8)),
+                };
+                let got = bank.access_check(idx, req);
+                assert_eq!(got, expected, "idx={idx} req={req}");
+                assert_eq!(got.wire_error().and_then(|e| e.tc18_wire_code()), wire);
+                assert_eq!(
+                    bank.access_permitted(idx, req),
+                    expected == SequencerAccess::Permitted
+                );
+            }
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-SEQ-013
+    //fusa:test REQ-WIREERR-005
+    fn check_compound_admission_enforces_ownership_and_skips_an_empty_bank() {
+        let step = CompoundStep {
+            sequencer_index: 1,
+            ..CompoundStep::default()
+        };
+        // No sequencers at all: the ownership gate is skipped (mock.c:1649).
+        assert_eq!(
+            SequencerBank::new(0).check_compound_admission(&step, 0),
+            Ok(())
+        );
+        let mut bank = SequencerBank::new(2);
+        // Unclaimed: fail-closed.
+        assert_eq!(
+            bank.check_compound_admission(&step, 1),
+            Err(RcpError::UnauthorizedAccess)
+        );
+        bank.set_owner(1, 1).unwrap();
+        assert_eq!(bank.check_compound_admission(&step, 1), Ok(()));
+        assert_eq!(
+            bank.check_compound_admission(&step, 2),
+            Err(RcpError::UnauthorizedAccess)
+        );
+        let unknown = CompoundStep {
+            sequencer_index: 2,
+            ..step
+        };
+        assert_eq!(
+            bank.check_compound_admission(&unknown, 1),
+            Err(RcpError::SequencerNotKnown)
+        );
+        // Ownership is independent of the state registers.
+        bank.force_state(1, SequencerState(9)).unwrap();
+        assert_eq!(bank.owner(1), Ok(1));
     }
 
     // ── check_chain_continuation ──────────────────────────────────────────────
@@ -4351,9 +6009,10 @@ mod tests {
             RequestLifecycleGuardInput::ClearNonSafestate,
             RequestLifecycleGuardInput::ClearSingle,
             RequestLifecycleGuardInput::Triggered {
-                endpoint_busy: true,
-                repeat: TriggerRepeatCount::Finite(0),
-                occurrences_so_far: 0,
+                step: TriggeredStep::default(),
+                runtime: TriggeredRuntime::default(),
+                elapsed: 0,
+                endpoint_idle: true,
             },
         ] {
             assert_eq!(
@@ -4510,40 +6169,48 @@ mod tests {
     #[test]
     //fusa:test REQ-RLC-002
     //fusa:test REQ-RLC-004
-    fn try_transition_started_to_under_execution_gates_triggered_on_repeat_exhaustion() {
-        let not_exhausted = RequestLifecycleGuardInput::Triggered {
-            endpoint_busy: true,
-            repeat: TriggerRepeatCount::Finite(3),
-            occurrences_so_far: 2,
+    fn try_transition_started_to_under_execution_gates_triggered_on_fire_readiness() {
+        let step = TriggeredStep {
+            trigger_source_ep: 3,
+            trigger_signal_nr: 2,
+            trigger_threshold: 1,
+            exec_delay: 5,
+            repeat_count: 0,
+        };
+        let mut runtime = TriggeredRuntime::default();
+        runtime.enter_started();
+        runtime.record_occurrence(&step, 3, 2);
+        runtime.record_occurrence(&step, 3, 2);
+        let input = |runtime, elapsed, endpoint_idle| RequestLifecycleGuardInput::Triggered {
+            step,
+            runtime,
+            elapsed,
+            endpoint_idle,
+        };
+        let hop = |i: &RequestLifecycleGuardInput| {
+            RequestLifecycleState::Started.try_transition(RequestLifecycleState::UnderExecution, i)
         };
         assert_eq!(
-            RequestLifecycleState::Started
-                .try_transition(RequestLifecycleState::UnderExecution, &not_exhausted),
+            hop(&input(runtime, 5, true)),
             Ok(RequestLifecycleState::UnderExecution)
         );
-
-        let exhausted = RequestLifecycleGuardInput::Triggered {
-            endpoint_busy: true,
-            repeat: TriggerRepeatCount::Finite(3),
-            occurrences_so_far: 3,
-        };
+        // Delay not yet elapsed, endpoint busy, or threshold not reached: held.
         assert_eq!(
-            RequestLifecycleState::Started
-                .try_transition(RequestLifecycleState::UnderExecution, &exhausted),
+            hop(&input(runtime, 4, true)),
             Err(RcpError::RequestRejected)
         );
-
-        let infinite_never_exhausts = RequestLifecycleGuardInput::Triggered {
-            endpoint_busy: false,
-            repeat: TriggerRepeatCount::Infinite,
-            occurrences_so_far: u16::MAX,
-        };
         assert_eq!(
-            RequestLifecycleState::Started.try_transition(
-                RequestLifecycleState::UnderExecution,
-                &infinite_never_exhausts
-            ),
-            Ok(RequestLifecycleState::UnderExecution)
+            hop(&input(runtime, 5, false)),
+            Err(RcpError::RequestRejected)
+        );
+        let mut one = TriggeredRuntime::default();
+        one.enter_started();
+        one.record_occurrence(&step, 3, 2);
+        assert_eq!(hop(&input(one, 5, true)), Err(RcpError::RequestRejected));
+        // Not started: never fires.
+        assert_eq!(
+            hop(&input(TriggeredRuntime::default(), 5, true)),
+            Err(RcpError::RequestRejected)
         );
     }
 
@@ -4577,9 +6244,10 @@ mod tests {
                 svr_sequencers_max: 0,
             },
             RequestLifecycleGuardInput::Triggered {
-                endpoint_busy: true,
-                repeat: TriggerRepeatCount::Finite(0),
-                occurrences_so_far: 0,
+                step: TriggeredStep::default(),
+                runtime: TriggeredRuntime::default(),
+                elapsed: 0,
+                endpoint_idle: true,
             },
             RequestLifecycleGuardInput::Compound {
                 current_sequencer_state: SequencerState(9),
@@ -4622,9 +6290,10 @@ mod tests {
                 svr_sequencers_max: 1,
             },
             RequestLifecycleGuardInput::Triggered {
-                endpoint_busy: false,
-                repeat: TriggerRepeatCount::Infinite,
-                occurrences_so_far: 0,
+                step: TriggeredStep::default(),
+                runtime: TriggeredRuntime::default(),
+                elapsed: 0,
+                endpoint_idle: true,
             },
             RequestLifecycleGuardInput::Compound {
                 current_sequencer_state: SequencerState(0),
@@ -5182,71 +6851,167 @@ mod tests {
 
     // ── Per-stream safety config: rx_enforce_seq / rx_seq_safestate_enable ───
 
+    fn seq_outcome(
+        accept: bool,
+        discontinuity: bool,
+        enter_safe_state: bool,
+    ) -> SequenceEnforcementOutcome {
+        SequenceEnforcementOutcome {
+            accept,
+            discontinuity,
+            enter_safe_state,
+        }
+    }
+
     #[test]
+    //fusa:test REQ-E2E-028
     //fusa:test REQ-SEQENF-001
-    //fusa:test REQ-SEQENF-003
-    fn evaluate_rx_enforce_seq_accepts_when_disabled_regardless_of_ordering() {
-        assert_eq!(
-            evaluate_rx_enforce_seq(10, 5, false, false),
-            SequenceEnforcementOutcome::Accepted
-        );
-        assert_eq!(
-            evaluate_rx_enforce_seq(10, 5, false, true),
-            SequenceEnforcementOutcome::Accepted
-        );
+    fn sequence_tracker_first_frame_always_accepts_without_discontinuity() {
+        for en in [false, true] {
+            for ss in [false, true] {
+                let mut t = SequenceTracker::new();
+                assert_eq!(t.prev_seq(), None);
+                assert_eq!(t.evaluate(en, ss, 77), seq_outcome(true, false, false));
+                assert_eq!(t.prev_seq(), Some(77));
+            }
+        }
     }
 
     #[test]
+    //fusa:test REQ-E2E-028
     //fusa:test REQ-SEQENF-003
-    fn evaluate_rx_enforce_seq_accepts_strictly_increasing_sequence() {
+    fn sequence_tracker_accepts_the_255_to_0_wrap_as_a_single_increment() {
+        let mut t = SequenceTracker::new();
+        t.evaluate(true, true, 254);
+        assert_eq!(t.evaluate(true, true, 255), seq_outcome(true, false, false));
         assert_eq!(
-            evaluate_rx_enforce_seq(5, 6, true, true),
-            SequenceEnforcementOutcome::Accepted
+            evaluate_rx_enforce_seq(&mut t, true, true, 0),
+            seq_outcome(true, false, false)
         );
+        assert_eq!(t.evaluate(true, true, 1), seq_outcome(true, false, false));
+        assert_eq!(t.prev_seq(), Some(1));
     }
 
     #[test]
-    //fusa:test REQ-SEQENF-003
-    fn evaluate_rx_enforce_seq_rejects_equal_or_decreasing_sequence() {
+    //fusa:test REQ-E2E-028
+    //fusa:test REQ-E2E-029
+    fn sequence_tracker_window_edge_plus_127_accepts_plus_128_rejects() {
+        // +127 is the last forward distance inside the RFC 1982 window: accepted,
+        // but a discontinuity (gap), so safe state when enabled.
+        let mut t = SequenceTracker::new();
+        t.evaluate(true, true, 200);
         assert_eq!(
-            evaluate_rx_enforce_seq(5, 5, true, false),
-            SequenceEnforcementOutcome::RejectedNoSafestate
+            t.evaluate(true, true, 200u8.wrapping_add(127)),
+            seq_outcome(true, true, true)
         );
+        assert_eq!(t.prev_seq(), Some(200u8.wrapping_add(127)));
+
+        // +128 is outside the window: rejected, prev_seq unchanged.
+        let mut t = SequenceTracker::new();
+        t.evaluate(true, false, 200);
         assert_eq!(
-            evaluate_rx_enforce_seq(5, 4, true, false),
-            SequenceEnforcementOutcome::RejectedNoSafestate
+            t.evaluate(true, false, 200u8.wrapping_add(128)),
+            seq_outcome(false, true, false)
         );
-        assert_eq!(
-            evaluate_rx_enforce_seq(5, 5, true, true),
-            SequenceEnforcementOutcome::RejectedSafestate
-        );
+        assert_eq!(t.prev_seq(), Some(200));
+    }
+
+    #[test]
+    //fusa:test REQ-E2E-028
+    //fusa:test REQ-E2E-029
+    fn sequence_tracker_rejects_duplicates_and_flags_safe_state_on_them() {
+        let mut t = SequenceTracker::new();
+        t.evaluate(true, true, 9);
+        let dup = t.evaluate(true, true, 9);
+        assert_eq!(dup, seq_outcome(false, true, true));
+        assert!(dup.is_rejected());
+        assert!(dup.drives_safestate());
+        // With rx_enforce_seq off a duplicate is still accepted (and still a
+        // discontinuity) — c-RCP parity: safe state is independent of accept.
+        let mut t = SequenceTracker::new();
+        t.evaluate(false, true, 9);
+        let dup = t.evaluate(false, true, 9);
+        assert_eq!(dup, seq_outcome(true, true, true));
+        assert!(!dup.is_rejected());
+        assert!(dup.drives_safestate());
     }
 
     #[test]
     //fusa:test REQ-SEQENF-002
-    fn sequence_enforcement_outcome_predicates_agree_with_variant_identity() {
-        assert!(!SequenceEnforcementOutcome::Accepted.is_rejected());
-        assert!(!SequenceEnforcementOutcome::Accepted.drives_safestate());
-        assert!(SequenceEnforcementOutcome::RejectedNoSafestate.is_rejected());
-        assert!(!SequenceEnforcementOutcome::RejectedNoSafestate.drives_safestate());
-        assert!(SequenceEnforcementOutcome::RejectedSafestate.is_rejected());
-        assert!(SequenceEnforcementOutcome::RejectedSafestate.drives_safestate());
+    fn sequence_enforcement_outcome_predicates_read_their_fields() {
+        assert!(!seq_outcome(true, false, false).is_rejected());
+        assert!(!seq_outcome(true, false, false).drives_safestate());
+        assert!(seq_outcome(false, true, false).is_rejected());
+        assert!(!seq_outcome(false, true, false).drives_safestate());
+        assert!(!seq_outcome(true, true, true).is_rejected());
+        assert!(seq_outcome(true, true, true).drives_safestate());
+    }
+
+    /// Golden vectors generated from c-RCP's real `rcp_e2e_seq_evaluate()`
+    /// (`c-RCP/src/e2e.c:516`) by a C harness linked against `librcp.a`:
+    /// per `(rx_enforce_seq, rx_seq_safestate_enable)`, the `(accept,
+    /// discontinuity, enter_safe_state)` triple for each seq in `SEQS`, and
+    /// the tracker's final `prev_seq`.
+    #[test]
+    //fusa:test REQ-E2E-028
+    //fusa:test REQ-E2E-029
+    //fusa:test REQ-SEQENF-001
+    //fusa:test REQ-SEQENF-003
+    fn sequence_tracker_matches_c_rcp_golden_vectors() {
+        const SEQS: [u8; 13] = [250, 251, 255, 0, 1, 1, 0, 128, 129, 2, 3, 131, 4];
+        let golden: [(bool, bool, &str, u8); 4] = [
+            (
+                false,
+                false,
+                "100 100 110 100 100 110 110 110 100 110 100 110 110",
+                4,
+            ),
+            (
+                false,
+                true,
+                "100 100 111 100 100 111 111 111 100 111 100 111 111",
+                4,
+            ),
+            (
+                true,
+                false,
+                "100 100 110 100 100 010 010 110 100 010 010 110 010",
+                131,
+            ),
+            (
+                true,
+                true,
+                "100 100 111 100 100 011 011 111 100 011 011 111 011",
+                131,
+            ),
+        ];
+        for (en, ss, expected, prev) in golden {
+            let mut t = SequenceTracker::new();
+            let got: Vec<String> = SEQS
+                .iter()
+                .map(|&seq| {
+                    let r = t.evaluate(en, ss, seq);
+                    format!(
+                        "{}{}{}",
+                        r.accept as u8, r.discontinuity as u8, r.enter_safe_state as u8
+                    )
+                })
+                .collect();
+            assert_eq!(got.join(" "), expected, "en={en} ss={ss}");
+            assert_eq!(t.prev_seq(), Some(prev), "en={en} ss={ss}");
+        }
     }
 
     #[test]
     //fusa:test REQ-SEQENF-003
-    fn evaluate_rx_enforce_seq_never_panics_for_any_sampled_input() {
-        let seqs = [0u32, 1, 5, u32::MAX];
-        for &last in &seqs {
-            for &candidate in &seqs {
-                for rx_enforce_seq in [false, true] {
-                    for rx_seq_safestate_enable in [false, true] {
-                        let _ = evaluate_rx_enforce_seq(
-                            last,
-                            candidate,
-                            rx_enforce_seq,
-                            rx_seq_safestate_enable,
-                        );
+    fn evaluate_rx_enforce_seq_never_panics_for_any_input() {
+        for prev in 0..=u8::MAX {
+            for seq in [0u8, 1, 127, 128, 255] {
+                for en in [false, true] {
+                    for ss in [false, true] {
+                        let mut t = SequenceTracker::new();
+                        t.evaluate(en, ss, prev);
+                        let _ = evaluate_rx_enforce_seq(&mut t, en, ss, seq);
                     }
                 }
             }
