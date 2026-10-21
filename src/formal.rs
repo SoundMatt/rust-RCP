@@ -146,15 +146,17 @@ mod tests {
     /// spec's safety properties.
     mod refinement {
         use super::super::*;
-        use crate::lifecycle::{is_register_writable, RcServerState, RegisterCategory};
+        use crate::lifecycle::{
+            check_hw_cfg, check_rcp_cfg, is_register_writable, EndpointPlausibility,
+            PlausibilitySnapshot, RcServerState, RegisterCategory, WriterCtx,
+        };
         use crate::request::{
             check_watchdog_overflow_purge, purge_normal_priority_on_watchdog_overflow,
             try_force_cancel_all, try_force_cancel_non_safestate, try_force_cancel_single,
             ClearTransactionNum, CompoundGateConfig, PendingRequestKey, RequestKind,
             RequestLifecycleGuardInput, RequestLifecycleState, SequencerState, TimedExecutionTime,
-            TriggerRepeatCount,
+            TriggeredRuntime, TriggeredStep,
         };
-        use crate::timestamp::AvtpTimestamp;
         use std::collections::{BTreeSet, VecDeque};
 
         // ── tla/LifecycleStateMachine.tla ────────────────────────────────
@@ -185,55 +187,95 @@ mod tests {
         }
 
         /// The spec's `Next` (plus stuttering), as a predicate on a step.
+        /// Stuttering is the `revise_hw` case with an unchanged input.
         fn lifecycle_spec_next(pre: LcState, post: LcState) -> bool {
-            use RcServerState::*;
             let inputs_same = pre.hw == post.hw && pre.rcp == post.rcp;
             let state_same = pre.state == post.state;
             let lock_same = pre.locked() == post.locked();
             let revise_hw = state_same && pre.rcp == post.rcp && lock_same;
             let revise_rcp = state_same && pre.hw == post.hw && lock_same;
-            let (from, to) = (pre.server(), post.server());
-            let action = inputs_same
-                && match (from, to) {
-                    // PromoteToHwConfigured
-                    (HwUnconfigured, HwConfigured) => pre.hw && lock_same,
-                    // PromoteToRcpConfigured
-                    (HwConfigured, RcpConfigured) => pre.rcp && post.locked(),
-                    // DemoteToHwUnconfigured
-                    (HwConfigured, HwUnconfigured) => lock_same,
-                    // DemoteRcpToHwConfigured / FullReset
-                    (RcpConfigured, HwConfigured) | (RcpConfigured, HwUnconfigured) => {
-                        !post.locked()
-                    }
-                    _ => false,
-                };
-            (state_same && inputs_same && lock_same) || revise_hw || revise_rcp || action
+            let action = inputs_same && lifecycle_spec_action(pre, post);
+            revise_hw || revise_rcp || action
+        }
+
+        /// The spec's five state-changing actions, ignoring `UNCHANGED`
+        /// on the two inputs (checked by the caller).
+        fn lifecycle_spec_action(pre: LcState, post: LcState) -> bool {
+            use RcServerState::*;
+            let lock_same = pre.locked() == post.locked();
+            match (pre.server(), post.server()) {
+                // PromoteToHwConfigured
+                (HwUnconfigured, HwConfigured) => pre.hw && lock_same,
+                // PromoteToRcpConfigured
+                (HwConfigured, RcpConfigured) => pre.rcp && post.locked(),
+                // DemoteToHwUnconfigured
+                (HwConfigured, HwUnconfigured) => lock_same,
+                // DemoteRcpToHwConfigured / FullReset
+                (RcpConfigured, HwConfigured) | (RcpConfigured, HwUnconfigured) => !post.locked(),
+                _ => false,
+            }
+        }
+
+        /// A one-endpoint plausibility snapshot whose [`check_hw_cfg`]
+        /// verdict is `hw` and whose [`check_rcp_cfg`] verdict is `rcp`:
+        /// the HW check reads only `hw_pin_mapped`/`has_request_stream`,
+        /// the RCP check only `has_stream_assoc` (no request stream is
+        /// configured, so the stream-consistency half holds vacuously).
+        fn snapshot_endpoint(hw: bool, rcp: bool) -> [EndpointPlausibility; 1] {
+            [EndpointPlausibility {
+                ep_used: true,
+                hw_pin_mapped: hw,
+                has_request_stream: true,
+                has_stream_assoc: rcp,
+                request_stream_index: 0,
+            }]
+        }
+
+        /// Every writer context (all 32 flag combinations).
+        fn all_writers() -> Vec<WriterCtx> {
+            (0u8..32)
+                .map(|m| WriterCtx {
+                    via_root_client_ep0: m & 1 != 0,
+                    via_owning_stream: m & 2 != 0,
+                    via_non_unicast_frame: m & 4 != 0,
+                    via_discovery_stream: m & 8 != 0,
+                    via_valid_stream_association: m & 16 != 0,
+                })
+                .collect()
         }
 
         /// Successors of `s` as the real code produces them: the two
         /// environment inputs revised freely, and `try_transition` towards
-        /// every target. The consistency closure returns the gating input
-        /// for the two guarded promote shapes and `true` (the most
-        /// permissive environment) for every other shape, so a forbidden
-        /// step can never be masked by the closure.
+        /// every target under a plausibility snapshot whose two verdicts
+        /// are exactly the spec's two inputs, for every writer context and
+        /// both idleness verdicts. Authorization and idleness only ever
+        /// remove steps, so enumerating all of them (including the most
+        /// permissive) cannot mask a forbidden step.
         fn lifecycle_successors(s: LcState) -> Vec<LcState> {
             let mut out = Vec::new();
             for b in [false, true] {
                 out.push(LcState { hw: b, ..s });
                 out.push(LcState { rcp: b, ..s });
             }
+            let eps = snapshot_endpoint(s.hw, s.rcp);
+            let snap = PlausibilitySnapshot {
+                endpoints: &eps,
+                request_streams: &[],
+                response_stream_count: 0,
+            };
+            assert_eq!(check_hw_cfg(Some(&snap)).is_ok(), s.hw);
+            assert_eq!(check_rcp_cfg(Some(&snap)).is_ok(), s.rcp);
+            let from = s.server();
             for target in LIFECYCLE_STATES {
-                let from = s.server();
-                let gate = move || match (from, target) {
-                    (RcServerState::HwUnconfigured, RcServerState::HwConfigured) => s.hw,
-                    (RcServerState::HwConfigured, RcServerState::RcpConfigured) => s.rcp,
-                    _ => true,
-                };
-                if let Ok(next) = from.try_transition(target, gate) {
-                    out.push(LcState {
-                        state: next.to_u8(),
-                        ..s
-                    });
+                for writer in all_writers() {
+                    for idle in [false, true] {
+                        if let Ok(next) = from.try_transition(target, Some(&snap), writer, idle) {
+                            out.push(LcState {
+                                state: next.to_u8(),
+                                ..s
+                            });
+                        }
+                    }
                 }
             }
             out
@@ -280,7 +322,19 @@ mod tests {
             let states: BTreeSet<u8> = reachable.iter().map(|s| s.state).collect();
             assert_eq!(states.len(), 3, "reachable: {reachable:?}");
 
-            let step_invariants: Vec<Invariant<(LcState, LcState)>> = vec![
+            let step_invariants = lifecycle_step_invariants();
+            for inv in &step_invariants {
+                assert_eq!(witness(&steps, inv), None, "{} violated", inv.name);
+            }
+            for step in &steps {
+                assert!(check_all(step, &step_invariants).all_passed());
+            }
+            assert_eventually_rcp_configured(&reachable);
+        }
+
+        /// The spec's `Next` plus its step-level safety properties.
+        fn lifecycle_step_invariants() -> Vec<Invariant<(LcState, LcState)>> {
+            vec![
                 Invariant::new("Next", |(a, b): &(LcState, LcState)| {
                     lifecycle_spec_next(*a, *b)
                 }),
@@ -298,17 +352,13 @@ mod tests {
                             || b.locked()
                     },
                 ),
-            ];
-            for inv in &step_invariants {
-                assert_eq!(witness(&steps, inv), None, "{} violated", inv.name);
-            }
-            for step in &steps {
-                assert!(check_all(step, &step_invariants).all_passed());
-            }
+            ]
+        }
 
-            // LP1 (bounded form): with both inputs consistent and held
-            // fixed, RcpConfigured is reachable from every reachable state
-            // through implementation steps alone.
+        /// LP1 (bounded form): with both inputs consistent and held fixed,
+        /// RcpConfigured is reachable from every reachable state through
+        /// implementation steps alone.
+        fn assert_eventually_rcp_configured(reachable: &BTreeSet<LcState>) {
             for &start in reachable.iter().filter(|s| s.hw && s.rcp) {
                 let mut seen = BTreeSet::from([start]);
                 let mut queue = VecDeque::from([start]);
@@ -402,8 +452,8 @@ mod tests {
             ];
             for (current, exec) in [(50, 100), (100, 100), (200, 100)] {
                 v.push(RequestLifecycleGuardInput::Timed {
-                    current: AvtpTimestamp(current),
-                    exec_time: TimedExecutionTime(AvtpTimestamp(exec)),
+                    current,
+                    exec_time: TimedExecutionTime::new(exec).unwrap(),
                 });
             }
             for cs in [false, true] {
@@ -414,14 +464,25 @@ mod tests {
                     });
                 }
             }
-            for endpoint_busy in [false, true] {
-                for occurrences_so_far in [0, 1, 5] {
-                    for repeat in [TriggerRepeatCount::Finite(1), TriggerRepeatCount::Infinite] {
-                        v.push(RequestLifecycleGuardInput::Triggered {
-                            endpoint_busy,
-                            repeat,
-                            occurrences_so_far,
-                        });
+            let step = TriggeredStep {
+                trigger_threshold: 1,
+                exec_delay: 2,
+                ..TriggeredStep::default()
+            };
+            for started in [false, true] {
+                for occurrence_count in [0, 1, 2] {
+                    for elapsed in [1, 2] {
+                        for endpoint_idle in [false, true] {
+                            v.push(RequestLifecycleGuardInput::Triggered {
+                                step,
+                                runtime: TriggeredRuntime {
+                                    occurrence_count,
+                                    started,
+                                },
+                                elapsed,
+                                endpoint_idle,
+                            });
+                        }
                     }
                 }
             }
@@ -442,6 +503,83 @@ mod tests {
             v
         }
 
+        /// `try_transition` towards every target under every guard input,
+        /// as `(post, cause)` pairs.
+        fn guarded_hops(
+            pre: RequestLifecycleState,
+            inputs: &[RequestLifecycleGuardInput],
+        ) -> Vec<(RequestLifecycleState, Cause)> {
+            let mut out = Vec::new();
+            for target in REQUEST_STATES {
+                for input in inputs {
+                    if let Ok(post) = pre.try_transition(target, input) {
+                        let cause = if post == RequestLifecycleState::Finalized {
+                            Cause::Completed
+                        } else {
+                            Cause::None
+                        };
+                        out.push((post, cause));
+                    }
+                }
+            }
+            out
+        }
+
+        /// `cause` if `post` moved off `pre`, else a stutter.
+        fn caused(
+            pre: RequestLifecycleState,
+            post: RequestLifecycleState,
+            cause: Cause,
+        ) -> (RequestLifecycleState, Cause) {
+            (post, if post != pre { cause } else { Cause::None })
+        }
+
+        /// The three cancellation functions applied to `pre`.
+        fn cancel_steps(
+            pre: RequestLifecycleState,
+            safestate_related: bool,
+        ) -> Vec<(RequestLifecycleState, Cause)> {
+            let mut out = Vec::new();
+            let mut s = pre;
+            let _ = try_force_cancel_all(&mut s);
+            out.push(caused(pre, s, Cause::ClearAll));
+            let mut s = pre;
+            let _ = try_force_cancel_non_safestate(&mut s, safestate_related);
+            out.push(caused(pre, s, Cause::ClearNonSafestate));
+            for candidate in [3u8, 4] {
+                let mut s = pre;
+                let _ = try_force_cancel_single(&mut s, candidate, ClearTransactionNum(3));
+                out.push(caused(pre, s, Cause::ClearSingle));
+            }
+            out
+        }
+
+        /// The watchdog purge applied to `pre`. The single-request rule and
+        /// its slice composition must agree; a purge finalizes the request.
+        fn purge_steps(
+            pre: RequestLifecycleState,
+            kind: RequestKind,
+        ) -> Vec<(RequestLifecycleState, Cause)> {
+            let mut out = Vec::new();
+            for overflowed in [false, true] {
+                let single = check_watchdog_overflow_purge(kind, overflowed).is_err();
+                let key = PendingRequestKey {
+                    kind,
+                    arrival_seq: 0,
+                };
+                let (_, purged) = purge_normal_priority_on_watchdog_overflow(&[key], overflowed);
+                assert_eq!(
+                    single,
+                    purged == vec![0],
+                    "{kind:?} overflowed={overflowed}"
+                );
+                if single && pre != RequestLifecycleState::Finalized {
+                    out.push((RequestLifecycleState::Finalized, Cause::WatchdogPurge));
+                }
+            }
+            out
+        }
+
         /// Every step the real request functions can take from `pre`.
         fn request_steps(
             pre: RequestLifecycleState,
@@ -457,66 +595,12 @@ mod tests {
                 safety_tagged,
                 safestate_related,
             };
-            let mut out = Vec::new();
-            for target in REQUEST_STATES {
-                for input in inputs {
-                    if let Ok(post) = pre.try_transition(target, input) {
-                        let cause = if post == RequestLifecycleState::Finalized {
-                            Cause::Completed
-                        } else {
-                            Cause::None
-                        };
-                        out.push(step(post, cause));
-                    }
-                }
-            }
-            let mut s = pre;
-            let _ = try_force_cancel_all(&mut s);
-            out.push(step(
-                s,
-                if s != pre {
-                    Cause::ClearAll
-                } else {
-                    Cause::None
-                },
-            ));
-            let mut s = pre;
-            let _ = try_force_cancel_non_safestate(&mut s, safestate_related);
-            let cause = if s != pre {
-                Cause::ClearNonSafestate
-            } else {
-                Cause::None
-            };
-            out.push(step(s, cause));
-            for candidate in [3u8, 4] {
-                let mut s = pre;
-                let _ = try_force_cancel_single(&mut s, candidate, ClearTransactionNum(3));
-                let cause = if s != pre {
-                    Cause::ClearSingle
-                } else {
-                    Cause::None
-                };
-                out.push(step(s, cause));
-            }
-            for overflowed in [false, true] {
-                // The single-request rule and its slice composition must
-                // agree; a purge finalizes the request.
-                let single = check_watchdog_overflow_purge(kind, overflowed).is_err();
-                let key = PendingRequestKey {
-                    kind,
-                    arrival_seq: 0,
-                };
-                let (_, purged) = purge_normal_priority_on_watchdog_overflow(&[key], overflowed);
-                assert_eq!(
-                    single,
-                    purged == vec![0],
-                    "{kind:?} overflowed={overflowed}"
-                );
-                if single && pre != RequestLifecycleState::Finalized {
-                    out.push(step(RequestLifecycleState::Finalized, Cause::WatchdogPurge));
-                }
-            }
-            out
+            guarded_hops(pre, inputs)
+                .into_iter()
+                .chain(cancel_steps(pre, safestate_related))
+                .chain(purge_steps(pre, kind))
+                .map(|(post, cause)| step(post, cause))
+                .collect()
         }
 
         #[test]
@@ -531,7 +615,18 @@ mod tests {
             let kinds = all_request_kinds();
             assert_eq!(kinds.len(), 12, "every RequestKind is explored");
 
-            let invariants: Vec<Invariant<RqStep>> = vec![
+            let (steps, reached) = request_explore(&kinds, &inputs);
+            assert_eq!(reached.len(), 4, "non-vacuity: every state reached");
+            assert!(steps.iter().any(|s| s.cause == Cause::WatchdogPurge));
+            assert!(steps.iter().any(|s| s.cause == Cause::ClearNonSafestate));
+            for inv in &request_invariants() {
+                assert_eq!(witness(&steps, inv), None, "{} violated", inv.name);
+            }
+        }
+
+        /// The spec's `Next` plus SP1-SP4.
+        fn request_invariants() -> Vec<Invariant<RqStep>> {
+            vec![
                 Invariant::new("Next", request_spec_next),
                 // SP1 NoSkipHop
                 Invariant::new("NoSkipHop", |s: &RqStep| {
@@ -556,16 +651,24 @@ mod tests {
                 Invariant::new("SafestateRequestsSurviveNonSafestateClear", |s: &RqStep| {
                     s.cause != Cause::ClearNonSafestate || !s.safestate_related
                 }),
-            ];
+            ]
+        }
 
+        /// Breadth-first search from `Pending` for every kind and both
+        /// `safestate_related` values: every step taken, and every state
+        /// reached (by name).
+        fn request_explore(
+            kinds: &[RequestKind],
+            inputs: &[RequestLifecycleGuardInput],
+        ) -> (Vec<RqStep>, BTreeSet<String>) {
             let mut steps = Vec::new();
             let mut reached = BTreeSet::new();
-            for &kind in &kinds {
+            for &kind in kinds {
                 for safestate_related in [false, true] {
                     let mut seen = vec![RequestLifecycleState::Pending];
                     let mut queue = VecDeque::from([RequestLifecycleState::Pending]);
                     while let Some(pre) = queue.pop_front() {
-                        for s in request_steps(pre, kind, safestate_related, &inputs) {
+                        for s in request_steps(pre, kind, safestate_related, inputs) {
                             if !seen.contains(&s.post) {
                                 seen.push(s.post);
                                 queue.push_back(s.post);
@@ -576,12 +679,7 @@ mod tests {
                     reached.extend(seen.iter().map(|s| format!("{s:?}")));
                 }
             }
-            assert_eq!(reached.len(), 4, "non-vacuity: every state reached");
-            assert!(steps.iter().any(|s| s.cause == Cause::WatchdogPurge));
-            assert!(steps.iter().any(|s| s.cause == Cause::ClearNonSafestate));
-            for inv in &invariants {
-                assert_eq!(witness(&steps, inv), None, "{} violated", inv.name);
-            }
+            (steps, reached)
         }
 
         // ── tla/E2ESafePoint.tla SP1 ─────────────────────────────────────

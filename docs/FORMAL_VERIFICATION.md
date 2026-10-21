@@ -44,8 +44,11 @@ spec's `Next` relation and satisfies the spec's safety properties:
 
 - `lifecycle_refines_tla_spec` checks `Next`, SP1, and SP2. It also checks a
   bounded form of LP1: with both inputs consistent, `RcpConfigured` is reachable
-  from every reachable state. The consistency closure returns `true` for every
-  unguarded shape, so a forbidden transition cannot hide behind the closure.
+  from every reachable state. Each step calls `try_transition` with a
+  plausibility snapshot whose `check_hw_cfg`/`check_rcp_cfg` verdicts are
+  exactly the spec's two inputs, under all 32 `WriterCtx` combinations and both
+  idleness verdicts. Authorization and idleness only remove steps, so the most
+  permissive writer is always explored and a forbidden transition cannot hide.
 - `request_lifecycle_refines_tla_spec` covers all 12 `RequestKind`s, every guard
   input shape with both verdicts, all three cancellations, and the purge in both
   its single-request and slice forms. It checks `Next` and SP1-SP4.

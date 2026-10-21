@@ -79,7 +79,7 @@ Init ==
     /\ cause             = "none"
 
 (* The guard inputs (timed exec time vs. presentation time, sequencer
- * state, chain predecessor outcome, trigger repeat count) change between
+ * state, chain predecessor outcome, trigger fire readiness) change between
  * evaluation attempts; their verdict is an unconstrained environment
  * input. *)
 ReviseGuard ==
@@ -95,7 +95,7 @@ Start ==
     /\ UNCHANGED <<guard_ok, safety_tagged, safestate_related, cause>>
 
 (* Started -> UnderExecution: gated by check_chain_continuation /
- * trigger-repeat exhaustion for Chained / Triggered kinds (REQ-RLC-004). *)
+ * TriggeredRuntime::fire_ready for Chained / Triggered kinds (REQ-RLC-004). *)
 Execute ==
     /\ state = Started
     /\ guard_ok
