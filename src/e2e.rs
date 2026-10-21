@@ -8,309 +8,114 @@
 //fusa:req REQ-CRC-008
 //fusa:req REQ-CRC-009
 //fusa:req REQ-CRC-010
-
 //! End-to-end protection: the OPEN Alliance TC18 safe-point CRC-32
-//! mechanism (polynomial `0xF4ACFB13`).
+//! mechanism (TC18 RC5 §13.6, polynomial `0xF4ACFB13`).
 //!
-//! ## History: REPLACEd from a CRC-16 + replay-guard model
-//! (`ROADMAP.md` Milestone 9, Satellite Package Disposition, `e2e` row)
+//! ## c-RCP port
 //!
-//! Earlier revisions of this module additively grew the real
-//! [`crc32_tc18`] machinery below (Milestone 6) alongside a pre-existing,
-//! structurally unrelated legacy mechanism: a fixed `[seqNum(4) |
-//! CRC-16(2) | payload]` frame (`wrap`/`unwrap`), a sliding-window
-//! anti-replay guard (`ReplayGuard`), and a `Controller`-wrapping decorator
-//! (`E2eController`) that applied `wrap` to every outgoing payload. That
-//! legacy trio served a different model (a `Zone`/`Controller`-keyed
-//! decorator stack) than the spec's own stream/endpoint-addressed one, and
-//! implemented a different algorithm (CRC-16/CCITT-FALSE, not the spec's
-//! CRC-32) — the Satellite Package Disposition table's own stated reason
-//! for giving `e2e` a REPLACE (not ADAPT) disposition. This item removes
-//! that legacy trio outright, per the same "delete, don't adapt"
-//! discipline the `wire`/`watchdog`/`powerstate` REPLACE items already
-//! established, leaving this module as the real TC18 safe-point mechanism
-//! only. No other module constructed or matched on `E2eController`,
-//! `e2e::wrap`, `e2e::unwrap`, or `ReplayGuard` (confirmed by inspection
-//! before this removal), so no caller-side migration was needed.
+//! This module is a port of c-RCP's E2E CRC layer (`c-RCP/src/e2e.c`,
+//! `c-RCP/include/rcp/e2e.h`). Byte-for-byte interop with c-RCP is the
+//! goal, so where c-RCP departs from the TC18 RC5 text this module copies
+//! c-RCP and says so in a `c-RCP parity:` note.
 //!
-//! ## Coverage rule (`ROADMAP.md` Milestone 6, "Coverage rule" bullet)
+//! | rust                              | c-RCP                                   |
+//! |-----------------------------------|-----------------------------------------|
+//! | [`crc32_tc18`]                    | `rcp_e2e_crc32` (`e2e.c:64-71`)         |
+//! | [`compute_crc`]                   | `rcp_e2e_compute_crc` (`e2e.c:124-150`) |
+//! | [`length_with_crc`]               | `rcp_e2e_length_with_crc` (`e2e.c:183-187`) |
+//! | [`data_length_for_protected_members`] | `rcp_e2e_data_length_for_protected_members` (`e2e.c:190-194`) |
+//! | [`wrap`] / [`unwrap`]             | `rcp_e2e_wrap` / `rcp_e2e_unwrap` (`e2e.c:200-339`) |
+//! | [`wrap_framed`] / [`unwrap_framed`] | `rcp_e2e_wrap_framed` / `_unwrap_framed` (`e2e.c:344-368`) |
+//! | [`fragment_carries_crc`]          | `rcp_e2e_fragment_carries_crc` (`e2e.c:373-376`) |
+//! | [`compute_fragmented_crc`]        | `rcp_e2e_compute_fragmented_crc` (`e2e.c:379-406`) |
+//! | [`E2eError`]                      | `rcp_e2e_errc_t`, `rcp_e2e_strerror`, `rcp_e2e_wire_error` (`e2e.c:11-42`) |
 //!
-//! [`build_crc32_coverage_buffer`] assembles the exact byte sequence
-//! [`crc32_tc18`] is meant to run over for a real safe-point AVTPDU/ACF
-//! frame: `stream_id`, then `avtp_timestamp` (or, for an NTSCF-headed
-//! frame — which carries no `avtp_timestamp` field at all — four zero
-//! bytes in its place), then the full ACF header (`byte_message_info`,
-//! which folds in the `acf_msg_type` discriminant, and — for ACF_GBB only
-//! — `message_timestamp`), then the payload. It reuses
-//! [`crate::avtp::HeaderVariant`] to decide which of `stream_id`/
-//! `avtp_timestamp` apply, and [`AcfCoverageMessage`] to decide which ACF
-//! header shape applies, rather than re-deriving either decision.
+//! [`wrap_for_header`]/[`unwrap_for_header`] are rust-only conveniences
+//! that read every CRC input from a decoded [`HeaderVariant`] and then call
+//! the `_framed` functions.
 //!
-//! ### Which length field gets the one-quadlet pre-adjustment
-//! (working interpretation, since reconciled against TC18 §13.6)
+//! ## Wire layout (TC18 RC5 §13.6 Figures 20/21)
 //!
-//! **Reconciled — citation relocated, but see the unresolved flag below.**
-//! TC18 §13.6 (TC18.txt line 4272) states: "When calculating the CRC, it
-//! needs to be considered that adding the CRC to the byte_msg_payload
-//! increases the acf_msg_length by 1." This is the RC4/RC5-reworded
-//! descendant of what this note used to cite at the old TC18.txt line 3798
-//! ("Before CRC calculation it is essential to adapt the acf_message_length
-//! by plus 1 quadlet for the CRC32 addition to the payload and in the AVTPD
-//! to increase the ntscf_data_length or in an TSCF header the
-//! stream_data_length by 4 octets per ACF type in the ACF payload being
-//! E-2-E protected.") — the old sentence does not appear anywhere in the
-//! current TC18.txt; TC18.txt's own `Commented [BE37]: 051RC4: updated
-//! text` marker sits on this paragraph, confirming the wording (not just
-//! the line number) changed. The `acf_msg_length + 1 quadlet` fact survives
-//! this reword and is what [`build_crc32_coverage_buffer`] implements — the
-//! working interpretation recorded below turned out to be correct.
+//! An E2E-protected ACF message is `[header][real payload][CRC32][pad]`:
+//! the CRC32 sits right after the real (unpadded) payload and the pad
+//! octets come after it. The header's `acf_msg_length` counts the CRC
+//! quadlet (+1); the `pad` field is unchanged. [`wrap`] finds the real/pad
+//! boundary by reading the `pad` field (octet 2, bits 7:6) of the frame
+//! it is given, as c-RCP does (`e2e.c:108-112`), and does the +1/-1 length
+//! adjustment itself.
 //!
-//! **Flag, deliberately not resolved here:** the old citation's **second**
-//! clause — increasing the AVTPDU-level `ntscf_data_length` /
-//! `stream_data_length` by 4 octets per E-2-E-protected ACF type — has no
-//! surviving textual counterpart anywhere in the current TC18.txt (checked
-//! by full-text search for `ntscf_data_length`, `stream_data_length`, and
-//! `4 octets`; the only remaining hits are the two header-diagram field
-//! labels themselves — Figure 20/21 — not an adjustment rule). This
-//! module's comment has cited that now-vanished clause as the reason
-//! requirement `REQ-CRC-016` ("not implemented anywhere in this crate")
-//! exists. Whether the RC4/RC5 revision dropped that requirement outright
-//! (so `REQ-CRC-016` may now be moot) or merely relocated/consolidated it
-//! somewhere this search did not recognize is a real open question this
-//! citation fix does not answer — it needs engineering judgment against the
-//! current spec text, not a citation swap. See issue #164 batch 4's PR
-//! description for this flag.
+//! ## CRC coverage
 //!
-//! The original reasoning, kept for the record: the Milestone 6 checklist
-//! stated a length field is pre-adjusted by one quadlet (4 octets) before
-//! the CRC is computed over it, but did not say which length field. Of
-//! this crate's currently-decoded length fields,
-//! `byte_message_info`'s `acf_msg_length` is the only one that lives inside
-//! the region this coverage rule actually covers (`stream_id`/
-//! `avtp_timestamp`/ACF-header/payload) — the AVTP-level
-//! `ntscf_data_length`/`stream_data_length` fields sit entirely outside
-//! that region, in [`crate::avtp`]'s NTSCF/TSCF header, which this
-//! function does not re-encode. [`build_crc32_coverage_buffer`] therefore
-//! treats `acf_msg_length` as the field being pre-adjusted: the value it
-//! encodes into the coverage buffer's ACF header is the caller-supplied
-//! `ByteMessageInfo::acf_msg_length` plus one quadlet (since
-//! rust-RCP-W01/W02, `acf_msg_length` is itself counted in quadlets, so
-//! this is a raw `+1`, not `+4`).
+//! [`compute_crc`] runs one CRC over, in order: `avtp_subtype` (1 octet),
+//! `header_octet1` (1 octet), a `tu` octet (`0x01`/`0x00`), `stream_id`
+//! (8 octets, big-endian), `avtp_timestamp` (4 octets, big-endian), then
+//! the ACF header and real payload with `acf_msg_length` already
+//! incremented (padding excluded).
 //!
-//! ## Provenance note: `crc32_tc18` verified by cross-implementation, not
-//! by a published check value
+//! c-RCP parity: under NTSCF framing c-RCP still feeds a zero `tu` octet
+//! and four zero `avtp_timestamp` octets (`c-RCP/src/e2e.c:140-148` and
+//! `:344-368`). TC18 RC5 Figure 21 (ACF_GBB under NTSCF) has no
+//! `avtp_timestamp` row and no `tu` column, and c-RCP's own header says so
+//! (`c-RCP/include/rcp/e2e.h:155-160`). This module copies c-RCP so its
+//! CRCs match c-RCP's (issue #152).
 //!
-//! The four parameters `ROADMAP.md`'s Milestone 6 checklist bullet states —
-//! polynomial `0xF4ACFB13`, init `0xFFFFFFFF`, final XOR `0xFFFFFFFF`,
-//! reflected input and output — fully and unambiguously determine one
-//! specific CRC-32 variant mathematically, so (per Guiding Principle 5)
-//! there is little genuine ambiguity left to flag about the algorithm
-//! itself. But because `0xF4ACFB13` is not a named/published CRC-32
-//! variant, there is no externally citable "check value" (the way the
-//! standard CRC-32/ISO-HDLC check value for `"123456789"` is publicly
-//! known) to test [`crc32_tc18`] against. This module's tests instead
-//! cross-validate [`crc32_tc18`]'s reflected-engine implementation (which
-//! runs the shift register LSB-first against the bit-reversed polynomial)
-//! against a second, structurally independent implementation of the exact
-//! same four parameters (which reflects each input byte and the final
-//! register by hand around a plain MSB-first shift register using the
-//! *unreversed* polynomial) across the classic `"123456789"` corpus,
-//! all-zero/all-`0xFF` boundary inputs, and several other patterns — the
-//! two agreeing is the correctness evidence, since both are direct,
-//! independently-written renderings of the same stated definition.
+//! ## Fragment trains
 //!
-//! This entry does not take a position on which requests/streams actually
-//! get CRC-protected in the first place — that is `ROADMAP.md` Milestone
-//! 6's later "Per-stream safety config" bullet's job, not this one's.
+//! Only the final fragment (`ms = 0`) carries the CRC
+//! ([`fragment_carries_crc`], [`check_fragment_crc_placement`]). Its value
+//! comes from [`compute_fragmented_crc`]: the same 15-octet header prefix,
+//! then the *first* fragment's encoded ACF header exactly as sent, then
+//! the concatenated payload of every segment. The final fragment carries
+//! that CRC in the same position [`wrap`] uses, with its own
+//! `acf_msg_length` incremented ([`finalize_crc_trailer`]).
 //!
-//! ## CRC trailer wire placement: `pad` comes before the CRC, not after
-//! (correctness fix, post-Milestone 9)
+//! c-RCP parity: c-RCP feeds the first fragment's header as-is
+//! (`c-RCP/src/e2e.c:379-406`, called from `c-RCP/src/mock.c:2370`), with
+//! that fragment's own `acf_msg_length`, `pad`, `ms = 1` and
+//! `segment_num = 0`, and without the +1 quadlet its single-frame path
+//! applies (`e2e.c:250`). TC18-13.6-007 says the CRC is calculated once,
+//! before fragmentation, which reads as a header for the whole message
+//! (length and pad recomputed from the combined payload, then +1). This
+//! module copies c-RCP (issues #169, #170).
 //!
-//! TC18's own two worked examples (Figure 19 for ACF_ABB, Figure 20 for
-//! ACF_GBB) show a CRC-protected message's real wire byte order as header
-//! (+ `message_timestamp`), real payload, `pad` zero octets, THEN the
-//! 4-byte CRC32 trailer. [`acf::encode_acf_abb`]/[`acf::encode_acf_gbb`]
-//! have no CRC-trailer concept of their own and always append their own
-//! automatically-derived `pad` after the entire `payload` blob they are
-//! given — so a caller that concatenates `real_payload + crc_bytes` into
-//! one blob before calling either encoder gets the reversed, non-conformant
-//! `payload, CRC, pad` order instead. This module's own now-fixed
-//! `acf::acf_abb_matches_figure_19_worked_example`/
-//! `acf::acf_gbb_matches_figure_20_worked_example` golden vectors
-//! previously did exactly that (their own byte positions went
-//! unchecked, only totals/counts did, which is how the bug hid) before
-//! being moved here as [`finalize_crc_trailer_matches_figure_19_worked_example`]/
-//! [`finalize_crc_trailer_matches_figure_20_worked_example`], now pinning
-//! the real byte sequence. [`finalize_crc_trailer`]/[`split_crc_trailer`]
-//! are the correct, composable encode/decode primitives — see their own
-//! doc comments and this module's "CRC trailer wire placement:
-//! encode/decode" section below.
+//! ## Legacy coverage-buffer API
 //!
-//! **TC18.txt citation-drift note (issue #164 batch 4):** the current
-//! TC18.txt revision renumbers and re-paginates these two worked examples
-//! as Figure 20 ("ACF_ABB under TSCF header (example)", caption at TC18.txt
-//! line 4231) and Figure 21 ("ACF_GBB under NTSCF header (example)",
-//! caption at line 4264) — "Figure 19" now names a wholly unrelated figure
-//! ("Configuration request", TC18.txt line 2860). The ACF_ABB example's
-//! byte counts this section and its tests depend on (6 payload + 2 pad +
-//! 4-byte CRC = 20 bytes = 5 quadlets) are confirmed unchanged under the
-//! new Figure 20 label. The ACF_GBB example is confirmed **not** just
-//! renumbered, though: TC18.txt carries a `Commented [BE39]: 051RC4 - text
-//! and figure updated` marker immediately after it, and its new Figure 21
-//! layout shows a different payload/pad split of the same
-//! 28-byte/7-quadlet total than this section assumes — see `src/acf.rs`'s
-//! own equivalent note (fixed in issue #164 batch 1) for the specific byte
-//! counts it found. This module's own
-//! `finalize_crc_trailer_matches_figure_19_worked_example`/
-//! `_figure_20_worked_example` test names, and their internal comments/
-//! assert messages, deliberately still say "Figure 19"/"Figure 20" and
-//! still encode the OLD ACF_GBB split (7 payload + 1 pad) — left unchanged
-//! here because (a) renaming a test or re-deriving its golden-vector byte
-//! layout is a code/test-logic change, out of scope for a citation-only
-//! fix, and (b) whether the ACF_GBB test's 7+1 split needs to become
-//! something else to match the new Figure 21, or is unaffected because
-//! `acf_msg_length = 0x07`/28 bytes total is what this crate's logic
-//! actually depends on (as `src/acf.rs`'s note argues for its own,
-//! analogous case), is an open question this pass deliberately does not
-//! answer — see issue #164 batch 4's PR description for this flag.
+//! [`build_crc32_coverage_buffer`] and
+//! [`build_crc32_coverage_buffer_for_fragment_train`] return the bytes
+//! [`compute_crc`]/[`compute_fragmented_crc`] run over, so
+//! `crc32_tc18(&buffer)` gives the same value. They are deprecated in
+//! favour of the functions above.
 //!
-//! ## Fragmentation interaction (`ROADMAP.md` Milestone 6, "Fragmentation
-//! interaction" bullet)
+//! ## `crc32_tc18` provenance
 //!
-//! [`CombinedFragmentPayload`], [`build_crc32_coverage_buffer_for_fragment_train`],
-//! and [`crc32_tc18_for_fragment_train`] extend the single-message coverage
-//! rule above to a message split across multiple ACF frames (a "fragment
-//! train"): the CRC is computed once, across the concatenated payload of
-//! every fragment in the train, and only the train's final fragment (the
-//! one whose [`acf::ByteMessageInfo::ms`] is `false`) carries it on the
-//! wire. [`fragment_crc_expectation`]/[`check_fragment_crc_placement`]
-//! state and validate that placement rule itself, independent of how the
-//! combined-payload CRC is computed.
-//!
-//! At the time this section was written, this crate had no live
-//! multi-AVTPDU reassembly buffer (that was `ROADMAP.md` Milestone 8's
-//! still-undecided job) — matching every Milestone 5/6 entry's precedent of
-//! taking not-yet-built state as a caller-supplied fact (e.g.
-//! `crate::request`'s `SequencerState`/`root_client`), this section takes a
-//! fragment train's per-segment payloads as a caller-supplied, already-
-//! ordered `&[&[u8]]` rather than reading `acf::ReadSizeOrSegment`
-//! itself to determine ordering. That is a deliberate, additional instance
-//! of Guiding Principle 5: `acf::ReadSizeOrSegment`'s own provenance
-//! note already flags that this crate has not resolved which bit(s), if
-//! any, select its `read_size` vs. `segment_num` interpretation, so this
-//! module treats "this is a fragment train, and this is its segment order"
-//! as a fact the caller establishes out of band, rather than silently
-//! resolving that open ambiguity here.
-//!
-//! `ROADMAP.md` Milestone 8 has since decided "go" and landed
-//! [`crate::fragment::FragmentReassemblyBuffer`], a real reassembly buffer
-//! that derives segment order from wire-arrival order plus a validated
-//! `segment_num` sequence rather than a caller-supplied slice.
-//! [`crate::fragment::verify_reassembled_train_crc`] composes
-//! [`crc32_tc18_for_fragment_train`] against that buffer's own
-//! wire-collected segments, re-verifying this section's CRC-placement rule
-//! against real reassembled state. The functions in this section keep their
-//! own `&[&[u8]]`-based signatures unchanged — Milestone 8 composed with
-//! them from `crate::fragment`, rather than editing them here.
-//!
-//! ### Working interpretation: non-payload coverage fields come from the
-//! final fragment's own header (Guiding Principle 5)
-//!
-//! The roadmap states the CRC is "computed across the combined payload"
-//! but does not say whether the coverage buffer's non-payload region
-//! (`stream_id`, `avtp_timestamp`, and the ACF header's own fields other
-//! than the payload) should likewise be drawn from each fragment
-//! individually (and, if so, how they would be combined — concatenated,
-//! required to match, or something else) or taken once from a single
-//! fragment. Since only the final fragment carries the CRC at all, and an
-//! intermediate fragment's own `byte_message_info`/`message_timestamp`
-//! describe *that fragment*, not the reassembled message,
-//! [`build_crc32_coverage_buffer_for_fragment_train`] takes the entire
-//! non-payload region from the caller-supplied final fragment's own
-//! [`AcfCoverageMessage`] — mirroring [`build_crc32_coverage_buffer`]'s
-//! existing single-message behavior with the payload field alone replaced
-//! by the train's combined payload — rather than inventing a multi-
-//! fragment header-combination rule the roadmap text does not state.
-//!
-//! **Flag, not cleanly resolved here — the old TC18.txt line 3801 sentence
-//! this note used to cite is genuinely gone, not just moved.** A full-text
-//! search of the current TC18.txt for "first AVTPDU", "first ACF header",
-//! and "payload of all segments" finds nothing. TC18 §13.6's
-//! fragmentation-vs-CRC rule now reads, in its entirety (TC18.txt lines
-//! 4274-4275): "Fragmentation, if applied to a message, happens after CRC
-//! calculation. So, the CRC is only calculated once and will be
-//! transmitted in the last segment." That sentence still supports this
-//! module's "only the final fragment carries the CRC" placement rule (see
-//! [`fragment_crc_expectation`]/[`check_fragment_crc_placement`]), but,
-//! unlike the old text, it no longer states — in either direction — which
-//! fragment's AVTPDU/ACF header fields the CRC coverage is computed over.
-//! Read literally, "happens after CRC calculation" suggests the CRC may now
-//! be computed once, before the message is even split into fragments, over
-//! a single not-yet-fragmented header — which would sidestep the old
-//! first-vs-final distinction rather than settle it either way.
-//!
-//! This module still uses the *final* fragment's AVTPDU/ACF header (see
-//! [`build_crc32_coverage_buffer_for_fragment_train`]'s doc comment), a
-//! choice this note used to record as a **known divergence** (`REQ-CRC-015`)
-//! from the old "*first* AVTPDU and ACF header data" wording. With that
-//! wording gone under the RC4/RC5 revision, it is genuinely unclear whether
-//! `REQ-CRC-015` still describes a real conformance gap, describes a now-
-//! moot one, or needs restating against a pre-fragmentation single-header
-//! model this crate does not implement (this crate always evaluates the
-//! coverage rule against one already-identified fragment's header — see
-//! this module's own "Fragmentation interaction" section above, which takes
-//! fragment order/identity as a caller-supplied fact). Deliberately left as
-//! an honest flag rather than a guessed citation or an asserted-correct
-//! claim: this backs a REQ-CRC frame-integrity requirement, and a wrong
-//! citation here is worse than an admitted gap. This looks like a real
-//! spec-conformance question worth its own follow-up issue, not just an
-//! unresolvable citation-text search — see issue #164 batch 4's PR
-//! description.
+//! TC18 §13.6 Table 34 fixes the CRC: polynomial `0xF4ACFB13`, init and
+//! final XOR `0xFFFFFFFF`, reflected input and output (CRC-32/AUTOSAR,
+//! check value `0x1697D06A` over `"123456789"`). The tests cross-check
+//! [`crc32_tc18`] against a separately written MSB-first reference.
+
+use std::fmt;
 
 use crate::acf::{self, AcfAbbMessage, AcfGbbMessage};
-use crate::avtp::HeaderVariant;
+use crate::avtp::{self, HeaderVariant};
 use crate::RcpError;
 
 // ── CRC-32 (TC18 safe-point) ────────────────────────────────────────────────
 
-/// Bit-reversal of the OPEN Alliance TC18 safe-point CRC-32 polynomial
-/// `0xF4ACFB13`, precomputed so [`crc32_tc18`] can shift its register right
-/// (LSB-first) instead of reflecting every input byte and the final
-/// register by hand — the standard technique for implementing a reflected
-/// CRC without an explicit per-byte/per-register bit-reversal step. See
-/// this module's provenance note above; the unreversed polynomial itself
-/// reappears in `tests::crc32_tc18_reference`, the independent
-/// cross-check.
-///
-/// TC18 §13.6 Table 34 "CRC32 Polynomial" (TC18.txt line 4193) names this
-/// CRC "CRC32P4" and fixes its six parameters: Polynomial `0xF4ACFB13`,
-/// Width 32 bit, Initial Value `0xFFFFFFFF`, Final XOR `0xFFFFFFFF`, Input
-/// reflection TRUE, Output reflection TRUE. (Renumbered from the old
-/// "Table 31" under the current TC18.txt revision — that number now names
-/// an unrelated table, "ep_generic_config register map"; the table's own
-/// content is otherwise confirmed unchanged: same six parameters, same
-/// values, at TC18.txt lines 4193-4208.)
+/// Bit-reversal of the TC18 safe-point CRC-32 polynomial `0xF4ACFB13`
+/// (TC18 §13.6 Table 34 "CRC32P4"), so [`crc32_tc18`] can shift its
+/// register right (LSB-first) instead of reflecting every byte. Same
+/// constant as c-RCP's `RCP_E2E_CRC32_RPOLY` (`c-RCP/src/e2e.c:50`).
 //fusa:req REQ-CRC-014
 const CRC32_TC18_POLY_REFLECTED: u32 = 0xC8DF_352F;
 
-/// Initial and final-XOR value, `0xFFFFFFFF`, shared by both ends of the
-/// algorithm per `ROADMAP.md` Milestone 6's stated parameters.
+/// Initial and final-XOR value, `0xFFFFFFFF` (TC18 §13.6 Table 34).
 const CRC32_TC18_INIT_XOROUT: u32 = 0xFFFF_FFFF;
 
-/// Computes the OPEN Alliance TC18 safe-point CRC-32 over `data`.
-///
-/// Polynomial `0xF4ACFB13`, init and final XOR both `0xFFFFFFFF`, reflected
-/// input and output.
-///
-/// This function computes the CRC over exactly the bytes it is given; it
-/// takes no position on which bytes of a safe-point frame belong in that
-/// slice (see this module's provenance note above).
-//fusa:req REQ-CRC-001
-//fusa:req REQ-CRC-002
-pub fn crc32_tc18(data: &[u8]) -> u32 {
-    let mut crc = CRC32_TC18_INIT_XOROUT;
+/// Feeds `data` into a running (not yet final-XORed) CRC register. Port
+/// of c-RCP's `crc32_update` (`c-RCP/src/e2e.c:52-61`), applied per byte.
+fn crc32_tc18_update(mut crc: u32, data: &[u8]) -> u32 {
     for &byte in data {
-        crc ^= byte as u32;
+        crc ^= u32::from(byte);
         for _ in 0..8 {
             crc = if crc & 1 != 0 {
                 (crc >> 1) ^ CRC32_TC18_POLY_REFLECTED
@@ -319,411 +124,666 @@ pub fn crc32_tc18(data: &[u8]) -> u32 {
             };
         }
     }
-    crc ^ CRC32_TC18_INIT_XOROUT
+    crc
 }
 
-// ── CRC-32 coverage rule ─────────────────────────────────────────────────────
-
-/// Number of quadlets the "length-field pre-adjustment" in `ROADMAP.md`
-/// Milestone 6's "Coverage rule" bullet adds to a length field before the
-/// CRC is computed: one quadlet. See this module's doc comment for which
-/// length field [`build_crc32_coverage_buffer`] applies this to, and why —
-/// this crate's own working interpretation, flagged per Guiding Principle
-/// 5. Since `acf::ByteMessageInfo::acf_msg_length` is itself counted in
-/// quadlets (rust-RCP-W01/W02, TC18 §11.2.1 Table 4), this pre-adjustment
-/// is a raw `+1` to that field, not `+4` — before that reconciliation,
-/// this module treated `acf_msg_length` as an opaque, undefined-unit
-/// field and added `4` directly to it; that was already just as much a
-/// working interpretation as this one, but the wrong one now that the
-/// field's real unit is confirmed.
-const CRC32_COVERAGE_LENGTH_PREADJUST_QUADLETS: u16 = 1;
-
-/// Which of the two Milestone 1 ACF message shapes a
-/// [`build_crc32_coverage_buffer`] call's "full ACF header" is drawn from.
+/// Computes the OPEN Alliance TC18 safe-point CRC-32 over `data`.
 ///
-/// Mirrors [`AcfAbbMessage`]/[`AcfGbbMessage`] rather than adding a new
-/// decoded representation of either: this type only selects which one
-/// applies, it does not reinterpret either message's fields.
+/// Polynomial `0xF4ACFB13`, init and final XOR both `0xFFFFFFFF`, reflected
+/// input and output. Port of c-RCP's `rcp_e2e_crc32`
+/// (`c-RCP/src/e2e.c:64-71`). Covers exactly the bytes it is given; see
+/// [`compute_crc`] for the safe-point coverage span.
+//fusa:req REQ-CRC-001
+//fusa:req REQ-CRC-002
+pub fn crc32_tc18(data: &[u8]) -> u32 {
+    crc32_tc18_update(CRC32_TC18_INIT_XOROUT, data) ^ CRC32_TC18_INIT_XOROUT
+}
+
+// ── Coverage span ────────────────────────────────────────────────────────────
+
+/// Quadlets the CRC32 trailer adds to `acf_msg_length`: exactly one.
+pub const CRC_TRAILER_QUADLETS: u16 = 1;
+
+/// Octets the CRC32 trailer occupies on the wire: one quadlet. c-RCP's
+/// `RCP_E2E_CRC_LEN` (`c-RCP/include/rcp/e2e.h:447`).
+pub const CRC_TRAILER_LEN: usize = acf::QUADLET_LEN;
+
+/// The one-quadlet `acf_msg_length` pre-adjustment applied before the CRC
+/// is computed (TC18-13.6-006).
+const CRC32_COVERAGE_LENGTH_PREADJUST_QUADLETS: u16 = CRC_TRAILER_QUADLETS;
+
+/// Length of the header-CRC prefix [`compute_crc`] feeds ahead of the ACF
+/// bytes: subtype (1) + octet 1 (1) + tu (1) + stream_id (8) +
+/// avtp_timestamp (4).
+const COVERAGE_PREFIX_LEN: usize = 15;
+
+/// The header-CRC bytes in the exact order c-RCP feeds them
+/// (`c-RCP/src/e2e.c:140-148`).
+fn coverage_prefix(
+    avtp_subtype: u8,
+    header_octet1: u8,
+    tu: bool,
+    stream_id: u64,
+    avtp_timestamp: u32,
+) -> [u8; COVERAGE_PREFIX_LEN] {
+    let mut p = [0u8; COVERAGE_PREFIX_LEN];
+    p[0] = avtp_subtype;
+    p[1] = header_octet1;
+    p[2] = u8::from(tu);
+    p[3..11].copy_from_slice(&stream_id.to_be_bytes());
+    p[11..15].copy_from_slice(&avtp_timestamp.to_be_bytes());
+    p
+}
+
+/// The CRC inputs `_framed` derives from the framing choice: subtype from
+/// `is_ntscf_framed`, and `tu`/`avtp_timestamp` forced to `false`/`0`
+/// under NTSCF (`c-RCP/src/e2e.c:344-368`).
+fn framed_inputs(is_ntscf_framed: bool, tu: bool, avtp_timestamp: u32) -> (u8, bool, u32) {
+    if is_ntscf_framed {
+        (avtp::NTSCF_SUBTYPE, false, 0)
+    } else {
+        (avtp::TSCF_SUBTYPE, tu, avtp_timestamp)
+    }
+}
+
+/// `(is_ntscf_framed, header_octet1, tu, stream_id, avtp_timestamp)` read
+/// from a decoded AVTPDU header.
+fn header_inputs(header: &HeaderVariant) -> (bool, u8, bool, u64, u32) {
+    let (is_ntscf, ts) = match header {
+        HeaderVariant::Ntscf(_) => (true, 0),
+        HeaderVariant::Tscf(h) => (false, h.avtp_timestamp),
+    };
+    (
+        is_ntscf,
+        header.octet1(),
+        header.tu(),
+        header.stream_id(),
+        ts,
+    )
+}
+
+/// The 15-octet header-CRC prefix for `header`, with the `_framed` NTSCF
+/// forcing applied.
+fn header_coverage_prefix(header: &HeaderVariant) -> [u8; COVERAGE_PREFIX_LEN] {
+    let (is_ntscf, octet1, tu, stream_id, ts) = header_inputs(header);
+    let (subtype, tu, ts) = framed_inputs(is_ntscf, tu, ts);
+    coverage_prefix(subtype, octet1, tu, stream_id, ts)
+}
+
+/// CRC32 over `avtp_subtype` + `header_octet1` + a `tu` octet +
+/// `stream_id` (8 octets, big-endian) + `avtp_timestamp` (4 octets,
+/// big-endian) + `acf_frame`, as one continuous CRC.
+///
+/// Port of c-RCP's `rcp_e2e_compute_crc` (`c-RCP/src/e2e.c:124-150`).
+/// Running the TC18 two-stage "header CRC seeds the ACF CRC" description
+/// as one continuous register gives the same value (Table 34: no
+/// intermediate final XOR). Pass `0`/`false` for `avtp_timestamp`/`tu`
+/// under NTSCF, or use [`wrap_framed`], which forces them.
+//fusa:req REQ-E2E-003
+pub fn compute_crc(
+    avtp_subtype: u8,
+    header_octet1: u8,
+    tu: bool,
+    stream_id: u64,
+    avtp_timestamp: u32,
+    acf_frame: &[u8],
+) -> u32 {
+    let prefix = coverage_prefix(avtp_subtype, header_octet1, tu, stream_id, avtp_timestamp);
+    let crc = crc32_tc18_update(CRC32_TC18_INIT_XOROUT, &prefix);
+    crc32_tc18_update(crc, acf_frame) ^ CRC32_TC18_INIT_XOROUT
+}
+
+/// `payload_len + CRC_TRAILER_LEN`, saturating at `usize::MAX`. Port of
+/// c-RCP's `rcp_e2e_length_with_crc` (`c-RCP/src/e2e.c:183-187`).
+//fusa:req REQ-E2E-004
+pub fn length_with_crc(payload_len: usize) -> usize {
+    payload_len.saturating_add(CRC_TRAILER_LEN)
+}
+
+/// How much an AVTPDU's `ntscf_data_length`/`stream_data_length` grows
+/// for `protected_member_count` E2E-protected ACF messages:
+/// `protected_member_count * CRC_TRAILER_LEN`, saturating. Port of c-RCP's
+/// `rcp_e2e_data_length_for_protected_members` (`c-RCP/src/e2e.c:190-194`).
+/// [`crate::avtp::encode_ntscf_frame`] already derives the length from the
+/// payload it is given, so this is for sizing and cross-checking only.
+//fusa:req REQ-E2E-037
+pub fn data_length_for_protected_members(protected_member_count: usize) -> usize {
+    protected_member_count.saturating_mul(CRC_TRAILER_LEN)
+}
+
+// ── wrap / unwrap ────────────────────────────────────────────────────────────
+
+/// The `pad` field (octet 2, bits 7:6) of an encoded ACF frame, or 0 if
+/// the frame is too short to hold octet 2. Port of c-RCP's
+/// `acf_pad_octets` (`c-RCP/src/e2e.c:108-112`).
+fn acf_pad_octets(frame: &[u8]) -> usize {
+    match frame.get(2) {
+        Some(&octet2) => usize::from((octet2 >> 6) & 0x03),
+        None => 0,
+    }
+}
+
+/// Adjusts the 9-bit `acf_msg_length` (octet 0 bit 0, octet 1) of
+/// `frame` by `delta` quadlets in place, keeping `acf_msg_type`. Returns
+/// `false` and leaves `frame` unchanged if it is shorter than 2 octets or
+/// the result would leave `0..=0x1FF`. Port of c-RCP's
+/// `adapt_acf_msg_length` (`c-RCP/src/e2e.c:164-180`).
+fn adapt_acf_msg_length(frame: &mut [u8], delta: i32) -> bool {
+    if frame.len() < 2 {
+        return false;
+    }
+    let type_bits = frame[0] & 0xFE;
+    let len_field = (u16::from(frame[0] & 0x01) << 8) | u16::from(frame[1]);
+    let adapted = i32::from(len_field) + delta;
+    if !(0..=i32::from(acf::ACF_MSG_LENGTH_9BIT_MAX)).contains(&adapted) {
+        return false;
+    }
+    frame[0] = type_bits | (((adapted >> 8) & 0x01) as u8);
+    frame[1] = (adapted & 0xFF) as u8;
+    true
+}
+
+/// Copies `acf_frame` with `acf_msg_length` +1 and a CRC32 trailer placed
+/// between the real payload and the pad octets; `crc_of` receives the
+/// adjusted real prefix. Shared by [`wrap`] and [`finalize_crc_trailer`]
+/// (`c-RCP/src/e2e.c:226-271`).
+fn insert_trailer(
+    acf_frame: &[u8],
+    crc_of: impl FnOnce(&[u8]) -> u32,
+) -> Result<Vec<u8>, RcpError> {
+    let pad = acf_pad_octets(acf_frame);
+    // pad <= 3 <= len whenever pad != 0 (octet 2 exists), so no underflow.
+    let real_len = acf_frame.len() - pad;
+    let mut out = Vec::with_capacity(acf_frame.len() + CRC_TRAILER_LEN);
+    out.extend_from_slice(&acf_frame[..real_len]);
+    if !adapt_acf_msg_length(&mut out, i32::from(CRC_TRAILER_QUADLETS)) {
+        return Err(if real_len < 2 {
+            RcpError::ShortFrame
+        } else {
+            RcpError::InvalidSize
+        });
+    }
+    let crc = crc_of(&out);
+    out.extend_from_slice(&crc.to_be_bytes());
+    out.extend_from_slice(&acf_frame[real_len..]);
+    Ok(out)
+}
+
+/// A received frame split around its CRC32 trailer: `(body, real_len,
+/// crc)`, where `body` is the frame with the 4 trailer octets removed
+/// (`acf_msg_length` not yet adjusted). `None` if the frame is shorter
+/// than the trailer plus the pad octets its `pad` field claims
+/// (`c-RCP/src/e2e.c:292-321`).
+fn split_trailer(frame: &[u8]) -> Option<(Vec<u8>, usize, u32)> {
+    if frame.len() < CRC_TRAILER_LEN {
+        return None;
+    }
+    let pad = acf_pad_octets(frame);
+    if pad + CRC_TRAILER_LEN > frame.len() {
+        return None;
+    }
+    let real_len = frame.len() - CRC_TRAILER_LEN - pad;
+    let mut crc_bytes = [0u8; CRC_TRAILER_LEN];
+    crc_bytes.copy_from_slice(&frame[real_len..real_len + CRC_TRAILER_LEN]);
+    let mut body = Vec::with_capacity(frame.len() - CRC_TRAILER_LEN);
+    body.extend_from_slice(&frame[..real_len]);
+    body.extend_from_slice(&frame[real_len + CRC_TRAILER_LEN..]);
+    Some((body, real_len, u32::from_be_bytes(crc_bytes)))
+}
+
+/// Protects an encoded ACF_ABB/ACF_GBB frame (as [`acf::encode_acf_abb`]/
+/// [`acf::encode_acf_gbb`] produce it, pad octets included): returns a
+/// copy with `acf_msg_length` +1 and the big-endian CRC32 from
+/// [`compute_crc`] placed right after the real payload, followed by the
+/// frame's own pad octets — `[header][real payload][CRC32][pad]` (TC18 RC5
+/// §13.6 Figures 20/21). The CRC covers the adjusted header and real
+/// payload, not the pad. `acf_frame` is never modified.
+///
+/// Port of c-RCP's `rcp_e2e_wrap` (`c-RCP/src/e2e.c:200-272`). Where
+/// c-RCP returns an empty buffer, this returns:
+/// `Err(RcpError::InvalidSize)` if `acf_frame.len()` is not a whole number
+/// of quadlets or `acf_msg_length` is already `0x1FF`;
+/// `Err(RcpError::ShortFrame)` if the real prefix is shorter than the
+/// 2-octet length field (including an empty frame).
+///
+/// [`unwrap`] reverses this whenever the real prefix still holds the `pad`
+/// field (octet 2), which any frame with a full `byte_message_info` does.
+/// As in c-RCP, a shorter real prefix puts a CRC octet where [`unwrap`]
+/// reads `pad`.
+//fusa:req REQ-E2E-005
+//fusa:req REQ-E2E-006
+pub fn wrap(
+    avtp_subtype: u8,
+    header_octet1: u8,
+    tu: bool,
+    stream_id: u64,
+    avtp_timestamp: u32,
+    acf_frame: &[u8],
+) -> Result<Vec<u8>, RcpError> {
+    if acf_frame.len() % acf::QUADLET_LEN != 0 {
+        return Err(RcpError::InvalidSize);
+    }
+    insert_trailer(acf_frame, |real| {
+        compute_crc(
+            avtp_subtype,
+            header_octet1,
+            tu,
+            stream_id,
+            avtp_timestamp,
+            real,
+        )
+    })
+}
+
+/// Why [`unwrap`] rejected a frame. Mirrors c-RCP's `rcp_e2e_errc_t`
+/// (`c-RCP/include/rcp/e2e.h:449-454`) minus `RCP_E2E_OK`, which is `Ok`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+//fusa:req REQ-E2E-001
+pub enum E2eError {
+    /// The frame is too short for a CRC32 trailer plus the pad octets its
+    /// `pad` field claims (`RCP_E2E_ERR_SHORT_FRAME`).
+    ShortFrame,
+    /// The CRC32 does not match (`RCP_E2E_ERR_CRC_MISMATCH`). The request
+    /// must not be executed. `acf_frame` is the frame with the trailer
+    /// removed and `acf_msg_length` restored, for diagnostics only.
+    CrcMismatch {
+        /// The unverified frame body.
+        acf_frame: Vec<u8>,
+    },
+}
+
+impl E2eError {
+    /// c-RCP's numeric `rcp_e2e_errc_t` value: `ShortFrame` = 1,
+    /// `CrcMismatch` = 2.
+    //fusa:req REQ-E2E-001
+    pub fn code(&self) -> u8 {
+        match self {
+            Self::ShortFrame => 1,
+            Self::CrcMismatch { .. } => 2,
+        }
+    }
+
+    /// c-RCP's `rcp_e2e_strerror` text (`c-RCP/src/e2e.c:11-25`).
+    //fusa:req REQ-E2E-001
+    pub fn strerror(&self) -> &'static str {
+        match self {
+            Self::ShortFrame => "e2e: frame too short for a CRC32 trailer",
+            Self::CrcMismatch { .. } => "e2e: POCI failure -- CRC32 mismatch, execution skipped",
+        }
+    }
+
+    /// The wire error code for a Response: `Some(RcpError::PociFailure)`
+    /// (code 12, TC18 §12.9.6 Table 30) for a CRC mismatch, `None` for a
+    /// short frame, which has no wire code. Port of c-RCP's
+    /// `rcp_e2e_wire_error` (`c-RCP/src/e2e.c:28-42`).
+    //fusa:req REQ-WIREERR-003
+    pub fn wire_error(&self) -> Option<RcpError> {
+        match self {
+            Self::ShortFrame => None,
+            Self::CrcMismatch { .. } => Some(RcpError::PociFailure),
+        }
+    }
+}
+
+impl fmt::Display for E2eError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.strerror())
+    }
+}
+
+impl std::error::Error for E2eError {}
+
+/// Reverses [`wrap`]: reads the CRC32 sitting after the real payload
+/// (located via the frame's `pad` field), checks it against
+/// [`compute_crc`] over the frame's real prefix (its `acf_msg_length`
+/// still +1), and returns the frame with the trailer removed and
+/// `acf_msg_length` -1 — ready for [`acf::decode_acf_abb`]/
+/// [`acf::decode_acf_gbb`].
+///
+/// Port of c-RCP's `rcp_e2e_unwrap` (`c-RCP/src/e2e.c:277-339`). Returns
+/// `Err(E2eError::ShortFrame)` if `frame` cannot hold the trailer and the
+/// claimed pad octets, and `Err(E2eError::CrcMismatch { .. })` if the CRC
+/// does not match. As in c-RCP, the length is left unadjusted if it
+/// cannot be decremented (real prefix under 2 octets, or length 0).
+//fusa:req REQ-E2E-007
+//fusa:req REQ-E2E-008
+//fusa:req REQ-E2E-009
+pub fn unwrap(
+    avtp_subtype: u8,
+    header_octet1: u8,
+    tu: bool,
+    stream_id: u64,
+    avtp_timestamp: u32,
+    frame: &[u8],
+) -> Result<Vec<u8>, E2eError> {
+    let (mut body, real_len, got) = split_trailer(frame).ok_or(E2eError::ShortFrame)?;
+    let want = compute_crc(
+        avtp_subtype,
+        header_octet1,
+        tu,
+        stream_id,
+        avtp_timestamp,
+        &frame[..real_len],
+    );
+    let _ = adapt_acf_msg_length(&mut body[..real_len], -i32::from(CRC_TRAILER_QUADLETS));
+    if got == want {
+        Ok(body)
+    } else {
+        Err(E2eError::CrcMismatch { acf_frame: body })
+    }
+}
+
+/// [`wrap`] with `avtp_subtype` derived from `is_ntscf_framed` (`0x82`
+/// NTSCF / `0x05` TSCF) and, under NTSCF, `tu` forced to `false` and
+/// `avtp_timestamp` to `0` whatever the caller passed. `header_octet1` is
+/// always used as given. Port of c-RCP's `rcp_e2e_wrap_framed`
+/// (`c-RCP/src/e2e.c:344-354`).
+///
+/// c-RCP parity: the forced NTSCF zeros are still fed to the CRC (one `tu`
+/// octet, four timestamp octets), although TC18 RC5 Figure 21 has neither
+/// field (`c-RCP/include/rcp/e2e.h:155-160`).
+//fusa:req REQ-E2E-035
+pub fn wrap_framed(
+    stream_id: u64,
+    is_ntscf_framed: bool,
+    header_octet1: u8,
+    tu: bool,
+    avtp_timestamp: u32,
+    acf_frame: &[u8],
+) -> Result<Vec<u8>, RcpError> {
+    let (subtype, tu, ts) = framed_inputs(is_ntscf_framed, tu, avtp_timestamp);
+    wrap(subtype, header_octet1, tu, stream_id, ts, acf_frame)
+}
+
+/// [`unwrap`] with the same derivation and NTSCF forcing as
+/// [`wrap_framed`]. Port of c-RCP's `rcp_e2e_unwrap_framed`
+/// (`c-RCP/src/e2e.c:357-368`).
+//fusa:req REQ-E2E-035
+pub fn unwrap_framed(
+    stream_id: u64,
+    is_ntscf_framed: bool,
+    header_octet1: u8,
+    tu: bool,
+    avtp_timestamp: u32,
+    frame: &[u8],
+) -> Result<Vec<u8>, E2eError> {
+    let (subtype, tu, ts) = framed_inputs(is_ntscf_framed, tu, avtp_timestamp);
+    unwrap(subtype, header_octet1, tu, stream_id, ts, frame)
+}
+
+/// [`wrap_framed`] with every CRC input read from `header`: framing from
+/// its variant, `header_octet1` from [`HeaderVariant::octet1`], `tu` and
+/// `avtp_timestamp` from a TSCF header (forced to `false`/`0` for NTSCF),
+/// and `stream_id`.
+//fusa:req REQ-CRC-020
+pub fn wrap_for_header(header: &HeaderVariant, acf_frame: &[u8]) -> Result<Vec<u8>, RcpError> {
+    let (is_ntscf, octet1, tu, stream_id, ts) = header_inputs(header);
+    wrap_framed(stream_id, is_ntscf, octet1, tu, ts, acf_frame)
+}
+
+/// [`unwrap_framed`] with every CRC input read from `header`, as in
+/// [`wrap_for_header`].
+//fusa:req REQ-CRC-020
+pub fn unwrap_for_header(header: &HeaderVariant, frame: &[u8]) -> Result<Vec<u8>, E2eError> {
+    let (is_ntscf, octet1, tu, stream_id, ts) = header_inputs(header);
+    unwrap_framed(stream_id, is_ntscf, octet1, tu, ts, frame)
+}
+
+// ── Fragmentation ────────────────────────────────────────────────────────────
+
+/// Whether a fragment carries the CRC: exactly `is_last_fragment`. Port of
+/// c-RCP's `rcp_e2e_fragment_carries_crc` (`c-RCP/src/e2e.c:373-376`).
+//fusa:req REQ-E2E-010
+pub fn fragment_carries_crc(is_last_fragment: bool) -> bool {
+    is_last_fragment
+}
+
+/// CRC32 for a fragment train: the [`compute_crc`] header prefix, then
+/// `first_fragment_header` (the first fragment's encoded ACF header, 8
+/// octets for ACF_ABB or 16 for ACF_GBB), then `reassembled_payload` (every
+/// segment's payload, in order), as one continuous CRC. Port of c-RCP's
+/// `rcp_e2e_compute_fragmented_crc` (`c-RCP/src/e2e.c:379-406`). There is
+/// no `_framed` form: under NTSCF pass `tu = false` and
+/// `avtp_timestamp = 0`, as c-RCP's caller does (`c-RCP/src/mock.c:2307`).
+///
+/// c-RCP parity: the first fragment's header is fed as sent, with its own
+/// `acf_msg_length`, `pad`, `ms = 1` and `segment_num = 0`, and without the
+/// +1 quadlet. TC18-13.6-007 ("Fragmentation ... happens after CRC
+/// calculation") reads as a header for the whole message instead.
+//fusa:req REQ-E2E-038
+pub fn compute_fragmented_crc(
+    avtp_subtype: u8,
+    header_octet1: u8,
+    tu: bool,
+    stream_id: u64,
+    avtp_timestamp: u32,
+    first_fragment_header: &[u8],
+    reassembled_payload: &[u8],
+) -> u32 {
+    let prefix = coverage_prefix(avtp_subtype, header_octet1, tu, stream_id, avtp_timestamp);
+    let mut crc = crc32_tc18_update(CRC32_TC18_INIT_XOROUT, &prefix);
+    crc = crc32_tc18_update(crc, first_fragment_header);
+    crc32_tc18_update(crc, reassembled_payload) ^ CRC32_TC18_INIT_XOROUT
+}
+
+// ── Typed-message helpers (legacy surface, re-implemented on the above) ─────
+
+/// Which ACF message shape a coverage helper reads its header from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AcfCoverageMessage<'a> {
-    /// An ACF_ABB message (no `message_timestamp`; `ACF_ABB_HEADER_LEN` ==
-    /// 8-byte header before payload — `acf_msg_type` is folded into that
-    /// header, not a separate leading byte, since rust-RCP-W01).
+    /// An ACF_ABB message (8-octet header, no `message_timestamp`).
     Abb(&'a AcfAbbMessage),
-    /// An ACF_GBB message (carries `message_timestamp`;
-    /// `ACF_GBB_HEADER_LEN` == 16-byte header before payload).
+    /// An ACF_GBB message (16-octet header including `message_timestamp`).
     Gbb(&'a AcfGbbMessage),
 }
 
-/// Assembles the exact byte sequence [`crc32_tc18`] is meant to run over
-/// for a real safe-point AVTPDU/ACF frame, per `ROADMAP.md` Milestone 6's
-/// "Coverage rule" bullet: `stream_id`, then `avtp_timestamp` (zeroed under
-/// NTSCF), then the full ACF header, then the payload.
+/// The CRC coverage bytes for one ACF message: the 15-octet header prefix
+/// (subtype, octet 1, `tu`, `stream_id`, `avtp_timestamp`; NTSCF forcing
+/// as in [`wrap_framed`]), then `byte_message_info` with `acf_msg_type` forced
+/// and `acf_msg_length` +1, then (ACF_GBB only) `message_timestamp`, then
+/// the payload. `crc32_tc18` of the result equals the CRC [`wrap`] places
+/// when `acf`'s `acf_msg_length`/`pad` match its payload (as
+/// [`acf::decode_acf_abb`]/[`acf::decode_acf_gbb`] return them); unlike
+/// [`wrap`], the caller's `acf_msg_length`/`pad` are used verbatim.
 ///
-/// - `stream_id` comes from whichever of [`HeaderVariant::Ntscf`]/
-///   [`HeaderVariant::Tscf`] `header` is, encoded big-endian as 8 bytes.
-/// - `avtp_timestamp` is the real 4-byte big-endian value from
-///   [`HeaderVariant::Tscf`], or, for [`HeaderVariant::Ntscf`] (which has no
-///   `avtp_timestamp` field to carry), four zero bytes occupying the same
-///   position in the buffer rather than being omitted.
-/// - The full ACF header is `acf`'s `byte_message_info` (via
-///   [`acf::encode_byte_message_info`], which folds the `acf_msg_type`
-///   discriminant into that same 8-byte header — see
-///   [`crate::acf`]'s "Canonical wire layout" doc section), and (for
-///   [`AcfCoverageMessage::Gbb`] only) the 8-byte `message_timestamp`, with
-///   the payload appended after. Before encoding, `acf`'s `byte_message_info.
-///   acf_msg_length` is increased by [`CRC32_COVERAGE_LENGTH_PREADJUST_QUADLETS`]
-///   — see this module's doc comment for why that field specifically. This
-///   deliberately calls [`acf::encode_byte_message_info`] directly rather
-///   than [`acf::encode_acf_abb`]/[`acf::encode_acf_gbb`]: those two derive
-///   `acf_msg_length`/`pad` from the real payload length for an actual wire
-///   frame and would simply discard this function's pre-adjusted value —
-///   this buffer is a CRC-coverage scratch
-///   construction that is never itself transmitted, so it has no reason to
-///   go through that real-frame derivation.
+/// c-RCP parity: under NTSCF the prefix still carries a zero `tu` octet and
+/// four zero timestamp octets (`c-RCP/src/e2e.c:140-148`), although TC18
+/// RC5 Figure 21 has neither field.
 ///
-/// Returns `Err(RcpError::InvalidSize)` if the pre-adjusted `acf_msg_length`
-/// (or any other `ByteMessageInfo` field) fails
-/// [`acf::encode_byte_message_info`]'s field-width validation.
-///
-/// Additive standalone plumbing, matching every prior Milestone 1-6 entry's
-/// discipline: not called from [`crc32_tc18`] or a decoder/dispatch loop —
-/// this function only assembles the buffer a caller would pass to
-/// `crc32_tc18` and `crate::request`'s `CRC_ERROR` dispatch path.
-/// Two further TC18 §13.6 properties fall out of this function's shape
-/// rather than needing code of their own:
-///
-/// - **The CRC is ACF-specific** (TC18.txt line 4191, reworded under the
-///   current RC4/RC5 revision from what this note used to cite at old line
-///   3789 — the fact survives, the exact sentence does not: "In Safe
-///   command mode a CRC32 is calculated per ACF type across specific
-///   fields of an AVTPDU header, ACF header, and the entire payload
-///   (except padding)"). This function takes exactly one
-///   [`AcfCoverageMessage`], so an AVTPDU carrying N E-2-E-protected ACF
-///   messages needs N independent calls and produces N independent CRCs;
-///   there is no way to fold two ACF messages into one coverage buffer.
-/// - **Requests and responses use the identical scheme** (TC18.txt line
-///   4276: "The CRC calculation for requests and responses follows the
-///   identical scheme" — near-verbatim relocation; only "request and
-///   response" → "requests and responses" changed). Neither this function
-///   nor [`crc32_tc18`] has a direction parameter; a response differs from
-///   a request only by the `rsp`/`err`/`evt` bits already inside the
-///   covered `byte_message_info`.
+/// Returns `Err(RcpError::InvalidSize)` if the adjusted header fails
+/// [`acf::encode_byte_message_info`]'s field-width checks.
 //fusa:req REQ-CRC-004
 //fusa:req REQ-CRC-005
 //fusa:req REQ-CRC-006
 //fusa:req REQ-CRC-007
 //fusa:req REQ-CRC-017
 //fusa:req REQ-CRC-019
+#[deprecated(
+    since = "6.0.0",
+    note = "use e2e::wrap_for_header / e2e::compute_crc (c-RCP rcp_e2e_wrap)"
+)]
 pub fn build_crc32_coverage_buffer(
     header: &HeaderVariant,
     acf: &AcfCoverageMessage,
 ) -> Result<Vec<u8>, RcpError> {
-    let (stream_id, avtp_timestamp_bytes) = match header {
-        HeaderVariant::Ntscf(h) => (h.stream_id, [0u8; 4]),
-        HeaderVariant::Tscf(h) => (h.stream_id, h.avtp_timestamp.to_be_bytes()),
+    let mut buf = header_coverage_prefix(header).to_vec();
+    let (info, msg_type, timestamp, payload) = match acf {
+        AcfCoverageMessage::Abb(m) => (m.info, acf::ACF_ABB_MSG_TYPE, None, &m.payload),
+        AcfCoverageMessage::Gbb(m) => (
+            m.info,
+            acf::ACF_GBB_MSG_TYPE,
+            Some(m.message_timestamp),
+            &m.payload,
+        ),
     };
-
-    let mut buf = Vec::new();
-    buf.extend_from_slice(&stream_id.to_be_bytes());
-    buf.extend_from_slice(&avtp_timestamp_bytes);
-
-    // This deliberately encodes via `acf::encode_byte_message_info` (which
-    // serializes whatever `acf_msg_length` it is given verbatim) rather
-    // than `acf::encode_acf_abb`/`acf::encode_acf_gbb` (which, since
-    // rust-RCP-N2-05, derive `acf_msg_length` from the real payload length
-    // and reject a caller-supplied value that disagrees). This buffer is a
-    // CRC-coverage scratch construction, not a real wire frame — the
-    // pre-adjusted length below is *never* actually transmitted on the
-    // wire, so it must bypass that real-frame derivation/validation
-    // entirely rather than trying to satisfy it.
-    match acf {
-        AcfCoverageMessage::Abb(msg) => {
-            let mut adjusted_info = msg.info;
-            adjusted_info.acf_msg_type = acf::ACF_ABB_MSG_TYPE;
-            adjusted_info.acf_msg_length = adjusted_info
-                .acf_msg_length
-                .saturating_add(CRC32_COVERAGE_LENGTH_PREADJUST_QUADLETS);
-            let info_bytes = acf::encode_byte_message_info(&adjusted_info)?;
-            buf.extend_from_slice(&info_bytes);
-            buf.extend_from_slice(&msg.payload);
-        }
-        AcfCoverageMessage::Gbb(msg) => {
-            let mut adjusted_info = msg.info;
-            adjusted_info.acf_msg_type = acf::ACF_GBB_MSG_TYPE;
-            adjusted_info.acf_msg_length = adjusted_info
-                .acf_msg_length
-                .saturating_add(CRC32_COVERAGE_LENGTH_PREADJUST_QUADLETS);
-            let info_bytes = acf::encode_byte_message_info(&adjusted_info)?;
-            buf.extend_from_slice(&info_bytes);
-            buf.extend_from_slice(&msg.message_timestamp.to_be_bytes());
-            buf.extend_from_slice(&msg.payload);
-        }
+    let adjusted = acf::ByteMessageInfo {
+        acf_msg_type: msg_type,
+        acf_msg_length: info
+            .acf_msg_length
+            .saturating_add(CRC32_COVERAGE_LENGTH_PREADJUST_QUADLETS),
+        ..info
+    };
+    buf.extend_from_slice(&acf::encode_byte_message_info(&adjusted)?);
+    if let Some(ts) = timestamp {
+        buf.extend_from_slice(&ts.to_be_bytes());
     }
-
+    buf.extend_from_slice(payload);
     Ok(buf)
 }
 
-// ── CRC trailer wire placement: encode/decode ───────────────────────────────
-//
-// TC18's own two worked examples (Figure 19 for ACF_ABB, Figure 20 for
-// ACF_GBB) show a CRC-protected ACF message's real wire byte order as:
-// header (+ `message_timestamp` for ACF_GBB), real payload, `pad` zero
-// octets (rounding header+payload up to a whole quadlet), THEN the 4-byte
-// CRC32 trailer — pad comes *before* the CRC, not after. `acf::encode_acf_abb`/
-// `acf::encode_acf_gbb` have no CRC-trailer concept of their own (see
-// `acf`'s "acf_msg_length quadlet semantics" note) and always append their
-// own automatically-derived `pad` after the *entire* `payload` they are
-// given; a caller that concatenates `real_payload + crc_bytes` into one
-// blob before calling either encoder therefore gets `pad` appended after
-// the CRC instead of before it — the wrong wire order. [`finalize_crc_trailer`]/
-// [`split_crc_trailer`] are the correct, composable way to get TC18's real
-// order out of those two unmodified encoders: call `encode_acf_abb`/
-// `encode_acf_gbb` with the real payload alone (so its own automatic `pad`
-// already lands immediately after the real payload, before this section's
-// functions ever run), then use these two functions to bump/un-bump
-// `acf_msg_length` by the trailer's one quadlet and append/strip the CRC
-// bytes themselves — matching the two-step "encode the pre-CRC frame, then
-// append the trailer" pattern `cpp-RCP`'s `rcp::e2e::append_crc` and
-// `c-RCP`'s equivalent already use.
-//
-// TC18.txt citation-drift note (issue #164 batch 4): these worked examples
-// are Figure 20 (ACF_ABB) / Figure 21 (ACF_GBB) under the current TC18.txt
-// revision, and the ACF_GBB one's content changed too, not just its number
-// — see this module's own "CRC trailer wire placement" doc comment above
-// for the full citation-drift flag and why it is left unresolved here.
-
-/// Number of quadlets (equivalently, [`QUADLET_LEN`]-byte octets) TC18's
-/// trailing CRC32 always occupies on the wire — exactly one quadlet, never
-/// more or fewer. Shared with [`CRC32_COVERAGE_LENGTH_PREADJUST_QUADLETS`]
-/// (the same one-quadlet bump [`build_crc32_coverage_buffer`] applies to
-/// its own scratch coverage header) rather than a second, independently
-/// named constant for the same value.
-pub const CRC_TRAILER_QUADLETS: u16 = CRC32_COVERAGE_LENGTH_PREADJUST_QUADLETS;
-
-/// Number of octets TC18's trailing CRC32 always occupies on the wire —
-/// one quadlet ([`QUADLET_LEN`]).
-pub const CRC_TRAILER_LEN: usize = acf::QUADLET_LEN;
-
-/// Turns an already-encoded, CRC-free ACF_ABB/ACF_GBB `frame` (as returned
-/// by [`acf::encode_acf_abb`]/[`acf::encode_acf_gbb`] called with the
-/// message's real payload only — no CRC bytes mixed in) into its
-/// CRC-protected wire form: bumps `frame`'s own `byte_message_info.
-/// acf_msg_length` by [`CRC_TRAILER_QUADLETS`] (the one quadlet the
-/// about-to-be-appended trailer adds to the message's total length) and
-/// appends `crc`'s 4 big-endian octets.
-///
-/// Because `frame` was built from the real payload alone, the encoder's
-/// own automatic `pad` octets already sit immediately after the real
-/// payload; this function only ever appends bytes after that point, so the
-/// result is always header (+ `message_timestamp`), real payload, `pad`
-/// zero octets, CRC — TC18's real order (Figure 19 / Figure 20; Figure 20 /
-/// Figure 21 under the current TC18.txt revision — see this module's top
-/// doc comment for the renumber/content-change flag) — never the reversed
-/// payload/CRC/pad order a caller gets by concatenating CRC bytes into the
-/// payload before calling `encode_acf_abb`/`encode_acf_gbb` (see this
-/// section's doc comment).
+/// Protects an already-encoded ACF frame with a caller-computed `crc`:
+/// `acf_msg_length` +1 and `crc`'s 4 big-endian octets inserted between
+/// the real payload and the pad octets (located via the frame's `pad`
+/// field) — the same `[header][real payload][CRC32][pad]` layout as
+/// [`wrap`]. Use it to place [`compute_fragmented_crc`]'s value on a
+/// fragment train's final fragment; for a single message use [`wrap`].
 ///
 /// Returns `Err(RcpError::ShortFrame)` if `frame` is shorter than
-/// [`acf::BYTE_MESSAGE_INFO_LEN`], and `Err(RcpError::InvalidSize)` if
-/// bumping `acf_msg_length` would overflow its 9-bit field width.
+/// [`acf::BYTE_MESSAGE_INFO_LEN`] and `Err(RcpError::InvalidSize)` if
+/// `acf_msg_length` is already `0x1FF`; `frame` is unchanged on error.
 //fusa:req REQ-CRC-012
 pub fn finalize_crc_trailer(frame: &mut Vec<u8>, crc: u32) -> Result<(), RcpError> {
     if frame.len() < acf::BYTE_MESSAGE_INFO_LEN {
         return Err(RcpError::ShortFrame);
     }
-    let mut info = acf::decode_byte_message_info(&frame[..acf::BYTE_MESSAGE_INFO_LEN])?;
-    info.acf_msg_length = info
-        .acf_msg_length
-        .checked_add(CRC_TRAILER_QUADLETS)
-        .filter(|&q| q <= acf::ACF_MSG_LENGTH_9BIT_MAX)
-        .ok_or(RcpError::InvalidSize)?;
-    let new_header = acf::encode_byte_message_info(&info)?;
-    frame[..acf::BYTE_MESSAGE_INFO_LEN].copy_from_slice(&new_header);
-    frame.extend_from_slice(&crc.to_be_bytes());
+    *frame = insert_trailer(frame, |_| crc)?;
     Ok(())
 }
 
-/// The mirror-image decode-side operation: splits a CRC-protected ACF
-/// message (as [`finalize_crc_trailer`] produces) into `(body, crc)`,
-/// where `body` is byte-for-byte what [`acf::decode_acf_abb`]/
-/// [`acf::decode_acf_gbb`] already know how to parse on their own — header
-/// (+ `message_timestamp`), real payload, native `pad` octets, with no CRC
-/// trailer involved at all — and `crc` is the real, wire-carried CRC32
-/// value for the caller to check (e.g. via
-/// [`crate::request::check_rx_enforce_e2e`]).
+/// Reverses [`finalize_crc_trailer`] without checking the CRC: returns
+/// `(body, crc)`, where `crc` is read from right after the real payload
+/// (located via the frame's `pad` field) and `body` is the frame with
+/// those 4 octets removed and `acf_msg_length` -1, ready for
+/// [`acf::decode_acf_abb`]/[`acf::decode_acf_gbb`]. Same split as
+/// [`unwrap`] and as c-RCP's final-fragment handling
+/// (`c-RCP/src/mock.c:2323-2341`).
 ///
-/// This exists because [`acf::decode_acf_abb`]/[`acf::decode_acf_gbb`]
-/// strip exactly `byte_message_info.pad` octets *from the end of the
-/// region `acf_msg_length` describes* — which, for a message whose
-/// `acf_msg_length` still counts the trailing CRC quadlet, would strip the
-/// CRC's own trailing bytes as if they were `pad` instead of the real
-/// `pad` octets that actually precede the CRC on the wire. Un-adjusting
-/// `acf_msg_length` by the same [`CRC_TRAILER_QUADLETS`]
-/// [`finalize_crc_trailer`] added, and removing the CRC's own 4 octets
-/// from the byte slice first, makes `body` a message
-/// [`acf::decode_acf_abb`]/[`acf::decode_acf_gbb`]'s existing `pad`-stripping
-/// logic parses correctly without any change to either decoder.
-///
-/// Returns `Err(RcpError::ShortFrame)` if `frame` is shorter than a header
-/// plus a full CRC trailer ([`acf::BYTE_MESSAGE_INFO_LEN`] +
-/// [`CRC_TRAILER_LEN`]), and `Err(RcpError::InvalidSize)` if the header's
-/// `acf_msg_length` is smaller than [`CRC_TRAILER_QUADLETS`] (i.e. does not
-/// actually describe a message with room for a CRC trailer at all).
+/// Returns `Err(RcpError::ShortFrame)` if `frame` is shorter than
+/// [`acf::BYTE_MESSAGE_INFO_LEN`] + [`CRC_TRAILER_LEN`], and
+/// `Err(RcpError::InvalidSize)` if `acf_msg_length` is 0.
 //fusa:req REQ-CRC-013
 pub fn split_crc_trailer(frame: &[u8]) -> Result<(Vec<u8>, u32), RcpError> {
     if frame.len() < acf::BYTE_MESSAGE_INFO_LEN + CRC_TRAILER_LEN {
         return Err(RcpError::ShortFrame);
     }
-    let mut info = acf::decode_byte_message_info(&frame[..acf::BYTE_MESSAGE_INFO_LEN])?;
-    info.acf_msg_length = info
-        .acf_msg_length
-        .checked_sub(CRC_TRAILER_QUADLETS)
-        .ok_or(RcpError::InvalidSize)?;
-    let new_header = acf::encode_byte_message_info(&info)?;
-
-    let crc_start = frame.len() - CRC_TRAILER_LEN;
-    let mut crc_bytes = [0u8; 4];
-    crc_bytes.copy_from_slice(&frame[crc_start..]);
-    let crc = u32::from_be_bytes(crc_bytes);
-
-    let mut body = frame[..crc_start].to_vec();
-    body[..acf::BYTE_MESSAGE_INFO_LEN].copy_from_slice(&new_header);
+    let (mut body, real_len, crc) = split_trailer(frame).ok_or(RcpError::ShortFrame)?;
+    if !adapt_acf_msg_length(&mut body[..real_len], -i32::from(CRC_TRAILER_QUADLETS)) {
+        return Err(RcpError::InvalidSize);
+    }
     Ok((body, crc))
 }
 
-// ── Fragmentation interaction ────────────────────────────────────────────────
-
-/// The combined payload of a multi-segment "fragment train", assembled by
-/// concatenating each fragment's own payload in the order the caller
-/// supplies them.
-///
-/// This crate has no live multi-AVTPDU reassembly buffer to read segment
-/// order from yet (`ROADMAP.md` Milestone 8), so segment order is a
-/// caller-supplied fact rather than something derived from
-/// `acf::ReadSizeOrSegment::as_segment_num` here — see this module's
-/// doc comment "Fragmentation interaction" section for why.
+/// The combined payload of a fragment train: each segment's payload
+/// concatenated in the order given.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct CombinedFragmentPayload(pub Vec<u8>);
 
 impl CombinedFragmentPayload {
-    /// Assembles a fragment train's combined payload by concatenating
-    /// `segments` verbatim, in the order given. An empty `segments` slice
-    /// yields an empty combined payload; this function never panics for
-    /// any input, including empty per-segment payloads.
+    /// Concatenates `segments` verbatim, in order. Never panics; an empty
+    /// slice gives an empty payload.
     //fusa:req REQ-CRC-009
     pub fn assemble(segments: &[&[u8]]) -> Self {
-        let mut combined = Vec::new();
-        for segment in segments {
-            combined.extend_from_slice(segment);
-        }
-        CombinedFragmentPayload(combined)
+        CombinedFragmentPayload(segments.concat())
     }
 }
 
-/// Assembles the CRC coverage buffer for a fragment train: identical to
-/// [`build_crc32_coverage_buffer`], except the payload region is the
-/// train's [`CombinedFragmentPayload`] (assembled from `segments`) rather
-/// than `final_fragment`'s own single-fragment payload.
+/// The first fragment's encoded ACF header (8 octets ACF_ABB, 16 ACF_GBB)
+/// exactly as [`acf::encode_acf_abb`]/[`acf::encode_acf_gbb`] put it on
+/// the wire: `acf_msg_length`/`pad` derived from that fragment's own
+/// payload.
+fn encoded_first_fragment_header(first: &AcfCoverageMessage) -> Result<Vec<u8>, RcpError> {
+    let (mut frame, header_len) = match first {
+        AcfCoverageMessage::Abb(m) => (acf::encode_acf_abb(m)?, acf::ACF_ABB_HEADER_LEN),
+        AcfCoverageMessage::Gbb(m) => (acf::encode_acf_gbb(m)?, acf::ACF_GBB_HEADER_LEN),
+    };
+    frame.truncate(header_len);
+    Ok(frame)
+}
+
+/// The CRC coverage bytes for a fragment train: the 15-octet header
+/// prefix (as [`build_crc32_coverage_buffer`]), then `first_fragment`'s
+/// encoded ACF header as sent (no +1, its own length and pad), then the
+/// concatenated `segments`. `crc32_tc18` of the result equals
+/// [`crc32_tc18_for_fragment_train`].
 ///
-/// `header` and `final_fragment` supply every non-payload field of the
-/// coverage buffer — `stream_id`, `avtp_timestamp`, and the full ACF
-/// header (including, for [`AcfCoverageMessage::Gbb`], `message_timestamp`)
-/// — from the train's final fragment (the one whose `ms` is `false`); see
-/// this module's doc comment for why the final fragment's own header is
-/// used rather than combining every fragment's header fields. The same
-/// length-field pre-adjustment [`build_crc32_coverage_buffer`] applies is
-/// applied here too, and this function returns the same
-/// `Err(RcpError::InvalidSize)` that call would return for an out-of-range
-/// header.
+/// c-RCP parity: first-fragment header fed as-is, as
+/// `rcp_e2e_compute_fragmented_crc` (`c-RCP/src/e2e.c:379-406`); see
+/// [`compute_fragmented_crc`].
 ///
-/// Additive standalone plumbing, matching every prior Milestone 1-6 entry's
-/// discipline: composes [`build_crc32_coverage_buffer`] rather than
-/// re-deriving its buffer-assembly logic, and is not wired into
-/// `crc32_tc18` or a decoder/dispatch loop.
+/// Returns `Err(RcpError::InvalidSize)` if `first_fragment` cannot be
+/// encoded.
 //fusa:req REQ-CRC-010
+#[deprecated(
+    since = "6.0.0",
+    note = "use e2e::crc32_tc18_for_fragment_train / e2e::compute_fragmented_crc"
+)]
 pub fn build_crc32_coverage_buffer_for_fragment_train(
     header: &HeaderVariant,
-    final_fragment: &AcfCoverageMessage,
+    first_fragment: &AcfCoverageMessage,
     segments: &[&[u8]],
 ) -> Result<Vec<u8>, RcpError> {
-    let combined = CombinedFragmentPayload::assemble(segments);
-    match final_fragment {
-        AcfCoverageMessage::Abb(msg) => {
-            let combined_msg = AcfAbbMessage {
-                info: msg.info,
-                payload: combined.0,
-            };
-            build_crc32_coverage_buffer(header, &AcfCoverageMessage::Abb(&combined_msg))
-        }
-        AcfCoverageMessage::Gbb(msg) => {
-            let combined_msg = AcfGbbMessage {
-                info: msg.info,
-                message_timestamp: msg.message_timestamp,
-                payload: combined.0,
-            };
-            build_crc32_coverage_buffer(header, &AcfCoverageMessage::Gbb(&combined_msg))
-        }
-    }
+    let mut buf = header_coverage_prefix(header).to_vec();
+    buf.extend_from_slice(&encoded_first_fragment_header(first_fragment)?);
+    buf.extend_from_slice(&CombinedFragmentPayload::assemble(segments).0);
+    Ok(buf)
 }
 
-/// Computes the safe-point CRC-32 for a fragment train: composes
-/// [`build_crc32_coverage_buffer_for_fragment_train`] and [`crc32_tc18`]
-/// rather than re-deriving either. This is the value the train's *final*
-/// fragment carries on the wire per the "only the last fragment carries
-/// the CRC" rule — see [`fragment_crc_expectation`]/
-/// [`check_fragment_crc_placement`] for that placement rule itself.
+/// The fragment-train CRC for a decoded AVTPDU header: [`compute_fragmented_crc`]
+/// over `header`'s CRC inputs (NTSCF forcing as in [`wrap_framed`]),
+/// `first_fragment`'s encoded ACF header and the concatenated `segments`.
+/// The train's final fragment carries the result
+/// ([`finalize_crc_trailer`]).
+///
+/// c-RCP parity: first-fragment header as sent, see
+/// [`compute_fragmented_crc`].
+///
+/// Returns `Err(RcpError::InvalidSize)` if `first_fragment` cannot be
+/// encoded.
 //fusa:req REQ-CRC-010
 pub fn crc32_tc18_for_fragment_train(
     header: &HeaderVariant,
-    final_fragment: &AcfCoverageMessage,
+    first_fragment: &AcfCoverageMessage,
     segments: &[&[u8]],
 ) -> Result<u32, RcpError> {
-    let buf = build_crc32_coverage_buffer_for_fragment_train(header, final_fragment, segments)?;
-    Ok(crc32_tc18(&buf))
+    let first_header = encoded_first_fragment_header(first_fragment)?;
+    let combined = CombinedFragmentPayload::assemble(segments);
+    let (is_ntscf, octet1, tu, stream_id, ts) = header_inputs(header);
+    let (subtype, tu, ts) = framed_inputs(is_ntscf, tu, ts);
+    Ok(compute_fragmented_crc(
+        subtype,
+        octet1,
+        tu,
+        stream_id,
+        ts,
+        &first_header,
+        &combined.0,
+    ))
 }
 
-/// Whether a CRC32 safe-point value is expected to accompany a given
-/// fragment of a fragment train, keyed only on that fragment's own `ms`
-/// ("more segments") flag.
+/// Whether a CRC is expected on a fragment, from its `ms` flag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FragmentCrcExpectation {
-    /// `ms == true`: more segments follow this one. No CRC field is
-    /// expected to accompany this fragment.
+    /// `ms == true`: more segments follow; no CRC on this fragment.
     NotExpected,
-    /// `ms == false`: this is the fragment train's final fragment. A CRC
-    /// field, computed across the train's combined payload (see
-    /// [`crc32_tc18_for_fragment_train`]), is expected to accompany it.
+    /// `ms == false`: the final fragment; it carries the train's CRC.
     Expected,
 }
 
-/// Derives [`FragmentCrcExpectation`] from a fragment's `ms` flag alone,
-/// per the "only the last fragment carries the CRC" rule.
+/// [`FragmentCrcExpectation`] from `ms` alone: only the last fragment
+/// carries the CRC (TC18-13.6-007; [`fragment_carries_crc`] with
+/// `is_last_fragment = !ms`).
 //fusa:req REQ-CRC-008
 pub fn fragment_crc_expectation(ms: bool) -> FragmentCrcExpectation {
-    if ms {
-        FragmentCrcExpectation::NotExpected
-    } else {
+    if fragment_carries_crc(!ms) {
         FragmentCrcExpectation::Expected
+    } else {
+        FragmentCrcExpectation::NotExpected
     }
 }
 
-/// Validates a fragment's actual CRC-presence state against
-/// [`fragment_crc_expectation`]'s rule, rather than silently ignoring a
-/// violation of it.
-///
-/// Returns `Ok(())` when `ms == true` and `crc_present == false` (an
-/// intermediate fragment correctly carrying no CRC), or when `ms == false`
-/// and `crc_present == true` (the final fragment correctly carrying one).
-/// Returns `Err(RcpError::InvalidParameter)` for either invalid
-/// combination: a CRC present on a non-final fragment, or absent on the
-/// final one — mirroring this crate's existing convention (see
-/// `crate::request::check_compound_bundle_claim`) of reporting caller-
-/// supplied state that fails a shape/consistency check as
-/// `InvalidParameter`, rather than inventing a new sentinel for this one
-/// rule ahead of the later "`CRC_ERROR` error path" checklist item, which
-/// is scoped to the wire-level error code a received `CRC_ERROR` produces,
-/// not to this placement rule.
+/// Checks a fragment's CRC presence against [`fragment_crc_expectation`]:
+/// `Ok(())` for no CRC with `ms == true` or a CRC with `ms == false`,
+/// otherwise `Err(RcpError::InvalidParameter)`.
 //fusa:req REQ-CRC-008
 pub fn check_fragment_crc_placement(ms: bool, crc_present: bool) -> Result<(), RcpError> {
     match (fragment_crc_expectation(ms), crc_present) {
@@ -737,6 +797,7 @@ pub fn check_fragment_crc_placement(ms: bool, crc_present: bool) -> Result<(), R
 //  Tests
 // ─────────────────────────────────────────────────────────────────────────────
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::*;
     use crate::avtp;
@@ -849,623 +910,6 @@ mod tests {
         assert_ne!(crc32_tc18(&data), baseline);
     }
 
-    // ── CRC-32 coverage rule ────────────────────────────────────────────────
-
-    fn sample_abb_message(acf_msg_length: u16, payload: &[u8]) -> AcfAbbMessage {
-        AcfAbbMessage {
-            info: acf::ByteMessageInfo {
-                acf_msg_length,
-                ..Default::default()
-            },
-            payload: payload.to_vec(),
-        }
-    }
-
-    fn sample_gbb_message(
-        acf_msg_length: u16,
-        message_timestamp: u64,
-        payload: &[u8],
-    ) -> AcfGbbMessage {
-        AcfGbbMessage {
-            info: acf::ByteMessageInfo {
-                acf_msg_length,
-                ..Default::default()
-            },
-            message_timestamp,
-            payload: payload.to_vec(),
-        }
-    }
-
-    // ── TC18 §13.6 Table 34 / ACF-specific / request-response symmetry ─────
-    // (Table 34, not 31 — see this module's doc comment for the renumber.)
-
-    #[test]
-    //fusa:test REQ-CRC-014
-    fn poly_constant_is_the_bit_reversal_of_table_31_polynomial() {
-        // TC18 §13.6 Table 34 "CRC32 Polynomial" (TC18.txt line 4193), read
-        // row by row. Renumbered from "Table 31" under the current
-        // TC18.txt revision — see this module's doc comment for the
-        // renumber note. (This test's own name still says "table_31";
-        // left alone since renaming a test function is a code change, not
-        // a citation fix.)
-        //   Polynomial        0xF4ACFB13
-        //   Width             32 bit
-        //   Initial Value     0xFFFFFFFF
-        //   Final XOR         0xFFFFFFFF
-        //   Input reflection  TRUE
-        //   Output reflection TRUE
-        //
-        // `crc32_tc18` runs a reflected (LSB-first) shift register, which
-        // is only equivalent to that definition if the constant it shifts
-        // against is the exact bit reversal of Table 34's polynomial.
-        const TABLE_31_POLYNOMIAL: u32 = 0xF4AC_FB13;
-        const TABLE_31_INITIAL_VALUE: u32 = 0xFFFF_FFFF;
-        const TABLE_31_FINAL_XOR: u32 = 0xFFFF_FFFF;
-        const TABLE_31_WIDTH_BITS: u32 = 32;
-
-        assert_eq!(
-            CRC32_TC18_POLY_REFLECTED,
-            TABLE_31_POLYNOMIAL.reverse_bits(),
-            "the reflected engine must shift against bitrev32(0xF4ACFB13)"
-        );
-        assert_eq!(CRC32_TC18_INIT_XOROUT, TABLE_31_INITIAL_VALUE);
-        assert_eq!(CRC32_TC18_INIT_XOROUT, TABLE_31_FINAL_XOR);
-        assert_eq!(u32::BITS, TABLE_31_WIDTH_BITS);
-    }
-
-    #[test]
-    //fusa:test REQ-CRC-017
-    fn crc32_is_computed_per_acf_type_individually() {
-        // TC18 §13.6 (TC18.txt line 4191), reworded under the current
-        // RC4/RC5 revision from the old TC18.txt line 3789 sentence this
-        // comment used to quote — the underlying fact (per-ACF-type CRC)
-        // survives, the wording does not: "In Safe command mode a CRC32 is
-        // calculated per ACF type across specific fields of an AVTPDU
-        // header, ACF header, and the entire payload (except padding)."
-        //
-        // Two ACF messages riding under one and the same AVTPDU header must
-        // therefore yield two independent coverage buffers and two
-        // independent CRCs — neither buffer may contain the other message's
-        // payload bytes.
-        let header = HeaderVariant::Ntscf(avtp::NtscfHeader {
-            stream_id: 0x0011_2233_4455_6677,
-            ..Default::default()
-        });
-        let first = sample_abb_message(3, b"first-acf");
-        let second = sample_gbb_message(5, 0x1234, b"second-acf");
-
-        let buf_first = build_crc32_coverage_buffer(&header, &AcfCoverageMessage::Abb(&first))
-            .expect("first ACF message covers on its own");
-        let buf_second = build_crc32_coverage_buffer(&header, &AcfCoverageMessage::Gbb(&second))
-            .expect("second ACF message covers on its own");
-
-        assert!(
-            !buf_first.windows(10).any(|w| w == b"second-acf"),
-            "the first ACF type's coverage must not include the second's payload"
-        );
-        assert!(
-            !buf_second.windows(9).any(|w| w == b"first-acf"),
-            "the second ACF type's coverage must not include the first's payload"
-        );
-        assert_ne!(
-            crc32_tc18(&buf_first),
-            crc32_tc18(&buf_second),
-            "two ACF types in one AVTPDU get two distinct CRC32 values"
-        );
-    }
-
-    #[test]
-    //fusa:test REQ-CRC-019
-    fn crc_scheme_is_identical_for_request_and_response() {
-        // TC18 §13.6 (TC18.txt line 4276): "The CRC calculation for
-        // requests and responses follows the identical scheme." (Near-
-        // verbatim relocation; only "request and response" → "requests and
-        // responses" changed under the current revision.)
-        //
-        // TC18 §11.2.1 Table 4 gives a request rsp = 0b and §11.3 Table 15
-        // gives a response rsp = 1b; that single covered header bit is the
-        // *only* thing that may differ between the two directions' coverage
-        // buffers. In particular, neither build_crc32_coverage_buffer nor
-        // crc32_tc18 takes a direction argument.
-        let header = HeaderVariant::Ntscf(avtp::NtscfHeader {
-            stream_id: 0x0102_0304_0506_0708,
-            ..Default::default()
-        });
-        let payload = b"same-bytes-both-ways";
-
-        let mut request = sample_abb_message(4, payload);
-        request.info.rsp = false;
-        let mut response = request.clone();
-        response.info.rsp = true;
-
-        let buf_request =
-            build_crc32_coverage_buffer(&header, &AcfCoverageMessage::Abb(&request)).unwrap();
-        let buf_response =
-            build_crc32_coverage_buffer(&header, &AcfCoverageMessage::Abb(&response)).unwrap();
-
-        assert_eq!(
-            buf_request.len(),
-            buf_response.len(),
-            "identical scheme: same coverage extent in both directions"
-        );
-        // rsp is octet 6 bit 6 of byte_message_info, which starts 12 bytes
-        // into the coverage buffer (8-byte stream_id + 4-byte
-        // avtp_timestamp position) — so index 12 + 6 == 18.
-        let differing: Vec<usize> = (0..buf_request.len())
-            .filter(|&i| buf_request[i] != buf_response[i])
-            .collect();
-        assert_eq!(
-            differing,
-            vec![18],
-            "only the rsp bit's own octet may differ between the two directions"
-        );
-        assert_eq!(buf_request[18] ^ buf_response[18], 0x40, "rsp is bit 6");
-
-        // And with rsp forced equal, the two directions produce byte-for-byte
-        // identical coverage and therefore an identical CRC.
-        response.info.rsp = false;
-        let buf_response_same =
-            build_crc32_coverage_buffer(&header, &AcfCoverageMessage::Abb(&response)).unwrap();
-        assert_eq!(buf_request, buf_response_same);
-        assert_eq!(crc32_tc18(&buf_request), crc32_tc18(&buf_response_same));
-    }
-
-    #[test]
-    //fusa:test REQ-CRC-004
-    fn coverage_buffer_leads_with_stream_id_bytes() {
-        let header = HeaderVariant::Ntscf(avtp::NtscfHeader {
-            stream_id: 0x0102_0304_0506_0708,
-            ..Default::default()
-        });
-        let acf = AcfCoverageMessage::Abb(&sample_abb_message(0, b"pl"));
-        let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
-        assert_eq!(&buf[0..8], &0x0102_0304_0506_0708u64.to_be_bytes());
-    }
-
-    #[test]
-    //fusa:test REQ-CRC-005
-    fn coverage_buffer_zeroes_avtp_timestamp_under_ntscf() {
-        let header = HeaderVariant::Ntscf(avtp::NtscfHeader {
-            stream_id: 0xAABB_CCDD_EEFF_0011,
-            ..Default::default()
-        });
-        let acf = AcfCoverageMessage::Abb(&sample_abb_message(0, b"pl"));
-        let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
-        // Bytes [8..12] are the avtp_timestamp position, immediately after
-        // the 8-byte stream_id — must be all-zero, not omitted, per the
-        // "zeroed under NTSCF" rule.
-        assert_eq!(&buf[8..12], &[0, 0, 0, 0]);
-    }
-
-    #[test]
-    //fusa:test REQ-CRC-005
-    fn coverage_buffer_uses_real_avtp_timestamp_under_tscf() {
-        let header = HeaderVariant::Tscf(avtp::TscfHeader {
-            stream_id: 0x1,
-            avtp_timestamp: 0xDEAD_BEEF,
-            ..Default::default()
-        });
-        let acf = AcfCoverageMessage::Abb(&sample_abb_message(0, b"pl"));
-        let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
-        assert_eq!(&buf[8..12], &0xDEAD_BEEFu32.to_be_bytes());
-    }
-
-    #[test]
-    //fusa:test REQ-CRC-007
-    fn coverage_buffer_abb_header_has_no_message_timestamp_region() {
-        let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
-        let payload = b"abb-payload";
-        let acf = AcfCoverageMessage::Abb(&sample_abb_message(0, payload));
-        let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
-        // 8 (stream_id) + 4 (avtp_timestamp) + ACF_ABB_HEADER_LEN + payload.
-        assert_eq!(buf.len(), 12 + acf::ACF_ABB_HEADER_LEN + payload.len());
-        // `acf_msg_type` is folded into byte_message_info's first octet
-        // (rust-RCP-W01), not a separate leading byte — decode it back out
-        // rather than comparing a raw byte.
-        let decoded_info = acf::decode_byte_message_info(&buf[12..]).unwrap();
-        assert_eq!(decoded_info.acf_msg_type, acf::ACF_ABB_MSG_TYPE);
-        assert_eq!(&buf[buf.len() - payload.len()..], payload);
-    }
-
-    #[test]
-    //fusa:test REQ-CRC-007
-    fn coverage_buffer_gbb_header_carries_message_timestamp() {
-        let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
-        let payload = b"gbb-payload";
-        let msg = sample_gbb_message(0, 0x0011_2233_4455_6677, payload);
-        let acf = AcfCoverageMessage::Gbb(&msg);
-        let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
-        // 8 (stream_id) + 4 (avtp_timestamp) + ACF_GBB_HEADER_LEN + payload.
-        assert_eq!(buf.len(), 12 + acf::ACF_GBB_HEADER_LEN + payload.len());
-        // `acf_msg_type` is folded into byte_message_info's first octet
-        // (rust-RCP-W01), not a separate leading byte — decode it back out
-        // rather than comparing a raw byte.
-        let decoded_info = acf::decode_byte_message_info(&buf[12..]).unwrap();
-        assert_eq!(decoded_info.acf_msg_type, acf::ACF_GBB_MSG_TYPE);
-        // message_timestamp occupies the 8 bytes just before the payload
-        // (ACF_GBB_HEADER_LEN already accounts for byte_message_info's
-        // width, so it starts right after that).
-        let ts_start = 12 + acf::BYTE_MESSAGE_INFO_LEN;
-        let ts_end = ts_start + 8;
-        assert_eq!(
-            &buf[ts_start..ts_end],
-            &0x0011_2233_4455_6677u64.to_be_bytes()
-        );
-        assert_eq!(&buf[buf.len() - payload.len()..], payload);
-    }
-
-    #[test]
-    //fusa:test REQ-CRC-006
-    fn coverage_buffer_preadjusts_acf_msg_length_by_one_quadlet() {
-        let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
-        let acf_msg_length = 0x0100u16;
-        let acf = AcfCoverageMessage::Abb(&sample_abb_message(acf_msg_length, b"x"));
-        let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
-        // The ACF header region starts at byte 12 (after stream_id +
-        // avtp_timestamp); byte_message_info starts immediately there —
-        // `acf_msg_type` is folded into it, not a separate leading byte
-        // (rust-RCP-W01).
-        let info_start = 12;
-        let decoded = acf::decode_byte_message_info(
-            &buf[info_start..info_start + acf::BYTE_MESSAGE_INFO_LEN],
-        )
-        .unwrap();
-        assert_eq!(
-            decoded.acf_msg_length,
-            acf_msg_length + CRC32_COVERAGE_LENGTH_PREADJUST_QUADLETS
-        );
-    }
-
-    #[test]
-    //fusa:test REQ-CRC-006
-    fn coverage_buffer_rejects_length_that_overflows_9_bits_after_preadjustment() {
-        let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
-        // Max legal 9-bit acf_msg_length; +1 pushes it past the field
-        // width, so encoding must fail the same way
-        // `acf::encode_byte_message_info` itself would.
-        let acf = AcfCoverageMessage::Abb(&sample_abb_message(acf::ACF_MSG_LENGTH_9BIT_MAX, b"x"));
-        assert_eq!(
-            build_crc32_coverage_buffer(&header, &acf),
-            Err(RcpError::InvalidSize)
-        );
-    }
-
-    #[test]
-    //fusa:test REQ-CRC-004
-    fn coverage_buffer_feeds_crc32_tc18_without_panicking() {
-        let header = HeaderVariant::Tscf(avtp::TscfHeader {
-            stream_id: 0x0203_0405_0607_0809,
-            avtp_timestamp: 0x1234_5678,
-            ..Default::default()
-        });
-        let msg = sample_gbb_message(0x0010, 0x99, b"safe-point payload");
-        let acf = AcfCoverageMessage::Gbb(&msg);
-        let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
-        let _ = crc32_tc18(&buf);
-    }
-
-    #[test]
-    //fusa:test REQ-CRC-004
-    fn coverage_buffer_changes_when_stream_id_differs() {
-        let payload = b"same-payload";
-        let acf = AcfCoverageMessage::Abb(&sample_abb_message(0, payload));
-        let h1 = HeaderVariant::Ntscf(avtp::NtscfHeader {
-            stream_id: 1,
-            ..Default::default()
-        });
-        let h2 = HeaderVariant::Ntscf(avtp::NtscfHeader {
-            stream_id: 2,
-            ..Default::default()
-        });
-        let b1 = build_crc32_coverage_buffer(&h1, &acf).unwrap();
-        let b2 = build_crc32_coverage_buffer(&h2, &acf).unwrap();
-        assert_ne!(crc32_tc18(&b1), crc32_tc18(&b2));
-    }
-
-    // ── CRC trailer wire placement: encode/decode ────────────────────────────
-    //
-    // Golden vectors: TC18 Figure 19 (ACF_ABB) / Figure 20 (ACF_GBB) worked
-    // examples, moved here from `acf.rs` (see this module's "CRC trailer
-    // wire placement" doc section) and strengthened to pin the ACTUAL byte
-    // sequence — not just total length/quadlet-count/pad-count, which
-    // stayed correct even under the old, reversed `payload, CRC, pad` byte
-    // order and so never caught that bug.
-    //
-    // TC18.txt citation-drift note (issue #164 batch 4): these are Figure
-    // 20 (ACF_ABB) / Figure 21 (ACF_GBB) under the current TC18.txt
-    // revision, and the ACF_GBB example's own content changed too — see
-    // this module's top-of-file doc comment for the full flag. The test
-    // names/comments below deliberately still say "Figure 19"/"Figure 20"
-    // and the ACF_GBB test still uses the OLD 7-payload/1-pad split; left
-    // as-is since neither is a citation-text fix (see the flag above).
-
-    #[test]
-    //fusa:test REQ-CRC-012
-    //fusa:test REQ-CRC-013
-    fn finalize_crc_trailer_matches_figure_19_worked_example() {
-        // Figure 19: ACF_ABB, 8-byte header + 6 real payload bytes + 2 pad
-        // bytes + 4-byte CRC32 trailer = 20 bytes total = 5 quadlets, wire
-        // order header, payload, pad, THEN CRC.
-        let real_payload: [u8; 6] = [0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6];
-        let msg = AcfAbbMessage {
-            info: acf::ByteMessageInfo::default(),
-            payload: real_payload.to_vec(),
-        };
-
-        // encode_acf_abb, called with the real payload alone, already gets
-        // the pre-CRC part exactly right: its own automatic pad lands
-        // right after the real payload.
-        let mut frame = acf::encode_acf_abb(&msg).unwrap();
-        assert_eq!(frame.len(), 16, "header(8) + payload(6) + native pad(2)");
-        let pre_crc_info =
-            acf::decode_byte_message_info(&frame[..acf::BYTE_MESSAGE_INFO_LEN]).unwrap();
-        assert_eq!(
-            pre_crc_info.acf_msg_length, 4,
-            "base length before the CRC trailer's own quadlet is counted"
-        );
-        assert_eq!(
-            pre_crc_info.pad, 2,
-            "Figure 19: 2 pad bytes, derived from the real payload alone"
-        );
-        assert_eq!(
-            &frame[8..14],
-            &real_payload,
-            "payload right after the header"
-        );
-        assert_eq!(
-            &frame[14..16],
-            &[0x00, 0x00],
-            "native pad right after the payload"
-        );
-
-        let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
-        let coverage_msg = AcfAbbMessage {
-            info: pre_crc_info,
-            payload: real_payload.to_vec(),
-        };
-        let coverage =
-            build_crc32_coverage_buffer(&header, &AcfCoverageMessage::Abb(&coverage_msg)).unwrap();
-        let crc = crc32_tc18(&coverage);
-
-        finalize_crc_trailer(&mut frame, crc).unwrap();
-        assert_eq!(frame.len(), 20, "Figure 19: total message is 20 bytes");
-
-        let final_info =
-            acf::decode_byte_message_info(&frame[..acf::BYTE_MESSAGE_INFO_LEN]).unwrap();
-        assert_eq!(
-            final_info.acf_msg_length, 0x05,
-            "Figure 19: acf_msg_length must be 5 quadlets"
-        );
-        assert_eq!(final_info.acf_msg_type, acf::ACF_ABB_MSG_TYPE);
-        assert_eq!(
-            final_info.pad, 2,
-            "Figure 19: 2 pad bytes — unchanged by finalize_crc_trailer"
-        );
-
-        // The exact TC18 wire byte sequence: header(8), payload(6), pad(2),
-        // CRC(4) — pad strictly BEFORE the CRC, not after it.
-        assert_eq!(
-            &frame[0..8],
-            &acf::encode_byte_message_info(&final_info).unwrap()
-        );
-        assert_eq!(
-            &frame[8..14],
-            &real_payload,
-            "payload comes right after the header"
-        );
-        assert_eq!(
-            &frame[14..16],
-            &[0x00, 0x00],
-            "pad comes right after the payload"
-        );
-        assert_eq!(
-            &frame[16..20],
-            &crc.to_be_bytes(),
-            "CRC comes last, after pad — not before it"
-        );
-
-        // Decode-side mirror: split_crc_trailer + acf::decode_acf_abb
-        // recover the real payload (pad already stripped by the acf
-        // layer's own existing logic) and the same CRC value.
-        let (body, decoded_crc) = split_crc_trailer(&frame).unwrap();
-        assert_eq!(decoded_crc, crc);
-        let decoded = acf::decode_acf_abb(&body).unwrap();
-        assert_eq!(decoded.payload, real_payload.to_vec());
-        assert_eq!(decoded.info.pad, 2);
-    }
-
-    #[test]
-    //fusa:test REQ-CRC-012
-    //fusa:test REQ-CRC-013
-    fn finalize_crc_trailer_matches_figure_20_worked_example() {
-        // Figure 20: ACF_GBB, 8-byte header + 8-byte timestamp + 7 real
-        // payload bytes + 1 pad byte + 4-byte CRC32 trailer = 28 bytes
-        // total = 7 quadlets, wire order header, timestamp, payload, pad,
-        // THEN CRC.
-        let real_payload: [u8; 7] = [0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7];
-        let message_timestamp: u64 = 0x0102_0304_0506_0708;
-        let msg = AcfGbbMessage {
-            info: acf::ByteMessageInfo::default(),
-            message_timestamp,
-            payload: real_payload.to_vec(),
-        };
-
-        let mut frame = acf::encode_acf_gbb(&msg).unwrap();
-        assert_eq!(
-            frame.len(),
-            24,
-            "header(8) + timestamp(8) + payload(7) + native pad(1)"
-        );
-        let pre_crc_info =
-            acf::decode_byte_message_info(&frame[..acf::BYTE_MESSAGE_INFO_LEN]).unwrap();
-        assert_eq!(
-            pre_crc_info.acf_msg_length, 6,
-            "base length before the CRC trailer's own quadlet is counted"
-        );
-        assert_eq!(
-            pre_crc_info.pad, 1,
-            "Figure 20: 1 pad byte, derived from the real payload alone"
-        );
-        let ts_start = acf::BYTE_MESSAGE_INFO_LEN;
-        assert_eq!(
-            &frame[ts_start..ts_start + 8],
-            &message_timestamp.to_be_bytes(),
-            "timestamp right after the header"
-        );
-        assert_eq!(
-            &frame[16..23],
-            &real_payload,
-            "payload right after the timestamp"
-        );
-        assert_eq!(
-            &frame[23..24],
-            &[0x00],
-            "native pad right after the payload"
-        );
-
-        let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
-        let coverage_msg = AcfGbbMessage {
-            info: pre_crc_info,
-            message_timestamp,
-            payload: real_payload.to_vec(),
-        };
-        let coverage =
-            build_crc32_coverage_buffer(&header, &AcfCoverageMessage::Gbb(&coverage_msg)).unwrap();
-        let crc = crc32_tc18(&coverage);
-
-        finalize_crc_trailer(&mut frame, crc).unwrap();
-        assert_eq!(frame.len(), 28, "Figure 20: total message is 28 bytes");
-
-        let final_info =
-            acf::decode_byte_message_info(&frame[..acf::BYTE_MESSAGE_INFO_LEN]).unwrap();
-        assert_eq!(
-            final_info.acf_msg_length, 0x07,
-            "Figure 20: acf_msg_length must be 7 quadlets"
-        );
-        assert_eq!(final_info.acf_msg_type, acf::ACF_GBB_MSG_TYPE);
-        assert_eq!(
-            final_info.pad, 1,
-            "Figure 20: 1 pad byte — unchanged by finalize_crc_trailer"
-        );
-
-        // The exact TC18 wire byte sequence: header(8), timestamp(8),
-        // payload(7), pad(1), CRC(4) — pad strictly BEFORE the CRC.
-        assert_eq!(
-            &frame[ts_start..ts_start + 8],
-            &message_timestamp.to_be_bytes()
-        );
-        assert_eq!(
-            &frame[16..23],
-            &real_payload,
-            "payload comes right after the timestamp"
-        );
-        assert_eq!(&frame[23..24], &[0x00], "pad comes right after the payload");
-        assert_eq!(
-            &frame[24..28],
-            &crc.to_be_bytes(),
-            "CRC comes last, after pad — not before it"
-        );
-
-        let (body, decoded_crc) = split_crc_trailer(&frame).unwrap();
-        assert_eq!(decoded_crc, crc);
-        let decoded = acf::decode_acf_gbb(&body).unwrap();
-        assert_eq!(decoded.payload, real_payload.to_vec());
-        assert_eq!(decoded.message_timestamp, message_timestamp);
-        assert_eq!(decoded.info.pad, 1);
-    }
-
-    #[test]
-    //fusa:test REQ-CRC-012
-    fn finalize_crc_trailer_never_places_pad_after_crc() {
-        // Regression guard for the padding-order bug this module's own
-        // "CRC trailer wire placement" doc section describes: naively
-        // concatenating `real_payload + crc_bytes` into one blob and
-        // handing THAT to `encode_acf_abb` (the old, buggy pattern) puts
-        // the encoder's automatically-derived pad after the CRC instead of
-        // before it. finalize_crc_trailer must never reproduce that order.
-        let real_payload: [u8; 6] = [1, 2, 3, 4, 5, 6];
-        let crc: u32 = 0x1122_3344;
-
-        // The old, buggy construction this fix replaces.
-        let buggy_payload: Vec<u8> = real_payload
-            .iter()
-            .copied()
-            .chain(crc.to_be_bytes())
-            .collect();
-        let buggy_msg = AcfAbbMessage {
-            info: acf::ByteMessageInfo::default(),
-            payload: buggy_payload,
-        };
-        let buggy_frame = acf::encode_acf_abb(&buggy_msg).unwrap();
-        // Buggy order: ...payload(6), CRC(4), pad(2) — CRC bytes land at
-        // [14..18], pad lands at [18..20], both wrong relative to Figure 19.
-        assert_eq!(&buggy_frame[14..18], &crc.to_be_bytes());
-        assert_eq!(&buggy_frame[18..20], &[0x00, 0x00]);
-
-        // The fixed construction.
-        let msg = AcfAbbMessage {
-            info: acf::ByteMessageInfo::default(),
-            payload: real_payload.to_vec(),
-        };
-        let mut frame = acf::encode_acf_abb(&msg).unwrap();
-        finalize_crc_trailer(&mut frame, crc).unwrap();
-        // Correct order: pad(2) at [14..16], THEN CRC(4) at [16..20].
-        assert_eq!(&frame[14..16], &[0x00, 0x00]);
-        assert_eq!(&frame[16..20], &crc.to_be_bytes());
-        assert_ne!(
-            frame, buggy_frame,
-            "the fixed byte order must differ from the old, buggy one"
-        );
-    }
-
-    #[test]
-    fn split_crc_trailer_rejects_short_frame() {
-        let short = vec![0u8; acf::BYTE_MESSAGE_INFO_LEN + CRC_TRAILER_LEN - 1];
-        assert_eq!(split_crc_trailer(&short), Err(RcpError::ShortFrame));
-    }
-
-    #[test]
-    fn split_crc_trailer_rejects_length_without_room_for_crc_trailer() {
-        // acf_msg_length describes a message shorter than the header
-        // itself once the CRC trailer's quadlet is un-adjusted — must be
-        // rejected, not silently underflow.
-        let info = acf::ByteMessageInfo {
-            acf_msg_type: acf::ACF_ABB_MSG_TYPE,
-            acf_msg_length: 0, // < CRC_TRAILER_QUADLETS
-            ..Default::default()
-        };
-        let header = acf::encode_byte_message_info(&info).unwrap();
-        let mut frame = header.to_vec();
-        frame.extend_from_slice(&[0u8; CRC_TRAILER_LEN]);
-        assert_eq!(split_crc_trailer(&frame), Err(RcpError::InvalidSize));
-    }
-
-    #[test]
-    fn finalize_crc_trailer_rejects_length_overflow() {
-        let info = acf::ByteMessageInfo {
-            acf_msg_type: acf::ACF_ABB_MSG_TYPE,
-            acf_msg_length: acf::ACF_MSG_LENGTH_9BIT_MAX,
-            ..Default::default()
-        };
-        let header = acf::encode_byte_message_info(&info).unwrap();
-        let mut frame = header.to_vec();
-        assert_eq!(
-            finalize_crc_trailer(&mut frame, 0),
-            Err(RcpError::InvalidSize)
-        );
-    }
-
-    #[test]
-    fn finalize_crc_trailer_rejects_short_frame() {
-        let mut short = vec![0u8; acf::BYTE_MESSAGE_INFO_LEN - 1];
-        assert_eq!(
-            finalize_crc_trailer(&mut short, 0),
-            Err(RcpError::ShortFrame)
-        );
-    }
-
-    // ── Fragmentation interaction ────────────────────────────────────────────
-
     #[test]
     //fusa:test REQ-CRC-009
     fn combined_fragment_payload_concatenates_in_given_order() {
@@ -1538,82 +982,1056 @@ mod tests {
         );
     }
 
+    // ── Coverage-buffer fixtures ────────────────────────────────────────────
+
+    fn sample_abb_message(acf_msg_length: u16, payload: &[u8]) -> AcfAbbMessage {
+        AcfAbbMessage {
+            info: acf::ByteMessageInfo {
+                acf_msg_length,
+                ..Default::default()
+            },
+            payload: payload.to_vec(),
+        }
+    }
+
+    fn sample_gbb_message(
+        acf_msg_length: u16,
+        message_timestamp: u64,
+        payload: &[u8],
+    ) -> AcfGbbMessage {
+        AcfGbbMessage {
+            info: acf::ByteMessageInfo {
+                acf_msg_length,
+                ..Default::default()
+            },
+            message_timestamp,
+            payload: payload.to_vec(),
+        }
+    }
+
+    fn hex(s: &str) -> Vec<u8> {
+        (0..s.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap())
+            .collect()
+    }
+
+    /// Offset of the ACF header inside a coverage buffer: the 15-octet
+    /// header-CRC prefix.
+    const ACF_AT: usize = COVERAGE_PREFIX_LEN;
+
+    // ── c-RCP golden vectors (#185) ─────────────────────────────────────────
+    //
+    // Generated from c-RCP's real code (c-RCP a4f3a1f, built out of tree):
+    // a C harness calling rcp_acf_encode_abb/_gbb, rcp_e2e_wrap_framed,
+    // rcp_e2e_unwrap_framed, rcp_e2e_compute_crc and
+    // rcp_e2e_compute_fragmented_crc. Each const is that harness's output.
+
+    /// Vector 1, NTSCF + ACF_ABB: byte_bus_id 0x123, transaction_num 0x5A,
+    /// op = write, hs = 1, payload A1..A6 (pad 2); stream_id
+    /// 0x0011223344556677, header_octet1 0x80. Wrapped with
+    /// `rcp_e2e_wrap_framed(sid, true, 0x80, tu = true, ts = 0xDEADBEEF, ..)`
+    /// — the NTSCF forcing must ignore that tu/ts.
+    const V1_PLAIN: &str = "1c048123025a8000a1a2a3a4a5a60000";
+    const V1_WRAPPED: &str = "1c058123025a8000a1a2a3a4a5a6627bd68e0000";
+    const V1_SID: u64 = 0x0011_2233_4455_6677;
+
+    /// Vector 2, TSCF + ACF_GBB: byte_bus_id 0x7FF, transaction_num 0x33,
+    /// op = read, read_size 4, mtv = 1, cs = 1, message_timestamp
+    /// 0x0102030405060708, payload B1..B5 (pad 3); stream_id
+    /// 0x8899AABBCCDDEEFF, header_octet1 0x89 (sv, mr, tv), tu = 1,
+    /// avtp_timestamp 0xCAFEBABE.
+    const V2_PLAIN: &str = "1a06e7ff013300040102030405060708b1b2b3b4b5000000";
+    const V2_WRAPPED: &str = "1a07e7ff013300040102030405060708b1b2b3b4b53ea965a3000000";
+    const V2_SID: u64 = 0x8899_AABB_CCDD_EEFF;
+    const V2_TS: u32 = 0xCAFE_BABE;
+
+    /// Vector 3, NTSCF fragment train, ACF_ABB: byte_bus_id 0x042,
+    /// transaction_num 0x77, op = write, payload C0..CC (13 octets) split
+    /// 5/5/3; stream_id 0x0102030405060708, header_octet1 0x80.
+    /// `V3_CRC` = rcp_e2e_compute_fragmented_crc(0x82, 0x80, false, sid, 0,
+    /// frag0[..8], C0..CC); `V3_FRAG2_WIRE` is the final fragment as
+    /// rcp_e2e_wrap_framed lays it out, with `V3_CRC` in the trailer slot.
+    const V3_FRAG0: &str = "1c04c04200779000c0c1c2c3c4000000";
+    const V3_FRAG1: &str = "1c04c04200779001c5c6c7c8c9000000";
+    const V3_FRAG2: &str = "1c03404200778000cacbcc00";
+    const V3_FRAG2_WIRE: &str = "1c04404200778000cacbcc81850db700";
+    const V3_CRC: u32 = 0x8185_0db7;
+    const V3_SID: u64 = 0x0102_0304_0506_0708;
+
+    fn v1_info() -> acf::ByteMessageInfo {
+        acf::ByteMessageInfo {
+            byte_bus_id: 0x123,
+            transaction_num: 0x5A,
+            op: true,
+            hs: true,
+            ..Default::default()
+        }
+    }
+
+    fn v2_message() -> AcfGbbMessage {
+        AcfGbbMessage {
+            info: acf::ByteMessageInfo {
+                byte_bus_id: 0x7FF,
+                transaction_num: 0x33,
+                op: false,
+                read_size_segment: acf::ReadSizeOrSegment(4),
+                mtv: true,
+                cs: true,
+                ..Default::default()
+            },
+            message_timestamp: 0x0102_0304_0506_0708,
+            payload: vec![0xB1, 0xB2, 0xB3, 0xB4, 0xB5],
+        }
+    }
+
+    fn v1_header() -> HeaderVariant {
+        HeaderVariant::Ntscf(avtp::NtscfHeader {
+            stream_id: V1_SID,
+            ntscf_data_length: 20,
+            ..Default::default()
+        })
+    }
+
+    fn v2_header() -> HeaderVariant {
+        HeaderVariant::Tscf(avtp::TscfHeader {
+            stream_id: V2_SID,
+            version: 0,
+            mr: true,
+            tv: true,
+            tu: true,
+            avtp_timestamp: V2_TS,
+            ..Default::default()
+        })
+    }
+
+    fn v3_message() -> AcfAbbMessage {
+        AcfAbbMessage {
+            info: acf::ByteMessageInfo {
+                byte_bus_id: 0x042,
+                transaction_num: 0x77,
+                op: true,
+                ..Default::default()
+            },
+            payload: (0xC0..=0xCC).collect(),
+        }
+    }
+
     #[test]
-    //fusa:test REQ-CRC-010
-    fn coverage_buffer_for_fragment_train_matches_manual_concatenation() {
+    //fusa:test REQ-E2E-005
+    //fusa:test REQ-E2E-038
+    fn embedded_golden_vectors_match_the_c_rcp_harness_output() {
+        // testdata/c_rcp_e2e_golden.txt is the harness's raw output
+        // (testdata/c_rcp_e2e_golden.c); the consts above must not drift.
+        let golden = include_str!("../testdata/c_rcp_e2e_golden.txt");
+        let field = |key: &str| -> &str {
+            golden
+                .lines()
+                .find(|l| l.starts_with(key))
+                .and_then(|l| l.rsplit([' ', '=']).next())
+                .unwrap_or_else(|| panic!("{key} missing from golden file"))
+        };
+        assert_eq!(field("v1 plain"), V1_PLAIN);
+        assert_eq!(field("v1 wrapped"), V1_WRAPPED);
+        assert_eq!(field("v2 plain"), V2_PLAIN);
+        assert_eq!(field("v2 wrapped"), V2_WRAPPED);
+        assert_eq!(field("v2 unwrap wrong tu"), "2");
+        assert_eq!(field("v3 frag0 plain"), V3_FRAG0);
+        assert_eq!(field("v3 frag1 plain"), V3_FRAG1);
+        assert_eq!(field("v3 frag2 plain"), V3_FRAG2);
+        assert_eq!(field("v3 frag2 wire"), V3_FRAG2_WIRE);
+        assert_eq!(field("v3 fragmented crc"), format!("{V3_CRC:08x}"));
+        assert_eq!(field("kat compute_crc="), "454c3806");
+        assert_eq!(field("kat compute_crc_empty"), "f8670df6");
+    }
+
+    #[test]
+    //fusa:test REQ-E2E-005
+    //fusa:test REQ-E2E-035
+    fn wrap_framed_matches_c_rcp_ntscf_abb_golden_vector() {
+        let plain = acf::encode_acf_abb(&AcfAbbMessage {
+            info: v1_info(),
+            payload: vec![0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6],
+        })
+        .unwrap();
+        assert_eq!(plain, hex(V1_PLAIN), "rust ACF_ABB encoding == c-RCP's");
+        let wrapped = wrap_framed(V1_SID, true, 0x80, true, 0xDEAD_BEEF, &plain).unwrap();
+        assert_eq!(wrapped, hex(V1_WRAPPED));
+        // Wire order payload, CRC, pad (RC5 Figure 20/21).
+        assert_eq!(&wrapped[8..14], &[0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6]);
+        assert_eq!(&wrapped[14..18], &0x627b_d68eu32.to_be_bytes());
+        assert_eq!(&wrapped[18..20], &[0, 0]);
+    }
+
+    #[test]
+    //fusa:test REQ-E2E-005
+    //fusa:test REQ-E2E-035
+    fn wrap_framed_matches_c_rcp_tscf_gbb_golden_vector() {
+        let plain = acf::encode_acf_gbb(&v2_message()).unwrap();
+        assert_eq!(plain, hex(V2_PLAIN), "rust ACF_GBB encoding == c-RCP's");
+        let wrapped = wrap_framed(V2_SID, false, 0x89, true, V2_TS, &plain).unwrap();
+        assert_eq!(wrapped, hex(V2_WRAPPED));
+    }
+
+    #[test]
+    //fusa:test REQ-CRC-020
+    fn wrap_for_header_matches_c_rcp_golden_vectors() {
+        assert_eq!(v1_header().octet1(), 0x80);
+        assert_eq!(v2_header().octet1(), 0x89);
+        assert_eq!(
+            wrap_for_header(&v1_header(), &hex(V1_PLAIN)).unwrap(),
+            hex(V1_WRAPPED)
+        );
+        assert_eq!(
+            wrap_for_header(&v2_header(), &hex(V2_PLAIN)).unwrap(),
+            hex(V2_WRAPPED)
+        );
+        assert_eq!(
+            unwrap_for_header(&v1_header(), &hex(V1_WRAPPED)),
+            Ok(hex(V1_PLAIN))
+        );
+        assert_eq!(
+            unwrap_for_header(&v2_header(), &hex(V2_WRAPPED)),
+            Ok(hex(V2_PLAIN))
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-CRC-020
+    fn unwrap_for_header_rejects_a_frame_wrapped_for_another_header() {
+        let wrapped = wrap_for_header(&v2_header(), &hex(V2_PLAIN)).unwrap();
+        let mut other = v2_header();
+        if let HeaderVariant::Tscf(h) = &mut other {
+            h.mr = false; // header_octet1 changes
+        }
+        assert!(matches!(
+            unwrap_for_header(&other, &wrapped),
+            Err(E2eError::CrcMismatch { .. })
+        ));
+    }
+
+    #[test]
+    //fusa:test REQ-E2E-009
+    fn unwrap_framed_recovers_c_rcp_golden_vectors() {
+        assert_eq!(
+            unwrap_framed(V1_SID, true, 0x80, false, 0, &hex(V1_WRAPPED)),
+            Ok(hex(V1_PLAIN))
+        );
+        assert_eq!(
+            unwrap_framed(V2_SID, false, 0x89, true, V2_TS, &hex(V2_WRAPPED)),
+            Ok(hex(V2_PLAIN))
+        );
+        // The decoded body is a valid plain ACF message again.
+        let body = unwrap_framed(V2_SID, false, 0x89, true, V2_TS, &hex(V2_WRAPPED)).unwrap();
+        assert_eq!(
+            acf::decode_acf_gbb(&body).unwrap().payload,
+            v2_message().payload
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-E2E-008
+    fn unwrap_framed_rejects_c_rcp_vector_with_wrong_tu() {
+        // c-RCP harness: rcp_e2e_unwrap_framed(.., tu = false, ..) on V2
+        // returns RCP_E2E_ERR_CRC_MISMATCH (2).
+        let err = unwrap_framed(V2_SID, false, 0x89, false, V2_TS, &hex(V2_WRAPPED)).unwrap_err();
+        assert_eq!(err.code(), 2);
+        assert_eq!(
+            err,
+            E2eError::CrcMismatch {
+                acf_frame: hex(V2_PLAIN)
+            }
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-E2E-003
+    fn compute_crc_matches_c_rcp_known_answers() {
+        assert_eq!(
+            compute_crc(
+                0x05,
+                0x81,
+                true,
+                0x0102_0304_0506_0708,
+                0x1122_3344,
+                &[1, 2, 3, 4]
+            ),
+            0x454c_3806
+        );
+        assert_eq!(compute_crc(0x82, 0x80, false, 0, 0, &[]), 0xf867_0df6);
+    }
+
+    #[test]
+    //fusa:test REQ-E2E-003
+    fn compute_crc_equals_crc32_over_the_concatenated_regions() {
+        let acf_frame = b"acf-bytes";
+        let mut concat = vec![0x05, 0x89, 0x01];
+        concat.extend_from_slice(&0x0102_0304_0506_0708u64.to_be_bytes());
+        concat.extend_from_slice(&0x1122_3344u32.to_be_bytes());
+        concat.extend_from_slice(acf_frame);
+        assert_eq!(
+            compute_crc(
+                0x05,
+                0x89,
+                true,
+                0x0102_0304_0506_0708,
+                0x1122_3344,
+                acf_frame
+            ),
+            crc32_tc18(&concat)
+        );
+        // Every input moves the CRC.
+        let base = compute_crc(0x05, 0x89, true, 1, 2, acf_frame);
+        assert_ne!(base, compute_crc(0x82, 0x89, true, 1, 2, acf_frame));
+        assert_ne!(base, compute_crc(0x05, 0x88, true, 1, 2, acf_frame));
+        assert_ne!(base, compute_crc(0x05, 0x89, false, 1, 2, acf_frame));
+        assert_ne!(base, compute_crc(0x05, 0x89, true, 3, 2, acf_frame));
+        assert_ne!(base, compute_crc(0x05, 0x89, true, 1, 4, acf_frame));
+        assert_ne!(base, compute_crc(0x05, 0x89, true, 1, 2, b"acf-bytez"));
+    }
+
+    #[test]
+    //fusa:test REQ-E2E-004
+    fn length_with_crc_adds_one_quadlet_and_saturates() {
+        assert_eq!(length_with_crc(0), 4);
+        assert_eq!(length_with_crc(16), 20);
+        assert_eq!(length_with_crc(usize::MAX - 4), usize::MAX);
+        assert_eq!(length_with_crc(usize::MAX - 3), usize::MAX);
+        assert_eq!(length_with_crc(usize::MAX), usize::MAX);
+    }
+
+    #[test]
+    //fusa:test REQ-E2E-037
+    fn data_length_for_protected_members_is_four_per_member_and_saturates() {
+        assert_eq!(data_length_for_protected_members(0), 0);
+        assert_eq!(data_length_for_protected_members(1), 4);
+        assert_eq!(data_length_for_protected_members(5), 20);
+        assert_eq!(data_length_for_protected_members(usize::MAX), usize::MAX);
+    }
+
+    #[test]
+    //fusa:test REQ-E2E-005
+    fn wrap_places_crc_after_real_payload_and_bumps_length() {
+        for payload_len in 0..8usize {
+            let payload: Vec<u8> = (1..=payload_len as u8).collect();
+            let plain = acf::encode_acf_abb(&AcfAbbMessage {
+                info: acf::ByteMessageInfo::default(),
+                payload: payload.clone(),
+            })
+            .unwrap();
+            let pad = (4 - (payload_len % 4)) % 4;
+            let real_len = 8 + payload_len;
+            let wrapped = wrap(0x82, 0x80, false, 7, 0, &plain).unwrap();
+            assert_eq!(wrapped.len(), plain.len() + CRC_TRAILER_LEN);
+            let mut adjusted = plain[..real_len].to_vec();
+            adjusted[1] += 1;
+            let crc = compute_crc(0x82, 0x80, false, 7, 0, &adjusted);
+            assert_eq!(&wrapped[..real_len], &adjusted[..]);
+            assert_eq!(&wrapped[real_len..real_len + 4], &crc.to_be_bytes());
+            assert_eq!(&wrapped[real_len + 4..], &vec![0u8; pad][..]);
+            assert_eq!(unwrap(0x82, 0x80, false, 7, 0, &wrapped), Ok(plain));
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-E2E-005
+    fn wrap_carries_pad_octets_through_verbatim() {
+        // c-RCP copies the caller's pad octets after the trailer rather
+        // than re-zeroing them, and unwrap returns them unchanged.
+        let mut plain = hex(V1_PLAIN);
+        plain[14] = 0xEE;
+        plain[15] = 0xFF;
+        let wrapped = wrap_framed(V1_SID, true, 0x80, false, 0, &plain).unwrap();
+        assert_eq!(&wrapped[18..20], &[0xEE, 0xFF]);
+        assert_eq!(&wrapped[..18], &hex(V1_WRAPPED)[..18]);
+        assert_eq!(
+            unwrap_framed(V1_SID, true, 0x80, false, 0, &wrapped),
+            Ok(plain)
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-E2E-006
+    fn wrap_fails_safe_on_invalid_input() {
+        // Not a whole number of quadlets.
+        assert_eq!(
+            wrap(0x82, 0, false, 0, 0, &[0u8; 9]),
+            Err(RcpError::InvalidSize)
+        );
+        // Empty: no length field to adjust.
+        assert_eq!(wrap(0x82, 0, false, 0, 0, &[]), Err(RcpError::ShortFrame));
+        // Four octets with pad = 3: real prefix of 1 octet.
+        assert_eq!(
+            wrap(0x82, 0, false, 0, 0, &[0x1C, 0x01, 0xC0, 0x00]),
+            Err(RcpError::ShortFrame)
+        );
+        // acf_msg_length already 0x1FF.
+        let mut full = vec![0u8; 8];
+        full[0] = (acf::ACF_ABB_MSG_TYPE << 1) | 1;
+        full[1] = 0xFF;
+        assert_eq!(
+            wrap(0x82, 0, false, 0, 0, &full),
+            Err(RcpError::InvalidSize)
+        );
+        // 0x1FE still wraps, to 0x1FF, keeping acf_msg_type.
+        full[1] = 0xFE;
+        let w = wrap(0x82, 0, false, 0, 0, &full).unwrap();
+        assert_eq!((w[0], w[1]), ((acf::ACF_ABB_MSG_TYPE << 1) | 1, 0xFF));
+        // Length 0x0FF carries into bit 8.
+        full[0] = acf::ACF_ABB_MSG_TYPE << 1;
+        full[1] = 0xFF;
+        let w = wrap(0x82, 0, false, 0, 0, &full).unwrap();
+        assert_eq!((w[0], w[1]), ((acf::ACF_ABB_MSG_TYPE << 1) | 1, 0x00));
+    }
+
+    #[test]
+    //fusa:test REQ-E2E-007
+    fn unwrap_rejects_short_frames() {
+        assert_eq!(unwrap(0x82, 0, false, 0, 0, &[]), Err(E2eError::ShortFrame));
+        assert_eq!(
+            unwrap(0x82, 0, false, 0, 0, &[0u8; 3]),
+            Err(E2eError::ShortFrame)
+        );
+        // pad field claims 3 octets but only the trailer fits.
+        assert_eq!(
+            unwrap(0x82, 0, false, 0, 0, &[0x00, 0x00, 0xC0, 0x00, 0x00, 0x00]),
+            Err(E2eError::ShortFrame)
+        );
+        // Exactly trailer + claimed pad: accepted as far as the split goes.
+        assert!(matches!(
+            unwrap(0x82, 0, false, 0, 0, &[0x00, 0x00, 0x40, 0x00, 0x00]),
+            Err(E2eError::CrcMismatch { .. }) | Ok(_)
+        ));
+    }
+
+    #[test]
+    //fusa:test REQ-E2E-008
+    fn unwrap_reports_crc_mismatch_on_any_corruption() {
+        let wrapped = hex(V1_WRAPPED);
+        for i in 0..18 {
+            let mut bad = wrapped.clone();
+            bad[i] ^= 0x01;
+            let got = unwrap_framed(V1_SID, true, 0x80, false, 0, &bad);
+            assert!(
+                matches!(got, Err(E2eError::CrcMismatch { .. })),
+                "bit flip at octet {i} must be a CRC mismatch, got {got:?}"
+            );
+        }
+        // Pad octets are not covered.
+        let mut pad_changed = wrapped.clone();
+        pad_changed[19] = 0x55;
+        assert!(unwrap_framed(V1_SID, true, 0x80, false, 0, &pad_changed).is_ok());
+        // Wrong stream_id.
+        assert!(matches!(
+            unwrap_framed(V1_SID + 1, true, 0x80, false, 0, &wrapped),
+            Err(E2eError::CrcMismatch { .. })
+        ));
+    }
+
+    #[test]
+    //fusa:test REQ-E2E-009
+    fn unwrap_round_trips_wrap_for_gbb_and_abb() {
+        let gbb = acf::encode_acf_gbb(&sample_gbb_message(0, 0x55, b"gbb")).unwrap();
+        let abb = acf::encode_acf_abb(&sample_abb_message(0, b"abcd")).unwrap();
+        for frame in [gbb, abb] {
+            let w = wrap(0x05, 0x81, true, 9, 10, &frame).unwrap();
+            assert_eq!(unwrap(0x05, 0x81, true, 9, 10, &w), Ok(frame));
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-E2E-007
+    fn unwrap_leaves_length_unadjusted_when_it_cannot_decrement() {
+        // acf_msg_length 0 and a CRC computed over that: c-RCP leaves the
+        // length untouched (adapt fails) and still reports OK.
+        let real = [0x1Cu8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+        let crc = compute_crc(0x82, 0, false, 0, 0, &real);
+        let mut frame = real.to_vec();
+        frame.extend_from_slice(&crc.to_be_bytes());
+        assert_eq!(unwrap(0x82, 0, false, 0, 0, &frame), Ok(real.to_vec()));
+    }
+
+    #[test]
+    //fusa:test REQ-E2E-035
+    fn framed_variants_force_ntscf_tu_and_timestamp_only() {
+        let plain = hex(V1_PLAIN);
+        let a = wrap_framed(5, true, 0x80, true, 0x1234, &plain).unwrap();
+        let b = wrap_framed(5, true, 0x80, false, 0, &plain).unwrap();
+        assert_eq!(a, b, "NTSCF ignores tu/avtp_timestamp");
+        assert_eq!(
+            a,
+            wrap(avtp::NTSCF_SUBTYPE, 0x80, false, 5, 0, &plain).unwrap()
+        );
+        let t1 = wrap_framed(5, false, 0x81, true, 0x1234, &plain).unwrap();
+        let t2 = wrap_framed(5, false, 0x81, false, 0x1234, &plain).unwrap();
+        let t3 = wrap_framed(5, false, 0x81, true, 0x1235, &plain).unwrap();
+        assert_ne!(t1, t2, "TSCF tu is covered");
+        assert_ne!(t1, t3, "TSCF avtp_timestamp is covered");
+        assert_eq!(
+            t1,
+            wrap(avtp::TSCF_SUBTYPE, 0x81, true, 5, 0x1234, &plain).unwrap()
+        );
+        assert_eq!(
+            unwrap_framed(5, true, 0x80, true, 0x9999, &a),
+            Ok(plain.clone())
+        );
+        assert_eq!(unwrap_framed(5, false, 0x81, true, 0x1234, &t1), Ok(plain));
+    }
+
+    #[test]
+    //fusa:test REQ-E2E-001
+    fn e2e_error_codes_and_messages_are_distinct() {
+        let short = E2eError::ShortFrame;
+        let mismatch = E2eError::CrcMismatch { acf_frame: vec![] };
+        assert_eq!(short.code(), 1);
+        assert_eq!(mismatch.code(), 2);
+        assert_ne!(short.strerror(), mismatch.strerror());
+        assert_eq!(
+            short.to_string(),
+            "e2e: frame too short for a CRC32 trailer"
+        );
+        assert_eq!(
+            mismatch.to_string(),
+            "e2e: POCI failure -- CRC32 mismatch, execution skipped"
+        );
+        let as_error: &dyn std::error::Error = &short;
+        assert!(as_error.source().is_none());
+    }
+
+    #[test]
+    //fusa:test REQ-WIREERR-003
+    fn e2e_wire_error_maps_crc_mismatch_to_poci_failure() {
+        let mismatch = E2eError::CrcMismatch { acf_frame: vec![1] };
+        assert_eq!(mismatch.wire_error(), Some(RcpError::PociFailure));
+        assert_eq!(RcpError::PociFailure.tc18_wire_code(), Some(12));
+        assert_eq!(E2eError::ShortFrame.wire_error(), None);
+    }
+
+    // ── TC18 §13.6 Table 34 / ACF-specific / request-response symmetry ─────
+
+    #[test]
+    //fusa:test REQ-CRC-014
+    fn poly_constant_is_the_bit_reversal_of_table_34_polynomial() {
+        // TC18 §13.6 Table 34 "CRC32 Polynomial": 0xF4ACFB13, 32 bit,
+        // init 0xFFFFFFFF, final XOR 0xFFFFFFFF, reflected in and out.
+        const TABLE_34_POLYNOMIAL: u32 = 0xF4AC_FB13;
+        assert_eq!(
+            CRC32_TC18_POLY_REFLECTED,
+            TABLE_34_POLYNOMIAL.reverse_bits()
+        );
+        assert_eq!(CRC32_TC18_INIT_XOROUT, 0xFFFF_FFFF);
+        assert_eq!(u32::BITS, 32);
+    }
+
+    #[test]
+    //fusa:test REQ-CRC-017
+    fn crc32_is_computed_per_acf_type_individually() {
+        // TC18 §13.6: "a CRC32 is calculated per ACF type". Two ACF
+        // messages under one AVTPDU get two independent coverage buffers.
+        let header = HeaderVariant::Ntscf(avtp::NtscfHeader {
+            stream_id: 0x0011_2233_4455_6677,
+            ..Default::default()
+        });
+        let first = sample_abb_message(3, b"first-acf");
+        let second = sample_gbb_message(5, 0x1234, b"second-acf");
+
+        let buf_first = build_crc32_coverage_buffer(&header, &AcfCoverageMessage::Abb(&first))
+            .expect("first ACF message covers on its own");
+        let buf_second = build_crc32_coverage_buffer(&header, &AcfCoverageMessage::Gbb(&second))
+            .expect("second ACF message covers on its own");
+
+        assert!(!buf_first.windows(10).any(|w| w == b"second-acf"));
+        assert!(!buf_second.windows(9).any(|w| w == b"first-acf"));
+        assert_ne!(crc32_tc18(&buf_first), crc32_tc18(&buf_second));
+    }
+
+    #[test]
+    //fusa:test REQ-CRC-019
+    fn crc_scheme_is_identical_for_request_and_response() {
+        // TC18 §13.6: "The CRC calculation for requests and responses
+        // follows the identical scheme." Only the covered rsp bit differs.
         let header = HeaderVariant::Ntscf(avtp::NtscfHeader {
             stream_id: 0x0102_0304_0506_0708,
             ..Default::default()
         });
-        let segments: [&[u8]; 3] = [b"seg-one-", b"seg-two-", b"seg-three"];
-        let final_info = acf::ByteMessageInfo {
-            acf_msg_length: 0x20,
-            ms: false,
+        let payload = b"same-bytes-both-ways";
+
+        let mut request = sample_abb_message(4, payload);
+        request.info.rsp = false;
+        let mut response = request.clone();
+        response.info.rsp = true;
+
+        let buf_request =
+            build_crc32_coverage_buffer(&header, &AcfCoverageMessage::Abb(&request)).unwrap();
+        let buf_response =
+            build_crc32_coverage_buffer(&header, &AcfCoverageMessage::Abb(&response)).unwrap();
+
+        assert_eq!(buf_request.len(), buf_response.len());
+        // rsp is octet 6 bit 6 of byte_message_info, which starts after the
+        // 15-octet header prefix.
+        let rsp_at = ACF_AT + 6;
+        let differing: Vec<usize> = (0..buf_request.len())
+            .filter(|&i| buf_request[i] != buf_response[i])
+            .collect();
+        assert_eq!(differing, vec![rsp_at]);
+        assert_eq!(buf_request[rsp_at] ^ buf_response[rsp_at], 0x40);
+
+        // The same holds through wrap: a request and a response differ in
+        // the rsp bit and the CRC only.
+        let req_frame = acf::encode_acf_abb(&request).unwrap();
+        let rsp_frame = acf::encode_acf_abb(&response).unwrap();
+        let wq = wrap_for_header(&header, &req_frame).unwrap();
+        let wr = wrap_for_header(&header, &rsp_frame).unwrap();
+        assert_eq!(unwrap_for_header(&header, &wq), Ok(req_frame));
+        assert_eq!(unwrap_for_header(&header, &wr), Ok(rsp_frame));
+    }
+
+    // ── Legacy coverage buffer ──────────────────────────────────────────────
+
+    #[test]
+    //fusa:test REQ-CRC-004
+    fn coverage_buffer_leads_with_the_c_rcp_header_prefix() {
+        let header = HeaderVariant::Tscf(avtp::TscfHeader {
+            stream_id: 0x0102_0304_0506_0708,
+            avtp_timestamp: 0x1122_3344,
+            tu: true,
+            mr: true,
+            tv: true,
+            ..Default::default()
+        });
+        let acf = AcfCoverageMessage::Abb(&sample_abb_message(0, b"pl"));
+        let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
+        assert_eq!(buf[0], avtp::TSCF_SUBTYPE);
+        assert_eq!(buf[1], 0x89);
+        assert_eq!(buf[2], 0x01, "tu octet");
+        assert_eq!(&buf[3..11], &0x0102_0304_0506_0708u64.to_be_bytes());
+        assert_eq!(&buf[11..15], &0x1122_3344u32.to_be_bytes());
+    }
+
+    #[test]
+    //fusa:test REQ-CRC-004
+    fn coverage_buffer_crc_equals_the_crc_wrap_places() {
+        // For a self-consistent message, crc32_tc18(coverage) is exactly
+        // the trailer wrap_for_header writes.
+        let msg = v2_message();
+        let plain = acf::encode_acf_gbb(&msg).unwrap();
+        let decoded = acf::decode_acf_gbb(&plain).unwrap();
+        let coverage =
+            build_crc32_coverage_buffer(&v2_header(), &AcfCoverageMessage::Gbb(&decoded)).unwrap();
+        let wrapped = wrap_for_header(&v2_header(), &plain).unwrap();
+        assert_eq!(&wrapped[21..25], &crc32_tc18(&coverage).to_be_bytes());
+
+        let abb = AcfAbbMessage {
+            info: v1_info(),
+            payload: vec![0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6],
+        };
+        let decoded = acf::decode_acf_abb(&acf::encode_acf_abb(&abb).unwrap()).unwrap();
+        let coverage =
+            build_crc32_coverage_buffer(&v1_header(), &AcfCoverageMessage::Abb(&decoded)).unwrap();
+        assert_eq!(
+            &hex(V1_WRAPPED)[14..18],
+            &crc32_tc18(&coverage).to_be_bytes()
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-CRC-005
+    fn coverage_buffer_feeds_zero_tu_and_timestamp_under_ntscf() {
+        // c-RCP parity: the zero tu octet and the four zero timestamp
+        // octets are present, not omitted.
+        let header = HeaderVariant::Ntscf(avtp::NtscfHeader {
+            stream_id: 0xAABB_CCDD_EEFF_0011,
+            ..Default::default()
+        });
+        let acf = AcfCoverageMessage::Abb(&sample_abb_message(0, b"pl"));
+        let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
+        assert_eq!(buf[0], avtp::NTSCF_SUBTYPE);
+        assert_eq!(buf[1], 0x80);
+        assert_eq!(buf[2], 0x00);
+        assert_eq!(&buf[11..15], &[0, 0, 0, 0]);
+        assert_eq!(buf.len(), ACF_AT + acf::ACF_ABB_HEADER_LEN + 2);
+    }
+
+    #[test]
+    //fusa:test REQ-CRC-005
+    fn coverage_buffer_uses_real_tu_and_avtp_timestamp_under_tscf() {
+        let header = HeaderVariant::Tscf(avtp::TscfHeader {
+            stream_id: 0x1,
+            avtp_timestamp: 0xDEAD_BEEF,
+            tu: false,
+            ..Default::default()
+        });
+        let acf = AcfCoverageMessage::Abb(&sample_abb_message(0, b"pl"));
+        let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
+        assert_eq!(buf[2], 0x00);
+        assert_eq!(&buf[11..15], &0xDEAD_BEEFu32.to_be_bytes());
+        let header_tu = HeaderVariant::Tscf(avtp::TscfHeader {
+            stream_id: 0x1,
+            avtp_timestamp: 0xDEAD_BEEF,
+            tu: true,
+            ..Default::default()
+        });
+        assert_eq!(
+            build_crc32_coverage_buffer(&header_tu, &acf).unwrap()[2],
+            0x01
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-CRC-007
+    fn coverage_buffer_abb_header_has_no_message_timestamp_region() {
+        let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
+        let payload = b"abb-payload";
+        let acf = AcfCoverageMessage::Abb(&sample_abb_message(0, payload));
+        let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
+        assert_eq!(buf.len(), ACF_AT + acf::ACF_ABB_HEADER_LEN + payload.len());
+        let decoded_info = acf::decode_byte_message_info(&buf[ACF_AT..]).unwrap();
+        assert_eq!(decoded_info.acf_msg_type, acf::ACF_ABB_MSG_TYPE);
+        assert_eq!(&buf[buf.len() - payload.len()..], payload);
+    }
+
+    #[test]
+    //fusa:test REQ-CRC-007
+    fn coverage_buffer_gbb_header_carries_message_timestamp() {
+        let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
+        let payload = b"gbb-payload";
+        let msg = sample_gbb_message(0, 0x0011_2233_4455_6677, payload);
+        let acf = AcfCoverageMessage::Gbb(&msg);
+        let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
+        assert_eq!(buf.len(), ACF_AT + acf::ACF_GBB_HEADER_LEN + payload.len());
+        let decoded_info = acf::decode_byte_message_info(&buf[ACF_AT..]).unwrap();
+        assert_eq!(decoded_info.acf_msg_type, acf::ACF_GBB_MSG_TYPE);
+        let ts_start = ACF_AT + acf::BYTE_MESSAGE_INFO_LEN;
+        assert_eq!(
+            &buf[ts_start..ts_start + 8],
+            &0x0011_2233_4455_6677u64.to_be_bytes()
+        );
+        assert_eq!(&buf[buf.len() - payload.len()..], payload);
+    }
+
+    #[test]
+    //fusa:test REQ-CRC-006
+    fn coverage_buffer_preadjusts_acf_msg_length_by_one_quadlet() {
+        let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
+        let acf_msg_length = 0x0100u16;
+        let acf = AcfCoverageMessage::Abb(&sample_abb_message(acf_msg_length, b"x"));
+        let buf = build_crc32_coverage_buffer(&header, &acf).unwrap();
+        let decoded =
+            acf::decode_byte_message_info(&buf[ACF_AT..ACF_AT + acf::BYTE_MESSAGE_INFO_LEN])
+                .unwrap();
+        assert_eq!(
+            decoded.acf_msg_length,
+            acf_msg_length + CRC32_COVERAGE_LENGTH_PREADJUST_QUADLETS
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-CRC-006
+    fn coverage_buffer_rejects_length_that_overflows_9_bits_after_preadjustment() {
+        let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
+        let acf = AcfCoverageMessage::Abb(&sample_abb_message(acf::ACF_MSG_LENGTH_9BIT_MAX, b"x"));
+        assert_eq!(
+            build_crc32_coverage_buffer(&header, &acf),
+            Err(RcpError::InvalidSize)
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-CRC-004
+    fn coverage_buffer_changes_when_stream_id_differs() {
+        let payload = b"same-payload";
+        let acf = AcfCoverageMessage::Abb(&sample_abb_message(0, payload));
+        let h1 = HeaderVariant::Ntscf(avtp::NtscfHeader {
+            stream_id: 1,
+            ..Default::default()
+        });
+        let h2 = HeaderVariant::Ntscf(avtp::NtscfHeader {
+            stream_id: 2,
+            ..Default::default()
+        });
+        let b1 = build_crc32_coverage_buffer(&h1, &acf).unwrap();
+        let b2 = build_crc32_coverage_buffer(&h2, &acf).unwrap();
+        assert_ne!(crc32_tc18(&b1), crc32_tc18(&b2));
+    }
+
+    // ── CRC trailer wire placement (TC18 RC5 Figures 20/21) ─────────────────
+
+    #[test]
+    //fusa:test REQ-CRC-012
+    //fusa:test REQ-CRC-013
+    fn finalize_crc_trailer_matches_figure_20_layout() {
+        // Figure 20, ACF_ABB under TSCF: header(8), 6 payload octets,
+        // CRC32(4), 2 pad octets = 20 octets = 5 quadlets.
+        let real_payload: [u8; 6] = [0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6];
+        let msg = AcfAbbMessage {
+            info: acf::ByteMessageInfo::default(),
+            payload: real_payload.to_vec(),
+        };
+        let mut frame = acf::encode_acf_abb(&msg).unwrap();
+        assert_eq!(frame.len(), 16);
+        let crc = 0x1122_3344;
+        finalize_crc_trailer(&mut frame, crc).unwrap();
+        assert_eq!(frame.len(), 20);
+        let info = acf::decode_byte_message_info(&frame[..8]).unwrap();
+        assert_eq!(info.acf_msg_length, 5);
+        assert_eq!(info.pad, 2);
+        assert_eq!(&frame[8..14], &real_payload);
+        assert_eq!(
+            &frame[14..18],
+            &crc.to_be_bytes(),
+            "CRC right after payload"
+        );
+        assert_eq!(&frame[18..20], &[0, 0], "pad after the CRC");
+
+        let (body, decoded_crc) = split_crc_trailer(&frame).unwrap();
+        assert_eq!(decoded_crc, crc);
+        let decoded = acf::decode_acf_abb(&body).unwrap();
+        assert_eq!(decoded.payload, real_payload.to_vec());
+    }
+
+    #[test]
+    //fusa:test REQ-CRC-012
+    //fusa:test REQ-CRC-013
+    fn finalize_crc_trailer_matches_figure_21_layout() {
+        // Figure 21 (RC5), ACF_GBB under NTSCF: header(8), timestamp(8),
+        // 5 payload octets, CRC32(4), 3 pad octets = 28 octets = 7 quadlets.
+        let real_payload: [u8; 5] = [0xB1, 0xB2, 0xB3, 0xB4, 0xB5];
+        let message_timestamp: u64 = 0x0102_0304_0506_0708;
+        let msg = AcfGbbMessage {
+            info: acf::ByteMessageInfo::default(),
+            message_timestamp,
+            payload: real_payload.to_vec(),
+        };
+        let mut frame = acf::encode_acf_gbb(&msg).unwrap();
+        assert_eq!(frame.len(), 24);
+        let crc = 0xA1B2_C3D4;
+        finalize_crc_trailer(&mut frame, crc).unwrap();
+        assert_eq!(frame.len(), 28);
+        let info = acf::decode_byte_message_info(&frame[..8]).unwrap();
+        assert_eq!(info.acf_msg_length, 7);
+        assert_eq!(info.pad, 3);
+        assert_eq!(&frame[8..16], &message_timestamp.to_be_bytes());
+        assert_eq!(&frame[16..21], &real_payload);
+        assert_eq!(&frame[21..25], &crc.to_be_bytes());
+        assert_eq!(&frame[25..28], &[0, 0, 0]);
+
+        let (body, decoded_crc) = split_crc_trailer(&frame).unwrap();
+        assert_eq!(decoded_crc, crc);
+        let decoded = acf::decode_acf_gbb(&body).unwrap();
+        assert_eq!(decoded.payload, real_payload.to_vec());
+        assert_eq!(decoded.message_timestamp, message_timestamp);
+    }
+
+    #[test]
+    //fusa:test REQ-CRC-012
+    fn finalize_crc_trailer_with_wrap_crc_equals_wrap() {
+        let plain = hex(V2_PLAIN);
+        let wrapped = hex(V2_WRAPPED);
+        let mut frame = plain.clone();
+        finalize_crc_trailer(&mut frame, 0x3ea9_65a3).unwrap();
+        assert_eq!(frame, wrapped);
+    }
+
+    #[test]
+    //fusa:test REQ-CRC-013
+    fn split_crc_trailer_rejects_short_frame() {
+        let short = vec![0u8; acf::BYTE_MESSAGE_INFO_LEN + CRC_TRAILER_LEN - 1];
+        assert_eq!(split_crc_trailer(&short), Err(RcpError::ShortFrame));
+    }
+
+    #[test]
+    //fusa:test REQ-CRC-013
+    fn split_crc_trailer_rejects_length_without_room_for_crc_trailer() {
+        let info = acf::ByteMessageInfo {
+            acf_msg_type: acf::ACF_ABB_MSG_TYPE,
+            acf_msg_length: 0,
             ..Default::default()
         };
-        // The final fragment's own payload field is irrelevant to the
-        // train buffer — only its header fields (info) are consulted; the
-        // payload region comes from `segments` instead.
-        let final_fragment_msg = AcfAbbMessage {
-            info: final_info,
-            payload: b"ignored-final-fragment-payload".to_vec(),
+        let header = acf::encode_byte_message_info(&info).unwrap();
+        let mut frame = header.to_vec();
+        frame.extend_from_slice(&[0u8; CRC_TRAILER_LEN]);
+        assert_eq!(split_crc_trailer(&frame), Err(RcpError::InvalidSize));
+    }
+
+    #[test]
+    //fusa:test REQ-CRC-012
+    fn finalize_crc_trailer_rejects_length_overflow() {
+        let info = acf::ByteMessageInfo {
+            acf_msg_type: acf::ACF_ABB_MSG_TYPE,
+            acf_msg_length: acf::ACF_MSG_LENGTH_9BIT_MAX,
+            ..Default::default()
         };
-        let final_fragment = AcfCoverageMessage::Abb(&final_fragment_msg);
+        let header = acf::encode_byte_message_info(&info).unwrap();
+        let mut frame = header.to_vec();
+        assert_eq!(
+            finalize_crc_trailer(&mut frame, 0),
+            Err(RcpError::InvalidSize)
+        );
+        assert_eq!(frame, header.to_vec(), "frame unchanged on error");
+    }
 
-        let via_train_fn =
-            build_crc32_coverage_buffer_for_fragment_train(&header, &final_fragment, &segments)
-                .unwrap();
+    #[test]
+    //fusa:test REQ-CRC-012
+    fn finalize_crc_trailer_rejects_short_frame() {
+        let mut short = vec![0u8; acf::BYTE_MESSAGE_INFO_LEN - 1];
+        assert_eq!(
+            finalize_crc_trailer(&mut short, 0),
+            Err(RcpError::ShortFrame)
+        );
+    }
 
-        let manual_combined_msg = AcfAbbMessage {
-            info: final_info,
-            payload: b"seg-one-seg-two-seg-three".to_vec(),
-        };
-        let manual =
-            build_crc32_coverage_buffer(&header, &AcfCoverageMessage::Abb(&manual_combined_msg))
-                .unwrap();
+    // ── Fragmentation ───────────────────────────────────────────────────────
 
-        assert_eq!(via_train_fn, manual);
+    #[test]
+    //fusa:test REQ-E2E-010
+    fn fragment_carries_crc_is_is_last_fragment() {
+        assert!(fragment_carries_crc(true));
+        assert!(!fragment_carries_crc(false));
+    }
+
+    #[test]
+    //fusa:test REQ-E2E-038
+    fn compute_fragmented_crc_matches_c_rcp_golden_vector() {
+        let frag0 = hex(V3_FRAG0);
+        let payload: Vec<u8> = (0xC0..=0xCC).collect();
+        assert_eq!(
+            compute_fragmented_crc(
+                avtp::NTSCF_SUBTYPE,
+                0x80,
+                false,
+                V3_SID,
+                0,
+                &frag0[..acf::ACF_ABB_HEADER_LEN],
+                &payload
+            ),
+            V3_CRC
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-E2E-038
+    fn compute_fragmented_crc_equals_crc32_over_the_concatenation() {
+        let hdr = [1u8, 2, 3, 4, 5, 6, 7, 8];
+        let payload = b"reassembled";
+        let mut concat = vec![0x05, 0x81, 0x01];
+        concat.extend_from_slice(&9u64.to_be_bytes());
+        concat.extend_from_slice(&10u32.to_be_bytes());
+        concat.extend_from_slice(&hdr);
+        concat.extend_from_slice(payload);
+        assert_eq!(
+            compute_fragmented_crc(0x05, 0x81, true, 9, 10, &hdr, payload),
+            crc32_tc18(&concat)
+        );
+        // Same as compute_crc over header ++ payload.
+        let mut acf_bytes = hdr.to_vec();
+        acf_bytes.extend_from_slice(payload);
+        assert_eq!(
+            compute_fragmented_crc(0x05, 0x81, true, 9, 10, &hdr, payload),
+            compute_crc(0x05, 0x81, true, 9, 10, &acf_bytes)
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-CRC-010
+    //fusa:test REQ-CRC-012
+    //fusa:test REQ-CRC-013
+    fn fragment_train_matches_c_rcp_golden_vector_end_to_end() {
+        let fragments = crate::fragment::fragment_abb_message(&v3_message(), 5).unwrap();
+        let encoded: Vec<Vec<u8>> = fragments
+            .iter()
+            .map(|f| acf::encode_acf_abb(f).unwrap())
+            .collect();
+        assert_eq!(encoded, vec![hex(V3_FRAG0), hex(V3_FRAG1), hex(V3_FRAG2)]);
+
+        let header = HeaderVariant::Ntscf(avtp::NtscfHeader {
+            stream_id: V3_SID,
+            ..Default::default()
+        });
+        let segments: Vec<&[u8]> = fragments.iter().map(|f| f.payload.as_slice()).collect();
+        let crc = crc32_tc18_for_fragment_train(
+            &header,
+            &AcfCoverageMessage::Abb(&fragments[0]),
+            &segments,
+        )
+        .unwrap();
+        assert_eq!(crc, V3_CRC);
+
+        // The final fragment carries it where wrap would put its own CRC.
+        let mut last = encoded[2].clone();
+        finalize_crc_trailer(&mut last, crc).unwrap();
+        assert_eq!(last, hex(V3_FRAG2_WIRE));
+
+        // Receive side: split the final fragment, recompute, compare.
+        let (body, got) = split_crc_trailer(&hex(V3_FRAG2_WIRE)).unwrap();
+        assert_eq!(body, hex(V3_FRAG2));
+        assert_eq!(got, crc);
+    }
+
+    #[test]
+    //fusa:test REQ-CRC-010
+    fn fragment_train_crc_uses_first_fragment_header_without_length_adjustment() {
+        // c-RCP parity (#169/#170): the first fragment's header is fed as
+        // sent — its own acf_msg_length (4), pad (3), ms = 1, segment 0 —
+        // not the final fragment's, and without the +1 quadlet.
+        let fragments = crate::fragment::fragment_abb_message(&v3_message(), 5).unwrap();
+        let header = HeaderVariant::Ntscf(avtp::NtscfHeader {
+            stream_id: V3_SID,
+            ..Default::default()
+        });
+        let segments: Vec<&[u8]> = fragments.iter().map(|f| f.payload.as_slice()).collect();
+        let buf = build_crc32_coverage_buffer_for_fragment_train(
+            &header,
+            &AcfCoverageMessage::Abb(&fragments[0]),
+            &segments,
+        )
+        .unwrap();
+        assert_eq!(&buf[ACF_AT..ACF_AT + 8], &hex(V3_FRAG0)[..8]);
+        assert_eq!(&buf[ACF_AT + 8..], &v3_message().payload[..]);
+        assert_eq!(crc32_tc18(&buf), V3_CRC);
+
+        let with_final = crc32_tc18_for_fragment_train(
+            &header,
+            &AcfCoverageMessage::Abb(&fragments[2]),
+            &segments,
+        )
+        .unwrap();
+        assert_ne!(
+            with_final, V3_CRC,
+            "final-fragment header gives another CRC"
+        );
     }
 
     #[test]
     //fusa:test REQ-CRC-010
     fn coverage_buffer_for_fragment_train_changes_when_any_segment_differs() {
         let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
-        let final_fragment_msg = sample_abb_message(0, b"unused");
-        let final_fragment = AcfCoverageMessage::Abb(&final_fragment_msg);
-
+        let first_msg = sample_abb_message(0, b"aaaa");
+        let first = AcfCoverageMessage::Abb(&first_msg);
         let segments_a: [&[u8]; 2] = [b"aaaa", b"bbbb"];
         let segments_b: [&[u8]; 2] = [b"aaaa", b"cccc"];
-
         let buf_a =
-            build_crc32_coverage_buffer_for_fragment_train(&header, &final_fragment, &segments_a)
-                .unwrap();
+            build_crc32_coverage_buffer_for_fragment_train(&header, &first, &segments_a).unwrap();
         let buf_b =
-            build_crc32_coverage_buffer_for_fragment_train(&header, &final_fragment, &segments_b)
-                .unwrap();
+            build_crc32_coverage_buffer_for_fragment_train(&header, &first, &segments_b).unwrap();
         assert_ne!(buf_a, buf_b);
     }
 
     #[test]
     //fusa:test REQ-CRC-010
-    fn coverage_buffer_for_fragment_train_gbb_carries_final_fragment_timestamp() {
+    fn coverage_buffer_for_fragment_train_gbb_carries_first_fragment_timestamp() {
         let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
-        let final_fragment_msg = sample_gbb_message(0, 0x1122_3344_5566_7788, b"unused");
-        let final_fragment = AcfCoverageMessage::Gbb(&final_fragment_msg);
+        let first_msg = sample_gbb_message(0, 0x1122_3344_5566_7788, b"part-a");
+        let first = AcfCoverageMessage::Gbb(&first_msg);
         let segments: [&[u8]; 2] = [b"part-a", b"part-b"];
-
         let buf =
-            build_crc32_coverage_buffer_for_fragment_train(&header, &final_fragment, &segments)
-                .unwrap();
-
-        // `acf_msg_type` is folded into byte_message_info's first octet
-        // (rust-RCP-W01), not a separate leading byte.
-        let decoded_info = acf::decode_byte_message_info(&buf[12..]).unwrap();
-        assert_eq!(decoded_info.acf_msg_type, acf::ACF_GBB_MSG_TYPE);
-        let ts_start = 12 + acf::BYTE_MESSAGE_INFO_LEN;
-        let ts_end = ts_start + 8;
+            build_crc32_coverage_buffer_for_fragment_train(&header, &first, &segments).unwrap();
         assert_eq!(
-            &buf[ts_start..ts_end],
+            &buf[ACF_AT..ACF_AT + acf::ACF_GBB_HEADER_LEN],
+            &acf::encode_acf_gbb(&first_msg).unwrap()[..acf::ACF_GBB_HEADER_LEN]
+        );
+        let ts_start = ACF_AT + acf::BYTE_MESSAGE_INFO_LEN;
+        assert_eq!(
+            &buf[ts_start..ts_start + 8],
             &0x1122_3344_5566_7788u64.to_be_bytes()
         );
         assert_eq!(&buf[buf.len() - 12..], b"part-apart-b");
@@ -1621,34 +2039,41 @@ mod tests {
 
     #[test]
     //fusa:test REQ-CRC-010
-    fn coverage_buffer_for_fragment_train_propagates_length_overflow_error() {
+    fn coverage_buffer_for_fragment_train_propagates_encode_error() {
         let header = HeaderVariant::Ntscf(avtp::NtscfHeader::default());
-        let final_fragment_msg = sample_abb_message(acf::ACF_MSG_LENGTH_9BIT_MAX, b"unused");
-        let final_fragment = AcfCoverageMessage::Abb(&final_fragment_msg);
+        let mut first_msg = sample_abb_message(0, b"x");
+        first_msg.info.byte_bus_id = 0x800; // wider than 11 bits
+        let first = AcfCoverageMessage::Abb(&first_msg);
+        let mut gbb = sample_gbb_message(0, 0, b"x");
+        gbb.info.byte_bus_id = 0x800;
         let segments: [&[u8]; 1] = [b"x"];
         assert_eq!(
-            build_crc32_coverage_buffer_for_fragment_train(&header, &final_fragment, &segments),
+            build_crc32_coverage_buffer_for_fragment_train(&header, &first, &segments),
+            Err(RcpError::InvalidSize)
+        );
+        assert_eq!(
+            crc32_tc18_for_fragment_train(&header, &AcfCoverageMessage::Gbb(&gbb), &segments),
             Err(RcpError::InvalidSize)
         );
     }
 
     #[test]
     //fusa:test REQ-CRC-010
-    fn crc32_tc18_for_fragment_train_matches_manual_computation() {
+    fn crc32_tc18_for_fragment_train_matches_coverage_buffer_under_tscf() {
         let header = HeaderVariant::Tscf(avtp::TscfHeader {
             stream_id: 0x0203_0405_0607_0809,
             avtp_timestamp: 0x1234_5678,
+            tu: true,
             ..Default::default()
         });
-        let final_fragment_msg = sample_abb_message(0, b"unused");
-        let final_fragment = AcfCoverageMessage::Abb(&final_fragment_msg);
+        let first_msg = sample_abb_message(0, b"hello-");
+        let first = AcfCoverageMessage::Abb(&first_msg);
         let segments: [&[u8]; 2] = [b"hello-", b"world"];
-
-        let via_helper =
-            crc32_tc18_for_fragment_train(&header, &final_fragment, &segments).unwrap();
+        let via_helper = crc32_tc18_for_fragment_train(&header, &first, &segments).unwrap();
         let buf =
-            build_crc32_coverage_buffer_for_fragment_train(&header, &final_fragment, &segments)
-                .unwrap();
+            build_crc32_coverage_buffer_for_fragment_train(&header, &first, &segments).unwrap();
         assert_eq!(via_helper, crc32_tc18(&buf));
+        assert_eq!(buf[2], 0x01, "TSCF tu covered");
+        assert_eq!(&buf[11..15], &0x1234_5678u32.to_be_bytes());
     }
 }

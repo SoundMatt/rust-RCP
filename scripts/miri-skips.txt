@@ -1,0 +1,22 @@
+# Miri exclusion list for scripts/miri.sh (issue #221).
+#
+# One libtest `--skip` filter per line (substring match against the full
+# test path), followed by `#` and the reason it cannot run under Miri.
+# Blank lines and lines starting with `#` are ignored. Keep this list as
+# short as possible: every entry is a test that gets NO undefined-behaviour
+# checking. An entry is only acceptable when Miri itself cannot execute the
+# test (an unsupported foreign operation aborts the whole test binary), not
+# when the test is merely slow.
+#
+# Whole-target exclusions (not listed here, enforced by scripts/miri.sh
+# running `--lib` only):
+#   - src/bin/rcp.rs tests and the CLI/RELAY integration paths: they spawn
+#     processes and bind real sockets; Miri has no process-spawn shim.
+#   - doctests: `cargo miri test --lib` does not run them; they are pure
+#     API-usage examples already covered by `cargo test --all-targets`.
+#   - benches/fuzz targets: built and smoke-run by their own CI jobs.
+#   - l2::tests::real_raw_ethernet_socket_round_trips_a_frame_over_a_veth_pair
+#     is already #[ignore]d (needs CAP_NET_RAW); Miri does not run ignored
+#     tests either.
+
+udp::tests::std_udp_socket  # std::net::UdpSocket (SOCK_DGRAM): Miri's socket shim only supports SOCK_STREAM ("socket: type 0x2 is unsupported")
