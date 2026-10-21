@@ -11,246 +11,55 @@
 //fusa:req REQ-LIFE-011
 //fusa:req REQ-LIFE-012
 
-//! RC Server lifecycle state machine — TC18 register-map model
-//! (`ROADMAP.md` Milestone 2, "Lifecycle State Machine" subsection, now in
-//! full).
+//! RC Server lifecycle state machine — TC18 RC5 §12.3 / Figure 17, ported
+//! from c-RCP's `src/lifecycle.c`.
 //!
-//! This module begins Milestone 2, which replaces the legacy
-//! `Zone`/`Controller`/`Registry` abstraction with a first-class RC Server
-//! entity model. Per Guiding Principle 2 ("sequence work so nothing is
-//! built on a foundation that will itself change later ... lifecycle model
-//! and register-map split before endpoints"), the lifecycle model comes
-//! first: [`RcServerState`] is the three-state machine every RC Server is
-//! in at all times, [`RegisterCategory`]/[`is_register_reachable`] give
-//! that state machine its first, coarsest teeth — which broad class of
-//! register can be touched at all in each state — and
-//! [`RcServerState::try_transition`]/[`is_transition_defined`] give it its
-//! second: which moves between states are even structurally allowed, and
-//! under what caller-supplied consistency guard.
+//! [`RcServerState`] is the three-state machine every RC Server is in at
+//! all times (`HW_UNCONFIGURED` = `0x00`, `HW_CONFIGURED` = `0x55`,
+//! `RCP_CONFIGURED` = `0xAA`). This module gives it five kinds of teeth:
 //!
-//! This module now covers all four "Lifecycle State Machine" checklist
-//! items, including the last of them:
+//! - **Transitions** — [`RcServerState::try_transition`] is a direct port
+//!   of c-RCP's `rcp_lifecycle_transition` (`c-RCP/src/lifecycle.c:142`):
+//!   the full Figure 17 transition table, including the `RCP_CONFIGURED`
+//!   -> `HW_CONFIGURED` and `RCP_CONFIGURED` -> `HW_UNCONFIGURED`
+//!   demotions, writer authorization ([`WriterCtx`]), the "all other EPs
+//!   are idle" check, and the structured plausibility checks
+//!   [`check_hw_cfg`]/[`check_rcp_cfg`] over a [`PlausibilitySnapshot`].
+//!   Failures are reported as [`LifecycleError`], c-RCP's
+//!   `rcp_lifecycle_errc_t`.
+//! - **The lifecycle gate** — [`should_accept`] is a pure port of c-RCP's
+//!   `rcp_lifecycle_should_accept` (`c-RCP/src/lifecycle.c:264`): the
+//!   per-state Accept/Drop/Reject decision a dispatcher runs before any
+//!   endpoint lookup. Until `RCP_CONFIGURED` only NTSCF ACF_ABB traffic to
+//!   EP0 is admitted.
+//! - **Per-field write locking** — [`is_field_writable`]/
+//!   [`check_field_writable`] port c-RCP's `rcp_lifecycle_field_writable`/
+//!   `rcp_lifecycle_field_write_error` (`c-RCP/src/lifecycle.c:376`,
+//!   `:463`), including the TC18 §12.7.5 Table 20 read-only General block
+//!   ([`FieldKind::ReadOnly`], always `LOCKED_MEM_ACCESS`) and the `W+`
+//!   lockable fields ([`is_field_writable_w_plus`]).
+//! - **Coarse category reachability/locking** — [`RegisterCategory`],
+//!   [`is_register_reachable`] and [`lock_policy`]/[`is_register_writable`]
+//!   are this crate's coarser, category-level view used by
+//!   [`crate::ep0::check_ep0_access`]. [`RegisterCategory::General`] has no
+//!   [`LockPolicy`] — TC18 Table 20 marks every General register `R` — so
+//!   a write to it reports `LockedMemAccess`, agreeing with
+//!   [`FieldKind::ReadOnly`].
 //!
-//! - **Register-locking-by-state**, including the `W`/`W*` distinction
-//!   (permanently locked once `RCP_CONFIGURED`). [`is_register_reachable`]
-//!   answers "is this category of register touchable at all right now" —
-//!   a coarser question than locking's "given that it's reachable, is a
-//!   *write* to it still permitted, or has it become permanently locked".
-//!   [`LockPolicy`]/[`lock_policy`]/[`is_register_writable`]/
-//!   [`check_register_writable`] now answer that finer question, layered
-//!   on top of (not replacing) reachability: a category this module
-//!   reports reachable in a given state may still be write-locked by this
-//!   rule.
-//! - The **demotion path** from `HW_CONFIGURED` back to `HW_UNCONFIGURED`.
-//!   [`RcServerState::try_transition`] now implements this transition in
-//!   addition to the two *forward* transitions (`HW_UNCONFIGURED` ->
-//!   `HW_CONFIGURED` and `HW_CONFIGURED` -> `RCP_CONFIGURED`), for exactly
-//!   the single hop named by the roadmap checklist's own wording —
-//!   `HW_CONFIGURED` -> `HW_UNCONFIGURED`, not `RCP_CONFIGURED` ->
-//!   anything. Every other `(from, to)` pair — any full rollback from
-//!   `RCP_CONFIGURED`, skipping `HW_CONFIGURED` entirely, or staying in
-//!   the same state — remains rejected with `RcpError::RequestRejected`.
-//!   See the Provenance note below for the judgment calls this item made
-//!   explicit rather than guessed at silently: whether the demotion needs
-//!   a guard (it does not), and
-//!   why demoting out of `RCP_CONFIGURED` is treated as a distinct,
-//!   still-unbuilt concern rather than assumed to be in scope here.
+//! Parity with c-RCP is proven against golden vectors generated by running
+//! c-RCP's real code over an exhaustive input grid
+//! (`scripts/c-rcp-golden/lifecycle_gen.c` ->
+//! `testdata/c_rcp_lifecycle_golden.txt`). Where c-RCP diverges from TC18
+//! RC5, this module copies c-RCP and says so in a `c-RCP parity:` note on
+//! the item concerned.
 //!
-//! Also out of scope, as later subsections of the same milestone: EP0 (the
-//! RC-Server-as-endpoint whole-register-map read/write path) and the
-//! concrete Register Map itself (the actual field layout of
-//! `svr_oa_tc18_magic_nr`, HW pin-mapping tables, etc.). [`RegisterCategory`]
-//! is intentionally an abstract placeholder standing in for "whichever
-//! concrete registers the Register Map subsection eventually defines,
-//! grouped this way" — it names no concrete field, mirroring how
-//! [`crate::addressing::EndpointId`] stood in for a concrete endpoint type
-//! ahead of Milestone 4. [`RcServerState::try_transition`]'s
-//! `is_consistent` closure parameter plays the same placeholder role for
-//! the `HW_CFG_INCONSISTENT`/`RCP_CFG_INCONSISTENT` guards: this crate has
-//! no register map yet to actually validate hardware or RCP-level
-//! configuration against, so the concrete consistency criteria are left to
-//! the caller (mirroring [`crate::formal::Invariant`]'s caller-supplied
-//! predicate shape) rather than guessed at here. Whatever eventually
-//! supplies a real predicate — the Register Map work, or the endpoints
-//! that sit on top of it — is this module's problem to wire up later, not
-//! this item's to invent.
+//! ## `Serialize`/`Deserialize` derive
 //!
-//! This module is additive and does not touch [`crate::config`] (the old,
-//! disposition-REPLACE `RcpConfig` model) or any other existing caller,
-//! matching the discipline every Milestone 1 entry already established.
-//!
-//! ## Provenance note
-//!
-//! The three state names, their numeric encodings (`HW_UNCONFIGURED` =
-//! `0x00`, `HW_CONFIGURED` = `0x55`, `RCP_CONFIGURED` = `0xAA`), and the
-//! `HW_CFG_INCONSISTENT`/`RCP_CFG_INCONSISTENT` guard names referenced above
-//! are taken directly from `ROADMAP.md`'s own Milestone 2 checklist text,
-//! which in turn cites the OPEN Alliance TC18 Remote Control Protocol
-//! Specification v0.5.1_RC by name only, never by section number, for this
-//! particular subsection (contrast the "Register Map" subsection a few
-//! lines further down the same milestone, whose bullets already cite
-//! `§3.6`–`§3.11`). This module's own doc comments therefore do not cite a
-//! `§3.x` section number for the lifecycle state machine itself — none is
-//! yet recorded anywhere in this crate — and per Guiding Principle 5 that
-//! absence is flagged here explicitly rather than papered over with a
-//! guessed number.
-//!
-//! [`RegisterCategory`] and the [`is_register_reachable`] reachability rule
-//! it drives go a step further than the roadmap text and are this crate's
-//! own working interpretation, not a transcription of the specification's
-//! behavior:
-//!
-//! - The `HwConfig`/`RcpConfig` split, and `RcpConfig` becoming reachable
-//!   only from `HW_CONFIGURED` onward, is inferred from the *existence* of
-//!   the `HW_CFG_INCONSISTENT` guard (named for the `HW_UNCONFIGURED` →
-//!   `HW_CONFIGURED` transition) and the separate `RCP_CFG_INCONSISTENT`
-//!   guard (named for the `HW_CONFIGURED` → `RCP_CONFIGURED` transition):
-//!   two distinctly-named guards for two distinctly-named configuration
-//!   phases reads as strong evidence of two distinct register categories
-//!   with different reachability, even though the roadmap text does not
-//!   spell that reachability rule out explicitly for this checklist item.
-//! - `General` register reachability being unconditional in every state is
-//!   this crate's own inference from `ROADMAP.md` Milestone 3 (Discovery)
-//!   immediately following this milestone: a discovering client plausibly
-//!   needs to read server-identity fields (`svr_vendor_id`,
-//!   `svr_device_id`, etc. — named in the Register Map subsection) before
-//!   any configuration has happened at all, which only works if those
-//!   fields are reachable in `HW_UNCONFIGURED` too.
-//!
-//! Both points are flagged per Guiding Principle 5 as this crate's own
-//! working interpretation, pending reconciliation against the
-//! specification's actual behavior (never its prose) before being relied
-//! on for interop with a real TC18 RC Server.
-//!
-//! [`RcServerState::try_transition`] and [`is_transition_defined`] go a
-//! similar step further than the roadmap text, again as this crate's own
-//! working interpretation rather than a transcription of specified
-//! behavior:
-//!
-//! - That exactly the *two forward* transitions named by the two guards
-//!   (`HW_UNCONFIGURED` -> `HW_CONFIGURED`, `HW_CONFIGURED` ->
-//!   `RCP_CONFIGURED`) plus the one demotion transition named by this
-//!   milestone's fourth checklist item (`HW_CONFIGURED` ->
-//!   `HW_UNCONFIGURED`) are structurally legal, and every other `(from,
-//!   to)` pair is rejected outright, is inferred from the roadmap
-//!   checklist naming exactly those three `(from, to)` pairs across its
-//!   four "Lifecycle State Machine" bullets and no others — read together,
-//!   that is this crate's evidence that no other transition (including
-//!   staying put, or any move originating at `RCP_CONFIGURED`) is meant to
-//!   succeed via this function.
-//! - Neither forward guard's actual pass/fail criterion is defined
-//!   anywhere in this crate yet — no register-map fields exist to validate
-//!   hardware or RCP-level configuration against, since the Register Map
-//!   subsection is later work in this same milestone. `try_transition`
-//!   therefore takes the consistency check as a caller-supplied
-//!   `is_consistent: impl FnOnce() -> bool` closure rather than evaluating
-//!   anything itself; on failure it returns
-//!   [`RcpError::InvalidParameter`] for *either* guard — this module
-//!   originally minted two distinct guard-named sentinels
-//!   (`HW_CFG_INCONSISTENT`/`RCP_CFG_INCONSISTENT`) here, but Milestone 2's
-//!   "Error Model" item (see [`crate::RcpError`]'s own doc comment for the
-//!   full mapping) folded both onto the same TC18 spec code, reading both
-//!   as the same "caller-supplied configuration failed a consistency
-//!   check" failure mode. `RcpError::RequestRejected` (for any `(from,
-//!   to)` pair outside the three defined transitions) is that same later
-//!   item's mapping for what this module used to call
-//!   `InvalidLifecycleTransition`.
-//! - The demotion transition (`HW_CONFIGURED` -> `HW_UNCONFIGURED`) is
-//!   modeled as **unconditional**: `is_consistent` is accepted by
-//!   `try_transition`'s signature (so callers passing the same closure
-//!   shape for every transition attempt still compile) but is never
-//!   actually invoked for this `(from, to)` pair, and the transition
-//!   always succeeds. This is this crate's own judgment call, not a
-//!   transcription of specified behavior: unlike the two forward
-//!   transitions, the roadmap checklist names no
-//!   `..._INCONSISTENT`-style guard for the demotion path at all, and
-//!   there is no register-map state yet for a demotion-time guard to
-//!   plausibly validate *against* — demoting away from `HW_CONFIGURED`
-//!   discards configuration rather than admitting new configuration that
-//!   could be found inconsistent. Per Guiding Principle 5 this is flagged
-//!   as a working assumption, not a specified fact.
-//! - Only the single `HW_CONFIGURED` -> `HW_UNCONFIGURED` hop is
-//!   implemented, matching the checklist bullet's own literal wording.
-//!   `RCP_CONFIGURED` -> `HW_UNCONFIGURED` (a full rollback) and
-//!   `RCP_CONFIGURED` -> `HW_CONFIGURED` (a lesser demotion) are
-//!   deliberately left undefined by this item rather than silently folded
-//!   in: the checklist bullet names only the `HW_CONFIGURED`-originating
-//!   hop, and per Guiding Principle 5 this crate does not assume a wider
-//!   scope than what was actually named. Whether demoting out of
-//!   `RCP_CONFIGURED` is ever wanted, and if so what it should mean for
-//!   the `RcpConfig` category's already-applied functional configuration,
-//!   is left as an explicit open question for a later item rather than
-//!   guessed at here.
-//!
-//! All four points are flagged per Guiding Principle 5 as this crate's own
-//! working interpretation, pending reconciliation against the
-//! specification's actual behavior (never its prose) before being relied
-//! on for interop with a real TC18 RC Server.
-//!
-//! [`LockPolicy`] and [`lock_policy`]'s per-[`RegisterCategory`] assignment
-//! go the same step further than the roadmap text, and are — like
-//! [`RegisterCategory`] itself — this crate's own working interpretation,
-//! not a transcription of the specification's behavior. No concrete
-//! Register Map exists yet (that subsection is later work in this same
-//! milestone) to derive a real per-field `W`/`W*` assignment from, so this
-//! crate reasons at the same [`RegisterCategory`] granularity
-//! [`is_register_reachable`] already uses:
-//!
-//! - [`RegisterCategory::General`] is modeled as `W`: writable whenever
-//!   reachable, the same category-level policy [`RegisterCategory::RcpConfig`]
-//!   already uses — `General` is reachable in every lifecycle state (see
-//!   [`is_register_reachable`]), so this makes it writable in every state
-//!   too, gated by nothing this module adds beyond reachability. This
-//!   module's own doc comment describes `General` as covering
-//!   server-identity/status fields (`svr_vendor_id`, `svr_device_id`, etc.),
-//!   and a real register map of this kind plausibly mixes read-only
-//!   identity/status fields with client-writable configuration fields even
-//!   within one coarse category — this crate does not yet model per-field
-//!   write granularity within `General` to distinguish the two. Modeling
-//!   the *entire* category as permanently locked (`lock_policy` previously
-//!   returning `None`) was tried and found to be actively wrong rather than
-//!   merely a coarse-grained simplification: it made the register-map write
-//!   path this category exists to exercise permanently unreachable dead
-//!   code for every caller, including the designated root client who is
-//!   otherwise the one caller meant to be able to write EP0. `General` is
-//!   therefore now modeled as `W` at the same category-level granularity
-//!   `RcpConfig` already uses, still gated by the separate, unconditional
-//!   root-client check that any EP0 write goes through regardless of
-//!   category (see [`crate::ep0::check_ep0_access_for_stream`]).
-//! - [`RegisterCategory::HwConfig`] is modeled as `W*`: writable while
-//!   reachable, but permanently locked the moment `RCP_CONFIGURED` is
-//!   reached. This is inferred from `HwConfig` being the *foundation*
-//!   layer — the `RCP_CFG_INCONSISTENT` guard that admits
-//!   `HW_CONFIGURED` -> `RCP_CONFIGURED` validates RCP-level configuration
-//!   against whatever hardware configuration already exists at that
-//!   moment, with no guard defined anywhere in this crate that
-//!   re-validates RCP-level configuration if hardware configuration were
-//!   changed out from under it afterward — permanently locking `HwConfig`
-//!   once `RCP_CONFIGURED` is reached is this crate's reading of what
-//!   keeps that invariant from silently breaking.
-//! - [`RegisterCategory::RcpConfig`] is modeled as `W`: writable whenever
-//!   reachable, including while `RCP_CONFIGURED`, with no permanent lock
-//!   this module adds on top of reachability. This is inferred from
-//!   `RcpConfig` being the *operating* layer built on top of `HwConfig` —
-//!   this crate's own reasonable expectation (per Guiding Principle 5,
-//!   flagged rather than asserted as spec fact) that functional/operating
-//!   parameters remain adjustable once a server is fully configured, unlike
-//!   the foundation they were built on.
-//!
-//! All three points are flagged per Guiding Principle 5 as this crate's own
-//! working interpretation, pending reconciliation against the
-//! specification's actual behavior (never its prose) before being relied
-//! on for interop with a real TC18 RC Server.
-//!
-//! ## `Serialize`/`Deserialize` derive (`ROADMAP.md` Milestone 9, `config`
-//! ## REPLACE cutover)
-//!
-//! [`RcServerState`] additionally derives `serde`'s `Serialize`/
-//! `Deserialize` here, purely additively, so [`crate::config`] can load a
-//! human-authored initial lifecycle state by variant name
-//! (`HwUnconfigured`/`HwConfigured`/`RcpConfigured`) without duplicating
-//! this type in a parallel loader-only shape. No transition rule, guard, or
-//! existing derive changes.
+//! [`RcServerState`] derives `serde`'s `Serialize`/`Deserialize` so
+//! [`crate::config`] can load a configured initial lifecycle state by
+//! variant name (`HwUnconfigured`/`HwConfigured`/`RcpConfigured`). TC18
+//! §12.3: "After a power cycle or restart ... the RC Server shall start in
+//! the life-cycle state it is actually configured in."
 
 use serde::{Deserialize, Serialize};
 
@@ -428,34 +237,31 @@ pub enum LockPolicy {
     /// alone rejects a write.
     W,
     /// `W*` — write access is available whenever the category is otherwise
-    /// reachable, up to and including `HW_CONFIGURED`, but becomes
-    /// permanently locked the moment the RC Server reaches
-    /// `RCP_CONFIGURED`. [`RcServerState::try_transition`] now implements a
-    /// demotion path, but only for the single `HW_CONFIGURED` ->
-    /// `HW_UNCONFIGURED` hop the roadmap checklist names — a category
-    /// locked by this rule only ever becomes locked upon reaching
-    /// `RCP_CONFIGURED` in the first place, and no transition this crate
-    /// implements moves a server *out of* `RCP_CONFIGURED` (backward or
-    /// otherwise), so that hop can never actually run while this lock is
-    /// engaged. This rule's stated escape hatch therefore remains a
-    /// still-unbuilt, separate concern — a demotion path originating at
-    /// `RCP_CONFIGURED` itself — not something this item's narrower,
-    /// literally-scoped hop resolves; see this module's Provenance note
-    /// for why that scoping was a deliberate choice rather than an
-    /// oversight.
+    /// reachable, up to and including `HW_CONFIGURED`, but is locked while
+    /// the RC Server is `RCP_CONFIGURED` (TC18 Table 24 legend). A
+    /// demotion out of `RCP_CONFIGURED` (see
+    /// [`RcServerState::try_transition`]) lifts the lock again.
     WStar,
 }
 
-/// This crate's provisional mapping from [`RegisterCategory`] to
-/// [`LockPolicy`], or `None` if this module models the category as never
-/// writable at all regardless of lifecycle state.
+/// This crate's mapping from [`RegisterCategory`] to [`LockPolicy`], or
+/// `None` if the category is never writable regardless of lifecycle state.
 ///
-/// See this module's doc comment for the per-category reasoning behind
-/// each assignment. Never panics for any input.
+/// - [`RegisterCategory::General`] -> `None`: TC18 RC5 §12.7.5 Table 20
+///   marks every General register access type `R`. c-RCP enforces the same
+///   rule with `RCP_LIFECYCLE_FIELD_READ_ONLY` (`c-RCP/src/lifecycle.c:432`)
+///   and `rcp_regmap_general_decode_write_request`
+///   (`c-RCP/src/regmap.c:262`); see [`FieldKind::ReadOnly`] and
+///   [`crate::regmap::general_decode_write_request`].
+/// - [`RegisterCategory::HwConfig`] -> `W*`.
+/// - [`RegisterCategory::RcpConfig`] -> `W`.
+///
+/// Never panics for any input.
 //fusa:req REQ-LIFE-009
+//fusa:req REQ-RMAP-037
 pub fn lock_policy(category: RegisterCategory) -> Option<LockPolicy> {
     match category {
-        RegisterCategory::General => Some(LockPolicy::W),
+        RegisterCategory::General => None,
         RegisterCategory::HwConfig => Some(LockPolicy::WStar),
         RegisterCategory::RcpConfig => Some(LockPolicy::W),
     }
@@ -511,111 +317,596 @@ pub fn check_register_writable(
     }
 }
 
+// ── Lifecycle error codes (c-RCP rcp_lifecycle_errc_t) ───────────────────────
+
+/// Why a lifecycle transition or plausibility check failed — a direct port
+/// of c-RCP's `rcp_lifecycle_errc_t` (`c-RCP/include/rcp/lifecycle.h:130`),
+/// with `RCP_LIFECYCLE_OK` expressed as `Ok(())`/`Ok(state)` instead of a
+/// variant. The numeric discriminants ([`LifecycleError::code`]) match
+/// c-RCP's exactly.
+///
+/// These are *local* lifecycle outcomes, not TC18 Table 27 wire error
+/// codes: c-RCP returns them straight to its caller
+/// (`rcp_mock_server_transition`, `c-RCP/src/mock.c:363`) without mapping
+/// them onto the wire, and so does this crate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+//fusa:req REQ-LIFECYCLE-021
+pub enum LifecycleError {
+    /// `RCP_LIFECYCLE_ERR_HW_CFG_INCONSISTENT` — [`check_hw_cfg`] failed.
+    HwCfgInconsistent = 1,
+    /// `RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT` — [`check_rcp_cfg`] failed.
+    RcpCfgInconsistent = 2,
+    /// `RCP_LIFECYCLE_ERR_INVALID_TRANSITION` — `(from, to)` is not a
+    /// modeled transition (see [`is_transition_defined`]).
+    InvalidTransition = 3,
+    /// `RCP_LIFECYCLE_ERR_UNAUTHORIZED` — the [`WriterCtx`] is not
+    /// permitted to request this `svr_lifecycle_state` change
+    /// (REQ-LIFECYCLE-031).
+    Unauthorized = 4,
+    /// `RCP_LIFECYCLE_ERR_EPS_NOT_IDLE` — another endpoint still has an
+    /// in-flight or queued request (REQ-LIFECYCLE-022).
+    ///
+    /// c-RCP parity: `c-RCP/include/rcp/lifecycle.h:139` — TC18 RC5
+    /// Figure 17 names an `EPs_NOT_IDLE` outcome that maps to none of the
+    /// numbered Table 27 wire error codes; c-RCP keeps it a local-only
+    /// code rather than inventing a wire mapping, and so does this crate.
+    EpsNotIdle = 5,
+}
+
+impl LifecycleError {
+    /// The c-RCP `rcp_lifecycle_errc_t` numeric value for this error.
+    //fusa:req REQ-LIFECYCLE-021
+    pub fn code(self) -> u8 {
+        self as u8
+    }
+
+    /// The human-readable message c-RCP's `rcp_lifecycle_strerror`
+    /// (`c-RCP/src/lifecycle.c:5`) returns for this error, byte-for-byte.
+    //fusa:req REQ-LIFECYCLE-021
+    pub fn message(self) -> &'static str {
+        match self {
+            Self::HwCfgInconsistent => "rcp/lifecycle: HW configuration inconsistent",
+            Self::RcpCfgInconsistent => "rcp/lifecycle: RCP configuration inconsistent",
+            Self::InvalidTransition => "rcp/lifecycle: invalid lifecycle transition",
+            Self::Unauthorized => "rcp/lifecycle: writer not authorized for this transition",
+            Self::EpsNotIdle => "rcp/lifecycle: another endpoint is not idle",
+        }
+    }
+}
+
+impl std::fmt::Display for LifecycleError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.message())
+    }
+}
+
+impl std::error::Error for LifecycleError {}
+
+// ── Plausibility snapshot (transition-guard input) ───────────────────────────
+
+/// One endpoint's configuration state, as far as the two plausibility
+/// checks need to see it — c-RCP's `rcp_lifecycle_endpoint_plausibility_t`
+/// (`c-RCP/include/rcp/lifecycle.h:167`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+//fusa:req REQ-LIFECYCLE-002
+//fusa:req REQ-LIFECYCLE-005
+pub struct EndpointPlausibility {
+    /// This endpoint slot is in use. Unused slots are skipped entirely.
+    pub ep_used: bool,
+    /// A valid HW pin mapping is present.
+    pub hw_pin_mapped: bool,
+    /// At least one configured request stream exists for this endpoint.
+    pub has_request_stream: bool,
+    /// A stream/`byte_bus_id` association exists for this endpoint.
+    pub has_stream_assoc: bool,
+    /// Which [`PlausibilitySnapshot::request_streams`] slot (0-based) this
+    /// endpoint's association refers to; meaningless while
+    /// `has_stream_assoc` is false (REQ-LIFECYCLE-038).
+    pub request_stream_index: usize,
+}
+
+/// One request stream's configuration state, as far as the
+/// `RCP_CFG_INCONSISTENT` guard needs to see it — c-RCP's
+/// `rcp_lifecycle_request_stream_plausibility_t`
+/// (`c-RCP/include/rcp/lifecycle.h:200`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+//fusa:req REQ-LIFECYCLE-006
+pub struct RequestStreamPlausibility {
+    /// This request stream slot is configured.
+    pub configured: bool,
+    /// An associated response stream exists.
+    pub has_response_stream: bool,
+    /// Which response-stream slot (0-based, validated against
+    /// [`PlausibilitySnapshot::response_stream_count`]) this stream's
+    /// association refers to; meaningless while `has_response_stream` is
+    /// false (REQ-RMAP-049).
+    pub response_stream_index: usize,
+}
+
+/// A read-only view over every endpoint and request-stream slot, passed to
+/// [`check_hw_cfg`]/[`check_rcp_cfg`] and to
+/// [`RcServerState::try_transition`] — c-RCP's
+/// `rcp_lifecycle_plausibility_snapshot_t`
+/// (`c-RCP/include/rcp/lifecycle.h:245`). Where c-RCP passes a nullable
+/// pointer, this crate passes `Option<&PlausibilitySnapshot>`; `None`
+/// means "no configuration evidence at all" and is treated as
+/// inconsistent, never as vacuously plausible.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+//fusa:req REQ-LIFECYCLE-002
+//fusa:req REQ-LIFECYCLE-005
+pub struct PlausibilitySnapshot<'a> {
+    /// Every endpoint slot.
+    pub endpoints: &'a [EndpointPlausibility],
+    /// Every request-stream slot.
+    pub request_streams: &'a [RequestStreamPlausibility],
+    /// How many real response/ack-queue slots exist (REQ-RMAP-049).
+    pub response_stream_count: usize,
+}
+
+/// The `HW_CFG_INCONSISTENT` plausibility check — c-RCP's
+/// `rcp_lifecycle_check_hw_cfg` (`c-RCP/src/lifecycle.c:23`).
+///
+/// Every in-use endpoint must have a HW pin mapping and at least one
+/// configured request stream. `None` (no evidence) is inconsistent.
+//fusa:req REQ-LIFECYCLE-002
+//fusa:req REQ-LIFECYCLE-003
+//fusa:req REQ-LIFECYCLE-004
+pub fn check_hw_cfg(snap: Option<&PlausibilitySnapshot<'_>>) -> Result<(), LifecycleError> {
+    let snap = snap.ok_or(LifecycleError::HwCfgInconsistent)?;
+    for ep in snap.endpoints.iter().filter(|ep| ep.ep_used) {
+        if !ep.hw_pin_mapped || !ep.has_request_stream {
+            return Err(LifecycleError::HwCfgInconsistent);
+        }
+    }
+    Ok(())
+}
+
+/// TC18 §12.3.1.2 bullets 2/3 — c-RCP's private
+/// `request_streams_consistent` (`c-RCP/src/lifecycle.c:49`).
+fn request_streams_consistent(snap: &PlausibilitySnapshot<'_>) -> bool {
+    snap.request_streams
+        .iter()
+        .enumerate()
+        .filter(|(_, rs)| rs.configured)
+        .all(|(i, rs)| {
+            rs.has_response_stream
+                && rs.response_stream_index < snap.response_stream_count
+                && snap
+                    .endpoints
+                    .iter()
+                    .any(|ep| ep.ep_used && ep.has_stream_assoc && ep.request_stream_index == i)
+        })
+}
+
+/// The `RCP_CFG_INCONSISTENT` plausibility check — c-RCP's
+/// `rcp_lifecycle_check_rcp_cfg` (`c-RCP/src/lifecycle.c:98`).
+///
+/// Every in-use endpoint must have a stream/`byte_bus_id` association;
+/// every configured request stream must name a real response-stream slot
+/// and be bound to at least one in-use endpoint (an orphaned stream slot is
+/// inconsistent). `None` (no evidence) is inconsistent.
+//fusa:req REQ-LIFECYCLE-005
+//fusa:req REQ-LIFECYCLE-006
+//fusa:req REQ-LIFECYCLE-007
+//fusa:req REQ-LIFECYCLE-038
+//fusa:req REQ-RMAP-049
+pub fn check_rcp_cfg(snap: Option<&PlausibilitySnapshot<'_>>) -> Result<(), LifecycleError> {
+    let snap = snap.ok_or(LifecycleError::RcpCfgInconsistent)?;
+    if snap
+        .endpoints
+        .iter()
+        .any(|ep| ep.ep_used && !ep.has_stream_assoc)
+    {
+        return Err(LifecycleError::RcpCfgInconsistent);
+    }
+    if !request_streams_consistent(snap) {
+        return Err(LifecycleError::RcpCfgInconsistent);
+    }
+    Ok(())
+}
+
+// ── Writer context ───────────────────────────────────────────────────────────
+
+/// Who is attempting a write — a functional-config write
+/// ([`is_field_writable`]) or a `svr_lifecycle_state` change
+/// ([`RcServerState::try_transition`]). c-RCP's
+/// `rcp_lifecycle_writer_ctx_t` (`c-RCP/include/rcp/lifecycle.h:322`).
+///
+/// Any combination may be true; only one authorizing condition needs to
+/// hold for a given rule. [`Default`] (all `false`) matches c-RCP's `{0}`
+/// initializer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+//fusa:req REQ-LIFECYCLE-031
+pub struct WriterCtx {
+    /// The request arrived via EP0 from the root client.
+    pub via_root_client_ep0: bool,
+    /// The request arrived via the endpoint's own registered request
+    /// stream.
+    pub via_owning_stream: bool,
+    /// The request frame's destination MAC was multicast or broadcast
+    /// (REQ-LIFECYCLE-027).
+    pub via_non_unicast_frame: bool,
+    /// The request arrived via the discovery stream
+    /// (REQ-LIFECYCLE-030/031/036).
+    pub via_discovery_stream: bool,
+    /// The request arrived via a valid, currently-configured
+    /// stream_id/`byte_bus_id` association. A caller must only ever set
+    /// this when **no** root client is configured (TC18 §12.3.1.2: "If a
+    /// root client is configured only the root client's
+    /// stream_id/byte_bus_id is accepted").
+    pub via_valid_stream_association: bool,
+}
+
+impl WriterCtx {
+    /// Every authorizing condition true, frame unicast — the
+    /// maximally-privileged writer [`check_field_writable`] re-evaluates
+    /// against to tell a state lock from a writer denial.
+    fn best() -> Self {
+        Self {
+            via_root_client_ep0: true,
+            via_owning_stream: true,
+            via_non_unicast_frame: false,
+            via_discovery_stream: true,
+            via_valid_stream_association: false,
+        }
+    }
+}
+
 // ── Lifecycle transitions ────────────────────────────────────────────────────
 
-/// Is `(from, to)` one of the three transitions this crate currently
-/// implements — the two guarded forward transitions, or the one
-/// unconditional demotion?
+/// Is `(from, to)` one of the five transitions c-RCP's
+/// `rcp_lifecycle_transition` (`c-RCP/src/lifecycle.c:142`) models?
 ///
-/// This is the coarse, state-shape check [`RcServerState::try_transition`]
-/// performs before it ever considers a caller-supplied consistency
-/// predicate — it says nothing about whether the hardware or RCP-level
-/// configuration being applied is actually consistent, only whether
-/// `(from, to)` is a transition shape this crate implements at all. Every
-/// pair other than the three named here is `false`, including staying in
-/// the same state, any move originating at `RCP_CONFIGURED` (backward or
-/// otherwise), and skipping `HW_CONFIGURED` entirely on the way up. Never
-/// panics for any input.
+/// - `HW_UNCONFIGURED` -> `HW_CONFIGURED`
+/// - `HW_CONFIGURED` -> `RCP_CONFIGURED`
+/// - `RCP_CONFIGURED` -> `HW_CONFIGURED` (demotion)
+/// - `HW_CONFIGURED` -> `HW_UNCONFIGURED` (reset)
+/// - `RCP_CONFIGURED` -> `HW_UNCONFIGURED` (reset)
 ///
-/// One of the excluded pairs is excluded by TC18 itself, not merely by
-/// this crate's reading of `ROADMAP.md`: TC18 §12.3.1.1 (TC18.txt line
-/// 2544) states that, from `HW_UNCONFIGURED`, "a request to advance the
-/// state directly to RCP_CONFIGURED will be rejected with an error
-/// response" — the two-hop route through `HW_CONFIGURED` is the only way
-/// up.
+/// The only unmodeled shape is skipping `HW_CONFIGURED` on the way up
+/// (TC18 §12.3.1.1: "A request to advance the state directly to
+/// RCP_CONFIGURED will be rejected with an error response"). A same-state
+/// request is not a transition — [`RcServerState::try_transition`] treats
+/// it as a no-op success — so this returns `false` for it. Never panics.
 //fusa:req REQ-LIFE-006
-//fusa:req REQ-LIFE-012
+//fusa:req REQ-LIFECYCLE-012
 //fusa:req REQ-LIFE-019
 pub fn is_transition_defined(from: RcServerState, to: RcServerState) -> bool {
-    matches!(
-        (from, to),
-        (RcServerState::HwUnconfigured, RcServerState::HwConfigured)
-            | (RcServerState::HwConfigured, RcServerState::RcpConfigured)
-            | (RcServerState::HwConfigured, RcServerState::HwUnconfigured)
-    )
+    from != to && !(from == RcServerState::HwUnconfigured && to == RcServerState::RcpConfigured)
 }
 
 impl RcServerState {
-    /// Attempt to move this RC Server from its current state (`self`) to
-    /// `target`.
+    /// Attempt to move this RC Server from `self` to `target` on behalf of
+    /// `writer` — a direct port of c-RCP's `rcp_lifecycle_transition`
+    /// (`c-RCP/src/lifecycle.c:142`). Returns the new state on success;
+    /// `self` is `Copy` and never mutated, so a failure leaves the
+    /// caller's state unchanged.
     ///
-    /// Three transitions are implemented:
+    /// | from -> to | writer authorization | idle-gated | plausibility |
+    /// |---|---|---|---|
+    /// | same state | — (no-op `Ok`) | no | no |
+    /// | `HW_UNCONFIGURED` -> `HW_CONFIGURED` | not consulted | no | [`check_hw_cfg`] |
+    /// | `HW_CONFIGURED` -> `RCP_CONFIGURED` | discovery, root client, or valid stream assoc | no | [`check_rcp_cfg`] |
+    /// | `RCP_CONFIGURED` -> `HW_CONFIGURED` | root client or valid stream assoc | yes | no |
+    /// | `HW_CONFIGURED` -> `HW_UNCONFIGURED` | discovery, root client, or valid stream assoc | yes | no |
+    /// | `RCP_CONFIGURED` -> `HW_UNCONFIGURED` | root client only | yes | no |
+    /// | `HW_UNCONFIGURED` -> `RCP_CONFIGURED` | — | — | [`LifecycleError::InvalidTransition`] |
     ///
-    /// - `HW_UNCONFIGURED` -> `HW_CONFIGURED`, guarded by the
-    ///   `HW_CFG_INCONSISTENT` check
-    /// - `HW_CONFIGURED` -> `RCP_CONFIGURED`, guarded by the
-    ///   `RCP_CFG_INCONSISTENT` check
-    /// - `HW_CONFIGURED` -> `HW_UNCONFIGURED` (the demotion path), which is
-    ///   unconditional — see this module's doc comment Provenance note for
-    ///   why no guard applies here
+    /// Authorization is checked before idleness, and both before
+    /// plausibility. `HW_UNCONFIGURED` -> `HW_CONFIGURED` does not consult
+    /// `writer`: TC18 §12.3.1.1 requires the request to arrive via the
+    /// discovery stream, which [`should_accept`] enforces one layer
+    /// up. [`should_accept`] is not yet wired into dispatch (#224), so until
+    /// it is, a caller of this transition must enforce that itself.
     ///
-    /// For either of the two guarded shapes, `is_consistent` is invoked
-    /// exactly once: if it returns `true`, the transition succeeds and
-    /// `Ok(target)` is returned; if it returns `false`, the matching guard
-    /// sentinel (`RcpError::InvalidParameter` or
-    /// `RcpError::InvalidParameter`) is returned and `self` is left
-    /// unchanged (this method takes `self` by value and returns the *new*
-    /// state on success — it does not mutate anything in place).
-    ///
-    /// For the demotion shape, `is_consistent` is *not* invoked at all —
-    /// the transition always succeeds with `Ok(target)` regardless of what
-    /// the closure would have returned.
-    ///
-    /// For every other `(self, target)` pair — see [`is_transition_defined`]
-    /// for the exact rule — `is_consistent` is never invoked at all, and
-    /// `Err(RcpError::RequestRejected)` is returned instead.
-    ///
-    /// This crate has no register map yet to derive a real consistency
-    /// check from (see this module's doc comment's Provenance note), so
-    /// `is_consistent` is deliberately a caller-supplied placeholder,
-    /// mirroring [`crate::formal::Invariant`]'s predicate shape. Never
-    /// panics for any input, including a `target` equal to `self`.
-    //fusa:req REQ-LIFE-006
+    /// c-RCP parity: `c-RCP/src/lifecycle.c:236` — the
+    /// `RCP_CONFIGURED` -> `HW_UNCONFIGURED` reset admits only
+    /// `via_root_client_ep0`, narrower than the `HW_CONFIGURED` reset.
+    /// c-RCP reads TC18 §12.7.4 ("Changes in configuration via a discovery
+    /// request are no longer allowed") and the Figure 17 arrow label
+    /// ("Root Client access via EP0") as excluding both the discovery
+    /// stream and the no-root-client stream association here. RC5's
+    /// §12.3.1.2 general rule would also admit those writers.
+    //fusa:req REQ-LIFECYCLE-008
+    //fusa:req REQ-LIFECYCLE-009
+    //fusa:req REQ-LIFECYCLE-010
+    //fusa:req REQ-LIFECYCLE-011
+    //fusa:req REQ-LIFECYCLE-012
+    //fusa:req REQ-LIFECYCLE-013
+    //fusa:req REQ-LIFECYCLE-022
+    //fusa:req REQ-LIFECYCLE-031
+    //fusa:req REQ-LIFECYCLE-037
+    //fusa:req REQ-LIFECYCLE-039
     //fusa:req REQ-LIFE-007
     //fusa:req REQ-LIFE-008
     //fusa:req REQ-LIFE-012
-    //fusa:req REQ-LIFE-019
     pub fn try_transition(
         self,
         target: Self,
-        is_consistent: impl FnOnce() -> bool,
-    ) -> Result<Self, RcpError> {
+        snap: Option<&PlausibilitySnapshot<'_>>,
+        writer: WriterCtx,
+        all_other_eps_idle: bool,
+    ) -> Result<Self, LifecycleError> {
+        use RcServerState::{HwConfigured, HwUnconfigured, RcpConfigured};
+
+        let authorized = writer.via_discovery_stream
+            || writer.via_root_client_ep0
+            || writer.via_valid_stream_association;
+        let idle = || {
+            if all_other_eps_idle {
+                Ok(())
+            } else {
+                Err(LifecycleError::EpsNotIdle)
+            }
+        };
+        let require = |ok: bool| {
+            if ok {
+                Ok(())
+            } else {
+                Err(LifecycleError::Unauthorized)
+            }
+        };
+
         match (self, target) {
-            (Self::HwUnconfigured, Self::HwConfigured) => {
-                if is_consistent() {
-                    Ok(target)
-                } else {
-                    Err(RcpError::InvalidParameter)
-                }
+            (HwUnconfigured, HwUnconfigured)
+            | (HwConfigured, HwConfigured)
+            | (RcpConfigured, RcpConfigured) => {}
+            (HwUnconfigured, HwConfigured) => check_hw_cfg(snap)?,
+            (HwConfigured, RcpConfigured) => {
+                require(authorized)?;
+                check_rcp_cfg(snap)?;
             }
-            (Self::HwConfigured, Self::RcpConfigured) => {
-                if is_consistent() {
-                    Ok(target)
-                } else {
-                    Err(RcpError::InvalidParameter)
-                }
+            (RcpConfigured, HwConfigured) => {
+                require(writer.via_root_client_ep0 || writer.via_valid_stream_association)?;
+                idle()?;
             }
-            // Demotion path: unconditional per this module's doc comment
-            // Provenance note. No `..._INCONSISTENT`-style guard is named
-            // for this transition anywhere in `ROADMAP.md`, and there is no
-            // newly-admitted configuration here for a guard to plausibly
-            // validate -- demoting discards configuration rather than
-            // accepting it, so `is_consistent` is deliberately left
-            // uninvoked.
-            (Self::HwConfigured, Self::HwUnconfigured) => Ok(target),
-            _ => Err(RcpError::RequestRejected),
+            (HwConfigured, HwUnconfigured) => {
+                require(authorized)?;
+                idle()?;
+            }
+            (RcpConfigured, HwUnconfigured) => {
+                require(writer.via_root_client_ep0)?;
+                idle()?;
+            }
+            (HwUnconfigured, RcpConfigured) => return Err(LifecycleError::InvalidTransition),
         }
+        Ok(target)
     }
+}
+
+// ── Per-state request filtering (lifecycle gate) ─────────────────────────────
+
+/// The discovery `byte_bus_id`: the one address reachable while the server
+/// is not yet `RCP_CONFIGURED` — c-RCP's
+/// `RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID` (`c-RCP/include/rcp/lifecycle.h:488`).
+//fusa:req REQ-LIFECYCLE-014
+pub const DISCOVERY_BYTE_BUS_ID: u16 = 0;
+
+/// [`should_accept`]'s three-way outcome — c-RCP's
+/// `rcp_lifecycle_accept_t` (`c-RCP/include/rcp/lifecycle.h:498`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+//fusa:req REQ-LIFECYCLE-033
+pub enum LifecycleAccept {
+    /// Admit the frame for normal processing.
+    Accept = 0,
+    /// Silently discard, no response at all.
+    Drop = 1,
+    /// Answer with `REQUEST_REJECTED` ([`crate::RcpError::RequestRejected`]),
+    /// process no further.
+    Reject = 2,
+}
+
+/// What a time-sync-incapable server does with a TSCF-headed AVTPDU —
+/// c-RCP's `rcp_avtp_tscf_fallback_t` (`c-RCP/include/rcp/avtp.h:324`).
+/// TC18 §13.3: "the presentation time shall be ignored, and the request(s)
+/// executed as if no presentation time were included or dropped depending
+/// on the configuration of the RC Server."
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[repr(u8)]
+//fusa:req REQ-AVTP-029
+pub enum TscfFallback {
+    /// Drop the frame outright (c-RCP's default).
+    #[default]
+    Drop = 0,
+    /// Admit it and ignore the presentation time.
+    Ignore = 1,
+}
+
+/// c-RCP's `rcp_avtp_should_drop_tscf` (`c-RCP/src/avtp.c:280`).
+fn should_drop_tscf(time_sync_supported: bool, avtp_subtype: u8, policy: TscfFallback) -> bool {
+    avtp_subtype == crate::avtp::TSCF_SUBTYPE
+        && !time_sync_supported
+        && policy == TscfFallback::Drop
+}
+
+/// The per-state request-filtering gate a dispatcher runs before any
+/// endpoint lookup — a pure port of c-RCP's `rcp_lifecycle_should_accept`
+/// (`c-RCP/src/lifecycle.c:264`, called at `c-RCP/src/mock.c:1483`).
+///
+/// - Any state: a TSCF frame on a time-sync-incapable server is dropped
+///   under [`TscfFallback::Drop`].
+/// - `HW_UNCONFIGURED`: TSCF is dropped; NTSCF not addressed to
+///   [`DISCOVERY_BYTE_BUS_ID`] (or any other subtype) is dropped; at EP0,
+///   ACF_ABB is accepted and any other message type is rejected (TC18
+///   §12.7: "Other valid requests to EP0 will be rejected with an error
+///   response with error code REQUEST_REJECTED").
+/// - `HW_CONFIGURED`: TSCF is dropped; anything not addressed to
+///   [`DISCOVERY_BYTE_BUS_ID`] is dropped; at EP0, ACF_ABB is accepted
+///   and anything else is rejected.
+/// - `RCP_CONFIGURED`: accepted.
+///
+/// `avtp_subtype` is the AVTPDU subtype octet ([`crate::avtp::NTSCF_SUBTYPE`]/
+/// [`crate::avtp::TSCF_SUBTYPE`]); `acf_msg_type` is the ACF message type
+/// ([`crate::acf::ACF_ABB_MSG_TYPE`]/[`crate::acf::ACF_GBB_MSG_TYPE`]).
+/// Never panics.
+///
+/// c-RCP parity: `c-RCP/src/lifecycle.c:296-343` — in `HW_CONFIGURED`,
+/// TC18 RC5 §12.3.1.2 says only requests to non-EP0 endpoints "that are
+/// not config requests" are dropped, and that ACF_GBB requests are
+/// "dropped without further response". c-RCP drops **every** non-EP0
+/// request, because it has no wire encoding for a functional-config
+/// request yet. At EP0 it answers ACF_GBB with REJECT, applying §12.7's
+/// EP0-scoped rule over §12.3.1.2. This crate copies both choices.
+//fusa:req REQ-LIFECYCLE-014
+//fusa:req REQ-LIFECYCLE-015
+//fusa:req REQ-LIFECYCLE-016
+//fusa:req REQ-LIFECYCLE-017
+//fusa:req REQ-LIFECYCLE-028
+//fusa:req REQ-LIFECYCLE-029
+//fusa:req REQ-LIFECYCLE-032
+//fusa:req REQ-LIFECYCLE-033
+//fusa:req REQ-AVTP-029
+pub fn should_accept(
+    state: RcServerState,
+    time_sync_supported: bool,
+    avtp_subtype: u8,
+    acf_msg_type: u8,
+    byte_bus_id: u16,
+    unsupported_time_sync_policy: TscfFallback,
+) -> LifecycleAccept {
+    use crate::acf::ACF_ABB_MSG_TYPE;
+    use crate::avtp::{NTSCF_SUBTYPE, TSCF_SUBTYPE};
+
+    if should_drop_tscf(
+        time_sync_supported,
+        avtp_subtype,
+        unsupported_time_sync_policy,
+    ) {
+        return LifecycleAccept::Drop;
+    }
+    let ep0_standard_only = || {
+        if acf_msg_type == ACF_ABB_MSG_TYPE {
+            LifecycleAccept::Accept
+        } else {
+            LifecycleAccept::Reject
+        }
+    };
+    match state {
+        RcServerState::HwUnconfigured => {
+            if avtp_subtype != NTSCF_SUBTYPE || byte_bus_id != DISCOVERY_BYTE_BUS_ID {
+                return LifecycleAccept::Drop;
+            }
+            ep0_standard_only()
+        }
+        RcServerState::HwConfigured => {
+            if avtp_subtype == TSCF_SUBTYPE || byte_bus_id != DISCOVERY_BYTE_BUS_ID {
+                return LifecycleAccept::Drop;
+            }
+            ep0_standard_only()
+        }
+        RcServerState::RcpConfigured => LifecycleAccept::Accept,
+    }
+}
+
+// ── Register-locking-by-state (per field kind) ───────────────────────────────
+
+/// Which locking category a register field falls into — c-RCP's
+/// `rcp_lifecycle_field_kind_t` (`c-RCP/include/rcp/lifecycle.h:616`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+//fusa:req REQ-LIFECYCLE-018
+pub enum FieldKind {
+    /// HW-pin-mapping and every block TC18 Figure 17 groups with it
+    /// (`EP_GEN_CFG`, `QUEUE_CFG`): writable only via the discovery
+    /// stream while `HW_UNCONFIGURED`.
+    HwGeneric = 0,
+    /// Functional config, access type `W`.
+    FunctionalW = 1,
+    /// Functional config, access type `W*`: permanently locked once
+    /// `RCP_CONFIGURED` (TC18 Table 24 legend).
+    FunctionalWStar = 2,
+    /// Access type `R` (e.g. the TC18 §12.7.5 Table 20 General block):
+    /// never writable.
+    ReadOnly = 3,
+}
+
+/// Is a field of `kind` writable in `state` by `writer`? A port of
+/// c-RCP's `rcp_lifecycle_field_writable` (`c-RCP/src/lifecycle.c:376`).
+///
+/// - [`FieldKind::HwGeneric`]: only in `HW_UNCONFIGURED`, only via the
+///   discovery stream.
+/// - [`FieldKind::FunctionalW`]: never in `HW_UNCONFIGURED`. In
+///   `HW_CONFIGURED`: root client, owning stream, or discovery stream. In
+///   `RCP_CONFIGURED`: root client or owning stream.
+/// - [`FieldKind::FunctionalWStar`]: any writer in `HW_UNCONFIGURED`;
+///   same as `FunctionalW` in `HW_CONFIGURED`; never in `RCP_CONFIGURED`.
+/// - [`FieldKind::ReadOnly`]: never (REQ-RMAP-025).
+///
+/// A write from a non-unicast frame is never accepted (REQ-LIFECYCLE-027).
+/// `writer.via_valid_stream_association` is not consulted, matching c-RCP.
+//fusa:req REQ-LIFECYCLE-018
+//fusa:req REQ-LIFECYCLE-019
+//fusa:req REQ-LIFECYCLE-020
+//fusa:req REQ-LIFECYCLE-026
+//fusa:req REQ-LIFECYCLE-027
+//fusa:req REQ-LIFECYCLE-035
+//fusa:req REQ-RMAP-037
+pub fn is_field_writable(state: RcServerState, kind: FieldKind, writer: WriterCtx) -> bool {
+    let authorized = writer.via_root_client_ep0 || writer.via_owning_stream;
+    let hw_configured_authorized = authorized || writer.via_discovery_stream;
+    let writable = match (kind, state) {
+        (FieldKind::HwGeneric, RcServerState::HwUnconfigured) => writer.via_discovery_stream,
+        (FieldKind::HwGeneric, _) => false,
+        (FieldKind::FunctionalW, RcServerState::HwUnconfigured) => false,
+        (FieldKind::FunctionalW, RcServerState::RcpConfigured) => authorized,
+        (FieldKind::FunctionalW, RcServerState::HwConfigured) => hw_configured_authorized,
+        (FieldKind::FunctionalWStar, RcServerState::RcpConfigured) => false,
+        (FieldKind::FunctionalWStar, RcServerState::HwConfigured) => hw_configured_authorized,
+        (FieldKind::FunctionalWStar, RcServerState::HwUnconfigured) => true,
+        (FieldKind::ReadOnly, _) => false,
+    };
+    writable && !writer.via_non_unicast_frame
+}
+
+/// Validating counterpart to [`is_field_writable`] — c-RCP's
+/// `rcp_lifecycle_field_write_error` (`c-RCP/src/lifecycle.c:463`).
+///
+/// `Ok(())` if writable. Otherwise re-evaluates with a maximally-privileged
+/// writer: if that is denied too, the lock is purely state-driven and the
+/// error is [`RcpError::LockedMemAccess`]; if not, the writer was the
+/// problem and the error is [`RcpError::UnauthorizedAccess`].
+//fusa:req REQ-WIREERR-004
+//fusa:req REQ-RMAP-037
+pub fn check_field_writable(
+    state: RcServerState,
+    kind: FieldKind,
+    writer: WriterCtx,
+) -> Result<(), RcpError> {
+    if is_field_writable(state, kind, writer) {
+        Ok(())
+    } else if !is_field_writable(state, kind, WriterCtx::best()) {
+        Err(RcpError::LockedMemAccess)
+    } else {
+        Err(RcpError::UnauthorizedAccess)
+    }
+}
+
+/// Writability of a `W+` field (lockable via its own explicit lock flag)
+/// — c-RCP's `rcp_lifecycle_field_writable_w_plus`
+/// (`c-RCP/src/lifecycle.c:486`): `false` while `locked`, otherwise the
+/// [`FieldKind::FunctionalWStar`] rule.
+//fusa:req REQ-RMAP-055
+pub fn is_field_writable_w_plus(state: RcServerState, writer: WriterCtx, locked: bool) -> bool {
+    !locked && is_field_writable(state, FieldKind::FunctionalWStar, writer)
+}
+
+/// Validating counterpart to [`is_field_writable_w_plus`] — c-RCP's
+/// `rcp_lifecycle_field_write_error_w_plus` (`c-RCP/src/lifecycle.c:495`).
+/// An explicit lock always reports [`RcpError::LockedMemAccess`];
+/// otherwise the same state-lock-vs-writer-denial split as
+/// [`check_field_writable`].
+//fusa:req REQ-RMAP-055
+pub fn check_field_writable_w_plus(
+    state: RcServerState,
+    writer: WriterCtx,
+    locked: bool,
+) -> Result<(), RcpError> {
+    if locked {
+        return Err(RcpError::LockedMemAccess);
+    }
+    check_field_writable(state, FieldKind::FunctionalWStar, writer)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -714,25 +1005,29 @@ mod tests {
             RcServerState::HwUnconfigured,
             RcServerState::RcpConfigured
         ));
-
-        // Rejected outright, without even consulting the plausibility
-        // guard: the transition shape itself is not admissible.
-        let mut guard_called = false;
-        let result =
-            RcServerState::HwUnconfigured.try_transition(RcServerState::RcpConfigured, || {
-                guard_called = true;
-                true
-            });
-        assert_eq!(result, Err(RcpError::RequestRejected));
-        assert!(!guard_called);
-
-        // The two-hop route TC18 does define is the only way up.
-        let hw_configured = RcServerState::HwUnconfigured
-            .try_transition(RcServerState::HwConfigured, || true)
-            .unwrap();
-        assert_eq!(hw_configured, RcServerState::HwConfigured);
+        let snap = good_snapshot();
+        let all = WriterCtx {
+            via_root_client_ep0: true,
+            via_owning_stream: true,
+            via_non_unicast_frame: false,
+            via_discovery_stream: true,
+            via_valid_stream_association: true,
+        };
         assert_eq!(
-            hw_configured.try_transition(RcServerState::RcpConfigured, || true),
+            RcServerState::HwUnconfigured.try_transition(
+                RcServerState::RcpConfigured,
+                Some(&snap),
+                all,
+                true
+            ),
+            Err(LifecycleError::InvalidTransition)
+        );
+        // The two-hop route TC18 does define is the only way up.
+        let hw = RcServerState::HwUnconfigured
+            .try_transition(RcServerState::HwConfigured, Some(&snap), all, true)
+            .unwrap();
+        assert_eq!(
+            hw.try_transition(RcServerState::RcpConfigured, Some(&snap), all, true),
             Ok(RcServerState::RcpConfigured)
         );
     }
@@ -827,7 +1122,7 @@ mod tests {
     #[test]
     //fusa:test REQ-LIFE-009
     fn lock_policy_matches_the_documented_per_category_assignment() {
-        assert_eq!(lock_policy(RegisterCategory::General), Some(LockPolicy::W));
+        assert_eq!(lock_policy(RegisterCategory::General), None);
         assert_eq!(
             lock_policy(RegisterCategory::HwConfig),
             Some(LockPolicy::WStar)
@@ -838,12 +1133,19 @@ mod tests {
         );
     }
 
+    /// TC18 RC5 §12.7.5 Table 20: the General block is read-only, so a
+    /// write is `LOCKED_MEM_ACCESS` in every state (issue #190).
     #[test]
     //fusa:test REQ-LIFE-009
     //fusa:test REQ-LIFE-010
-    fn general_registers_are_writable_in_every_state() {
+    //fusa:test REQ-RMAP-037
+    fn general_registers_are_read_only_in_every_state() {
         for state in ALL_STATES {
-            assert!(is_register_writable(state, RegisterCategory::General));
+            assert!(!is_register_writable(state, RegisterCategory::General));
+            assert_eq!(
+                check_register_writable(state, RegisterCategory::General),
+                Err(RcpError::LockedMemAccess)
+            );
         }
     }
 
@@ -931,151 +1233,505 @@ mod tests {
         }
     }
 
-    // ── Transition guard: which shapes are defined ───────────────────────
+    // ── c-RCP golden vectors (scripts/c-rcp-golden/lifecycle_gen.c) ───────
 
-    #[test]
-    //fusa:test REQ-LIFE-006
-    //fusa:test REQ-LIFE-012
-    fn is_transition_defined_true_only_for_the_three_implemented_transitions() {
-        for from in ALL_STATES {
-            for to in ALL_STATES {
-                let defined = is_transition_defined(from, to);
-                let expected = matches!(
-                    (from, to),
-                    (RcServerState::HwUnconfigured, RcServerState::HwConfigured)
-                        | (RcServerState::HwConfigured, RcServerState::RcpConfigured)
-                        | (RcServerState::HwConfigured, RcServerState::HwUnconfigured)
-                );
-                assert_eq!(defined, expected, "{from:?} -> {to:?}");
-            }
+    const GOLDEN: &str = include_str!("../testdata/c_rcp_lifecycle_golden.txt");
+
+    fn golden(key: &str) -> &'static str {
+        GOLDEN
+            .lines()
+            .find_map(|l| l.strip_prefix(key).and_then(|r| r.strip_prefix(' ')))
+            .unwrap_or_else(|| panic!("golden key {key} missing"))
+    }
+
+    const EP_GOOD: EndpointPlausibility = EndpointPlausibility {
+        ep_used: true,
+        hw_pin_mapped: true,
+        has_request_stream: true,
+        has_stream_assoc: true,
+        request_stream_index: 0,
+    };
+    const RS_GOOD: RequestStreamPlausibility = RequestStreamPlausibility {
+        configured: true,
+        has_response_stream: true,
+        response_stream_index: 0,
+    };
+
+    /// The same eleven snapshot variants `lifecycle_gen.c`'s `mk()` builds,
+    /// index 0 being "no snapshot" (c-RCP's NULL).
+    fn golden_snapshots() -> Vec<(
+        Vec<EndpointPlausibility>,
+        Vec<RequestStreamPlausibility>,
+        usize,
+    )> {
+        let base = || (vec![EP_GOOD], vec![RS_GOOD], 1usize);
+        let mut v = vec![(vec![], vec![], 0)]; // 0: unused (None)
+        v.push(base()); // 1: fully plausible
+        let mut s = base();
+        s.0[0].hw_pin_mapped = false; // 2
+        v.push(s);
+        let mut s = base();
+        s.0[0].has_request_stream = false; // 3
+        v.push(s);
+        let mut s = base();
+        s.0[0].has_stream_assoc = false; // 4
+        v.push(s);
+        let mut s = base();
+        s.1[0].has_response_stream = false; // 5
+        v.push(s);
+        let mut s = base();
+        s.2 = 0; // 6: response index out of range
+        v.push(s);
+        let mut s = base();
+        s.1.push(RS_GOOD); // 7: orphaned second request stream
+        v.push(s);
+        v.push((vec![], vec![], 1)); // 8: empty
+        v.push((vec![EndpointPlausibility::default()], vec![], 1)); // 9: unused ep only
+        let mut s = base();
+        s.0[0].ep_used = false; // 10: stream bound only by an unused ep
+        s.0[0].hw_pin_mapped = false;
+        v.push(s);
+        v
+    }
+
+    fn with_snapshot<R>(idx: usize, f: impl FnOnce(Option<&PlausibilitySnapshot<'_>>) -> R) -> R {
+        let all = golden_snapshots();
+        let (eps, rss, n) = &all[idx];
+        let snap = PlausibilitySnapshot {
+            endpoints: eps,
+            request_streams: rss,
+            response_stream_count: *n,
+        };
+        f(if idx == 0 { None } else { Some(&snap) })
+    }
+
+    fn writer(bits: u8) -> WriterCtx {
+        WriterCtx {
+            via_root_client_ep0: bits & 1 != 0,
+            via_owning_stream: bits & 2 != 0,
+            via_non_unicast_frame: bits & 4 != 0,
+            via_discovery_stream: bits & 8 != 0,
+            via_valid_stream_association: bits & 16 != 0,
+        }
+    }
+
+    fn code(r: Result<(), LifecycleError>) -> char {
+        match r {
+            Ok(()) => '0',
+            Err(e) => char::from(b'0' + e.code()),
+        }
+    }
+
+    fn wire(r: Result<(), RcpError>) -> char {
+        match r {
+            Ok(()) => '0',
+            Err(RcpError::LockedMemAccess) => 'L',
+            Err(RcpError::UnauthorizedAccess) => 'U',
+            Err(_) => '?',
         }
     }
 
     #[test]
-    //fusa:test REQ-LIFE-006
-    fn try_transition_success_agrees_with_is_transition_defined_when_guard_passes() {
+    //fusa:test REQ-LIFECYCLE-002
+    //fusa:test REQ-LIFECYCLE-003
+    //fusa:test REQ-LIFECYCLE-004
+    //fusa:test REQ-LIFECYCLE-005
+    //fusa:test REQ-LIFECYCLE-006
+    //fusa:test REQ-LIFECYCLE-007
+    //fusa:test REQ-LIFECYCLE-038
+    //fusa:test REQ-RMAP-049
+    fn c_rcp_golden_plausibility_checks_match_byte_for_byte() {
+        let hw: String = (0..11)
+            .map(|i| with_snapshot(i, |s| code(check_hw_cfg(s))))
+            .collect();
+        let rcp: String = (0..11)
+            .map(|i| with_snapshot(i, |s| code(check_rcp_cfg(s))))
+            .collect();
+        assert_eq!(hw, golden("HW_CFG"));
+        assert_eq!(rcp, golden("RCP_CFG"));
+    }
+
+    #[test]
+    //fusa:test REQ-LIFECYCLE-008
+    //fusa:test REQ-LIFECYCLE-009
+    //fusa:test REQ-LIFECYCLE-010
+    //fusa:test REQ-LIFECYCLE-011
+    //fusa:test REQ-LIFECYCLE-012
+    //fusa:test REQ-LIFECYCLE-013
+    //fusa:test REQ-LIFECYCLE-022
+    //fusa:test REQ-LIFECYCLE-031
+    //fusa:test REQ-LIFECYCLE-037
+    //fusa:test REQ-LIFECYCLE-039
+    //fusa:test REQ-LIFE-007
+    //fusa:test REQ-LIFE-008
+    fn c_rcp_golden_transition_table_matches_byte_for_byte() {
+        let mut got = String::new();
         for from in ALL_STATES {
             for to in ALL_STATES {
-                let defined = is_transition_defined(from, to);
-                let result = from.try_transition(to, || true);
-                assert_eq!(result.is_ok(), defined, "{from:?} -> {to:?}");
+                for s in 0..11 {
+                    for bits in 0..32u8 {
+                        for idle in [false, true] {
+                            let r = with_snapshot(s, |snap| {
+                                from.try_transition(to, snap, writer(bits), idle)
+                            });
+                            if let Ok(next) = r {
+                                assert_eq!(next, to);
+                            }
+                            got.push(code(r.map(|_| ())));
+                        }
+                    }
+                }
             }
+        }
+        assert_eq!(got, golden("TRANSITION"));
+    }
+
+    #[test]
+    //fusa:test REQ-LIFECYCLE-014
+    //fusa:test REQ-LIFECYCLE-015
+    //fusa:test REQ-LIFECYCLE-016
+    //fusa:test REQ-LIFECYCLE-017
+    //fusa:test REQ-LIFECYCLE-028
+    //fusa:test REQ-LIFECYCLE-029
+    //fusa:test REQ-LIFECYCLE-032
+    //fusa:test REQ-LIFECYCLE-033
+    //fusa:test REQ-AVTP-029
+    fn c_rcp_golden_should_accept_matches_byte_for_byte() {
+        let mut got = String::new();
+        for state in ALL_STATES {
+            for ts in [false, true] {
+                for sub in [0x05u8, 0x82, 0x00] {
+                    for mt in [0x0Eu8, 0x0D, 0x00] {
+                        for bb in [0u16, 1, 0x7FF] {
+                            for p in [TscfFallback::Drop, TscfFallback::Ignore] {
+                                let a = should_accept(state, ts, sub, mt, bb, p);
+                                got.push(char::from(b'0' + a as u8));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert_eq!(got, golden("ACCEPT"));
+    }
+
+    #[test]
+    //fusa:test REQ-LIFECYCLE-018
+    //fusa:test REQ-LIFECYCLE-019
+    //fusa:test REQ-LIFECYCLE-020
+    //fusa:test REQ-LIFECYCLE-026
+    //fusa:test REQ-LIFECYCLE-027
+    //fusa:test REQ-LIFECYCLE-035
+    //fusa:test REQ-WIREERR-004
+    //fusa:test REQ-RMAP-037
+    fn c_rcp_golden_field_write_error_matches_byte_for_byte() {
+        let kinds = [
+            FieldKind::HwGeneric,
+            FieldKind::FunctionalW,
+            FieldKind::FunctionalWStar,
+            FieldKind::ReadOnly,
+        ];
+        let mut got = String::new();
+        for state in ALL_STATES {
+            for kind in kinds {
+                for bits in 0..32u8 {
+                    let w = writer(bits);
+                    let r = check_field_writable(state, kind, w);
+                    assert_eq!(r.is_ok(), is_field_writable(state, kind, w));
+                    got.push(wire(r));
+                }
+            }
+        }
+        assert_eq!(got, golden("FIELD"));
+    }
+
+    #[test]
+    //fusa:test REQ-RMAP-055
+    fn c_rcp_golden_w_plus_write_error_matches_byte_for_byte() {
+        let mut got = String::new();
+        for state in ALL_STATES {
+            for bits in 0..32u8 {
+                for locked in [false, true] {
+                    let w = writer(bits);
+                    let r = check_field_writable_w_plus(state, w, locked);
+                    assert_eq!(r.is_ok(), is_field_writable_w_plus(state, w, locked));
+                    got.push(wire(r));
+                }
+            }
+        }
+        assert_eq!(got, golden("WPLUS"));
+    }
+
+    #[test]
+    //fusa:test REQ-LIFECYCLE-021
+    fn lifecycle_error_codes_and_messages_match_c_rcp_strerror() {
+        let all = [
+            LifecycleError::HwCfgInconsistent,
+            LifecycleError::RcpCfgInconsistent,
+            LifecycleError::InvalidTransition,
+            LifecycleError::Unauthorized,
+            LifecycleError::EpsNotIdle,
+        ];
+        for (i, e) in all.iter().enumerate() {
+            assert_eq!(e.code() as usize, i + 1);
+            assert_eq!(e.message(), golden(&format!("STRERR{}", i + 1)));
+            assert_eq!(e.to_string(), e.message());
+        }
+        let mut msgs: Vec<_> = all.iter().map(|e| e.message()).collect();
+        msgs.sort_unstable();
+        msgs.dedup();
+        assert_eq!(msgs.len(), all.len());
+    }
+
+    // ── Targeted edge/guard tests (one per edge and guard) ──────────────
+
+    const ROOT: WriterCtx = WriterCtx {
+        via_root_client_ep0: true,
+        via_owning_stream: false,
+        via_non_unicast_frame: false,
+        via_discovery_stream: false,
+        via_valid_stream_association: false,
+    };
+    const DISCOVERY: WriterCtx = WriterCtx {
+        via_root_client_ep0: false,
+        via_owning_stream: false,
+        via_non_unicast_frame: false,
+        via_discovery_stream: true,
+        via_valid_stream_association: false,
+    };
+    const ASSOC: WriterCtx = WriterCtx {
+        via_root_client_ep0: false,
+        via_owning_stream: false,
+        via_non_unicast_frame: false,
+        via_discovery_stream: false,
+        via_valid_stream_association: true,
+    };
+    const NOBODY: WriterCtx = WriterCtx {
+        via_root_client_ep0: false,
+        via_owning_stream: false,
+        via_non_unicast_frame: false,
+        via_discovery_stream: false,
+        via_valid_stream_association: false,
+    };
+
+    fn good_snapshot() -> PlausibilitySnapshot<'static> {
+        const EPS: [EndpointPlausibility; 1] = [EP_GOOD];
+        const RSS: [RequestStreamPlausibility; 1] = [RS_GOOD];
+        PlausibilitySnapshot {
+            endpoints: &EPS,
+            request_streams: &RSS,
+            response_stream_count: 1,
         }
     }
 
-    // ── Transition guard: round-trip on the two guarded transitions ──────
-
     #[test]
-    //fusa:test REQ-LIFE-007
-    fn hw_unconfigured_to_hw_configured_succeeds_when_guard_passes() {
-        let result =
-            RcServerState::HwUnconfigured.try_transition(RcServerState::HwConfigured, || true);
-        assert_eq!(result, Ok(RcServerState::HwConfigured));
-    }
-
-    #[test]
-    //fusa:test REQ-LIFE-007
-    fn hw_unconfigured_to_hw_configured_rejected_when_guard_fails() {
-        let result =
-            RcServerState::HwUnconfigured.try_transition(RcServerState::HwConfigured, || false);
-        assert_eq!(result, Err(RcpError::InvalidParameter));
-    }
-
-    #[test]
-    //fusa:test REQ-LIFE-007
-    fn hw_configured_to_rcp_configured_succeeds_when_guard_passes() {
-        let result =
-            RcServerState::HwConfigured.try_transition(RcServerState::RcpConfigured, || true);
-        assert_eq!(result, Ok(RcServerState::RcpConfigured));
-    }
-
-    #[test]
-    //fusa:test REQ-LIFE-007
-    fn hw_configured_to_rcp_configured_rejected_when_guard_fails() {
-        let result =
-            RcServerState::HwConfigured.try_transition(RcServerState::RcpConfigured, || false);
-        assert_eq!(result, Err(RcpError::InvalidParameter));
-    }
-
-    // ── Transition guard: round-trip on the demotion path ────────────────
-
-    #[test]
-    //fusa:test REQ-LIFE-012
-    fn hw_configured_to_hw_unconfigured_succeeds_regardless_of_guard_result() {
-        // Unconditional: the demotion path is not gated by any consistency
-        // guard (see this module's doc comment Provenance note), so it
-        // succeeds identically whether the supplied closure would have
-        // returned true or false.
-        let succeeded =
-            RcServerState::HwConfigured.try_transition(RcServerState::HwUnconfigured, || true);
-        assert_eq!(succeeded, Ok(RcServerState::HwUnconfigured));
-
-        let also_succeeded =
-            RcServerState::HwConfigured.try_transition(RcServerState::HwUnconfigured, || false);
-        assert_eq!(also_succeeded, Ok(RcServerState::HwUnconfigured));
-    }
-
-    #[test]
-    //fusa:test REQ-LIFE-012
-    fn hw_configured_to_hw_unconfigured_never_consults_the_guard() {
-        let mut guard_called = false;
-        let result =
-            RcServerState::HwConfigured.try_transition(RcServerState::HwUnconfigured, || {
-                guard_called = true;
-                true
-            });
-        assert_eq!(result, Ok(RcServerState::HwUnconfigured));
-        assert!(
-            !guard_called,
-            "the unconditional demotion path should never invoke is_consistent"
+    //fusa:test REQ-LIFECYCLE-008
+    fn hw_unconfigured_to_hw_configured_is_gated_only_by_hw_cfg() {
+        use RcServerState::*;
+        let snap = good_snapshot();
+        // Writer and idleness not consulted.
+        assert_eq!(
+            HwUnconfigured.try_transition(HwConfigured, Some(&snap), NOBODY, false),
+            Ok(HwConfigured)
+        );
+        assert_eq!(
+            HwUnconfigured.try_transition(HwConfigured, None, ROOT, true),
+            Err(LifecycleError::HwCfgInconsistent)
         );
     }
 
-    // ── Transition guard: rejection of every undefined transition ────────
+    #[test]
+    //fusa:test REQ-LIFECYCLE-009
+    //fusa:test REQ-LIFECYCLE-031
+    fn hw_configured_to_rcp_configured_checks_writer_then_rcp_cfg() {
+        use RcServerState::*;
+        let snap = good_snapshot();
+        for w in [ROOT, DISCOVERY, ASSOC] {
+            assert_eq!(
+                HwConfigured.try_transition(RcpConfigured, Some(&snap), w, false),
+                Ok(RcpConfigured)
+            );
+        }
+        // Unauthorized is reported before plausibility.
+        assert_eq!(
+            HwConfigured.try_transition(RcpConfigured, None, NOBODY, true),
+            Err(LifecycleError::Unauthorized)
+        );
+        assert_eq!(
+            HwConfigured.try_transition(RcpConfigured, None, ROOT, true),
+            Err(LifecycleError::RcpCfgInconsistent)
+        );
+    }
 
     #[test]
-    //fusa:test REQ-LIFE-008
-    fn undefined_transitions_are_rejected_without_consulting_the_guard() {
-        let undefined_pairs = [
-            // Full rollback in one step -- out of scope for this item, which
-            // implements only the single HW_CONFIGURED -> HW_UNCONFIGURED
-            // hop the roadmap checklist names (see this module's doc
-            // comment Provenance note).
-            (RcServerState::RcpConfigured, RcServerState::HwUnconfigured),
-            // Skipping HW_CONFIGURED entirely.
-            (RcServerState::HwUnconfigured, RcServerState::RcpConfigured),
-            // A lesser demotion out of RCP_CONFIGURED -- also out of scope
-            // for the same reason as the full rollback above.
-            (RcServerState::RcpConfigured, RcServerState::HwConfigured),
-            // Staying in the same state, for all three states.
-            (RcServerState::HwUnconfigured, RcServerState::HwUnconfigured),
-            (RcServerState::HwConfigured, RcServerState::HwConfigured),
-            (RcServerState::RcpConfigured, RcServerState::RcpConfigured),
-        ];
-        for (from, to) in undefined_pairs {
-            let mut guard_called = false;
-            let result = from.try_transition(to, || {
-                guard_called = true;
-                true
-            });
-            assert_eq!(result, Err(RcpError::RequestRejected), "{from:?} -> {to:?}");
-            assert!(
-                !guard_called,
-                "guard should not be consulted for undefined transition {from:?} -> {to:?}"
+    //fusa:test REQ-LIFECYCLE-039
+    fn rcp_configured_to_hw_configured_needs_ep0_writer_and_idle() {
+        use RcServerState::*;
+        assert_eq!(
+            RcpConfigured.try_transition(HwConfigured, None, ROOT, true),
+            Ok(HwConfigured)
+        );
+        assert_eq!(
+            RcpConfigured.try_transition(HwConfigured, None, ASSOC, true),
+            Ok(HwConfigured)
+        );
+        assert_eq!(
+            RcpConfigured.try_transition(HwConfigured, None, DISCOVERY, true),
+            Err(LifecycleError::Unauthorized)
+        );
+        assert_eq!(
+            RcpConfigured.try_transition(HwConfigured, None, ROOT, false),
+            Err(LifecycleError::EpsNotIdle)
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-LIFECYCLE-010
+    //fusa:test REQ-LIFECYCLE-022
+    //fusa:test REQ-LIFE-012
+    fn hw_configured_reset_needs_authorized_writer_and_idle() {
+        use RcServerState::*;
+        for w in [ROOT, DISCOVERY, ASSOC] {
+            assert_eq!(
+                HwConfigured.try_transition(HwUnconfigured, None, w, true),
+                Ok(HwUnconfigured)
             );
+        }
+        assert_eq!(
+            HwConfigured.try_transition(HwUnconfigured, None, NOBODY, true),
+            Err(LifecycleError::Unauthorized)
+        );
+        assert_eq!(
+            HwConfigured.try_transition(HwUnconfigured, None, ROOT, false),
+            Err(LifecycleError::EpsNotIdle)
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-LIFECYCLE-011
+    //fusa:test REQ-LIFECYCLE-037
+    fn rcp_configured_reset_needs_root_client_only_and_idle() {
+        use RcServerState::*;
+        assert_eq!(
+            RcpConfigured.try_transition(HwUnconfigured, None, ROOT, true),
+            Ok(HwUnconfigured)
+        );
+        for w in [DISCOVERY, ASSOC, NOBODY] {
+            assert_eq!(
+                RcpConfigured.try_transition(HwUnconfigured, None, w, true),
+                Err(LifecycleError::Unauthorized)
+            );
+        }
+        assert_eq!(
+            RcpConfigured.try_transition(HwUnconfigured, None, ROOT, false),
+            Err(LifecycleError::EpsNotIdle)
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-LIFECYCLE-013
+    fn same_state_transition_is_a_no_op_success() {
+        for s in ALL_STATES {
+            assert_eq!(s.try_transition(s, None, NOBODY, false), Ok(s));
         }
     }
 
-    // ── Fuzz-style: arbitrary (state, state, guard-result) never panics ──
-
     #[test]
-    //fusa:test REQ-LIFE-008
-    //fusa:test REQ-LIFE-012
-    fn try_transition_never_panics_for_any_state_pair_or_guard_result() {
+    //fusa:test REQ-LIFE-006
+    //fusa:test REQ-LIFECYCLE-012
+    fn is_transition_defined_matches_the_five_modeled_edges() {
         for from in ALL_STATES {
             for to in ALL_STATES {
-                let _ = from.try_transition(to, || true);
-                let _ = from.try_transition(to, || false);
+                let expected = from != to
+                    && (from, to) != (RcServerState::HwUnconfigured, RcServerState::RcpConfigured);
+                assert_eq!(
+                    is_transition_defined(from, to),
+                    expected,
+                    "{from:?}->{to:?}"
+                );
+                // With the most permissive inputs, a modeled edge succeeds
+                // and an unmodeled one is InvalidTransition.
+                let snap = good_snapshot();
+                let r = from.try_transition(to, Some(&snap), ROOT, true);
+                if expected {
+                    assert_eq!(r, Ok(to));
+                } else if from != to {
+                    assert_eq!(r, Err(LifecycleError::InvalidTransition));
+                }
+            }
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-LIFECYCLE-014
+    //fusa:test REQ-LIFECYCLE-033
+    fn gate_accepts_only_standard_ep0_ntscf_before_rcp_configured() {
+        use crate::acf::{ACF_ABB_MSG_TYPE, ACF_GBB_MSG_TYPE};
+        use crate::avtp::{NTSCF_SUBTYPE, TSCF_SUBTYPE};
+        let d = TscfFallback::Drop;
+        for state in [RcServerState::HwUnconfigured, RcServerState::HwConfigured] {
+            assert_eq!(
+                should_accept(state, true, NTSCF_SUBTYPE, ACF_ABB_MSG_TYPE, 0, d),
+                LifecycleAccept::Accept
+            );
+            assert_eq!(
+                should_accept(state, true, NTSCF_SUBTYPE, ACF_GBB_MSG_TYPE, 0, d),
+                LifecycleAccept::Reject
+            );
+            assert_eq!(
+                should_accept(state, true, NTSCF_SUBTYPE, ACF_ABB_MSG_TYPE, 1, d),
+                LifecycleAccept::Drop
+            );
+            assert_eq!(
+                should_accept(state, true, TSCF_SUBTYPE, ACF_ABB_MSG_TYPE, 0, d),
+                LifecycleAccept::Drop
+            );
+        }
+        assert_eq!(
+            should_accept(
+                RcServerState::RcpConfigured,
+                true,
+                TSCF_SUBTYPE,
+                ACF_GBB_MSG_TYPE,
+                7,
+                d
+            ),
+            LifecycleAccept::Accept
+        );
+        // §13.3 IGNORE policy admits TSCF on a time-sync-incapable server.
+        assert_eq!(
+            should_accept(
+                RcServerState::RcpConfigured,
+                false,
+                TSCF_SUBTYPE,
+                ACF_ABB_MSG_TYPE,
+                7,
+                d
+            ),
+            LifecycleAccept::Drop
+        );
+        assert_eq!(
+            should_accept(
+                RcServerState::RcpConfigured,
+                false,
+                TSCF_SUBTYPE,
+                ACF_ABB_MSG_TYPE,
+                7,
+                TscfFallback::Ignore
+            ),
+            LifecycleAccept::Accept
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-RMAP-037
+    fn read_only_fields_are_locked_for_every_state_and_writer() {
+        for state in ALL_STATES {
+            for bits in 0..32u8 {
+                assert_eq!(
+                    check_field_writable(state, FieldKind::ReadOnly, writer(bits)),
+                    Err(RcpError::LockedMemAccess)
+                );
             }
         }
     }

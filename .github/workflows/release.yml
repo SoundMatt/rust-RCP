@@ -5,15 +5,291 @@ on:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
 
+permissions:
+  contents: read
+
 jobs:
-  publish:
-    name: Publish to crates.io
+  # ── Version gate (issue #212) ─────────────────────────────────────────────
+  # Mirrors c-RCP's release-time version-match gate (c-RCP/.github/workflows/
+  # release.yml:87-116): the tag being released must equal Cargo.toml's
+  # version (and Cargo.lock/CHANGELOG.md, via the same script ci.yml's
+  # version-sources-agree job runs). Every SBOM/provenance artifact and the
+  # crates.io upload are labelled from Cargo.toml, so a mismatch would ship
+  # mislabelled evidence -- which is how 5.11.0 evidence could have been
+  # stamped onto a v2.0.0 tag. Both jobs below depend on this one.
+  version-gate:
+    name: Tag matches Cargo.toml version
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - name: tag == Cargo.toml == Cargo.lock == CHANGELOG.md
+        run: bash scripts/version-sources-check.sh "${{ github.ref_name }}"
+
+  # ── Safety evidence (issues #92, #219) ────────────────────────────────────
+  # Mirrors c-RCP's `regenerate-safety-artifacts` job (c-RCP/.github/
+  # workflows/release.yml:11-209): on every release tag, regenerate the
+  # safety-evidence set with the pinned safety tool and COMMIT it to the
+  # default branch with `[skip ci]` (c-RCP release.yml:178-204), and also
+  # upload it as a workflow artifact. In addition (issue #92), attach it to
+  # the GitHub Release itself, so the evidence for a tag outlives workflow
+  # artifact retention.
+  #
+  # Deliberately independent of the `publish` job: a missing/invalid
+  # CARGO_REGISTRY_TOKEN (issue #12) must never block the safety evidence.
+  #
+  # Divergence from c-RCP: c-RCP checks out `main` and regenerates from main's
+  # HEAD. rust-RCP cuts releases from `release/*` branches, so the tag's tree
+  # can differ from the default branch's; the evidence is generated from the
+  # TAGGED tree and only the commit lands on the default branch.
+  regenerate-safety-artifacts:
+    name: Regenerate safety artifacts
+    needs: version-gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: checkout the tagged tree
+        uses: actions/checkout@v4
+        with:
+          path: src
+      - name: checkout the default branch (commit target)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: evidence
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src
+      - name: install rsfusa
+        run: cargo install --git https://github.com/SoundMatt/rust-FuSa --tag v0.3.17 rsfusa --locked
+
+      - name: build release binary (needed for qualify)
+        working-directory: src
+        run: cargo build --release --locked
+      - name: test evidence (rsfusa verify)
+        working-directory: src
+        run: rsfusa verify --dir .
+      - name: safety check — gates on ERROR findings
+        working-directory: src
+        run: rsfusa check --dir . --format json --output check-report.json
+      - name: cybersecurity analysis — CWE-mapped
+        working-directory: src
+        run: rsfusa cyber --dir . --format json --output cyber-report.json
+      - name: module coupling analysis
+        working-directory: src
+        run: rsfusa coupling --dir .
+      - name: requirement traceability (100% hard gate)
+        working-directory: src
+        run: rsfusa trace --dir . --req-coverage 100 --format json --output trace.json
+      - name: regenerate dFMEA
+        working-directory: src
+        run: rsfusa fmea --dir .
+      # tara.json is hand-authored (ISO/SAE 21434 TARA), not regenerated or
+      # committed here -- same rule as c-RCP release.yml ("tara.json/tara.md
+      # are hand-authored, not regenerated here"). --output keeps the
+      # generated code-scan report from overwriting it.
+      - name: TARA code-scan report
+        working-directory: src
+        run: rsfusa tara --dir . --output tara-report.json --md tara-report.md
+      - name: tool qualification evidence
+        working-directory: src
+        run: rsfusa qualify
+      - name: regenerate SBOM, provenance, and artifact manifest
+        working-directory: src
+        run: rsfusa release --dir .
+
+      # Release-gate check (c-RCP release.yml:87-116 equivalent): `rsfusa
+      # release` labels the SBOM/provenance with the Cargo package name; the
+      # version is the Cargo.toml one the version-gate job already matched
+      # against the tag. Confirm the artifacts describe THIS package.
+      - name: verify shipped artifacts declare this package
+        working-directory: src
+        run: |
+          fail=0
+          for f in sbom.json provenance.json; do
+            module=$(jq -r '.module' "$f")
+            if [ "$module" != "rust-rcp" ]; then
+              echo "::error file=$f::declares module '$module', expected 'rust-rcp'"
+              fail=1
+            fi
+          done
+          [ "$fail" -eq 0 ] || exit 1
+
+      - name: regenerate safety case (after every evidence item it cites)
+        working-directory: src
+        run: |
+          set -o pipefail
+          rsfusa safety-case --dir . | tee safety-case.log
+          if grep -q 'required evidence item(s) missing' safety-case.log; then
+            echo "::error::rsfusa safety-case reports missing REQUIRED evidence"
+            exit 1
+          fi
+
+      # Gap reports grade against certification targets; their job here is
+      # to GENERATE the report, not to gate on it (c-RCP release.yml keeps
+      # these `|| true` for that reason). scripts/rsfusa-report.sh keeps that
+      # intent without `|| true`: exit 1 (gaps recorded) is accepted, a
+      # usage/runtime error or a missing report fails the job.
+      - name: regenerate ISO 26262 gap report (ASIL-B)
+        working-directory: src
+        run: bash scripts/rsfusa-report.sh iso26262-gap-report.json -- rsfusa iso26262 --dir . --format json --output iso26262-gap-report.json
+      - name: regenerate IEC 61508 gap report
+        working-directory: src
+        run: bash scripts/rsfusa-report.sh iec61508-gap-report.json -- rsfusa iec61508 --dir . --format json --output iec61508-gap-report.json
+      - name: regenerate DO-178C gap report
+        working-directory: src
+        run: bash scripts/rsfusa-report.sh do178c-gap-report.json -- rsfusa do178c --dir . --format json --output do178c-gap-report.json
+      - name: regenerate IEC 62443 gap report
+        working-directory: src
+        run: bash scripts/rsfusa-report.sh iec62443-gap-report.json -- rsfusa iec62443 --dir . --format json --output iec62443-gap-report.json
+      - name: regenerate Software Accomplishment Summary (DO-178C §11.20)
+        working-directory: src
+        run: rsfusa sas --dir .
+      - name: regenerate Software Configuration Index (DO-178C §11.16)
+        working-directory: src
+        run: rsfusa sci --dir . --output sci.json
+      - name: bundle audit evidence pack
+        working-directory: src
+        run: rsfusa audit-pack --output audit-pack.zip
+      - name: generate safety badge
+        working-directory: src
+        run: rsfusa badge --dir . --output fusa-badge.svg
+
+      - name: verify the evidence set was produced
+        working-directory: src
+        run: |
+          missing=0
+          for f in \
+            fmea.json fmea.csv safety-case.json safety-case.md \
+            sbom.json provenance.json artifact-manifest.json trace.json \
+            .fusa-evidence.json iso26262-gap-report.json iec61508-gap-report.json do178c-gap-report.json \
+            iec62443-gap-report.json sas.md sci.json qualify-report.json \
+            audit-pack.zip fusa-badge.svg check-report.json cyber-report.json \
+            coupling-report.json; do
+            if [ ! -s "$f" ]; then
+              echo "::error::Release evidence missing: $f"
+              missing=$((missing + 1))
+            fi
+          done
+          git diff --exit-code -- tara.json .fusa-hara.json .fusa-reqs.json \
+            || { echo "::error::a release step rewrote a hand-authored safety artifact"; missing=$((missing + 1)); }
+          [ "$missing" -eq 0 ] || exit 1
+
+      - name: upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-safety-artifacts-${{ github.ref_name }}
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            src/fmea.json
+            src/fmea.csv
+            src/safety-case.json
+            src/safety-case.md
+            src/tara.json
+            src/sbom.json
+            src/provenance.json
+            src/artifact-manifest.json
+            src/trace.json
+            src/.fusa-evidence.json
+            src/iso26262-gap-report.json
+            src/iec61508-gap-report.json
+            src/do178c-gap-report.json
+            src/iec62443-gap-report.json
+            src/sas.md
+            src/sci.json
+            src/qualify-report.json
+            src/audit-pack.zip
+            src/fusa-badge.svg
+            src/check-report.json
+            src/cyber-report.json
+            src/coupling-report.json
+
+      # c-RCP release.yml:178-204: commit the regenerated evidence to the
+      # default branch with [skip ci] (so the commit does not re-trigger the
+      # full CI matrix), DCO-signed by the bot.
+      - name: commit regenerated artifacts to the default branch
+        run: |
+          set -euo pipefail
+          files="fmea.csv fmea.json safety-case.json safety-case.md sbom.json provenance.json artifact-manifest.json iso26262-gap-report.json iec61508-gap-report.json do178c-gap-report.json iec62443-gap-report.json sas.md sci.json qualify-report.json audit-pack.zip fusa-badge.svg check-report.json cyber-report.json coupling-report.json"
+          for f in $files; do cp "src/$f" "evidence/$f"; done
+          cd evidence
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # shellcheck disable=SC2086
+          git add $files
+          if git diff --cached --quiet; then
+            echo "No artifact changes for $TAG — nothing to commit."
+            exit 0
+          fi
+          git commit \
+            -m "chore: regenerate safety artifacts for $TAG [skip ci]" \
+            -m "Signed-off-by: github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+          branch="${{ github.event.repository.default_branch }}"
+          for attempt in 1 2 3 4 5 6; do
+            if git push origin "HEAD:refs/heads/$branch"; then
+              exit 0
+            fi
+            echo "push attempt $attempt failed; rebasing onto origin/$branch and retrying"
+            sleep 20
+            git pull --rebase origin "$branch"
+          done
+          echo "::error::could not push regenerated artifacts to $branch"
+          exit 1
+
+      # Issue #92: also attach the evidence to the GitHub Release object for
+      # this tag (creating the Release if none exists yet -- nothing else in
+      # this repo creates one), so it is fetchable alongside the release and
+      # does not expire with workflow-artifact retention.
+      - name: attach evidence to the GitHub Release
+        working-directory: src
+        run: |
+          set -euo pipefail
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            awk '/^## v/{if(n++)exit} n' CHANGELOG.md > release-notes.md
+            gh release create "$TAG" --verify-tag --title "$TAG" --notes-file release-notes.md
+          fi
+          zip -q "fusa-safety-evidence-$TAG.zip" \
+            fmea.json fmea.csv safety-case.json safety-case.md tara.json \
+            sbom.json provenance.json artifact-manifest.json trace.json \
+            .fusa-evidence.json iso26262-gap-report.json iec61508-gap-report.json \
+            do178c-gap-report.json iec62443-gap-report.json sas.md sci.json \
+            qualify-report.json audit-pack.zip fusa-badge.svg check-report.json \
+            cyber-report.json coupling-report.json
+          gh release upload "$TAG" --clobber \
+            sbom.json provenance.json artifact-manifest.json \
+            safety-case.json safety-case.md qualify-report.json audit-pack.zip \
+            "fusa-safety-evidence-$TAG.zip"
+
+  # ── crates.io publish (issue #12) ─────────────────────────────────────────
+  # The crate is published as `rust-rcp` (`rcp` on crates.io has belonged to
+  # an unrelated project since 2020); the library is still imported as
+  # `rcp` (`[lib] name = "rcp"`).
+  publish:
+    name: Publish to crates.io
+    needs: version-gate
+    runs-on: ubuntu-latest
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - name: require CARGO_REGISTRY_TOKEN
+        run: |
+          if [ -z "${CARGO_REGISTRY_TOKEN}" ]; then
+            echo "::error::CARGO_REGISTRY_TOKEN is not configured (repo Settings -> Secrets and variables -> Actions). A crates.io API token with publish-new/publish-update scope for the 'rust-rcp' crate is required; see issue #12. The safety-evidence job is independent of this one and is unaffected."
+            exit 1
+          fi
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Verify clean build
-        run: cargo test --all-targets --release
+        run: cargo test --all-targets --release --locked
       - name: Publish
-        run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        # cargo reads the token from $CARGO_REGISTRY_TOKEN; it is never put
+        # on the command line (where an empty value used to surface as the
+        # unhelpful "a value is required for '--token <TOKEN>'").
+        run: cargo publish --locked
