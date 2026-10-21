@@ -100,6 +100,107 @@ jobs:
           files: lcov.info
           fail_ci_if_error: false
 
+  # ── Branch coverage, ratchet-gated (issue #221) ─────────────────────────────
+  # Rust counterpart of c-RCP's `mcdc` job and its "MC/DC regression gate
+  # (ratchet floor, not 100%)" step (c-RCP .github/workflows/ci.yml:379).
+  # rustc no longer offers MC/DC instrumentation (-Zcoverage-options=mcdc
+  # was removed; only block|branch|condition remain on the pinned nightly),
+  # so this gates llvm-cov *branch* coverage instead -- ISO 26262-6 Table 12
+  # rates branch coverage "++" for ASIL B. Like c-RCP's gate it hard-fails
+  # only on regression below the floor committed in
+  # .branch-coverage-ratchet.json (see that file's provenance note); it is
+  # not a 100% gate. `--branch` needs nightly; pinned to the same nightly as
+  # api-stability and miri.
+  branch-coverage:
+    name: Branch coverage (llvm-cov --branch, ratchet-gated)
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-10-21
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+      - name: install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov --locked
+      - name: collect branch coverage
+        run: |
+          cargo +nightly-2026-10-21 llvm-cov --branch --all-targets --locked \
+            --json --summary-only --output-path branch-summary.json
+      # Uploaded before the gate so a failing gate still leaves the
+      # numbers inspectable (same ordering as c-RCP's mcdc job).
+      - name: upload branch coverage summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: branch-coverage-summary
+          path: branch-summary.json
+      - name: branch coverage regression gate (ratchet floor, not 100%)
+        run: python3 scripts/branch_coverage_gate.py branch-summary.json
+
+  # ── Miri: undefined-behaviour checking (issue #221) ─────────────────────────
+  # Rust counterpart of c-RCP's ASan/UBSan `sanitize` job (c-RCP
+  # .github/workflows/ci.yml:86). The crate is #![forbid(unsafe_code)], but
+  # the unsafe code it executes in std and in dependencies (tokio, serde,
+  # crc, ...) is still checked for UB, out-of-bounds/use-after-free, invalid
+  # alignment, leaks and data races. Scope: `cargo miri test --lib` (1100+
+  # unit tests) minus scripts/miri-skips.txt, whose header documents every
+  # exclusion and why (currently: tests binding a real std UdpSocket, which
+  # Miri's socket shim cannot execute; bin/doc/bench/fuzz targets are out of
+  # scope). Any Miri error fails the job.
+  miri:
+    name: Miri (UB checking, cargo miri test --lib)
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-10-21
+          components: miri, rust-src
+      - uses: Swatinem/rust-cache@v2
+      - name: miri setup
+        run: cargo +nightly-2026-10-21 miri setup
+      - name: cargo miri test --lib (exclusions in scripts/miri-skips.txt)
+        run: bash scripts/miri.sh
+
+  # ── TLA+ formal verification (issue #221) ───────────────────────────────────
+  # Mirrors c-RCP's `formal-verification` job (c-RCP
+  # .github/workflows/ci.yml:193), running the same two shared specs
+  # (tla/LifecycleStateMachine.tla, tla/E2ESafePoint.tla) plus
+  # rust-RCP's own tla/RequestLifecycle.tla. TLC exits non-zero on any
+  # invariant/property violation or deadlock. src/formal.rs's `refinement`
+  # tests (run by the `test` job) tie each spec to the real rust code. See
+  # docs/FORMAL_VERIFICATION.md. Unlike c-RCP (which downloads "latest"),
+  # tla2tools.jar is pinned to a release and checksum-verified.
+  formal-verification:
+    name: formal verification (TLC model checking)
+    runs-on: ubuntu-latest
+    env:
+      TLA_TOOLS_VERSION: v1.7.4
+      TLA_TOOLS_SHA256: 936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: download TLC (tla2tools.jar, pinned)
+        run: |
+          curl -sSL -o "$RUNNER_TEMP/tla2tools.jar" \
+            "https://github.com/tlaplus/tlaplus/releases/download/${TLA_TOOLS_VERSION}/tla2tools.jar"
+          echo "${TLA_TOOLS_SHA256}  $RUNNER_TEMP/tla2tools.jar" | sha256sum -c -
+      - name: model-check LifecycleStateMachine.tla
+        working-directory: tla
+        run: java -jar "$RUNNER_TEMP/tla2tools.jar" -workers 4 -metadir "$RUNNER_TEMP/tlc-states" LifecycleStateMachine.tla
+      - name: model-check E2ESafePoint.tla
+        working-directory: tla
+        run: java -jar "$RUNNER_TEMP/tla2tools.jar" -workers 4 -metadir "$RUNNER_TEMP/tlc-states" E2ESafePoint.tla
+      - name: model-check RequestLifecycle.tla
+        working-directory: tla
+        run: java -jar "$RUNNER_TEMP/tla2tools.jar" -workers 4 -metadir "$RUNNER_TEMP/tlc-states" RequestLifecycle.tla
+
   # ── FuSa gap check ────────────────────────────────────────────────────────
   fusa:
     name: FuSa gap check
