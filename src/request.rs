@@ -1573,8 +1573,13 @@ fn decode_repurposed_gbb(b: &[u8]) -> Result<AcfGbbMessage, RequestCodecError> {
     Ok(msg)
 }
 
-/// Build a repurposed ACF_GBB frame (`mtv = 0`, `op = 1`).
-fn encode_repurposed_gbb(
+/// Build a repurposed ACF_GBB frame (`mtv = 0`, `op = 1`), the
+/// counterpart of c-RCP's `encode_gbb_repurposed()` (`c-RCP/src/request.c`).
+/// `pub(crate)` so other in-crate tests (e.g. [`crate::tsn`]) build
+/// repurposed frames through the request layer rather than by stuffing
+/// `message_timestamp` into [`encode_acf_gbb`], which zeroes it for
+/// `mtv = 0` (REQ-ACF-011).
+pub(crate) fn encode_repurposed_gbb(
     byte_bus_id: u16,
     evt: Evt,
     cs: bool,

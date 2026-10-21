@@ -488,6 +488,9 @@ mod tests {
         let gbb = AcfGbbMessage {
             info: ByteMessageInfo {
                 byte_bus_id: 6,
+                // A timed GBB: only mtv = 1 carries message_timestamp on the
+                // wire (REQ-ACF-011; c-RCP acf.c zeroes it for mtv = 0).
+                mtv: true,
                 ..Default::default()
             },
             message_timestamp: 0x1122,
