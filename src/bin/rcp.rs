@@ -61,11 +61,11 @@
 //! state carried between separate `rust-rcp` invocations. This is flagged
 //! here per Guiding Principle 5 rather than left an unstated limitation.
 //!
-//! `serve` (added alongside [`rcp::udp::StdUdpSocket`]) is this binary's
+//! `serve` (added alongside [`rcp::udp::StdUdpSocket`], now over [`rcp::udp::UdpAvtpTransport`]) is this binary's
 //! first command backed by a real OS socket rather than an in-process
 //! `RcServer` invoked directly: it runs [`rcp::udp::UdpRcServer`] —
 //! previously only ever exercised in this crate's own unit tests, against
-//! mock sockets — over a real, bound [`rcp::udp::StdUdpSocket`], serving
+//! mock sockets — over a real, bound [`rcp::udp::UdpAvtpTransport`], serving
 //! real inbound UDP datagrams until `--max-requests` is reached (default:
 //! unbounded, run until a fatal socket error). Before this item, this
 //! crate had no concrete `rcp::udp::UdpSocket` implementation over a real
@@ -88,7 +88,7 @@ use rcp::discovery;
 use rcp::ep0::EP0_BYTE_BUS_ID;
 use rcp::mock::{MockEndpoint, RcServer};
 use rcp::regmap::{EndpointType, GeneralRegisters};
-use rcp::udp::{StdUdpSocket, UdpRcServer};
+use rcp::udp::{UdpAvtpTransport, UdpRcServer};
 
 const TOOL: &str = "rust-rcp";
 const PROTOCOL: &str = "RCP";
@@ -617,7 +617,7 @@ fn cmd_endpoint_write(args: &[String]) {
 /// `rust-rcp serve --udp <bind-ip> [--port <n>] [--stream <hex>]
 /// [--max-requests <n>]`.
 ///
-/// Binds a real [`StdUdpSocket`] to `--udp:--port` (default
+/// Binds a real bind-mode [`UdpAvtpTransport`] to `--udp:--port` (default
 /// [`rcp::udp::ANNEX_J_CONTROL_PORT`]) and runs [`UdpRcServer`] against it
 /// — a fresh [`RcServer`] with [`GeneralRegisters::default`] and an empty
 /// endpoint table, the same starting state `discover`/`register`/
@@ -637,10 +637,12 @@ fn cmd_serve(args: &[String]) {
             process::exit(1);
         }
     };
-    let bind_ip: std::net::IpAddr = match bind_ip_str.parse() {
+    // UdpAvtpTransport is IPv4-only, as c-RCP's inet_pton(AF_INET, ...)
+    // (c-RCP/src/udp.c:329-358).
+    let bind_ip: std::net::Ipv4Addr = match bind_ip_str.parse() {
         Ok(ip) => ip,
         Err(e) => {
-            eprintln!("error: invalid --udp address {bind_ip_str:?}: {e}");
+            eprintln!("error: invalid --udp IPv4 address {bind_ip_str:?}: {e}");
             process::exit(1);
         }
     };
@@ -648,20 +650,20 @@ fn cmd_serve(args: &[String]) {
     let local_stream = parse_stream_arg(args, "--stream").unwrap_or_else(|| StreamId::from_u64(0));
     let max_requests = parse_u32_arg(args, "--max-requests");
 
-    let socket = match StdUdpSocket::bind(std::net::SocketAddr::new(bind_ip, port)) {
-        Ok(s) => s,
+    let transport = match UdpAvtpTransport::bind(&bind_ip.to_string(), port, false) {
+        Ok(t) => t,
         Err(e) => {
             eprintln!("error: {}", e);
             process::exit(3);
         }
     };
-    let bound_addr = socket
+    let bound_addr = transport
         .local_addr()
         .map(|a| a.to_string())
         .unwrap_or_else(|_| format!("{bind_ip}:{port}"));
 
     let rc_server = RcServer::new(GeneralRegisters::default());
-    let server = UdpRcServer::new(local_stream, Arc::new(socket), rc_server);
+    let server = UdpRcServer::new(local_stream, Arc::new(transport), rc_server);
 
     println!(
         "serve: listening on udp {} (stream={})",
@@ -705,16 +707,10 @@ fn serve_loop(server: &UdpRcServer, max_requests: Option<u32>) -> Result<(), (u3
 fn log_served(served: u32, report: &rcp::udp::ServeReport) {
     println!("serve: dispatched request #{served}");
     if let Some(e) = &report.dispatch.error {
-        eprintln!(
-            "serve: dropped malformed datagram from {}: {e}",
-            report.peer
-        );
+        eprintln!("serve: dropped malformed datagram: {e}");
     }
     if let Some(e) = &report.response_error {
-        eprintln!(
-            "serve: could not frame the response to {}: {e}",
-            report.peer
-        );
+        eprintln!("serve: could not frame the response: {e}");
     }
 }
 
@@ -926,21 +922,32 @@ mod tests {
         sent: std::sync::Mutex<usize>,
     }
 
-    impl rcp::udp::UdpSocket for ScriptedSocket {
-        fn send_to(&self, buf: &[u8], _addr: std::net::SocketAddr) -> Result<usize, RcpError> {
+    impl rcp::avtp::AvtpTransport for ScriptedSocket {
+        fn send_frame(&self, _frame: &[u8]) -> Result<(), RcpError> {
             *self.sent.lock().unwrap() += 1;
-            Ok(buf.len())
+            Ok(())
         }
 
-        fn recv_from(
+        fn recv_frame(
             &self,
-            _timeout: Option<std::time::Duration>,
-        ) -> Result<(Vec<u8>, std::net::SocketAddr), RcpError> {
+            _deadline: Option<std::time::Instant>,
+            buf: &mut [u8],
+        ) -> Result<usize, RcpError> {
             let mut inbound = self.inbound.lock().unwrap();
             if inbound.is_empty() {
                 return Err(RcpError::Timeout);
             }
-            Ok((inbound.remove(0), "127.0.0.1:9".parse().unwrap()))
+            let frame = inbound.remove(0);
+            buf[..frame.len()].copy_from_slice(&frame);
+            Ok(frame.len())
+        }
+
+        fn close(&self) -> Result<(), RcpError> {
+            Ok(())
+        }
+
+        fn time_sync_supported(&self) -> bool {
+            false
         }
     }
 
