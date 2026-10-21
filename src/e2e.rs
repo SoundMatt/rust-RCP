@@ -1285,7 +1285,11 @@ mod tests {
         let real_payload: [u8; 7] = [0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7];
         let message_timestamp: u64 = 0x0102_0304_0506_0708;
         let msg = AcfGbbMessage {
-            info: acf::ByteMessageInfo::default(),
+            // mtv=1: encode_acf_gbb zeroes an untimed timestamp (REQ-ACF-011).
+            info: acf::ByteMessageInfo {
+                mtv: true,
+                ..acf::ByteMessageInfo::default()
+            },
             message_timestamp,
             payload: real_payload.to_vec(),
         };

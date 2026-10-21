@@ -482,7 +482,12 @@ pub enum RcpError {
     #[error("rcp/error: PWM_IN_NO_SIGNAL — PWM_IN endpoint has no signal to report")]
     PwmInNoSignal,
 
-    #[error("rcp/error: POCI_FAILURE — POCI (peripheral-on-chip-interconnect) transaction failed")]
+    // TC18 RC5 §12.9.6 Table 30 describes code 12 as "CRC of request does
+    // not match". The name itself is the SPI data line POCI
+    // (peripheral-out, controller-in, Table 23), not a
+    // "peripheral-on-chip-interconnect". RcpError::CrcError shares this
+    // wire code (see tc18_wire_code).
+    #[error("rcp/error: POCI_FAILURE — CRC of request does not match (TC18 Table 30 code 12)")]
     PociFailure,
 
     #[error(
@@ -568,9 +573,17 @@ impl RcpError {
     /// This error's TC18 Table 27 ("Error codes in responses") numeric wire
     /// value, for building a real `err=1` response's `byte_msg_payload`
     /// (rust-RCP-W04/W05) — `None` for every variant Table 27 does not
-    /// name (the RELAY sentinels, the general-purpose/wire variants, and
-    /// this crate's own `ChainAborted`/`ChainError`/`CrcError` additions,
-    /// which have no TC18-numbered counterpart).
+    /// name (the RELAY sentinels and the general-purpose/wire variants).
+    ///
+    /// [`RcpError::CrcError`] maps to `POCI_FAILURE` (12), sharing that
+    /// code with [`RcpError::PociFailure`], so a CRC-32 safe-point failure
+    /// can produce a real `err=1` response.
+    ///
+    /// c-RCP parity: c-RCP `src/e2e.c:28-34` (`rcp_e2e_wire_error`, its
+    /// REQ-WIREERR-003) maps a CRC mismatch to `RCP_ERROR_POCI_FAILURE`.
+    /// TC18 RC5 §13.6 (TC18.txt L4188-4189) names the code `CRC_ERROR`,
+    /// but Table 30 has no such entry; its code 12 is `POCI_FAILURE`, "CRC
+    /// of request does not match". This method copies c-RCP's choice.
     ///
     /// This is deliberately independent of [`crate::capi::CError`]'s
     /// discriminants (an internal, incompatible C-ABI numbering scheme —
@@ -589,6 +602,7 @@ impl RcpError {
     /// `INVALID_PARAMETER` = 15, `CHAIN_ABORTED` = 16, `CHAIN_ERROR` = 17.
     //fusa:req REQ-ERR-021
     //fusa:req REQ-ERR-022
+    //fusa:req REQ-WIREERR-003
     pub fn tc18_wire_code(&self) -> Option<u8> {
         match self {
             Self::UnsupportedCmd => Some(1),
@@ -602,7 +616,7 @@ impl RcpError {
             Self::PwmInNoSignal => Some(9),
             Self::ReqStorageOvfl => Some(10),
             Self::RequestRejected => Some(11),
-            Self::PociFailure => Some(12),
+            Self::PociFailure | Self::CrcError => Some(12),
             Self::PresentationTimeTooFar => Some(13),
             Self::GptpFail => Some(14),
             Self::InvalidParameter => Some(15),
@@ -928,13 +942,27 @@ mod tests {
             RcpError::AlreadyExists,
             RcpError::Busy,
             RcpError::ShortFrame,
-            RcpError::CrcError,
             RcpError::ConfigWriteNotImplemented,
             RcpError::InvalidSize,
             RcpError::Other("x".into()),
         ] {
             assert_eq!(error.tc18_wire_code(), None, "for {error:?}");
         }
+    }
+
+    #[test]
+    //fusa:test REQ-WIREERR-003
+    fn crc_error_maps_to_poci_failure_like_c_rcp() {
+        // c-RCP src/e2e.c:28-34: a CRC mismatch is POCI_FAILURE (12).
+        assert_eq!(RcpError::CrcError.tc18_wire_code(), Some(12));
+        assert_eq!(
+            RcpError::CrcError.tc18_wire_code(),
+            RcpError::PociFailure.tc18_wire_code()
+        );
+        let poci = RcpError::PociFailure.to_string();
+        assert!(poci.contains("POCI_FAILURE"));
+        assert!(poci.contains("CRC of request does not match"));
+        assert!(!poci.contains("peripheral-on-chip"));
     }
 
     #[test]
