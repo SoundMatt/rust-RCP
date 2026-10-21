@@ -3773,6 +3773,35 @@ impl core::marker::Unpin for rcp::request::OverflowOutcome
 impl core::marker::UnsafeUnpin for rcp::request::OverflowOutcome
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::OverflowOutcome
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::OverflowOutcome
+pub enum rcp::request::RequestCodecError
+pub rcp::request::RequestCodecError::BadMsgType
+pub rcp::request::RequestCodecError::EvtHsCsNonzero
+pub rcp::request::RequestCodecError::NotRepurposed
+pub rcp::request::RequestCodecError::ReservedNonzero
+pub rcp::request::RequestCodecError::ShortFrame
+pub rcp::request::RequestCodecError::UnknownType
+pub rcp::request::RequestCodecError::UnsupportedCmd
+impl rcp::request::RequestCodecError
+pub fn rcp::request::RequestCodecError::response_error(self) -> core::option::Option<rcp::RcpError>
+impl core::clone::Clone for rcp::request::RequestCodecError
+pub fn rcp::request::RequestCodecError::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::RequestCodecError
+impl core::cmp::PartialEq for rcp::request::RequestCodecError
+pub fn rcp::request::RequestCodecError::eq(&self, &Self) -> bool
+impl core::error::Error for rcp::request::RequestCodecError
+impl core::fmt::Debug for rcp::request::RequestCodecError
+pub fn rcp::request::RequestCodecError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rcp::request::RequestCodecError
+pub fn rcp::request::RequestCodecError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::request::RequestCodecError
+impl core::marker::StructuralPartialEq for rcp::request::RequestCodecError
+impl core::marker::Freeze for rcp::request::RequestCodecError
+impl core::marker::Send for rcp::request::RequestCodecError
+impl core::marker::Sync for rcp::request::RequestCodecError
+impl core::marker::Unpin for rcp::request::RequestCodecError
+impl core::marker::UnsafeUnpin for rcp::request::RequestCodecError
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::RequestCodecError
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::RequestCodecError
 #[repr(u8)] pub enum rcp::request::RequestKind
 pub rcp::request::RequestKind::Chained = 1
 pub rcp::request::RequestKind::ClearAll = 5
@@ -3828,9 +3857,10 @@ pub rcp::request::RequestLifecycleGuardInput::Timed
 pub rcp::request::RequestLifecycleGuardInput::Timed::current: u64
 pub rcp::request::RequestLifecycleGuardInput::Timed::exec_time: rcp::request::TimedExecutionTime
 pub rcp::request::RequestLifecycleGuardInput::Triggered
-pub rcp::request::RequestLifecycleGuardInput::Triggered::endpoint_busy: bool
-pub rcp::request::RequestLifecycleGuardInput::Triggered::occurrences_so_far: u16
-pub rcp::request::RequestLifecycleGuardInput::Triggered::repeat: rcp::request::TriggerRepeatCount
+pub rcp::request::RequestLifecycleGuardInput::Triggered::elapsed: u32
+pub rcp::request::RequestLifecycleGuardInput::Triggered::endpoint_idle: bool
+pub rcp::request::RequestLifecycleGuardInput::Triggered::runtime: rcp::request::TriggeredRuntime
+pub rcp::request::RequestLifecycleGuardInput::Triggered::step: rcp::request::TriggeredStep
 impl core::clone::Clone for rcp::request::RequestLifecycleGuardInput
 pub fn rcp::request::RequestLifecycleGuardInput::clone(&self) -> Self
 impl core::cmp::Eq for rcp::request::RequestLifecycleGuardInput
@@ -3909,29 +3939,28 @@ impl core::marker::Unpin for rcp::request::SafeStateMechanism
 impl core::marker::UnsafeUnpin for rcp::request::SafeStateMechanism
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::SafeStateMechanism
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::SafeStateMechanism
-pub enum rcp::request::SequenceEnforcementOutcome
-pub rcp::request::SequenceEnforcementOutcome::Accepted
-pub rcp::request::SequenceEnforcementOutcome::RejectedNoSafestate
-pub rcp::request::SequenceEnforcementOutcome::RejectedSafestate
-impl rcp::request::SequenceEnforcementOutcome
-pub fn rcp::request::SequenceEnforcementOutcome::drives_safestate(&self) -> bool
-pub fn rcp::request::SequenceEnforcementOutcome::is_rejected(&self) -> bool
-impl core::clone::Clone for rcp::request::SequenceEnforcementOutcome
-pub fn rcp::request::SequenceEnforcementOutcome::clone(&self) -> Self
-impl core::cmp::Eq for rcp::request::SequenceEnforcementOutcome
-impl core::cmp::PartialEq for rcp::request::SequenceEnforcementOutcome
-pub fn rcp::request::SequenceEnforcementOutcome::eq(&self, &Self) -> bool
-impl core::fmt::Debug for rcp::request::SequenceEnforcementOutcome
-pub fn rcp::request::SequenceEnforcementOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::marker::Copy for rcp::request::SequenceEnforcementOutcome
-impl core::marker::StructuralPartialEq for rcp::request::SequenceEnforcementOutcome
-impl core::marker::Freeze for rcp::request::SequenceEnforcementOutcome
-impl core::marker::Send for rcp::request::SequenceEnforcementOutcome
-impl core::marker::Sync for rcp::request::SequenceEnforcementOutcome
-impl core::marker::Unpin for rcp::request::SequenceEnforcementOutcome
-impl core::marker::UnsafeUnpin for rcp::request::SequenceEnforcementOutcome
-impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::SequenceEnforcementOutcome
-impl core::panic::unwind_safe::UnwindSafe for rcp::request::SequenceEnforcementOutcome
+pub enum rcp::request::SequencerAccess
+pub rcp::request::SequencerAccess::Denied
+pub rcp::request::SequencerAccess::Permitted
+pub rcp::request::SequencerAccess::Unknown
+impl rcp::request::SequencerAccess
+pub fn rcp::request::SequencerAccess::wire_error(self) -> core::option::Option<rcp::RcpError>
+impl core::clone::Clone for rcp::request::SequencerAccess
+pub fn rcp::request::SequencerAccess::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::SequencerAccess
+impl core::cmp::PartialEq for rcp::request::SequencerAccess
+pub fn rcp::request::SequencerAccess::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::request::SequencerAccess
+pub fn rcp::request::SequencerAccess::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::request::SequencerAccess
+impl core::marker::StructuralPartialEq for rcp::request::SequencerAccess
+impl core::marker::Freeze for rcp::request::SequencerAccess
+impl core::marker::Send for rcp::request::SequencerAccess
+impl core::marker::Sync for rcp::request::SequencerAccess
+impl core::marker::Unpin for rcp::request::SequencerAccess
+impl core::marker::UnsafeUnpin for rcp::request::SequencerAccess
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::SequencerAccess
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::SequencerAccess
 pub enum rcp::request::TriggerRepeatCount
 pub rcp::request::TriggerRepeatCount::Finite(u16)
 pub rcp::request::TriggerRepeatCount::Infinite
@@ -3954,6 +3983,70 @@ impl core::marker::Unpin for rcp::request::TriggerRepeatCount
 impl core::marker::UnsafeUnpin for rcp::request::TriggerRepeatCount
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::TriggerRepeatCount
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::TriggerRepeatCount
+pub struct rcp::request::ChainedMember
+pub rcp::request::ChainedMember::byte_bus_id: u16
+pub rcp::request::ChainedMember::chain_exec_delay: u16
+pub rcp::request::ChainedMember::cs: bool
+pub rcp::request::ChainedMember::payload: alloc::vec::Vec<u8>
+pub rcp::request::ChainedMember::transaction_num: u8
+impl core::clone::Clone for rcp::request::ChainedMember
+pub fn rcp::request::ChainedMember::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::ChainedMember
+impl core::cmp::PartialEq for rcp::request::ChainedMember
+pub fn rcp::request::ChainedMember::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::request::ChainedMember
+pub fn rcp::request::ChainedMember::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::request::ChainedMember
+impl core::marker::Freeze for rcp::request::ChainedMember
+impl core::marker::Send for rcp::request::ChainedMember
+impl core::marker::Sync for rcp::request::ChainedMember
+impl core::marker::Unpin for rcp::request::ChainedMember
+impl core::marker::UnsafeUnpin for rcp::request::ChainedMember
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::ChainedMember
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::ChainedMember
+pub struct rcp::request::ClearRequest
+pub rcp::request::ClearRequest::byte_bus_id: u16
+pub rcp::request::ClearRequest::transaction_num: u8
+impl core::clone::Clone for rcp::request::ClearRequest
+pub fn rcp::request::ClearRequest::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::ClearRequest
+impl core::cmp::PartialEq for rcp::request::ClearRequest
+pub fn rcp::request::ClearRequest::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::request::ClearRequest
+pub fn rcp::request::ClearRequest::default() -> Self
+impl core::fmt::Debug for rcp::request::ClearRequest
+pub fn rcp::request::ClearRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::request::ClearRequest
+impl core::marker::StructuralPartialEq for rcp::request::ClearRequest
+impl core::marker::Freeze for rcp::request::ClearRequest
+impl core::marker::Send for rcp::request::ClearRequest
+impl core::marker::Sync for rcp::request::ClearRequest
+impl core::marker::Unpin for rcp::request::ClearRequest
+impl core::marker::UnsafeUnpin for rcp::request::ClearRequest
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::ClearRequest
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::ClearRequest
+pub struct rcp::request::ClearSingleRequest
+pub rcp::request::ClearSingleRequest::byte_bus_id: u16
+pub rcp::request::ClearSingleRequest::clear_transaction_num: u8
+pub rcp::request::ClearSingleRequest::transaction_num: u8
+impl core::clone::Clone for rcp::request::ClearSingleRequest
+pub fn rcp::request::ClearSingleRequest::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::ClearSingleRequest
+impl core::cmp::PartialEq for rcp::request::ClearSingleRequest
+pub fn rcp::request::ClearSingleRequest::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::request::ClearSingleRequest
+pub fn rcp::request::ClearSingleRequest::default() -> Self
+impl core::fmt::Debug for rcp::request::ClearSingleRequest
+pub fn rcp::request::ClearSingleRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::request::ClearSingleRequest
+impl core::marker::StructuralPartialEq for rcp::request::ClearSingleRequest
+impl core::marker::Freeze for rcp::request::ClearSingleRequest
+impl core::marker::Send for rcp::request::ClearSingleRequest
+impl core::marker::Sync for rcp::request::ClearSingleRequest
+impl core::marker::Unpin for rcp::request::ClearSingleRequest
+impl core::marker::UnsafeUnpin for rcp::request::ClearSingleRequest
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::ClearSingleRequest
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::ClearSingleRequest
 pub struct rcp::request::ClearTransactionNum(pub u8)
 impl core::clone::Clone for rcp::request::ClearTransactionNum
 pub fn rcp::request::ClearTransactionNum::clone(&self) -> Self
@@ -4015,6 +4108,52 @@ impl core::marker::Unpin for rcp::request::CompoundGateConfig
 impl core::marker::UnsafeUnpin for rcp::request::CompoundGateConfig
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::CompoundGateConfig
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::CompoundGateConfig
+pub struct rcp::request::CompoundRequest
+pub rcp::request::CompoundRequest::byte_bus_id: u16
+pub rcp::request::CompoundRequest::evt: rcp::acf::Evt
+pub rcp::request::CompoundRequest::payload: alloc::vec::Vec<u8>
+pub rcp::request::CompoundRequest::request_type: rcp::request::RequestKind
+pub rcp::request::CompoundRequest::step: rcp::request::CompoundStep
+pub rcp::request::CompoundRequest::transaction_num: u8
+impl core::clone::Clone for rcp::request::CompoundRequest
+pub fn rcp::request::CompoundRequest::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::CompoundRequest
+impl core::cmp::PartialEq for rcp::request::CompoundRequest
+pub fn rcp::request::CompoundRequest::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::request::CompoundRequest
+pub fn rcp::request::CompoundRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::request::CompoundRequest
+impl core::marker::Freeze for rcp::request::CompoundRequest
+impl core::marker::Send for rcp::request::CompoundRequest
+impl core::marker::Sync for rcp::request::CompoundRequest
+impl core::marker::Unpin for rcp::request::CompoundRequest
+impl core::marker::UnsafeUnpin for rcp::request::CompoundRequest
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::CompoundRequest
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::CompoundRequest
+pub struct rcp::request::CompoundStep
+pub rcp::request::CompoundStep::exec_delay: u16
+pub rcp::request::CompoundStep::next_state: u8
+pub rcp::request::CompoundStep::repeat_count: u16
+pub rcp::request::CompoundStep::sequencer_index: u8
+pub rcp::request::CompoundStep::start_state: u8
+impl core::clone::Clone for rcp::request::CompoundStep
+pub fn rcp::request::CompoundStep::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::CompoundStep
+impl core::cmp::PartialEq for rcp::request::CompoundStep
+pub fn rcp::request::CompoundStep::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::request::CompoundStep
+pub fn rcp::request::CompoundStep::default() -> Self
+impl core::fmt::Debug for rcp::request::CompoundStep
+pub fn rcp::request::CompoundStep::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::request::CompoundStep
+impl core::marker::StructuralPartialEq for rcp::request::CompoundStep
+impl core::marker::Freeze for rcp::request::CompoundStep
+impl core::marker::Send for rcp::request::CompoundStep
+impl core::marker::Sync for rcp::request::CompoundStep
+impl core::marker::Unpin for rcp::request::CompoundStep
+impl core::marker::UnsafeUnpin for rcp::request::CompoundStep
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::CompoundStep
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::CompoundStep
 pub struct rcp::request::PendingRequestKey
 pub rcp::request::PendingRequestKey::arrival_seq: u64
 pub rcp::request::PendingRequestKey::kind: rcp::request::RequestKind
@@ -4034,13 +4173,64 @@ impl core::marker::Unpin for rcp::request::PendingRequestKey
 impl core::marker::UnsafeUnpin for rcp::request::PendingRequestKey
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::PendingRequestKey
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::PendingRequestKey
+pub struct rcp::request::SequenceEnforcementOutcome
+pub rcp::request::SequenceEnforcementOutcome::accept: bool
+pub rcp::request::SequenceEnforcementOutcome::discontinuity: bool
+pub rcp::request::SequenceEnforcementOutcome::enter_safe_state: bool
+impl rcp::request::SequenceEnforcementOutcome
+pub fn rcp::request::SequenceEnforcementOutcome::drives_safestate(&self) -> bool
+pub fn rcp::request::SequenceEnforcementOutcome::is_rejected(&self) -> bool
+impl core::clone::Clone for rcp::request::SequenceEnforcementOutcome
+pub fn rcp::request::SequenceEnforcementOutcome::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::SequenceEnforcementOutcome
+impl core::cmp::PartialEq for rcp::request::SequenceEnforcementOutcome
+pub fn rcp::request::SequenceEnforcementOutcome::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::request::SequenceEnforcementOutcome
+pub fn rcp::request::SequenceEnforcementOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::request::SequenceEnforcementOutcome
+impl core::marker::StructuralPartialEq for rcp::request::SequenceEnforcementOutcome
+impl core::marker::Freeze for rcp::request::SequenceEnforcementOutcome
+impl core::marker::Send for rcp::request::SequenceEnforcementOutcome
+impl core::marker::Sync for rcp::request::SequenceEnforcementOutcome
+impl core::marker::Unpin for rcp::request::SequenceEnforcementOutcome
+impl core::marker::UnsafeUnpin for rcp::request::SequenceEnforcementOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::SequenceEnforcementOutcome
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::SequenceEnforcementOutcome
+pub struct rcp::request::SequenceTracker
+impl rcp::request::SequenceTracker
+pub fn rcp::request::SequenceTracker::evaluate(&mut self, bool, bool, u8) -> rcp::request::SequenceEnforcementOutcome
+pub fn rcp::request::SequenceTracker::new() -> Self
+pub fn rcp::request::SequenceTracker::prev_seq(&self) -> core::option::Option<u8>
+impl core::clone::Clone for rcp::request::SequenceTracker
+pub fn rcp::request::SequenceTracker::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::SequenceTracker
+impl core::cmp::PartialEq for rcp::request::SequenceTracker
+pub fn rcp::request::SequenceTracker::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::request::SequenceTracker
+pub fn rcp::request::SequenceTracker::default() -> Self
+impl core::fmt::Debug for rcp::request::SequenceTracker
+pub fn rcp::request::SequenceTracker::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::request::SequenceTracker
+impl core::marker::StructuralPartialEq for rcp::request::SequenceTracker
+impl core::marker::Freeze for rcp::request::SequenceTracker
+impl core::marker::Send for rcp::request::SequenceTracker
+impl core::marker::Sync for rcp::request::SequenceTracker
+impl core::marker::Unpin for rcp::request::SequenceTracker
+impl core::marker::UnsafeUnpin for rcp::request::SequenceTracker
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::SequenceTracker
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::SequenceTracker
 pub struct rcp::request::SequencerBank
 impl rcp::request::SequencerBank
+pub fn rcp::request::SequencerBank::access_check(&self, u8, u8) -> rcp::request::SequencerAccess
+pub fn rcp::request::SequencerBank::access_permitted(&self, u8, u8) -> bool
 pub fn rcp::request::SequencerBank::advance_if_still_in_start_state(&mut self, &rcp::request::CompoundGateConfig, rcp::request::SequencerState) -> core::result::Result<bool, rcp::RcpError>
+pub fn rcp::request::SequencerBank::check_compound_admission(&self, &rcp::request::CompoundStep, u8) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::SequencerBank::check_compound_gate(&self, &rcp::request::CompoundGateConfig) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::SequencerBank::force_state(&mut self, u8, rcp::request::SequencerState) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::SequencerBank::new(u8) -> Self
+pub fn rcp::request::SequencerBank::owner(&self, u8) -> core::result::Result<u8, rcp::RcpError>
 pub fn rcp::request::SequencerBank::read(&self, u8) -> core::result::Result<rcp::request::SequencerState, rcp::RcpError>
+pub fn rcp::request::SequencerBank::set_owner(&mut self, u8, u8) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::SequencerBank::svr_sequencers_max(&self) -> u8
 impl core::clone::Clone for rcp::request::SequencerBank
 pub fn rcp::request::SequencerBank::clone(&self) -> Self
@@ -4100,6 +4290,26 @@ impl core::marker::Unpin for rcp::request::TimedExecutionTime
 impl core::marker::UnsafeUnpin for rcp::request::TimedExecutionTime
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::TimedExecutionTime
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::TimedExecutionTime
+pub struct rcp::request::TimedRequest
+pub rcp::request::TimedRequest::byte_bus_id: u16
+pub rcp::request::TimedRequest::payload: alloc::vec::Vec<u8>
+pub rcp::request::TimedRequest::presentation_time: u64
+pub rcp::request::TimedRequest::transaction_num: u8
+impl core::clone::Clone for rcp::request::TimedRequest
+pub fn rcp::request::TimedRequest::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::TimedRequest
+impl core::cmp::PartialEq for rcp::request::TimedRequest
+pub fn rcp::request::TimedRequest::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::request::TimedRequest
+pub fn rcp::request::TimedRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::request::TimedRequest
+impl core::marker::Freeze for rcp::request::TimedRequest
+impl core::marker::Send for rcp::request::TimedRequest
+impl core::marker::Sync for rcp::request::TimedRequest
+impl core::marker::Unpin for rcp::request::TimedRequest
+impl core::marker::UnsafeUnpin for rcp::request::TimedRequest
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::TimedRequest
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::TimedRequest
 pub struct rcp::request::TriggerExecDelay(pub u32)
 impl core::clone::Clone for rcp::request::TriggerExecDelay
 pub fn rcp::request::TriggerExecDelay::clone(&self) -> Self
@@ -4119,9 +4329,86 @@ impl core::marker::Unpin for rcp::request::TriggerExecDelay
 impl core::marker::UnsafeUnpin for rcp::request::TriggerExecDelay
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::TriggerExecDelay
 impl core::panic::unwind_safe::UnwindSafe for rcp::request::TriggerExecDelay
+pub struct rcp::request::TriggeredRequest
+pub rcp::request::TriggeredRequest::byte_bus_id: u16
+pub rcp::request::TriggeredRequest::payload: alloc::vec::Vec<u8>
+pub rcp::request::TriggeredRequest::request_type: rcp::request::RequestKind
+pub rcp::request::TriggeredRequest::step: rcp::request::TriggeredStep
+pub rcp::request::TriggeredRequest::transaction_num: u8
+impl core::clone::Clone for rcp::request::TriggeredRequest
+pub fn rcp::request::TriggeredRequest::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::TriggeredRequest
+impl core::cmp::PartialEq for rcp::request::TriggeredRequest
+pub fn rcp::request::TriggeredRequest::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::request::TriggeredRequest
+pub fn rcp::request::TriggeredRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::request::TriggeredRequest
+impl core::marker::Freeze for rcp::request::TriggeredRequest
+impl core::marker::Send for rcp::request::TriggeredRequest
+impl core::marker::Sync for rcp::request::TriggeredRequest
+impl core::marker::Unpin for rcp::request::TriggeredRequest
+impl core::marker::UnsafeUnpin for rcp::request::TriggeredRequest
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::TriggeredRequest
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::TriggeredRequest
+pub struct rcp::request::TriggeredRuntime
+pub rcp::request::TriggeredRuntime::occurrence_count: u32
+pub rcp::request::TriggeredRuntime::started: bool
+impl rcp::request::TriggeredRuntime
+pub fn rcp::request::TriggeredRuntime::enter_started(&mut self)
+pub fn rcp::request::TriggeredRuntime::fire_ready(&self, &rcp::request::TriggeredStep, u32, bool) -> bool
+pub fn rcp::request::TriggeredRuntime::record_occurrence(&mut self, &rcp::request::TriggeredStep, u8, u8) -> bool
+pub fn rcp::request::TriggeredRuntime::threshold_reached(&self, &rcp::request::TriggeredStep) -> bool
+pub fn rcp::request::TriggeredRuntime::tick(&mut self, &rcp::request::TriggeredStep, u32, bool) -> bool
+impl core::clone::Clone for rcp::request::TriggeredRuntime
+pub fn rcp::request::TriggeredRuntime::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::TriggeredRuntime
+impl core::cmp::PartialEq for rcp::request::TriggeredRuntime
+pub fn rcp::request::TriggeredRuntime::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::request::TriggeredRuntime
+pub fn rcp::request::TriggeredRuntime::default() -> Self
+impl core::fmt::Debug for rcp::request::TriggeredRuntime
+pub fn rcp::request::TriggeredRuntime::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::request::TriggeredRuntime
+impl core::marker::StructuralPartialEq for rcp::request::TriggeredRuntime
+impl core::marker::Freeze for rcp::request::TriggeredRuntime
+impl core::marker::Send for rcp::request::TriggeredRuntime
+impl core::marker::Sync for rcp::request::TriggeredRuntime
+impl core::marker::Unpin for rcp::request::TriggeredRuntime
+impl core::marker::UnsafeUnpin for rcp::request::TriggeredRuntime
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::TriggeredRuntime
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::TriggeredRuntime
+pub struct rcp::request::TriggeredStep
+pub rcp::request::TriggeredStep::exec_delay: u16
+pub rcp::request::TriggeredStep::repeat_count: u16
+pub rcp::request::TriggeredStep::trigger_signal_nr: u8
+pub rcp::request::TriggeredStep::trigger_source_ep: u8
+pub rcp::request::TriggeredStep::trigger_threshold: u8
+impl rcp::request::TriggeredStep
+pub fn rcp::request::TriggeredStep::exec_delay_elapsed(&self, u32) -> bool
+impl core::clone::Clone for rcp::request::TriggeredStep
+pub fn rcp::request::TriggeredStep::clone(&self) -> Self
+impl core::cmp::Eq for rcp::request::TriggeredStep
+impl core::cmp::PartialEq for rcp::request::TriggeredStep
+pub fn rcp::request::TriggeredStep::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::request::TriggeredStep
+pub fn rcp::request::TriggeredStep::default() -> Self
+impl core::fmt::Debug for rcp::request::TriggeredStep
+pub fn rcp::request::TriggeredStep::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::request::TriggeredStep
+impl core::marker::StructuralPartialEq for rcp::request::TriggeredStep
+impl core::marker::Freeze for rcp::request::TriggeredStep
+impl core::marker::Send for rcp::request::TriggeredStep
+impl core::marker::Sync for rcp::request::TriggeredStep
+impl core::marker::Unpin for rcp::request::TriggeredStep
+impl core::marker::UnsafeUnpin for rcp::request::TriggeredStep
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::request::TriggeredStep
+impl core::panic::unwind_safe::UnwindSafe for rcp::request::TriggeredStep
+pub const rcp::request::COMPOUND_REPEAT_INFINITE: u16
 pub const rcp::request::MIN_SEQUENCERS_FOR_COMPOUND_BUNDLE: u8
+pub const rcp::request::SEQUENCER_OWNER_UNCLAIMED: u8
 pub const rcp::request::TIMED_PRESENTATION_TIME_MAX: u64
 pub const rcp::request::TIMED_PRESENTATION_TIME_MODULUS: u64
+pub const rcp::request::TRIGGERED_REPEAT_INFINITE: u16
 pub const rcp::request::TRIGGER_REPEAT_COUNT_INFINITE_SENTINEL: u16
 pub fn rcp::request::advance_sequencer_if_still_in_start_state(rcp::request::SequencerState, &rcp::request::CompoundGateConfig, rcp::request::SequencerState) -> core::option::Option<rcp::request::SequencerState>
 pub fn rcp::request::check_chain_continuation(bool, bool) -> core::result::Result<(), rcp::RcpError>
@@ -4133,15 +4420,31 @@ pub fn rcp::request::check_compound_gate(rcp::request::SequencerState, &rcp::req
 pub fn rcp::request::check_rx_enforce_e2e(&[u8], u32, bool) -> core::result::Result<(), (rcp::RcpError, rcp::request::E2eFailureScope)>
 pub fn rcp::request::check_sequencer_num_in_bounds(u8, u8) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::check_watchdog_overflow_purge(rcp::request::RequestKind, bool) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::request::complete_repetition(&mut u16) -> bool
+pub fn rcp::request::decode_chained_member(&[u8]) -> core::result::Result<rcp::request::ChainedMember, rcp::request::RequestCodecError>
+pub fn rcp::request::decode_clear_all(&[u8]) -> core::result::Result<rcp::request::ClearRequest, rcp::request::RequestCodecError>
+pub fn rcp::request::decode_clear_non_safestate(&[u8]) -> core::result::Result<rcp::request::ClearRequest, rcp::request::RequestCodecError>
+pub fn rcp::request::decode_clear_single(&[u8]) -> core::result::Result<rcp::request::ClearSingleRequest, rcp::request::RequestCodecError>
+pub fn rcp::request::decode_compound_request(&[u8]) -> core::result::Result<rcp::request::CompoundRequest, rcp::request::RequestCodecError>
+pub fn rcp::request::decode_timed_request(&[u8]) -> core::result::Result<rcp::request::TimedRequest, rcp::request::RequestCodecError>
+pub fn rcp::request::decode_triggered_request(&[u8]) -> core::result::Result<rcp::request::TriggeredRequest, rcp::request::RequestCodecError>
 pub fn rcp::request::e2e_failure_scope(bool) -> rcp::request::E2eFailureScope
+pub fn rcp::request::encode_chained_member(&rcp::request::ChainedMember) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::request::encode_clear_all(&rcp::request::ClearRequest) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::request::encode_clear_non_safestate(&rcp::request::ClearRequest) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::request::encode_clear_single(&rcp::request::ClearSingleRequest) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::request::encode_compound_request(&rcp::request::CompoundRequest) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::request::encode_timed_request(&rcp::request::TimedRequest) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::request::encode_triggered_request(&rcp::request::TriggeredRequest) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::request::enter_sequencer_driven_safe_state(&mut rcp::request::SequencerBank, &rcp::request::CompoundGateConfig) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::evaluate_request_storage_overflow(bool, bool) -> rcp::request::OverflowOutcome
-pub fn rcp::request::evaluate_rx_enforce_seq(u32, u32, bool, bool) -> rcp::request::SequenceEnforcementOutcome
+pub fn rcp::request::evaluate_rx_enforce_seq(&mut rcp::request::SequenceTracker, bool, bool, u8) -> rcp::request::SequenceEnforcementOutcome
 pub fn rcp::request::execution_priority_tier(rcp::request::RequestKind) -> rcp::request::ExecutionPriorityTier
 pub fn rcp::request::is_gate_satisfied(rcp::request::SequencerState, &rcp::request::CompoundGateConfig) -> bool
 pub fn rcp::request::is_request_lifecycle_transition_defined(rcp::request::RequestLifecycleState, rcp::request::RequestLifecycleState) -> bool
 pub fn rcp::request::is_timed_request_ready(u64, rcp::request::TimedExecutionTime) -> bool
 pub fn rcp::request::is_trigger_repeat_exhausted(u16, rcp::request::TriggerRepeatCount) -> bool
+pub fn rcp::request::peek_request_type(&[u8]) -> core::result::Result<u8, rcp::request::RequestCodecError>
 pub fn rcp::request::purge_normal_priority_on_watchdog_overflow(&[rcp::request::PendingRequestKey], bool) -> (alloc::vec::Vec<usize>, alloc::vec::Vec<usize>)
 pub fn rcp::request::resolve_compound_exec_delay(rcp::request::RequestKind, &rcp::request::CompoundExecDelays) -> core::option::Option<u32>
 pub fn rcp::request::resolve_safe_state_action(bool, rcp::request::SafeStateMechanism) -> rcp::request::SafeStateAction
@@ -4149,7 +4452,7 @@ pub fn rcp::request::resolve_safe_state_mechanism(bool, u8, u8) -> rcp::request:
 pub fn rcp::request::resolve_trigger_exec_delay(rcp::request::RequestKind, rcp::request::TriggerExecDelay) -> core::option::Option<u32>
 pub fn rcp::request::safe_state_sequencer_gate(u8, u8) -> rcp::request::CompoundGateConfig
 pub fn rcp::request::select_next_pending_request(&[rcp::request::PendingRequestKey]) -> core::option::Option<usize>
-pub fn rcp::request::should_count_trigger_occurrence(bool) -> bool
+pub fn rcp::request::should_count_trigger_occurrence(&rcp::request::TriggeredStep, u8, u8) -> bool
 pub fn rcp::request::timed_due(u64, u64) -> bool
 pub fn rcp::request::try_force_cancel_all(&mut rcp::request::RequestLifecycleState) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::request::try_force_cancel_non_safestate(&mut rcp::request::RequestLifecycleState, bool) -> core::result::Result<(), rcp::RcpError>
