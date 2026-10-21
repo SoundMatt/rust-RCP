@@ -1424,6 +1424,31 @@ impl core::marker::Unpin for rcp::fragment::FragmentAcceptOutcome
 impl core::marker::UnsafeUnpin for rcp::fragment::FragmentAcceptOutcome
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::fragment::FragmentAcceptOutcome
 impl core::panic::unwind_safe::UnwindSafe for rcp::fragment::FragmentAcceptOutcome
+pub enum rcp::fragment::FragmentPlanError
+pub rcp::fragment::FragmentPlanError::BadSegmentCount
+pub rcp::fragment::FragmentPlanError::Disabled
+pub rcp::fragment::FragmentPlanError::TooManySegments
+impl rcp::fragment::FragmentPlanError
+pub fn rcp::fragment::FragmentPlanError::code(self) -> u32
+impl core::clone::Clone for rcp::fragment::FragmentPlanError
+pub fn rcp::fragment::FragmentPlanError::clone(&self) -> Self
+impl core::cmp::Eq for rcp::fragment::FragmentPlanError
+impl core::cmp::PartialEq for rcp::fragment::FragmentPlanError
+pub fn rcp::fragment::FragmentPlanError::eq(&self, &Self) -> bool
+impl core::error::Error for rcp::fragment::FragmentPlanError
+impl core::fmt::Debug for rcp::fragment::FragmentPlanError
+pub fn rcp::fragment::FragmentPlanError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rcp::fragment::FragmentPlanError
+pub fn rcp::fragment::FragmentPlanError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::fragment::FragmentPlanError
+impl core::marker::StructuralPartialEq for rcp::fragment::FragmentPlanError
+impl core::marker::Freeze for rcp::fragment::FragmentPlanError
+impl core::marker::Send for rcp::fragment::FragmentPlanError
+impl core::marker::Sync for rcp::fragment::FragmentPlanError
+impl core::marker::Unpin for rcp::fragment::FragmentPlanError
+impl core::marker::UnsafeUnpin for rcp::fragment::FragmentPlanError
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::fragment::FragmentPlanError
+impl core::panic::unwind_safe::UnwindSafe for rcp::fragment::FragmentPlanError
 pub struct rcp::fragment::FragmentReassemblyBuffer
 impl rcp::fragment::FragmentReassemblyBuffer
 pub fn rcp::fragment::FragmentReassemblyBuffer::accept_fragment(&mut self, &rcp::acf::ByteMessageInfo, &[u8]) -> core::result::Result<rcp::fragment::FragmentAcceptOutcome, rcp::RcpError>
@@ -1448,6 +1473,35 @@ impl core::marker::Unpin for rcp::fragment::FragmentReassemblyBuffer
 impl core::marker::UnsafeUnpin for rcp::fragment::FragmentReassemblyBuffer
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::fragment::FragmentReassemblyBuffer
 impl core::panic::unwind_safe::UnwindSafe for rcp::fragment::FragmentReassemblyBuffer
+pub struct rcp::fragment::FragmentSegment
+pub rcp::fragment::FragmentSegment::len: usize
+pub rcp::fragment::FragmentSegment::ms: bool
+pub rcp::fragment::FragmentSegment::offset: usize
+pub rcp::fragment::FragmentSegment::segment_num: u16
+impl core::clone::Clone for rcp::fragment::FragmentSegment
+pub fn rcp::fragment::FragmentSegment::clone(&self) -> Self
+impl core::cmp::Eq for rcp::fragment::FragmentSegment
+impl core::cmp::PartialEq for rcp::fragment::FragmentSegment
+pub fn rcp::fragment::FragmentSegment::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::fragment::FragmentSegment
+pub fn rcp::fragment::FragmentSegment::default() -> Self
+impl core::fmt::Debug for rcp::fragment::FragmentSegment
+pub fn rcp::fragment::FragmentSegment::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::fragment::FragmentSegment
+impl core::marker::StructuralPartialEq for rcp::fragment::FragmentSegment
+impl core::marker::Freeze for rcp::fragment::FragmentSegment
+impl core::marker::Send for rcp::fragment::FragmentSegment
+impl core::marker::Sync for rcp::fragment::FragmentSegment
+impl core::marker::Unpin for rcp::fragment::FragmentSegment
+impl core::marker::UnsafeUnpin for rcp::fragment::FragmentSegment
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::fragment::FragmentSegment
+impl core::panic::unwind_safe::UnwindSafe for rcp::fragment::FragmentSegment
+pub const rcp::fragment::MAX_INTERMEDIATE_SEGMENTS: usize
+pub fn rcp::fragment::fragment_abb_message(&rcp::acf::AcfAbbMessage, usize) -> core::result::Result<alloc::vec::Vec<rcp::acf::AcfAbbMessage>, rcp::fragment::FragmentPlanError>
+pub fn rcp::fragment::fragment_gbb_message(&rcp::acf::AcfGbbMessage, usize) -> core::result::Result<alloc::vec::Vec<rcp::acf::AcfGbbMessage>, rcp::fragment::FragmentPlanError>
+pub fn rcp::fragment::fragment_plan(usize, usize, &mut [rcp::fragment::FragmentSegment]) -> core::result::Result<(), rcp::fragment::FragmentPlanError>
+pub fn rcp::fragment::fragment_plan_count(usize, usize) -> usize
+pub fn rcp::fragment::fragment_plan_vec(usize, usize) -> core::result::Result<alloc::vec::Vec<rcp::fragment::FragmentSegment>, rcp::fragment::FragmentPlanError>
 pub fn rcp::fragment::verify_reassembled_train_crc(&rcp::fragment::FragmentReassemblyBuffer, &rcp::avtp::HeaderVariant, &rcp::e2e::AcfCoverageMessage<'_>, bool) -> core::result::Result<u32, rcp::RcpError>
 pub mod rcp::gpio
 #[repr(u8)] pub enum rcp::gpio::GpioWriteSemantics
