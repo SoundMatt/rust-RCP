@@ -109,6 +109,7 @@ pub mod record;
 pub mod regmap;
 pub mod relay;
 pub mod request;
+pub mod respqueue;
 // Test-only: retirement guard for the requirements of the modules removed
 // by issue #211 (`tlstransport`, `proxy`, `redundancy`, `federation`,
 // `dyndata`). See its own module doc comment.
