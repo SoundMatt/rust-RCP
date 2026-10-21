@@ -11,6 +11,8 @@
 //fusa:req REQ-L2-011
 //fusa:req REQ-L2-012
 //fusa:req REQ-L2-013
+//fusa:req REQ-L2-014
+//fusa:req REQ-L2-015
 
 //! Layer-2 (raw Ethernet) transport for the TC18 AVTPDU/ACF wire format.
 //!
@@ -101,7 +103,9 @@
 //! wraps each AVTPDU in an Ethernet II header to the configured destination
 //! MAC; `recv_frame` polls in 20 ms slices (so `close` from another thread
 //! unblocks it), skips transient socket errors and frames that are short or
-//! not [`ETHERTYPE_AVTP`] (`l2.c:215-237`), and returns only the AVTPDU.
+//! not [`ETHERTYPE_AVTP`] (`l2.c:215-237`) or not addressed to this host
+//! (rust-RCP#206; see `L2AvtpTransport::addressed_to_us`), and returns
+//! only the AVTPDU.
 //! [`RawEthernetSocket::recv`] additionally skips the transmit-tap copies
 //! of frames that other local sockets send on the same interface
 //! (`PACKET_OUTGOING`, `l2.c:216-226`). [`L2Transport`]'s `send_acf_abb`/`send_acf_gbb` are now
@@ -170,6 +174,38 @@ pub fn decode_ethernet_frame(frame: &[u8]) -> Result<DecodedEthernetFrame<'_>, R
         )));
     }
     Ok((dest_mac, src_mac, &frame[ETHERNET_HEADER_LEN..]))
+}
+
+/// `sockaddr_ll.sll_pkttype` value the Linux kernel stamps on the copy of
+/// a frame this host itself transmitted that an `AF_PACKET` socket is
+/// handed back on its own receive queue (`<linux/if_packet.h>`
+/// `PACKET_OUTGOING`). Defined here, not taken from `libc`, so the pure
+/// [`raw_frame_accepted`] filter is buildable and testable on every
+/// target; a Linux-only test pins it to `nix::libc::PACKET_OUTGOING`.
+const PACKET_OUTGOING: u8 = 4;
+
+/// Receive-side admission filter applied by [`RawEthernetSocket`]'s
+/// `recv` to every frame the kernel hands it, mirroring c-RCP
+/// `src/l2.c:226` (`if (from.sll_pkttype == PACKET_OUTGOING) continue;`)
+/// followed by `src/l2.c:228`'s `rcp_l2_frame_decode()` check: a frame is
+/// dropped (and the caller re-polls) when the kernel reports it as this
+/// socket's own looped-back transmission (`pkttype ==
+/// Some(PACKET_OUTGOING)`), or when it is too short / not EtherType
+/// [`ETHERTYPE_AVTP`]. `pkttype` is `None` when `recvfrom` returned no
+/// link-layer address at all, in which case only the frame check applies.
+//fusa:req REQ-L2-014
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+fn raw_frame_accepted(pkttype: Option<u8>, frame: &[u8]) -> bool {
+    if pkttype == Some(PACKET_OUTGOING) {
+        return false;
+    }
+    decode_ethernet_frame(frame).is_ok()
+}
+
+/// `true` when `mac`'s individual/group bit (bit 0 of octet 0) is clear —
+/// the same test as c-RCP `src/l2.c:79` `rcp_l2_mac_is_unicast()`.
+fn mac_is_unicast(mac: [u8; 6]) -> bool {
+    mac[0] & 0x01 == 0
 }
 
 // ── L2Socket trait ───────────────────────────────────────────────────────────
@@ -367,6 +403,35 @@ impl L2AvtpTransport {
         self.dst_mac
     }
 
+    /// Whether a decoded frame from `src` to `dst` is traffic for this
+    /// transport. Dropped: frames whose source MAC is this transport's own
+    /// `src_mac` (our own transmission looped back, e.g. by a socket with
+    /// no `pkttype` metadata or a multicast `dst_mac` the kernel loops
+    /// back), and frames whose destination is a unicast MAC other than
+    /// this host's `src_mac`. Every group (multicast or broadcast)
+    /// destination is admitted, whatever `dst_mac` is: which groups reach
+    /// this socket is left to the kernel's own multicast membership, as in
+    /// c-RCP. A c-RCP responder replies to its own configured `dst_mac`
+    /// (c-RCP `src/l2.c:150,158`), which may be broadcast or a group even
+    /// when this client addresses that peer by its unicast MAC.
+    ///
+    /// c-RCP parity: c-RCP `src/l2.c` `l2_avtp_recv()` (lines 186-250)
+    /// has no source-MAC or destination-MAC check at all; it drops only
+    /// `PACKET_OUTGOING` (line 226) and non-AVTP/short frames (228-237).
+    /// Two rust-only checks (rust-RCP#206) diverge from it: (1) the
+    /// own-`src_mac` source drop, which on a real socket only removes
+    /// frames c-RCP also drops (another socket's transmission on the same
+    /// interface is also `PACKET_OUTGOING`) and otherwise covers sockets
+    /// without `pkttype` metadata; (2) the drop of unicast frames for
+    /// another host, which a non-promiscuous interface never delivers
+    /// (`PACKET_OTHERHOST`) but which c-RCP would accept on a promiscuous
+    /// interface. Neither check drops any broadcast or multicast frame
+    /// c-RCP would accept.
+    //fusa:req REQ-L2-015
+    fn addressed_to_us(&self, dst: [u8; 6], src: [u8; 6]) -> bool {
+        src != self.src_mac && (dst == self.src_mac || !mac_is_unicast(dst))
+    }
+
     fn is_closed(&self) -> bool {
         *self.closed.lock().unwrap_or_else(|e| e.into_inner())
     }
@@ -412,9 +477,12 @@ impl AvtpTransport for L2AvtpTransport {
             let Ok(wire) = self.socket.recv(Some(avtp::poll_slice(deadline))) else {
                 continue;
             };
-            let Ok((_dst, _src, payload)) = decode_ethernet_frame(&wire) else {
+            let Ok((dst, src, payload)) = decode_ethernet_frame(&wire) else {
                 continue;
             };
+            if !self.addressed_to_us(dst, src) {
+                continue;
+            }
             let dst = buf.get_mut(..payload.len()).ok_or(RcpError::Busy)?;
             dst.copy_from_slice(payload);
             return Ok(payload.len());
@@ -503,9 +571,13 @@ mod raw_socket {
             // AF_PACKET sockets otherwise receive nothing at all (the
             // `protocol` argument to the real socket(2) syscall is itself
             // a packet filter, not merely descriptive). This module's own
-            // `recv` relies on `decode_ethernet_frame`'s EtherType check
+            // `recv` relies on `raw_frame_accepted`'s EtherType check
             // to reject anything that isn't ours, rather than filtering
-            // at the socket layer.
+            // at the socket layer. c-RCP (`src/l2.c` socket()/bind())
+            // opens with protocol htons(0x22F0) instead; nix 0.31's
+            // `SockProtocol` has no variant for an arbitrary EtherType, so
+            // rust filters the same EtherType in safe code after recvfrom
+            // — the set of frames handed to callers is identical.
             let fd = socket(
                 AddressFamily::Packet,
                 SockType::Raw,
@@ -538,8 +610,14 @@ mod raw_socket {
             // A zero TimeVal means "block indefinitely" (POSIX SO_RCVTIMEO
             // semantics) — see L2Socket::recv's own doc comment for this
             // caveat on `Some(Duration::ZERO)`.
+            // A non-zero remainder below 1 µs would truncate to the
+            // zero TimeVal and block forever; clamp it up to 1 µs.
             let tv = match timeout {
-                Some(d) => TimeVal::new(d.as_secs() as i64, d.subsec_micros() as i64),
+                Some(d) if d.is_zero() => TimeVal::new(0, 0),
+                Some(d) => {
+                    let d = d.max(Duration::from_micros(1));
+                    TimeVal::new(d.as_secs() as i64, d.subsec_micros() as i64)
+                }
                 None => TimeVal::new(0, 0),
             };
             setsockopt(&self.fd, ReceiveTimeout, &tv)
@@ -581,28 +659,35 @@ mod raw_socket {
         }
 
         /// Receives one frame that arrived on the bound interface from the
-        /// wire. This socket is bound with `ETH_P_ALL`, so the kernel's
-        /// transmit tap (`dev_queue_xmit_nit`) also hands it a copy of
-        /// every frame that *other* local sockets transmit on the same
-        /// interface, marked `sll_pkttype == PACKET_OUTGOING`. (Linux never
-        /// loops a socket's *own* transmitted frames back to it: the tap
-        /// skips the sending socket.) Those outgoing copies are skipped, so
-        /// a second endpoint on the same host and interface never sees
-        /// another local endpoint's transmissions as received traffic.
+        /// wire and passes [`super::raw_frame_accepted`]. This socket is
+        /// bound with `ETH_P_ALL`, so the kernel's transmit tap
+        /// (`dev_queue_xmit_nit`) also hands it a copy of every frame that
+        /// *other* local sockets transmit on the same interface, marked
+        /// `sll_pkttype == PACKET_OUTGOING`. (Linux never loops a socket's
+        /// *own* transmitted frames back to it: the tap skips the sending
+        /// socket.) Those outgoing copies are skipped, so a second endpoint
+        /// on the same host and interface never sees another local
+        /// endpoint's transmissions as received traffic. Frames that are
+        /// short or not EtherType [`super::ETHERTYPE_AVTP`] are skipped too.
         ///
-        /// c-RCP parity: `c-RCP/src/l2.c:216-226` (`l2_avtp_recv()`) applies
-        /// the same `PACKET_OUTGOING` filter. Its comment says the filter
-        /// drops "a copy of every frame this same socket itself transmits",
-        /// which Linux does not deliver; the filter's real effect is the one
-        /// described above. The filter is ported unchanged.
+        /// c-RCP parity: `c-RCP/src/l2.c:216-238` (`l2_avtp_recv()`) applies
+        /// the same `PACKET_OUTGOING` filter followed by the same frame
+        /// decode check. Its comment says the filter drops "a copy of every
+        /// frame this same socket itself transmits", which Linux does not
+        /// deliver; the filter's real effect is the one described above.
+        /// The filter is ported unchanged.
         ///
         /// `timeout` bounds the whole call: after each skipped frame the
         /// receive timeout is re-armed to the time left, so a steady stream
-        /// of filtered frames cannot extend the call past `timeout`.
+        /// of filtered frames cannot extend the call past `timeout`. A
+        /// timeout too large to add to `Instant::now()` (e.g.
+        /// `Duration::MAX`) means no overall deadline rather than an
+        /// overflow panic.
         //fusa:req REQ-L2-007
         //fusa:req REQ-L2-012
+        //fusa:req REQ-L2-014
         fn recv(&self, timeout: Option<Duration>) -> Result<Vec<u8>, RcpError> {
-            let deadline = timeout.map(|t| Instant::now() + t);
+            let deadline = timeout.and_then(|t| Instant::now().checked_add(t));
             self.set_recv_timeout(timeout)?;
             let mut buf = [0u8; 65535];
             loop {
@@ -614,17 +699,17 @@ mod raw_socket {
                             RcpError::Other(format!("l2: recvfrom: {e}"))
                         }
                     })?;
-                if peer.is_some_and(|p| p.pkttype() == nix::libc::PACKET_OUTGOING) {
-                    if let Some(d) = deadline {
-                        let left = d.saturating_duration_since(Instant::now());
-                        if left.is_zero() {
-                            return Err(RcpError::Timeout);
-                        }
-                        self.set_recv_timeout(Some(left))?;
-                    }
-                    continue;
+                let pkttype = peer.map(|p| p.pkttype());
+                if super::raw_frame_accepted(pkttype, &buf[..n]) {
+                    return Ok(buf[..n].to_vec());
                 }
-                return Ok(buf[..n].to_vec());
+                if let Some(d) = deadline {
+                    let left = d.saturating_duration_since(Instant::now());
+                    if left.is_zero() {
+                        return Err(RcpError::Timeout);
+                    }
+                    self.set_recv_timeout(Some(left))?;
+                }
             }
         }
     }
@@ -899,7 +984,9 @@ mod tests {
                 };
                 let payload = acf::encode_acf_gbb(&resp).unwrap();
                 let ntscf = avtp::encode_ntscf_frame(local_stream(), 1, &payload).unwrap();
-                Ok(encode_ethernet_frame(DEST_MAC, SRC_MAC, &ntscf))
+                // Response from the peer (DEST_MAC) addressed back to
+                // this host (SRC_MAC).
+                Ok(encode_ethernet_frame(SRC_MAC, DEST_MAC, &ntscf))
             }
         }
         let socket = Arc::new(EchoGbb);
@@ -933,6 +1020,219 @@ mod tests {
         let (dest, src, _payload) = decode_ethernet_frame(&sent[0]).unwrap();
         assert_eq!(dest, DEST_MAC);
         assert_eq!(src, SRC_MAC);
+    }
+
+    // ── Receive filtering (rust-RCP#206, c-RCP src/l2.c:226-238) ──────────
+
+    /// A well-formed ACF_ABB response frame echoing `byte_bus_id`,
+    /// addressed `dest` <- `src`.
+    fn abb_response_frame(dest: [u8; 6], src: [u8; 6], byte_bus_id: u16) -> Vec<u8> {
+        let resp = AcfAbbMessage {
+            info: ByteMessageInfo {
+                byte_bus_id,
+                rsp: true,
+                ..Default::default()
+            },
+            payload: vec![0xC3],
+        };
+        let payload = acf::encode_acf_abb(&resp).unwrap();
+        let ntscf = avtp::encode_ntscf_frame(local_stream(), 1, &payload).unwrap();
+        encode_ethernet_frame(dest, src, &ntscf)
+    }
+
+    /// Mock socket modelling the Linux kernel's AF_PACKET loopback: every
+    /// frame handed to `send` is queued straight back onto this same
+    /// socket's receive queue (ahead of any genuine reply), exactly as an
+    /// unfiltered raw socket would see its own transmission.
+    struct LoopbackL2 {
+        queue: Mutex<Vec<Vec<u8>>>,
+        replies: Mutex<Vec<Vec<u8>>>,
+        recv_calls: Mutex<usize>,
+    }
+
+    impl LoopbackL2 {
+        fn new(replies: Vec<Vec<u8>>) -> Arc<Self> {
+            Arc::new(Self {
+                queue: Mutex::new(Vec::new()),
+                replies: Mutex::new(replies),
+                recv_calls: Mutex::new(0),
+            })
+        }
+    }
+
+    impl L2Socket for LoopbackL2 {
+        fn send(&self, frame: &[u8]) -> Result<usize, RcpError> {
+            let mut q = self.queue.lock().unwrap();
+            q.push(frame.to_vec());
+            q.append(&mut self.replies.lock().unwrap());
+            Ok(frame.len())
+        }
+
+        fn recv(&self, _timeout: Option<Duration>) -> Result<Vec<u8>, RcpError> {
+            *self.recv_calls.lock().unwrap() += 1;
+            let mut q = self.queue.lock().unwrap();
+            if q.is_empty() {
+                Err(RcpError::Timeout)
+            } else {
+                Ok(q.remove(0))
+            }
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-L2-015
+    fn l2_transport_skips_its_own_looped_back_request() {
+        // Mutation-sensitive: without the filter the transport decodes its
+        // own request (op=1, rsp=0) as the "response".
+        let reply = abb_response_frame(SRC_MAC, DEST_MAC, 7);
+        let socket = LoopbackL2::new(vec![reply]);
+        let transport = L2Transport::new(local_stream(), socket.clone(), DEST_MAC, SRC_MAC);
+        let resp = transport
+            .send_acf_abb(&request(7), 0, Some(Duration::from_secs(1)))
+            .unwrap();
+        assert!(resp.info.rsp, "must be the peer's response, not our echo");
+        assert_eq!(resp.payload, vec![0xC3]);
+        assert_eq!(*socket.recv_calls.lock().unwrap(), 2);
+    }
+
+    #[test]
+    //fusa:test REQ-L2-015
+    fn l2_transport_times_out_when_only_its_own_frame_comes_back() {
+        let socket = LoopbackL2::new(Vec::new());
+        let transport = L2Transport::new(local_stream(), socket, DEST_MAC, SRC_MAC);
+        let err = transport
+            .send_acf_abb(&request(7), 0, Some(Duration::from_secs(1)))
+            .unwrap_err();
+        assert_eq!(err, RcpError::Timeout);
+    }
+
+    #[test]
+    //fusa:test REQ-L2-015
+    fn l2_transport_skips_wrong_ethertype_short_and_misaddressed_frames() {
+        let mut wrong_ethertype = abb_response_frame(SRC_MAC, DEST_MAC, 7);
+        wrong_ethertype[12] = 0x08;
+        wrong_ethertype[13] = 0x00;
+        let short = vec![0u8; 13];
+        let other_host = abb_response_frame([0x02, 0, 0, 0, 0, 0x99], DEST_MAC, 7);
+        let good = abb_response_frame(SRC_MAC, DEST_MAC, 7);
+        let socket = QueuedL2::with_inbound(vec![wrong_ethertype, short, other_host, good]);
+        let transport = L2Transport::new(local_stream(), socket.clone(), DEST_MAC, SRC_MAC);
+        let resp = transport.send_acf_abb(&request(7), 0, None).unwrap();
+        assert_eq!(resp.payload, vec![0xC3]);
+        assert!(socket.inbound.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    //fusa:test REQ-L2-015
+    fn l2_transport_accepts_broadcast_reply_under_unicast_dest_mac() {
+        // A c-RCP responder replies to its own configured dst_mac (c-RCP
+        // src/l2.c:150,158), here broadcast, while this client addresses
+        // it by its unicast MAC: the reply must be admitted, as c-RCP's
+        // l2_avtp_recv() admits it. Mutation-sensitive: dropping group
+        // destinations that differ from dest_mac makes this fail.
+        let socket = QueuedL2::with_inbound(vec![abb_response_frame([0xFF; 6], DEST_MAC, 7)]);
+        let transport = L2Transport::new(local_stream(), socket, DEST_MAC, SRC_MAC);
+        let resp = transport
+            .send_acf_abb(&request(7), 0, Some(Duration::from_secs(1)))
+            .unwrap();
+        assert!(resp.info.rsp);
+        assert_eq!(resp.payload, vec![0xC3]);
+    }
+
+    #[test]
+    //fusa:test REQ-L2-015
+    fn l2_transport_accepts_any_group_reply_leaving_membership_to_the_kernel() {
+        // A multicast group other than dest_mac (unicast here) is
+        // admitted: group membership filtering is the kernel's job, as in
+        // c-RCP.
+        let group = [0x01, 0x00, 0x5E, 0, 0, 1];
+        let socket = QueuedL2::with_inbound(vec![abb_response_frame(group, DEST_MAC, 7)]);
+        let transport = L2Transport::new(local_stream(), socket, DEST_MAC, SRC_MAC);
+        let resp = transport.send_acf_abb(&request(7), 0, None).unwrap();
+        assert!(resp.info.rsp);
+    }
+
+    #[test]
+    //fusa:test REQ-L2-015
+    fn l2_transport_huge_timeout_does_not_overflow_the_deadline() {
+        // `Instant::now() + Duration::MAX` would panic; it must instead
+        // mean "no deadline".
+        let socket = QueuedL2::with_inbound(vec![abb_response_frame(SRC_MAC, DEST_MAC, 7)]);
+        let transport = L2Transport::new(local_stream(), socket, DEST_MAC, SRC_MAC);
+        let resp = transport
+            .send_acf_abb(&request(7), 0, Some(Duration::MAX))
+            .unwrap();
+        assert!(resp.info.rsp);
+    }
+
+    #[test]
+    //fusa:test REQ-L2-015
+    fn l2_transport_accepts_responses_to_its_configured_multicast_group() {
+        let group = [0x91, 0xE0, 0xF0, 0x00, 0x0E, 0x80];
+        let peer = [0x02, 0xAA, 0, 0, 0, 0x01];
+        let socket = QueuedL2::with_inbound(vec![
+            // Our own multicast request looped back: same dest, own src.
+            abb_response_frame(group, SRC_MAC, 7),
+            abb_response_frame(group, peer, 7),
+        ]);
+        let transport = L2Transport::new(local_stream(), socket.clone(), group, SRC_MAC);
+        let resp = transport.send_acf_abb(&request(7), 0, None).unwrap();
+        assert!(resp.info.rsp);
+        assert!(socket.inbound.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    //fusa:test REQ-L2-015
+    fn l2_transport_deadline_spans_dropped_frames() {
+        // A socket that only ever returns a misaddressed frame, slowly:
+        // the transport's single overall deadline must still fire.
+        struct Chatty;
+        impl L2Socket for Chatty {
+            fn send(&self, frame: &[u8]) -> Result<usize, RcpError> {
+                Ok(frame.len())
+            }
+            fn recv(&self, timeout: Option<Duration>) -> Result<Vec<u8>, RcpError> {
+                assert!(timeout.is_some_and(|t| !t.is_zero()));
+                std::thread::sleep(Duration::from_millis(5));
+                Ok(abb_response_frame(DEST_MAC, DEST_MAC, 7))
+            }
+        }
+        let transport = L2Transport::new(local_stream(), Arc::new(Chatty), DEST_MAC, SRC_MAC);
+        let err = transport
+            .send_acf_abb(&request(7), 0, Some(Duration::from_millis(30)))
+            .unwrap_err();
+        assert_eq!(err, RcpError::Timeout);
+    }
+
+    #[test]
+    //fusa:test REQ-L2-014
+    fn raw_frame_filter_drops_packet_outgoing_and_non_avtp() {
+        let good = abb_response_frame(SRC_MAC, DEST_MAC, 7);
+        assert!(raw_frame_accepted(None, &good));
+        assert!(raw_frame_accepted(Some(0), &good)); // PACKET_HOST
+        assert!(raw_frame_accepted(Some(2), &good)); // PACKET_MULTICAST
+        assert!(!raw_frame_accepted(Some(PACKET_OUTGOING), &good));
+        let mut ipv4 = good.clone();
+        ipv4[12] = 0x08;
+        ipv4[13] = 0x00;
+        assert!(!raw_frame_accepted(Some(0), &ipv4));
+        assert!(!raw_frame_accepted(None, &good[..13]));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    //fusa:test REQ-L2-014
+    fn packet_outgoing_matches_linux_uapi() {
+        assert_eq!(PACKET_OUTGOING, nix::libc::PACKET_OUTGOING);
+    }
+
+    #[test]
+    //fusa:test REQ-L2-015
+    fn mac_is_unicast_tests_the_group_bit() {
+        assert!(mac_is_unicast(SRC_MAC));
+        assert!(mac_is_unicast(DEST_MAC));
+        assert!(!mac_is_unicast([0xFF; 6]));
+        assert!(!mac_is_unicast([0x01, 0x00, 0x5E, 0, 0, 1]));
     }
 
     // ── Non-Linux RawEthernetSocket stub ───────────────────────────────────
@@ -1017,6 +1317,15 @@ mod tests {
                 }
             }
         }
+
+        // rust-RCP#206 / c-RCP src/l2.c:226: the sender's own socket must
+        // not hand back its own transmission (PACKET_OUTGOING), and must
+        // drop the non-AVTP link-local chatter (NDP/MLD) a fresh veth pair
+        // emits — so with nothing else sent, tx.recv times out.
+        let err = tx
+            .recv(Some(Duration::from_millis(300)))
+            .expect_err("tx must not receive its own looped-back frame");
+        assert_eq!(err, RcpError::Timeout);
     }
 
     // ── L2AvtpTransport (mocked L2Socket — no real socket, no privileges) ─
@@ -1069,14 +1378,14 @@ mod tests {
     #[test]
     //fusa:test REQ-L2-010
     fn l2_avtp_recv_skips_non_avtp_and_short_frames_and_returns_the_avtpdu() {
-        let mut ipv4 = encode_ethernet_frame(DEST_MAC, SRC_MAC, &[0xEE]);
+        let mut ipv4 = encode_ethernet_frame(SRC_MAC, DEST_MAC, &[0xEE]);
         ipv4[12] = 0x08;
         ipv4[13] = 0x00;
         let socket = QueuedL2::with_inbound(vec![
             vec![0u8; 5],
             ipv4,
-            encode_ethernet_frame(DEST_MAC, SRC_MAC, &[0x82, 7, 7]),
-            encode_ethernet_frame(DEST_MAC, SRC_MAC, &[1, 2, 3, 4]),
+            encode_ethernet_frame(SRC_MAC, DEST_MAC, &[0x82, 7, 7]),
+            encode_ethernet_frame(SRC_MAC, DEST_MAC, &[1, 2, 3, 4]),
         ]);
         let t = L2AvtpTransport::new(socket, DEST_MAC, SRC_MAC, false);
         let mut buf = [0u8; 3];

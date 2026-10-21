@@ -39,9 +39,9 @@
 //! `(`[`avtp::StreamId`]`, byte_bus_id)`, exchanging AVTPDU/ACF-framed
 //! requests ([`avtp`], [`acf`]) that this crate decodes, routes
 //! ([`ep0`], [`addressing`]), and dispatches against the RC Server's
-//! lifecycle/register-map model ([`lifecycle`], [`regmap`]). [`mock::RcServer`]
-//! is this crate's in-process reference implementation of that dispatch
-//! path; [`mod@adapt`] binds it to the RELAY specification's `Adapt()` /
+//! lifecycle/register-map model ([`lifecycle`], [`regmap`]). [`server::RcServer`]
+//! is this crate's RC Server, with one frame-level dispatch entry point
+//! ([`server::RcServer::dispatch_frame`]); [`mod@adapt`] binds it to the RELAY specification's `Adapt()` /
 //! `to_message()` / `from_message()` contract.
 //!
 //! This crate implements RELAY specification version [`SPEC_VERSION`].
@@ -114,6 +114,7 @@ pub mod request;
 // `dyndata`). See its own module doc comment.
 #[cfg(test)]
 mod retired;
+pub mod server;
 pub mod shmem;
 pub mod sim;
 pub mod spi;
