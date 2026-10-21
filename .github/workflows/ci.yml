@@ -100,6 +100,107 @@ jobs:
           files: lcov.info
           fail_ci_if_error: false
 
+  # ── Branch coverage, ratchet-gated (issue #221) ─────────────────────────────
+  # Rust counterpart of c-RCP's `mcdc` job and its "MC/DC regression gate
+  # (ratchet floor, not 100%)" step (c-RCP .github/workflows/ci.yml:379).
+  # rustc no longer offers MC/DC instrumentation (-Zcoverage-options=mcdc
+  # was removed; only block|branch|condition remain on the pinned nightly),
+  # so this gates llvm-cov *branch* coverage instead -- ISO 26262-6 Table 12
+  # rates branch coverage "++" for ASIL B. Like c-RCP's gate it hard-fails
+  # only on regression below the floor committed in
+  # .branch-coverage-ratchet.json (see that file's provenance note); it is
+  # not a 100% gate. `--branch` needs nightly; pinned to the same nightly as
+  # api-stability and miri.
+  branch-coverage:
+    name: Branch coverage (llvm-cov --branch, ratchet-gated)
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-10-21
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+      - name: install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov --locked
+      - name: collect branch coverage
+        run: |
+          cargo +nightly-2026-10-21 llvm-cov --branch --all-targets --locked \
+            --json --summary-only --output-path branch-summary.json
+      # Uploaded before the gate so a failing gate still leaves the
+      # numbers inspectable (same ordering as c-RCP's mcdc job).
+      - name: upload branch coverage summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: branch-coverage-summary
+          path: branch-summary.json
+      - name: branch coverage regression gate (ratchet floor, not 100%)
+        run: python3 scripts/branch_coverage_gate.py branch-summary.json
+
+  # ── Miri: undefined-behaviour checking (issue #221) ─────────────────────────
+  # Rust counterpart of c-RCP's ASan/UBSan `sanitize` job (c-RCP
+  # .github/workflows/ci.yml:86). The crate is #![forbid(unsafe_code)], but
+  # the unsafe code it executes in std and in dependencies (tokio, serde,
+  # crc, ...) is still checked for UB, out-of-bounds/use-after-free, invalid
+  # alignment, leaks and data races. Scope: `cargo miri test --lib` (1100+
+  # unit tests) minus scripts/miri-skips.txt, whose header documents every
+  # exclusion and why (currently: tests binding a real std UdpSocket, which
+  # Miri's socket shim cannot execute; bin/doc/bench/fuzz targets are out of
+  # scope). Any Miri error fails the job.
+  miri:
+    name: Miri (UB checking, cargo miri test --lib)
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-10-21
+          components: miri, rust-src
+      - uses: Swatinem/rust-cache@v2
+      - name: miri setup
+        run: cargo +nightly-2026-10-21 miri setup
+      - name: cargo miri test --lib (exclusions in scripts/miri-skips.txt)
+        run: bash scripts/miri.sh
+
+  # ── TLA+ formal verification (issue #221) ───────────────────────────────────
+  # Mirrors c-RCP's `formal-verification` job (c-RCP
+  # .github/workflows/ci.yml:193), running the same two shared specs
+  # (tla/LifecycleStateMachine.tla, tla/E2ESafePoint.tla) plus
+  # rust-RCP's own tla/RequestLifecycle.tla. TLC exits non-zero on any
+  # invariant/property violation or deadlock. src/formal.rs's `refinement`
+  # tests (run by the `test` job) tie each spec to the real rust code. See
+  # docs/FORMAL_VERIFICATION.md. Unlike c-RCP (which downloads "latest"),
+  # tla2tools.jar is pinned to a release and checksum-verified.
+  formal-verification:
+    name: formal verification (TLC model checking)
+    runs-on: ubuntu-latest
+    env:
+      TLA_TOOLS_VERSION: v1.7.4
+      TLA_TOOLS_SHA256: 936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: download TLC (tla2tools.jar, pinned)
+        run: |
+          curl -sSL -o "$RUNNER_TEMP/tla2tools.jar" \
+            "https://github.com/tlaplus/tlaplus/releases/download/${TLA_TOOLS_VERSION}/tla2tools.jar"
+          echo "${TLA_TOOLS_SHA256}  $RUNNER_TEMP/tla2tools.jar" | sha256sum -c -
+      - name: model-check LifecycleStateMachine.tla
+        working-directory: tla
+        run: java -jar "$RUNNER_TEMP/tla2tools.jar" -workers 4 -metadir "$RUNNER_TEMP/tlc-states" LifecycleStateMachine.tla
+      - name: model-check E2ESafePoint.tla
+        working-directory: tla
+        run: java -jar "$RUNNER_TEMP/tla2tools.jar" -workers 4 -metadir "$RUNNER_TEMP/tlc-states" E2ESafePoint.tla
+      - name: model-check RequestLifecycle.tla
+        working-directory: tla
+        run: java -jar "$RUNNER_TEMP/tla2tools.jar" -workers 4 -metadir "$RUNNER_TEMP/tlc-states" RequestLifecycle.tla
+
   # ── FuSa gap check ────────────────────────────────────────────────────────
   fusa:
     name: FuSa gap check
@@ -251,6 +352,141 @@ jobs:
       - name: run cyber gap check
         run: bash scripts/cyber-gap-check.sh
 
+  # ── Required safety artifacts present (issue #218) ────────────────────────
+  # Mirrors c-RCP's `required-artifacts` job (c-RCP/.github/workflows/
+  # ci.yml:216): the hand-maintained safety/security artifacts the rsfusa
+  # lifecycle below reads (and an auditor expects to find) must exist, so
+  # deleting or renaming one fails CI instead of silently degrading every
+  # generated report that depends on it.
+  required-artifacts:
+    name: Required safety artifacts present
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify required safety artifacts are present
+        run: |
+          missing=0
+          for f in \
+            .fusa.json \
+            .fusa-reqs.json \
+            .fusa-hara.json \
+            .fusa-dfmea.json \
+            .fusa-problems.json \
+            .fusa-iec62443.json \
+            tara.json \
+            HARA.md \
+            SECURITY.md \
+            INCIDENT-RESPONSE.md \
+            SAFETY_PLAN.md \
+            .github/CODEOWNERS; do
+            if [ ! -s "$f" ]; then
+              echo "::error::Required safety artifact missing: $f"
+              missing=$((missing + 1))
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
+
+  # ── Version sources agree (issue #212) ────────────────────────────────────
+  # Mirrors c-RCP's `version-sources-agree` job (c-RCP/.github/workflows/
+  # ci.yml:251): Cargo.toml's version, Cargo.lock's entry for this package,
+  # CHANGELOG.md's top entry and any crate-version constant in src/ must all
+  # agree. release.yml re-runs the same script with the tag being released.
+  version-sources-agree:
+    name: Cargo.toml / Cargo.lock / CHANGELOG.md versions agree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare the version sources
+        run: bash scripts/version-sources-check.sh
+
+  # ── rust-FuSa binary (shared by every rsfusa-* job below) ─────────────────
+  # Mirrors c-RCP's `cfusa-build` job: build the pinned safety tool once and
+  # hand the binary to each gate job, instead of every job re-installing it.
+  rsfusa-build:
+    name: Build rsfusa v0.3.17
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dtolnay/rust-toolchain@stable
+      - name: install rsfusa
+        run: cargo install --git https://github.com/SoundMatt/rust-FuSa --tag v0.3.17 rsfusa --locked
+      - name: upload rsfusa binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: rsfusa-binary
+          path: ~/.cargo/bin/rsfusa
+          if-no-files-found: error
+          retention-days: 1
+
+  # ── rsfusa gates (issue #218) ─────────────────────────────────────────────
+  # Each of these used to be a `|| true` step inside the lifecycle job below,
+  # so a failing lint/analyze/complexity run, or one that produced nothing,
+  # left CI green. Like c-RCP's separate cfusa-check/-lint/-analyze/-cyber
+  # jobs (c-RCP/.github/workflows/ci.yml:556-625), each is now its own job
+  # whose real exit code fails the build.
+  rsfusa-gates:
+    name: rsfusa ${{ matrix.gate }}
+    needs: rsfusa-build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        gate: [check, lint, analyze, comp, cyber]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: rsfusa-binary
+          path: ${{ runner.temp }}/rsfusa
+      - name: put rsfusa on PATH
+        run: |
+          chmod +x "$RUNNER_TEMP/rsfusa/rsfusa"
+          echo "$RUNNER_TEMP/rsfusa" >> "$GITHUB_PATH"
+      - name: rsfusa ${{ matrix.gate }} (exit code gates)
+        run: rsfusa ${{ matrix.gate }} --dir . --format json --output ${{ matrix.gate }}-report.json
+      - name: report produced
+        run: test -s ${{ matrix.gate }}-report.json
+
+  # ── rsfusa trace: 100% traced AND tested (issues #90, #218) ───────────────
+  # Mirrors c-RCP's cfusa-trace job (c-RCP/.github/workflows/ci.yml:628-720):
+  # `--req-coverage 100` is the tool's own hard gate on "every requirement
+  # traced", and the JSON `coverage` object (schemaVersion-tagged, unlike the
+  # human-readable text) gates "every requirement tested" -- RELAY §20.1
+  # item 2 requires both.
+  rsfusa-trace:
+    name: rsfusa trace (100% traced and tested)
+    needs: rsfusa-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: rsfusa-binary
+          path: ${{ runner.temp }}/rsfusa
+      - name: put rsfusa on PATH
+        run: |
+          chmod +x "$RUNNER_TEMP/rsfusa/rsfusa"
+          echo "$RUNNER_TEMP/rsfusa" >> "$GITHUB_PATH"
+      - name: traceability matrix
+        run: rsfusa trace --dir . --format text
+      - name: requirement coverage (100% hard gate)
+        run: rsfusa trace --dir . --req-coverage 100 --format json --output trace.json
+      - name: test-trace coverage (100% hard gate, "tested" metric)
+        run: |
+          cov="$(jq '.coverage' trace.json)"
+          echo "$cov"
+          total=$(echo "$cov" | jq '.totalRequirements')
+          traced=$(echo "$cov" | jq '.tracedRequirements')
+          tested=$(echo "$cov" | jq '.testedRequirements')
+          if [ -z "$total" ] || [ "$total" = "null" ] || [ "$total" -eq 0 ]; then
+            echo "::error::trace.json has no coverage.totalRequirements"
+            exit 1
+          fi
+          if [ "$traced" != "$total" ] || [ "$tested" != "$total" ]; then
+            echo "::error::'tested' metric gate failed: traced=$traced tested=$tested total=$total (both must equal total for a 100% gate)"
+            exit 1
+          fi
+          echo "OK: $traced/$total traced, $tested/$total tested"
+
   # ── Full rust-FuSa lifecycle (§20.1.2) ────────────────────────────────────
   # RELAY spec §20.1 item 2: the language safety tool run across its full
   # lifecycle — standard check (ERROR-gated), requirement traceability,
@@ -258,61 +494,103 @@ jobs:
   # `audit` job), and tool qualification — not just this repo's own
   # `fusa-gap-check.sh`/`cyber-gap-check.sh` scripts (the `fusa`/`cyber` jobs
   # above), which predate rust-FuSa's own CI integration.
+  #
+  # No step here ends in `|| true` any more (issue #218). Steps whose job is
+  # to RECORD gaps (gap reports, the --strict SARIF) run through
+  # scripts/rsfusa-report.sh, which tolerates exit 1 (findings recorded) but
+  # fails on a usage/runtime error or a missing report. The evidence set is
+  # then checked file-by-file before upload.
   rust-fusa:
     name: rust-FuSa full lifecycle
-    needs: lint
+    needs: [lint, rsfusa-build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: install rsfusa
-        run: cargo install --git https://github.com/SoundMatt/rust-FuSa --tag v0.3.17 rsfusa --locked
+      - uses: actions/download-artifact@v4
+        with:
+          name: rsfusa-binary
+          path: ${{ runner.temp }}/rsfusa
+      - name: put rsfusa on PATH
+        run: |
+          chmod +x "$RUNNER_TEMP/rsfusa/rsfusa"
+          echo "$RUNNER_TEMP/rsfusa" >> "$GITHUB_PATH"
       - name: build release binary (needed for qualify)
         # Cargo.lock is committed (this crate ships a binary, src/bin/rcp.rs)
         # and built --locked so the qualified release artifact matches the
         # audited/shipped dependency graph exactly.
         run: cargo build --release --locked
 
-      - name: coding standard lint (best-effort)
-        run: rsfusa lint --dir . --format json --output lint-report.json || true
-      - name: static analysis (best-effort)
-        run: rsfusa analyze --dir . --format json --output analyze-report.json || true
-      - name: cyclomatic complexity V(G) (best-effort)
-        run: rsfusa comp --dir . --format json --output comp-report.json || true
+      - name: coding standard lint
+        run: rsfusa lint --dir . --format json --output lint-report.json
+      - name: static analysis
+        run: rsfusa analyze --dir . --format json --output analyze-report.json
+      - name: cyclomatic complexity V(G)
+        run: rsfusa comp --dir . --format json --output comp-report.json
 
       - name: safety check — gates on ERROR findings (§20.1 item 2)
         run: rsfusa check --dir . --format json --output check-report.json
-      - name: safety check SARIF, strict (best-effort, code scanning)
-        run: rsfusa check --dir . --strict --format sarif --output results.sarif || true
+      - name: safety check SARIF, strict (code scanning; WARNINGs recorded, not gated)
+        run: bash scripts/rsfusa-report.sh results.sarif -- rsfusa check --dir . --strict --format sarif --output results.sarif
 
       - name: requirement traceability matrix (§20.1 item 2 / §20.4)
-        run: |
-          rsfusa trace --dir . --format json --output trace.json
-          rsfusa trace --dir . --format text
+        run: rsfusa trace --dir . --req-coverage 100 --format json --output trace.json
 
-      - name: FMEA (best-effort, §20.4 dFMEA evidence)
-        run: rsfusa fmea --dir . || true
-      - name: TARA (§20.4) — see the hand-authored tara.json for the source of truth
-        run: rsfusa tara --dir .
+      - name: FMEA (§20.4 dFMEA evidence)
+        run: rsfusa fmea --dir .
+      - name: TARA report (§20.4)
+        # --output/--md keep the generated report OUT of tara.json: tara.json
+        # is the hand-authored ISO/SAE 21434 TARA (the source of truth), and
+        # a bare `rsfusa tara --dir .` overwrites it with a code-scan
+        # skeleton -- which this job then used to upload as "tara.json".
+        run: rsfusa tara --dir . --output tara-report.json --md tara-report.md
       - name: cybersecurity analysis — CWE-mapped (§20.1 item 2)
         run: rsfusa cyber --dir . --format json --output cyber-report.json
-      - name: boundary diagram (best-effort)
-        run: rsfusa boundary --dir . || true
-      - name: HARA (best-effort)
-        run: rsfusa hara show --dir . || true
-      - name: safety case assembly (best-effort)
-        run: rsfusa safety-case --dir . || true
-      - name: ISO 26262 Part 6 gap report (best-effort)
-        run: rsfusa iso26262 --dir . --format json --output iso26262-gap-report.json || true
+      - name: boundary diagram
+        run: rsfusa boundary --dir .
+      - name: HARA (§20.4)
+        run: rsfusa hara show --dir . --format json > hara-report.json
 
+      - name: test evidence (rsfusa verify)
+        run: rsfusa verify --dir .
       - name: tool qualification (§20.1 item 2)
         run: rsfusa qualify
-
       - name: release artifacts — SBOM, provenance, manifest (§20.5)
         run: rsfusa release --dir .
-      - name: audit pack (best-effort)
-        run: rsfusa audit-pack --output audit-pack.zip || true
+
+      - name: safety case assembly (after every evidence item it cites)
+        run: |
+          set -o pipefail
+          rsfusa safety-case --dir . | tee safety-case.log
+          if grep -q 'required evidence item(s) missing' safety-case.log; then
+            echo "::error::rsfusa safety-case reports missing REQUIRED evidence (see safety-case.md)"
+            exit 1
+          fi
+      - name: ISO 26262 Part 6 gap report (gaps recorded, not gated)
+        run: bash scripts/rsfusa-report.sh iso26262-gap-report.json -- rsfusa iso26262 --dir . --format json --output iso26262-gap-report.json
+
+      - name: audit pack
+        run: rsfusa audit-pack --output audit-pack.zip
+
+      - name: verify the full evidence set was produced
+        run: |
+          missing=0
+          for f in \
+            check-report.json lint-report.json analyze-report.json comp-report.json \
+            cyber-report.json trace.json fmea.json fmea.csv tara.json \
+            tara-report.json tara-report.md hara-report.json boundary.dot \
+            .fusa-evidence.json safety-case.json safety-case.md \
+            iso26262-gap-report.json qualify-report.json sbom.json \
+            provenance.json artifact-manifest.json audit-pack.zip results.sarif; do
+            if [ ! -s "$f" ]; then
+              echo "::error::Safety evidence missing: $f"
+              missing=$((missing + 1))
+            fi
+          done
+          git diff --exit-code -- tara.json .fusa-hara.json .fusa-reqs.json \
+            || { echo "::error::a lifecycle step rewrote a hand-authored safety artifact"; missing=$((missing + 1)); }
+          [ "$missing" -eq 0 ] || exit 1
 
       - name: upload SARIF to GitHub code scanning
         if: always() && github.event_name != 'pull_request'
@@ -326,6 +604,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fusa-safety-evidence
+          include-hidden-files: true
           path: |
             check-report.json
             lint-report.json
@@ -334,8 +613,14 @@ jobs:
             cyber-report.json
             trace.json
             fmea.json
+            fmea.csv
             tara.json
-            tara.md
+            tara-report.json
+            tara-report.md
+            hara-report.json
+            boundary.dot
+            boundary.mermaid
+            .fusa-evidence.json
             safety-case.json
             safety-case.md
             iso26262-gap-report.json
@@ -344,7 +629,7 @@ jobs:
             provenance.json
             artifact-manifest.json
             audit-pack.zip
-          if-no-files-found: warn
+          if-no-files-found: error
 
   # ── SBOM ─────────────────────────────────────────────────────────────────
   sbom:
@@ -356,17 +641,28 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: install cargo-cyclonedx
-        run: cargo install cargo-cyclonedx --locked
+        # Pinned (issue #91): --override-filename's semantics are
+        # version-specific. In 0.5.9 it takes the name WITHOUT an extension
+        # and appends `.json` itself.
+        run: cargo install cargo-cyclonedx@0.5.9 --locked
       - name: generate SBOM
         # cargo-cyclonedx has no --locked flag of its own; it reads the
         # committed Cargo.lock as-is (see the "build" job for the flag that
         # actually enforces --locked semantics against dependency drift).
-        run: cargo cyclonedx --format json --override-filename bom.json
+        # `bom`, not `bom.json` (issue #91): `--override-filename bom.json`
+        # writes `bom.json.json`, so the upload below found nothing and the
+        # job stayed green with zero SBOM produced.
+        run: cargo cyclonedx --format json --override-filename bom
+      - name: verify SBOM was produced
+        run: |
+          test -s bom.json
+          jq -e '.bomFormat == "CycloneDX" and .metadata.component.name == "rust-rcp"' bom.json
       - name: upload SBOM
         uses: actions/upload-artifact@v4
         with:
           name: sbom
           path: bom.json
+          if-no-files-found: error
 
   # ── Security audit ────────────────────────────────────────────────────────
   audit:

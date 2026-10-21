@@ -132,10 +132,11 @@
 //!   as a separate wire bit. **Partially resolved in `v4.0.0`:** Figure 5
 //!   defines a single-bit `tv` ("timestamp valid") flag at bit 15, which
 //!   [`crate::avtp::encode_tscf_header`] now emits, derived from that same
-//!   all-zero-is-untimed convention. Neither implementation's
-//!   *modeling* matches the specification's single bit — go-RCP's marker
-//!   is two bits wide, this crate's is a derived rather than stored value
-//!   — but this crate's *bytes* now do.
+//!   all-zero-is-untimed convention. **Fully resolved in `v6.0.0`:**
+//!   [`crate::avtp::TscfHeader::tv`] is now a stored wire bit (as are
+//!   `mr`/`tu`/`version`), mirroring c-RCP's `rcp_avtp_tscf_header_t`, so
+//!   this crate's *modeling* matches the specification's single bit too;
+//!   go-RCP's marker remains two bits wide.
 //! - **Message-kind discriminant.** go-RCP tags its two ACF-equivalent
 //!   message kinds `1` (short/no-timestamp) and `2` (long/timestamped).
 //!   This crate uses [`crate::acf::ACF_ABB_MSG_TYPE`] = `0x0E` and
@@ -268,18 +269,19 @@ pub mod golden {
     ];
 
     /// A [`crate::avtp::TscfHeader`] whose encoding is pinned by
-    /// [`TSCF_GOLDEN_BYTES`]. `avtp_timestamp` (`0x1A2B3C4D`) is
-    /// deliberately non-degenerate — not all-zero, which
-    /// [`crate::timestamp::AvtpTimestamp`] treats as the untimed sentinel —
-    /// so this vector exercises a genuine timed value.
+    /// [`TSCF_GOLDEN_BYTES`]. `tv` is set and `avtp_timestamp`
+    /// (`0x1A2B3C4D`) is deliberately non-degenerate, so this vector
+    /// exercises a genuine timed value.
     /// `stream_data_length` (19) is the exact length of
     /// [`ACF_GBB_GOLDEN_BYTES`] below.
     pub fn tscf_header_fields() -> crate::avtp::TscfHeader {
         crate::avtp::TscfHeader {
+            tv: true,
             sequence_num: 0x2A,
             avtp_timestamp: 0x1A2B_3C4D,
             stream_data_length: 19,
             stream_id: crate::avtp::StreamId::new(SENDER_MAC_2, UNIQUE_ID_2).to_u64(),
+            ..Default::default()
         }
     }
 
@@ -657,10 +659,9 @@ mod tests {
     //fusa:test REQ-CONF-002
     fn tscf_header_matches_golden_bytes_both_directions() {
         let hdr = golden::tscf_header_fields();
-        // Sanity: this vector's avtp_timestamp must stay non-degenerate —
-        // if it ever became zero, this would no longer exercise a genuine
-        // timed value under crate::timestamp::AvtpTimestamp's
-        // all-zero-is-untimed convention.
+        // Sanity: this vector must stay a genuine timed value (tv set,
+        // non-degenerate avtp_timestamp).
+        assert!(hdr.tv);
         assert_ne!(hdr.avtp_timestamp, 0);
         let encoded = avtp::encode_tscf_header(&hdr).unwrap();
         assert_eq!(
