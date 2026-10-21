@@ -1199,8 +1199,11 @@ pub struct GeneralWriteRejection {
 pub fn general_decode_write_request(b: &[u8]) -> Result<GeneralWriteRejection, GeneralRegmapError> {
     use crate::lifecycle::{check_field_writable, FieldKind, RcServerState, WriterCtx};
 
+    // c-RCP's `rcp_acf_decode_abb` (`c-RCP/src/acf.c:400`) reports
+    // `acf_msg_length * 4 < 8` and `pad > body_len` as SHORT_FRAME, where
+    // `crate::acf` reports them as `InvalidSize`; both map to `ShortFrame`.
     let msg = crate::acf::decode_acf_abb(b).map_err(|e| match e {
-        RcpError::ShortFrame => GeneralRegmapError::ShortFrame,
+        RcpError::ShortFrame | RcpError::InvalidSize => GeneralRegmapError::ShortFrame,
         _ => GeneralRegmapError::BadMsgType,
     })?;
     if msg.info.byte_bus_id != crate::ep0::EP0_BYTE_BUS_ID {
@@ -1982,6 +1985,7 @@ impl ConfigTableRow for SequencerStateEntry {
 // ─────────────────────────────────────────────────────────────────────────────
 #[cfg(test)]
 mod tests {
+    use super::*;
 
     // ── General block write requests (c-RCP golden frame) ───────────────
 
@@ -2027,7 +2031,7 @@ mod tests {
             general_decode_write_request(&bus),
             Err(GeneralRegmapError::WrongBus)
         );
-        // An ACF_GBB message type is not an ABB.
+        // c-RCP: GENWR_GBB 2 (an ACF_GBB message type is not an ABB)
         let mut gbb = C_RCP_GENWR_FRAME;
         gbb[0] = (crate::acf::ACF_GBB_MSG_TYPE << 1) | (gbb[0] & 1);
         assert_eq!(
@@ -2035,7 +2039,39 @@ mod tests {
             Err(GeneralRegmapError::BadMsgType)
         );
     }
-    use super::*;
+
+    #[test]
+    //fusa:test REQ-RMAP-037
+    fn general_write_request_bad_length_or_pad_is_short_frame_like_c_rcp() {
+        let golden = include_str!("../testdata/c_rcp_lifecycle_golden.txt");
+        let c_rcp = |key: &str| -> u8 {
+            golden
+                .lines()
+                .find_map(|l| l.strip_prefix(key)?.strip_prefix(' '))
+                .unwrap_or_else(|| panic!("{key} missing from golden"))
+                .trim()
+                .parse()
+                .unwrap()
+        };
+        let rust = |f: &[u8]| general_decode_write_request(f).unwrap_err() as u8;
+        // acf_msg_length 0 and 1: declared total shorter than the header.
+        let mut m = C_RCP_GENWR_FRAME;
+        m[1] = 0x00;
+        assert_eq!(rust(&m), c_rcp("GENWR_LEN0"));
+        assert_eq!(rust(&m), GeneralRegmapError::ShortFrame as u8);
+        m[1] = 0x01;
+        assert_eq!(rust(&m), c_rcp("GENWR_LEN1"));
+        // acf_msg_length 2 (header only) with pad 1 > body_len 0.
+        m[1] = 0x02;
+        m[2] |= 0x40;
+        assert_eq!(rust(&m), c_rcp("GENWR_PAD"));
+        assert_eq!(rust(&m), GeneralRegmapError::ShortFrame as u8);
+        // Truncated and wrong message type agree too.
+        assert_eq!(rust(&C_RCP_GENWR_FRAME[..4]), c_rcp("GENWR_SHORT"));
+        let mut gbb = C_RCP_GENWR_FRAME;
+        gbb[0] = (crate::acf::ACF_GBB_MSG_TYPE << 1) | (gbb[0] & 1);
+        assert_eq!(rust(&gbb), c_rcp("GENWR_GBB"));
+    }
 
     const ALL_ENDPOINT_TYPES: [EndpointType; 13] = [
         EndpointType::Wakeup,

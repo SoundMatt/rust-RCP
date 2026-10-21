@@ -421,12 +421,12 @@ fn cmd_register_read(args: &[String]) {
 /// EP0-addressed [`AcfAbbMessage`] write request, dispatched through
 /// [`RcServer::handle_abb`]. If `--root` is given, `--stream` is first
 /// designated the server's root client via [`RcServer::set_root_client`]
-/// before the write is attempted — without it, a non-root stream is
-/// rejected with `RcpError::UnauthorizedAccess` before ever reaching the
-/// write-policy check.
+/// before the write is attempted. With or without it, the write is
+/// answered with `RcpError::LockedMemAccess`: every General-block register
+/// is read-only, and (as in c-RCP, `c-RCP/src/regmap.c:283`) that code does
+/// not depend on the writer.
 ///
-/// Reports whatever [`RcServer::handle_abb`] actually returns, including
-/// `RcpError::LockedMemAccess` for the root client itself: see
+/// Reports whatever [`RcServer::handle_abb`] actually returns: see
 /// [`RcServer::handle_abb`]'s own doc comment for why a general-register
 /// write is currently never actually accepted by this in-process server.
 //fusa:req REQ-CLI-005

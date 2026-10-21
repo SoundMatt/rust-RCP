@@ -596,8 +596,9 @@ impl RcServerState {
     /// Authorization is checked before idleness, and both before
     /// plausibility. `HW_UNCONFIGURED` -> `HW_CONFIGURED` does not consult
     /// `writer`: TC18 §12.3.1.1 requires the request to arrive via the
-    /// discovery stream, which [`should_accept`] already enforces one layer
-    /// up.
+    /// discovery stream, which [`should_accept`] enforces one layer
+    /// up. [`should_accept`] is not yet wired into dispatch (#224), so until
+    /// it is, a caller of this transition must enforce that itself.
     ///
     /// c-RCP parity: `c-RCP/src/lifecycle.c:236` — the
     /// `RCP_CONFIGURED` -> `HW_UNCONFIGURED` reset admits only

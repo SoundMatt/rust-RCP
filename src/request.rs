@@ -358,8 +358,8 @@
 //!   [`check_compound_gate`], [`advance_sequencer_if_still_in_start_state`])
 //!   keeps taking it as a caller-supplied [`SequencerState`] value rather
 //!   than being retrofitted to require a [`SequencerBank`], mirroring
-//!   [`crate::lifecycle::RcServerState::try_transition`]'s `is_consistent`
-//!   closure and [`crate::ep0::check_ep0_access_for_stream`]'s
+//!   [`crate::lifecycle::should_accept`]'s caller-supplied `state`
+//!   and [`crate::ep0::check_ep0_access_for_stream`]'s
 //!   `root_client` parameter — neither of those blocked on a sibling item
 //!   building the thing they read, and neither did these when they were
 //!   added. [`SequencerBank::check_compound_gate`] is the new bank-backed

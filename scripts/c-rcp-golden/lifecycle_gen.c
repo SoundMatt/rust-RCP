@@ -137,6 +137,22 @@ int main(void)
         for (size_t i = 0; i < f.len; i++) printf("%02X", f.data[i]);
         printf("\nGENWR %d %d 0x%02X\n", rcp_regmap_general_decode_write_request(f.data, f.len, &err, &txn), err, txn);
         printf("GENWR_SHORT %d\n", rcp_regmap_general_decode_write_request(f.data, 4, &err, &txn));
+        /* Malformed acf_msg_length / pad on an otherwise-golden frame
+         * (rcp_acf_decode_abb returns SHORT_FRAME for all of these). */
+        {
+            uint8_t m[12];
+            memcpy(m, f.data, sizeof m);
+            m[1] = 0x00; /* acf_msg_length 0: total 0 < header */
+            printf("GENWR_LEN0 %d\n", rcp_regmap_general_decode_write_request(m, sizeof m, &err, &txn));
+            m[1] = 0x01; /* acf_msg_length 1: total 4 < header */
+            printf("GENWR_LEN1 %d\n", rcp_regmap_general_decode_write_request(m, sizeof m, &err, &txn));
+            m[1] = 0x02;               /* header only, body_len 0 */
+            m[2] = (uint8_t)(m[2] | 0x40u); /* pad 1 > body_len 0 */
+            printf("GENWR_PAD %d\n", rcp_regmap_general_decode_write_request(m, sizeof m, &err, &txn));
+            memcpy(m, f.data, sizeof m);
+            m[0] = (uint8_t)((RCP_ACF_MSG_TYPE_GBB << 1) | (m[0] & 1u));
+            printf("GENWR_GBB %d\n", rcp_regmap_general_decode_write_request(m, sizeof m, &err, &txn));
+        }
         rcp_bytes_free(&f);
         hdr.op = RCP_ACF_OP_READ;
         f = rcp_acf_encode_abb(&hdr, payload, 4);
