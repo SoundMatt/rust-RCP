@@ -34,12 +34,16 @@
 //!   another by accident — there is no shared trait or conversion between
 //!   them, only the one-way `From`/`to_*` conversions each has with its own
 //!   matching raw integer type.
-//! - **Invalid/uncertain timestamp fallback.** [`AvtpTimestamp::semantics`]
-//!   and [`MessageTimestamp::semantics`] fold an all-zero raw value down to
-//!   [`TimestampMeaning::Untimed`], matching the roadmap's stated leniency;
-//!   every other raw value is [`TimestampMeaning::Timed`].
-//!   [`AvtpTimestamp::is_untimed`]/[`MessageTimestamp::is_untimed`] are the
-//!   boolean shorthand for the same check.
+//! - **Timestamp validity comes from the wire bit, not the value.**
+//!   [`TimestampMeaning::from_valid_bit`] maps TSCF's `tv` /
+//!   ACF_GBB's `mtv` bit to [`TimestampMeaning::Timed`]/
+//!   [`TimestampMeaning::Untimed`]; a raw value of 0 is an ordinary, valid
+//!   timestamp when its validity bit is set (TC18 §13.3; mirrors c-RCP,
+//!   which gates on `tv`/`mtv` only, `c-RCP/src/server.c:338-339`). This
+//!   replaces the earlier all-zero-is-untimed sentinel rule.
+//!   [`crate::avtp::TscfHeader::timestamp_meaning`] applies it to a decoded
+//!   TSCF header; [`crate::avtp::extend_timestamp`] reconstructs the 48-bit
+//!   gPTP instant a 32-bit `avtp_timestamp` denotes.
 //!
 //! Each type also carries a wraparound-aware comparison pair —
 //! [`AvtpTimestamp::wrapping_delta`]/[`AvtpTimestamp::is_after`] and
@@ -76,14 +80,11 @@
 //! and are flagged here for reconciliation before being relied on for
 //! interop with a real TC18 RC Server:
 //!
-//! - **The fallback trigger condition.** This module treats *exactly*
-//!   all-zero (`0u32`/`0u64`) as the "untimed" sentinel and every other raw
-//!   value — including small values like `1` and large ones like
-//!   `u32::MAX`/`u64::MAX` — as genuinely timed. The roadmap says "an
-//!   all-zero timestamp region", which could instead name a narrower or
-//!   wider band of sentinel values (e.g. a handful of reserved low values,
-//!   or all-`0xFF` as an additional sentinel alongside all-zero); this
-//!   module implements the literal, narrowest reading (exact zero only).
+//! - **The fallback trigger condition** (now resolved). This module used
+//!   to treat an exact all-zero raw value as the "untimed" sentinel. TC18
+//!   §13.3 and §11.4.1 instead carry validity in a separate wire bit (`tv`
+//!   / `mtv`), and 0 is a legal gPTP-derived timestamp, so validity is now
+//!   taken from that bit alone ([`TimestampMeaning::from_valid_bit`]).
 //! - **The two rollover-period lengths.** [`AvtpTimestamp::ROLLOVER_PERIOD`]
 //!   and [`MessageTimestamp::ROLLOVER_PERIOD`] are each set to the full
 //!   range of the field's own bit width (2^32 and 2^64 raw ticks,
@@ -94,21 +95,48 @@
 //!   full bit width, if some high bits are reserved); this module makes no
 //!   claim about tick units and assumes the full bit width is significant.
 
-/// How a decoded timestamp value should be interpreted, per this module's
-/// invalid/uncertain timestamp fallback rule.
+/// How a decoded timestamp value should be interpreted, per the
+/// timestamp-validity bit that accompanies it on the wire.
 ///
-/// Returned by [`AvtpTimestamp::semantics`] and [`MessageTimestamp::semantics`].
+/// Validity is carried by a separate wire bit — TSCF's `tv`
+/// ([`crate::avtp::TscfHeader::tv`]) or ACF_GBB's `mtv`
+/// ([`crate::acf::ByteMessageInfo::mtv`]) — never by the raw timestamp
+/// value: 0 is a perfectly valid timestamp. Build one with
+/// [`TimestampMeaning::from_valid_bit`] or
+/// [`crate::avtp::TscfHeader::timestamp_meaning`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 //fusa:req REQ-TS-004
 pub enum TimestampMeaning {
-    /// The raw value falls in this module's untimed fallback region (exact
-    /// all-zero — see the module's provenance note) and must be treated as
-    /// carrying no timing information at all, not as a legitimate "tick
-    /// zero" timestamp.
+    /// The validity bit is clear (`tv = 0` / `mtv = 0`): the timestamp
+    /// carries no timing information and is ignored (TC18 §13.3: "with the
+    /// time stamp marked as invalid (i.e. tv = 0), the timestamp is
+    /// ignored").
     Untimed,
-    /// The raw value is outside the fallback region and carries a genuine,
-    /// wraparound-aware timestamp.
+    /// The validity bit is set: the raw value — whatever it is, including
+    /// 0 — is a genuine, wraparound-aware timestamp.
     Timed,
+}
+
+impl TimestampMeaning {
+    /// Map a wire validity bit (`tv`/`mtv`) to its meaning.
+    ///
+    /// Mirrors c-RCP, which gates every presentation-time use on `tv`
+    /// alone (`c-RCP/src/server.c:338-339`) and every capture-timestamp
+    /// use on `mtv` alone (`c-RCP/include/rcp/acf.h:722-727`).
+    //fusa:req REQ-TS-004
+    pub fn from_valid_bit(valid: bool) -> Self {
+        if valid {
+            Self::Timed
+        } else {
+            Self::Untimed
+        }
+    }
+
+    /// Shorthand for `self == TimestampMeaning::Untimed`.
+    //fusa:req REQ-TS-004
+    pub fn is_untimed(self) -> bool {
+        self == Self::Untimed
+    }
 }
 
 // ── AvtpTimestamp ─────────────────────────────────────────────────────────────
@@ -148,23 +176,6 @@ impl AvtpTimestamp {
     /// [`crate::avtp::TscfHeader::avtp_timestamp`].
     pub fn to_u32(self) -> u32 {
         self.0
-    }
-
-    /// This value's fallback-rule interpretation. See
-    /// [`TimestampMeaning`] and the module's provenance note.
-    //fusa:req REQ-TS-004
-    pub fn semantics(self) -> TimestampMeaning {
-        if self.0 == 0 {
-            TimestampMeaning::Untimed
-        } else {
-            TimestampMeaning::Timed
-        }
-    }
-
-    /// Shorthand for `self.semantics() == TimestampMeaning::Untimed`.
-    //fusa:req REQ-TS-004
-    pub fn is_untimed(self) -> bool {
-        self.semantics() == TimestampMeaning::Untimed
     }
 
     /// Signed, wraparound-aware difference `self - earlier`, in raw ticks.
@@ -242,23 +253,6 @@ impl MessageTimestamp {
         self.0
     }
 
-    /// This value's fallback-rule interpretation. See
-    /// [`TimestampMeaning`] and the module's provenance note.
-    //fusa:req REQ-TS-004
-    pub fn semantics(self) -> TimestampMeaning {
-        if self.0 == 0 {
-            TimestampMeaning::Untimed
-        } else {
-            TimestampMeaning::Timed
-        }
-    }
-
-    /// Shorthand for `self.semantics() == TimestampMeaning::Untimed`.
-    //fusa:req REQ-TS-004
-    pub fn is_untimed(self) -> bool {
-        self.semantics() == TimestampMeaning::Untimed
-    }
-
     /// Signed, wraparound-aware difference `self - earlier`, in raw ticks.
     ///
     /// Same convention as [`AvtpTimestamp::wrapping_delta`], applied over
@@ -333,49 +327,81 @@ mod tests {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  AvtpTimestamp: fallback rule
+    //  Validity comes from the tv/mtv bit, not the raw value
     // ═══════════════════════════════════════════════════════════════════
 
     #[test]
     //fusa:test REQ-TS-004
-    fn avtp_timestamp_zero_is_untimed() {
-        assert_eq!(AvtpTimestamp::new(0).semantics(), TimestampMeaning::Untimed);
-        assert!(AvtpTimestamp::new(0).is_untimed());
-        assert_eq!(AvtpTimestamp::default(), AvtpTimestamp::new(0));
+    fn timestamp_meaning_follows_the_valid_bit_only() {
+        assert_eq!(
+            TimestampMeaning::from_valid_bit(true),
+            TimestampMeaning::Timed
+        );
+        assert_eq!(
+            TimestampMeaning::from_valid_bit(false),
+            TimestampMeaning::Untimed
+        );
+        assert!(TimestampMeaning::from_valid_bit(false).is_untimed());
+        assert!(!TimestampMeaning::from_valid_bit(true).is_untimed());
     }
 
     #[test]
     //fusa:test REQ-TS-004
-    fn avtp_timestamp_nonzero_is_timed() {
-        for raw in [1u32, 2, 0x1234_5678, u32::MAX] {
-            let ts = AvtpTimestamp::new(raw);
-            assert_eq!(ts.semantics(), TimestampMeaning::Timed, "raw={raw:#010X}");
-            assert!(!ts.is_untimed(), "raw={raw:#010X}");
+    fn tscf_zero_timestamp_with_tv_set_is_timed() {
+        // TC18 §13.3: validity is the tv bit. A raw avtp_timestamp of 0 is
+        // a legal gPTP-derived value and must not be read as "untimed".
+        let timed_zero = TscfHeader {
+            tv: true,
+            avtp_timestamp: 0,
+            ..Default::default()
+        };
+        assert_eq!(timed_zero.timestamp_meaning(), TimestampMeaning::Timed);
+
+        // ...and a non-zero value with tv clear is ignored.
+        let untimed_nonzero = TscfHeader {
+            tv: false,
+            avtp_timestamp: 0x1234_5678,
+            ..Default::default()
+        };
+        assert_eq!(
+            untimed_nonzero.timestamp_meaning(),
+            TimestampMeaning::Untimed
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-TS-004
+    fn tscf_tu_bit_does_not_affect_timestamp_meaning() {
+        // TC18 §13.3: "In case the time stamp is uncertain (i.e. tu = 1),
+        // then this shall be executed as if tu = 0."
+        for tv in [false, true] {
+            let a = TscfHeader {
+                tv,
+                tu: false,
+                ..Default::default()
+            };
+            let b = TscfHeader { tu: true, ..a };
+            assert_eq!(a.timestamp_meaning(), b.timestamp_meaning());
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  MessageTimestamp: fallback rule
-    // ═══════════════════════════════════════════════════════════════════
-
     #[test]
     //fusa:test REQ-TS-004
-    fn message_timestamp_zero_is_untimed() {
-        assert_eq!(
-            MessageTimestamp::new(0).semantics(),
-            TimestampMeaning::Untimed
-        );
-        assert!(MessageTimestamp::new(0).is_untimed());
-        assert_eq!(MessageTimestamp::default(), MessageTimestamp::new(0));
-    }
-
-    #[test]
-    //fusa:test REQ-TS-004
-    fn message_timestamp_nonzero_is_timed() {
-        for raw in [1u64, 2, 0x0123_4567_89AB_CDEF, u64::MAX] {
-            let ts = MessageTimestamp::new(raw);
-            assert_eq!(ts.semantics(), TimestampMeaning::Timed, "raw={raw:#018X}");
-            assert!(!ts.is_untimed(), "raw={raw:#018X}");
+    fn gbb_mtv_bit_maps_to_meaning_regardless_of_value() {
+        for (mtv, ts) in [(true, 0u64), (false, 0xCAFE_BABE_0000_0000)] {
+            let info = ByteMessageInfo {
+                mtv,
+                ..Default::default()
+            };
+            let msg = AcfGbbMessage {
+                info,
+                message_timestamp: ts,
+                payload: vec![],
+            };
+            assert_eq!(
+                TimestampMeaning::from_valid_bit(msg.info.mtv).is_untimed(),
+                !mtv
+            );
         }
     }
 
@@ -511,13 +537,13 @@ mod tests {
     fn avtp_timestamp_interoperates_with_tscf_header_field() {
         let hdr = TscfHeader {
             sequence_num: 1,
+            tv: true,
             avtp_timestamp: 0x0BAD_F00D,
-            stream_data_length: 0,
-            stream_id: 0,
+            ..Default::default()
         };
         let ts = AvtpTimestamp::new(hdr.avtp_timestamp);
         assert_eq!(ts.to_u32(), hdr.avtp_timestamp);
-        assert_eq!(ts.semantics(), TimestampMeaning::Timed);
+        assert_eq!(hdr.timestamp_meaning(), TimestampMeaning::Timed);
     }
 
     #[test]
@@ -530,22 +556,11 @@ mod tests {
         };
         let ts = MessageTimestamp::new(msg.message_timestamp);
         assert_eq!(ts.to_u64(), msg.message_timestamp);
-        assert_eq!(ts.semantics(), TimestampMeaning::Timed);
     }
 
-    #[test]
-    //fusa:test REQ-TS-005
-    fn zero_message_timestamp_on_acf_gbb_message_is_untimed() {
-        // The fallback rule applies identically to a message_timestamp
-        // sourced from a real AcfGbbMessage, not just a bare u64.
-        let msg = AcfGbbMessage {
-            info: ByteMessageInfo::default(),
-            message_timestamp: 0,
-            payload: vec![],
-        };
-        assert!(MessageTimestamp::new(msg.message_timestamp).is_untimed());
-    }
-
+    // ═══════════════════════════════════════════════════════════════════
+    //  Never panics on arbitrary input
+    // ═══════════════════════════════════════════════════════════════════
     // ═══════════════════════════════════════════════════════════════════
     //  Never panics on arbitrary input
     // ═══════════════════════════════════════════════════════════════════
@@ -568,8 +583,6 @@ mod tests {
             for &b in &values {
                 let ta = AvtpTimestamp::new(a);
                 let tb = AvtpTimestamp::new(b);
-                let _ = ta.semantics();
-                let _ = ta.is_untimed();
                 let _ = ta.wrapping_delta(tb);
                 let _ = ta.is_after(tb);
             }
@@ -594,8 +607,6 @@ mod tests {
             for &b in &values {
                 let ta = MessageTimestamp::new(a);
                 let tb = MessageTimestamp::new(b);
-                let _ = ta.semantics();
-                let _ = ta.is_untimed();
                 let _ = ta.wrapping_delta(tb);
                 let _ = ta.is_after(tb);
             }
