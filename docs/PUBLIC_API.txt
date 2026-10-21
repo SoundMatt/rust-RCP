@@ -2058,6 +2058,81 @@ pub fn rcp::l2::decode_ethernet_frame(&[u8]) -> core::result::Result<rcp::l2::De
 pub fn rcp::l2::encode_ethernet_frame([u8; 6], [u8; 6], &[u8]) -> alloc::vec::Vec<u8>
 pub type rcp::l2::DecodedEthernetFrame<'a> = ([u8; 6], [u8; 6], &'a [u8])
 pub mod rcp::lifecycle
+#[repr(u8)] pub enum rcp::lifecycle::FieldKind
+pub rcp::lifecycle::FieldKind::FunctionalW = 1
+pub rcp::lifecycle::FieldKind::FunctionalWStar = 2
+pub rcp::lifecycle::FieldKind::HwGeneric = 0
+pub rcp::lifecycle::FieldKind::ReadOnly = 3
+impl core::clone::Clone for rcp::lifecycle::FieldKind
+pub fn rcp::lifecycle::FieldKind::clone(&self) -> Self
+impl core::cmp::Eq for rcp::lifecycle::FieldKind
+impl core::cmp::PartialEq for rcp::lifecycle::FieldKind
+pub fn rcp::lifecycle::FieldKind::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::lifecycle::FieldKind
+pub fn rcp::lifecycle::FieldKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for rcp::lifecycle::FieldKind
+pub fn rcp::lifecycle::FieldKind::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for rcp::lifecycle::FieldKind
+impl core::marker::StructuralPartialEq for rcp::lifecycle::FieldKind
+impl core::marker::Freeze for rcp::lifecycle::FieldKind
+impl core::marker::Send for rcp::lifecycle::FieldKind
+impl core::marker::Sync for rcp::lifecycle::FieldKind
+impl core::marker::Unpin for rcp::lifecycle::FieldKind
+impl core::marker::UnsafeUnpin for rcp::lifecycle::FieldKind
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::lifecycle::FieldKind
+impl core::panic::unwind_safe::UnwindSafe for rcp::lifecycle::FieldKind
+#[repr(u8)] pub enum rcp::lifecycle::LifecycleAccept
+pub rcp::lifecycle::LifecycleAccept::Accept = 0
+pub rcp::lifecycle::LifecycleAccept::Drop = 1
+pub rcp::lifecycle::LifecycleAccept::Reject = 2
+impl core::clone::Clone for rcp::lifecycle::LifecycleAccept
+pub fn rcp::lifecycle::LifecycleAccept::clone(&self) -> Self
+impl core::cmp::Eq for rcp::lifecycle::LifecycleAccept
+impl core::cmp::PartialEq for rcp::lifecycle::LifecycleAccept
+pub fn rcp::lifecycle::LifecycleAccept::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::lifecycle::LifecycleAccept
+pub fn rcp::lifecycle::LifecycleAccept::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for rcp::lifecycle::LifecycleAccept
+pub fn rcp::lifecycle::LifecycleAccept::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for rcp::lifecycle::LifecycleAccept
+impl core::marker::StructuralPartialEq for rcp::lifecycle::LifecycleAccept
+impl core::marker::Freeze for rcp::lifecycle::LifecycleAccept
+impl core::marker::Send for rcp::lifecycle::LifecycleAccept
+impl core::marker::Sync for rcp::lifecycle::LifecycleAccept
+impl core::marker::Unpin for rcp::lifecycle::LifecycleAccept
+impl core::marker::UnsafeUnpin for rcp::lifecycle::LifecycleAccept
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::lifecycle::LifecycleAccept
+impl core::panic::unwind_safe::UnwindSafe for rcp::lifecycle::LifecycleAccept
+#[repr(u8)] pub enum rcp::lifecycle::LifecycleError
+pub rcp::lifecycle::LifecycleError::EpsNotIdle = 5
+pub rcp::lifecycle::LifecycleError::HwCfgInconsistent = 1
+pub rcp::lifecycle::LifecycleError::InvalidTransition = 3
+pub rcp::lifecycle::LifecycleError::RcpCfgInconsistent = 2
+pub rcp::lifecycle::LifecycleError::Unauthorized = 4
+impl rcp::lifecycle::LifecycleError
+pub fn rcp::lifecycle::LifecycleError::code(self) -> u8
+pub fn rcp::lifecycle::LifecycleError::message(self) -> &'static str
+impl core::clone::Clone for rcp::lifecycle::LifecycleError
+pub fn rcp::lifecycle::LifecycleError::clone(&self) -> Self
+impl core::cmp::Eq for rcp::lifecycle::LifecycleError
+impl core::cmp::PartialEq for rcp::lifecycle::LifecycleError
+pub fn rcp::lifecycle::LifecycleError::eq(&self, &Self) -> bool
+impl core::error::Error for rcp::lifecycle::LifecycleError
+impl core::fmt::Debug for rcp::lifecycle::LifecycleError
+pub fn rcp::lifecycle::LifecycleError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rcp::lifecycle::LifecycleError
+pub fn rcp::lifecycle::LifecycleError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for rcp::lifecycle::LifecycleError
+pub fn rcp::lifecycle::LifecycleError::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for rcp::lifecycle::LifecycleError
+impl core::marker::StructuralPartialEq for rcp::lifecycle::LifecycleError
+impl core::marker::Freeze for rcp::lifecycle::LifecycleError
+impl core::marker::Send for rcp::lifecycle::LifecycleError
+impl core::marker::Sync for rcp::lifecycle::LifecycleError
+impl core::marker::Unpin for rcp::lifecycle::LifecycleError
+impl core::marker::UnsafeUnpin for rcp::lifecycle::LifecycleError
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::lifecycle::LifecycleError
+impl core::panic::unwind_safe::UnwindSafe for rcp::lifecycle::LifecycleError
 pub enum rcp::lifecycle::LockPolicy
 pub rcp::lifecycle::LockPolicy::W
 pub rcp::lifecycle::LockPolicy::WStar
@@ -2086,7 +2161,7 @@ pub const rcp::lifecycle::RcServerState::INITIAL: Self
 pub fn rcp::lifecycle::RcServerState::from_u8(u8) -> core::result::Result<Self, rcp::RcpError>
 pub fn rcp::lifecycle::RcServerState::to_u8(self) -> u8
 impl rcp::lifecycle::RcServerState
-pub fn rcp::lifecycle::RcServerState::try_transition(self, Self, impl core::ops::function::FnOnce() -> bool) -> core::result::Result<Self, rcp::RcpError>
+pub fn rcp::lifecycle::RcServerState::try_transition(self, Self, core::option::Option<&rcp::lifecycle::PlausibilitySnapshot<'_>>, rcp::lifecycle::WriterCtx, bool) -> core::result::Result<Self, rcp::lifecycle::LifecycleError>
 impl core::clone::Clone for rcp::lifecycle::RcServerState
 pub fn rcp::lifecycle::RcServerState::clone(&self) -> Self
 impl core::cmp::Eq for rcp::lifecycle::RcServerState
@@ -2129,12 +2204,135 @@ impl core::marker::Unpin for rcp::lifecycle::RegisterCategory
 impl core::marker::UnsafeUnpin for rcp::lifecycle::RegisterCategory
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::lifecycle::RegisterCategory
 impl core::panic::unwind_safe::UnwindSafe for rcp::lifecycle::RegisterCategory
+#[repr(u8)] pub enum rcp::lifecycle::TscfFallback
+pub rcp::lifecycle::TscfFallback::Drop = 0
+pub rcp::lifecycle::TscfFallback::Ignore = 1
+impl core::clone::Clone for rcp::lifecycle::TscfFallback
+pub fn rcp::lifecycle::TscfFallback::clone(&self) -> Self
+impl core::cmp::Eq for rcp::lifecycle::TscfFallback
+impl core::cmp::PartialEq for rcp::lifecycle::TscfFallback
+pub fn rcp::lifecycle::TscfFallback::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::lifecycle::TscfFallback
+pub fn rcp::lifecycle::TscfFallback::default() -> Self
+impl core::fmt::Debug for rcp::lifecycle::TscfFallback
+pub fn rcp::lifecycle::TscfFallback::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for rcp::lifecycle::TscfFallback
+pub fn rcp::lifecycle::TscfFallback::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for rcp::lifecycle::TscfFallback
+impl core::marker::StructuralPartialEq for rcp::lifecycle::TscfFallback
+impl core::marker::Freeze for rcp::lifecycle::TscfFallback
+impl core::marker::Send for rcp::lifecycle::TscfFallback
+impl core::marker::Sync for rcp::lifecycle::TscfFallback
+impl core::marker::Unpin for rcp::lifecycle::TscfFallback
+impl core::marker::UnsafeUnpin for rcp::lifecycle::TscfFallback
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::lifecycle::TscfFallback
+impl core::panic::unwind_safe::UnwindSafe for rcp::lifecycle::TscfFallback
+pub struct rcp::lifecycle::EndpointPlausibility
+pub rcp::lifecycle::EndpointPlausibility::ep_used: bool
+pub rcp::lifecycle::EndpointPlausibility::has_request_stream: bool
+pub rcp::lifecycle::EndpointPlausibility::has_stream_assoc: bool
+pub rcp::lifecycle::EndpointPlausibility::hw_pin_mapped: bool
+pub rcp::lifecycle::EndpointPlausibility::request_stream_index: usize
+impl core::clone::Clone for rcp::lifecycle::EndpointPlausibility
+pub fn rcp::lifecycle::EndpointPlausibility::clone(&self) -> Self
+impl core::cmp::Eq for rcp::lifecycle::EndpointPlausibility
+impl core::cmp::PartialEq for rcp::lifecycle::EndpointPlausibility
+pub fn rcp::lifecycle::EndpointPlausibility::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::lifecycle::EndpointPlausibility
+pub fn rcp::lifecycle::EndpointPlausibility::default() -> Self
+impl core::fmt::Debug for rcp::lifecycle::EndpointPlausibility
+pub fn rcp::lifecycle::EndpointPlausibility::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::lifecycle::EndpointPlausibility
+impl core::marker::StructuralPartialEq for rcp::lifecycle::EndpointPlausibility
+impl core::marker::Freeze for rcp::lifecycle::EndpointPlausibility
+impl core::marker::Send for rcp::lifecycle::EndpointPlausibility
+impl core::marker::Sync for rcp::lifecycle::EndpointPlausibility
+impl core::marker::Unpin for rcp::lifecycle::EndpointPlausibility
+impl core::marker::UnsafeUnpin for rcp::lifecycle::EndpointPlausibility
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::lifecycle::EndpointPlausibility
+impl core::panic::unwind_safe::UnwindSafe for rcp::lifecycle::EndpointPlausibility
+pub struct rcp::lifecycle::PlausibilitySnapshot<'a>
+pub rcp::lifecycle::PlausibilitySnapshot::endpoints: &'a [rcp::lifecycle::EndpointPlausibility]
+pub rcp::lifecycle::PlausibilitySnapshot::request_streams: &'a [rcp::lifecycle::RequestStreamPlausibility]
+pub rcp::lifecycle::PlausibilitySnapshot::response_stream_count: usize
+impl<'a> core::clone::Clone for rcp::lifecycle::PlausibilitySnapshot<'a>
+pub fn rcp::lifecycle::PlausibilitySnapshot<'a>::clone(&self) -> Self
+impl<'a> core::cmp::Eq for rcp::lifecycle::PlausibilitySnapshot<'a>
+impl<'a> core::cmp::PartialEq for rcp::lifecycle::PlausibilitySnapshot<'a>
+pub fn rcp::lifecycle::PlausibilitySnapshot<'a>::eq(&self, &Self) -> bool
+impl<'a> core::default::Default for rcp::lifecycle::PlausibilitySnapshot<'a>
+pub fn rcp::lifecycle::PlausibilitySnapshot<'a>::default() -> Self
+impl<'a> core::fmt::Debug for rcp::lifecycle::PlausibilitySnapshot<'a>
+pub fn rcp::lifecycle::PlausibilitySnapshot<'a>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a> core::marker::Copy for rcp::lifecycle::PlausibilitySnapshot<'a>
+impl<'a> core::marker::StructuralPartialEq for rcp::lifecycle::PlausibilitySnapshot<'a>
+impl<'a> core::marker::Freeze for rcp::lifecycle::PlausibilitySnapshot<'a>
+impl<'a> core::marker::Send for rcp::lifecycle::PlausibilitySnapshot<'a>
+impl<'a> core::marker::Sync for rcp::lifecycle::PlausibilitySnapshot<'a>
+impl<'a> core::marker::Unpin for rcp::lifecycle::PlausibilitySnapshot<'a>
+impl<'a> core::marker::UnsafeUnpin for rcp::lifecycle::PlausibilitySnapshot<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for rcp::lifecycle::PlausibilitySnapshot<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for rcp::lifecycle::PlausibilitySnapshot<'a>
+pub struct rcp::lifecycle::RequestStreamPlausibility
+pub rcp::lifecycle::RequestStreamPlausibility::configured: bool
+pub rcp::lifecycle::RequestStreamPlausibility::has_response_stream: bool
+pub rcp::lifecycle::RequestStreamPlausibility::response_stream_index: usize
+impl core::clone::Clone for rcp::lifecycle::RequestStreamPlausibility
+pub fn rcp::lifecycle::RequestStreamPlausibility::clone(&self) -> Self
+impl core::cmp::Eq for rcp::lifecycle::RequestStreamPlausibility
+impl core::cmp::PartialEq for rcp::lifecycle::RequestStreamPlausibility
+pub fn rcp::lifecycle::RequestStreamPlausibility::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::lifecycle::RequestStreamPlausibility
+pub fn rcp::lifecycle::RequestStreamPlausibility::default() -> Self
+impl core::fmt::Debug for rcp::lifecycle::RequestStreamPlausibility
+pub fn rcp::lifecycle::RequestStreamPlausibility::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::lifecycle::RequestStreamPlausibility
+impl core::marker::StructuralPartialEq for rcp::lifecycle::RequestStreamPlausibility
+impl core::marker::Freeze for rcp::lifecycle::RequestStreamPlausibility
+impl core::marker::Send for rcp::lifecycle::RequestStreamPlausibility
+impl core::marker::Sync for rcp::lifecycle::RequestStreamPlausibility
+impl core::marker::Unpin for rcp::lifecycle::RequestStreamPlausibility
+impl core::marker::UnsafeUnpin for rcp::lifecycle::RequestStreamPlausibility
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::lifecycle::RequestStreamPlausibility
+impl core::panic::unwind_safe::UnwindSafe for rcp::lifecycle::RequestStreamPlausibility
+pub struct rcp::lifecycle::WriterCtx
+pub rcp::lifecycle::WriterCtx::via_discovery_stream: bool
+pub rcp::lifecycle::WriterCtx::via_non_unicast_frame: bool
+pub rcp::lifecycle::WriterCtx::via_owning_stream: bool
+pub rcp::lifecycle::WriterCtx::via_root_client_ep0: bool
+pub rcp::lifecycle::WriterCtx::via_valid_stream_association: bool
+impl core::clone::Clone for rcp::lifecycle::WriterCtx
+pub fn rcp::lifecycle::WriterCtx::clone(&self) -> Self
+impl core::cmp::Eq for rcp::lifecycle::WriterCtx
+impl core::cmp::PartialEq for rcp::lifecycle::WriterCtx
+pub fn rcp::lifecycle::WriterCtx::eq(&self, &Self) -> bool
+impl core::default::Default for rcp::lifecycle::WriterCtx
+pub fn rcp::lifecycle::WriterCtx::default() -> Self
+impl core::fmt::Debug for rcp::lifecycle::WriterCtx
+pub fn rcp::lifecycle::WriterCtx::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rcp::lifecycle::WriterCtx
+impl core::marker::StructuralPartialEq for rcp::lifecycle::WriterCtx
+impl core::marker::Freeze for rcp::lifecycle::WriterCtx
+impl core::marker::Send for rcp::lifecycle::WriterCtx
+impl core::marker::Sync for rcp::lifecycle::WriterCtx
+impl core::marker::Unpin for rcp::lifecycle::WriterCtx
+impl core::marker::UnsafeUnpin for rcp::lifecycle::WriterCtx
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::lifecycle::WriterCtx
+impl core::panic::unwind_safe::UnwindSafe for rcp::lifecycle::WriterCtx
+pub const rcp::lifecycle::DISCOVERY_BYTE_BUS_ID: u16
+pub fn rcp::lifecycle::check_field_writable(rcp::lifecycle::RcServerState, rcp::lifecycle::FieldKind, rcp::lifecycle::WriterCtx) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::lifecycle::check_field_writable_w_plus(rcp::lifecycle::RcServerState, rcp::lifecycle::WriterCtx, bool) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::lifecycle::check_hw_cfg(core::option::Option<&rcp::lifecycle::PlausibilitySnapshot<'_>>) -> core::result::Result<(), rcp::lifecycle::LifecycleError>
+pub fn rcp::lifecycle::check_rcp_cfg(core::option::Option<&rcp::lifecycle::PlausibilitySnapshot<'_>>) -> core::result::Result<(), rcp::lifecycle::LifecycleError>
 pub fn rcp::lifecycle::check_register_reachable(rcp::lifecycle::RcServerState, rcp::lifecycle::RegisterCategory) -> core::result::Result<(), rcp::RcpError>
 pub fn rcp::lifecycle::check_register_writable(rcp::lifecycle::RcServerState, rcp::lifecycle::RegisterCategory) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::lifecycle::is_field_writable(rcp::lifecycle::RcServerState, rcp::lifecycle::FieldKind, rcp::lifecycle::WriterCtx) -> bool
+pub fn rcp::lifecycle::is_field_writable_w_plus(rcp::lifecycle::RcServerState, rcp::lifecycle::WriterCtx, bool) -> bool
 pub fn rcp::lifecycle::is_register_reachable(rcp::lifecycle::RcServerState, rcp::lifecycle::RegisterCategory) -> bool
 pub fn rcp::lifecycle::is_register_writable(rcp::lifecycle::RcServerState, rcp::lifecycle::RegisterCategory) -> bool
 pub fn rcp::lifecycle::is_transition_defined(rcp::lifecycle::RcServerState, rcp::lifecycle::RcServerState) -> bool
 pub fn rcp::lifecycle::lock_policy(rcp::lifecycle::RegisterCategory) -> core::option::Option<rcp::lifecycle::LockPolicy>
+pub fn rcp::lifecycle::should_accept(rcp::lifecycle::RcServerState, bool, u8, u8, u16, rcp::lifecycle::TscfFallback) -> rcp::lifecycle::LifecycleAccept
 pub mod rcp::lin
 pub enum rcp::lin::LinRequest
 pub rcp::lin::LinRequest::ConfigWrite
@@ -2425,7 +2623,7 @@ pub fn rcp::mock::RcServer::new(rcp::regmap::GeneralRegisters) -> alloc::rcs::ar
 pub fn rcp::mock::RcServer::register_endpoint(&self, rcp::avtp::StreamId, u16, alloc::rcs::arc::Arc<dyn rcp::mock::Endpoint>) -> core::result::Result<rcp::addressing::EndpointId, rcp::RcpError>
 pub fn rcp::mock::RcServer::set_root_client(&self, core::option::Option<rcp::avtp::StreamId>)
 pub fn rcp::mock::RcServer::state(&self) -> rcp::lifecycle::RcServerState
-pub fn rcp::mock::RcServer::try_transition(&self, rcp::lifecycle::RcServerState, impl core::ops::function::FnOnce() -> bool) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::mock::RcServer::try_transition(&self, rcp::lifecycle::RcServerState, core::option::Option<&rcp::lifecycle::PlausibilitySnapshot<'_>>, rcp::lifecycle::WriterCtx, bool) -> core::result::Result<(), rcp::lifecycle::LifecycleError>
 impl !core::marker::Freeze for rcp::mock::RcServer
 impl core::marker::Send for rcp::mock::RcServer
 impl core::marker::Sync for rcp::mock::RcServer
@@ -2903,6 +3101,29 @@ impl core::marker::Unpin for rcp::regmap::EndpointType
 impl core::marker::UnsafeUnpin for rcp::regmap::EndpointType
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::regmap::EndpointType
 impl core::panic::unwind_safe::UnwindSafe for rcp::regmap::EndpointType
+#[repr(u8)] pub enum rcp::regmap::GeneralRegmapError
+pub rcp::regmap::GeneralRegmapError::BadMsgType = 2
+pub rcp::regmap::GeneralRegmapError::ShortFrame = 1
+pub rcp::regmap::GeneralRegmapError::WrongBus = 3
+pub rcp::regmap::GeneralRegmapError::WrongOp = 4
+impl core::clone::Clone for rcp::regmap::GeneralRegmapError
+pub fn rcp::regmap::GeneralRegmapError::clone(&self) -> Self
+impl core::cmp::Eq for rcp::regmap::GeneralRegmapError
+impl core::cmp::PartialEq for rcp::regmap::GeneralRegmapError
+pub fn rcp::regmap::GeneralRegmapError::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::regmap::GeneralRegmapError
+pub fn rcp::regmap::GeneralRegmapError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for rcp::regmap::GeneralRegmapError
+pub fn rcp::regmap::GeneralRegmapError::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for rcp::regmap::GeneralRegmapError
+impl core::marker::StructuralPartialEq for rcp::regmap::GeneralRegmapError
+impl core::marker::Freeze for rcp::regmap::GeneralRegmapError
+impl core::marker::Send for rcp::regmap::GeneralRegmapError
+impl core::marker::Sync for rcp::regmap::GeneralRegmapError
+impl core::marker::Unpin for rcp::regmap::GeneralRegmapError
+impl core::marker::UnsafeUnpin for rcp::regmap::GeneralRegmapError
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::regmap::GeneralRegmapError
+impl core::panic::unwind_safe::UnwindSafe for rcp::regmap::GeneralRegmapError
 pub struct rcp::regmap::CommonFunctionalConfig
 pub rcp::regmap::CommonFunctionalConfig::ep_clear_req_storage: bool
 pub rcp::regmap::CommonFunctionalConfig::ep_enable: bool
@@ -3020,6 +3241,23 @@ impl core::marker::Unpin for rcp::regmap::GeneralRegisters
 impl core::marker::UnsafeUnpin for rcp::regmap::GeneralRegisters
 impl core::panic::unwind_safe::RefUnwindSafe for rcp::regmap::GeneralRegisters
 impl core::panic::unwind_safe::UnwindSafe for rcp::regmap::GeneralRegisters
+pub struct rcp::regmap::GeneralWriteRejection
+pub rcp::regmap::GeneralWriteRejection::error: rcp::RcpError
+pub rcp::regmap::GeneralWriteRejection::transaction_num: u8
+impl core::clone::Clone for rcp::regmap::GeneralWriteRejection
+pub fn rcp::regmap::GeneralWriteRejection::clone(&self) -> Self
+impl core::cmp::PartialEq for rcp::regmap::GeneralWriteRejection
+pub fn rcp::regmap::GeneralWriteRejection::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rcp::regmap::GeneralWriteRejection
+pub fn rcp::regmap::GeneralWriteRejection::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::regmap::GeneralWriteRejection
+impl core::marker::Freeze for rcp::regmap::GeneralWriteRejection
+impl core::marker::Send for rcp::regmap::GeneralWriteRejection
+impl core::marker::Sync for rcp::regmap::GeneralWriteRejection
+impl core::marker::Unpin for rcp::regmap::GeneralWriteRejection
+impl core::marker::UnsafeUnpin for rcp::regmap::GeneralWriteRejection
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::regmap::GeneralWriteRejection
+impl core::panic::unwind_safe::UnwindSafe for rcp::regmap::GeneralWriteRejection
 pub struct rcp::regmap::HwPinMappingEntry
 pub rcp::regmap::HwPinMappingEntry::hw_ep_nr: u8
 pub rcp::regmap::HwPinMappingEntry::hw_ep_pin_nr: u8
@@ -3285,6 +3523,7 @@ pub fn rcp::regmap::check_functional_config_matches_ep_type(&rcp::regmap::PerEpC
 pub fn rcp::regmap::decode_rows<T: rcp::regmap::ConfigTableRow>(&[u8]) -> core::result::Result<alloc::vec::Vec<T>, rcp::RcpError>
 pub fn rcp::regmap::encode_rows<T: rcp::regmap::ConfigTableRow>(&[T]) -> alloc::vec::Vec<u8>
 pub fn rcp::regmap::functional_config_matches_ep_type(&rcp::regmap::PerEpConfigBlock, &rcp::regmap::PerEpTypeFunctionalConfig) -> bool
+pub fn rcp::regmap::general_decode_write_request(&[u8]) -> core::result::Result<rcp::regmap::GeneralWriteRejection, rcp::regmap::GeneralRegmapError>
 pub fn rcp::regmap::register_category(rcp::regmap::ConfigLayer) -> rcp::lifecycle::RegisterCategory
 pub mod rcp::relay
 pub enum rcp::relay::BackPressurePolicy

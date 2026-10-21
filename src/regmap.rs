@@ -1147,6 +1147,85 @@ impl GeneralRegisters {
     }
 }
 
+// ── General block write requests (TC18 Table 20: read-only) ─────────────────
+
+/// Why [`general_decode_write_request`] could not even recognize a
+/// General-block write request — c-RCP's `rcp_regmap_general_errc_t`
+/// (`c-RCP/include/rcp/regmap.h:1082`, `RCP_REGMAP_GENERAL_OK` expressed
+/// as `Ok`). Discriminants match c-RCP's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+//fusa:req REQ-RMAP-037
+pub enum GeneralRegmapError {
+    /// Shorter than the ACF_ABB header or its declared length.
+    ShortFrame = 1,
+    /// Not a well-formed ACF_ABB message.
+    BadMsgType = 2,
+    /// `byte_bus_id` is not EP0.
+    WrongBus = 3,
+    /// `op` is not a write.
+    WrongOp = 4,
+}
+
+/// A recognized General-block write request and the wire error it must be
+/// answered with.
+#[derive(Debug, Clone, PartialEq)]
+//fusa:req REQ-RMAP-037
+pub struct GeneralWriteRejection {
+    /// Always [`RcpError::LockedMemAccess`].
+    pub error: RcpError,
+    /// The request's `transaction_num`, for building the error response.
+    pub transaction_num: u8,
+}
+
+/// Decode an ACF_ABB write request addressed to EP0 targeting the TC18
+/// §12.7.5 Table 20 General block — a port of c-RCP's
+/// `rcp_regmap_general_decode_write_request` (`c-RCP/src/regmap.c:262`).
+///
+/// Every Table 20 register is access type `R`, so this never applies a
+/// write. It only recognizes one and reports the wire error to answer it
+/// with: always [`RcpError::LockedMemAccess`], derived from
+/// [`crate::lifecycle::check_field_writable`] with
+/// [`crate::lifecycle::FieldKind::ReadOnly`]. That result does not depend
+/// on state or writer. Returns a [`GeneralRegmapError`] if the frame is
+/// malformed, not EP0-addressed, or not a write. Never panics.
+///
+/// c-RCP parity: `c-RCP/src/regmap.c:283` — TC18 RC5 does not say which
+/// Table 27 code answers a write to an `R` register. c-RCP picks
+/// `LOCKED_MEM_ACCESS` regardless of writer, and so does this crate. A
+/// non-root writer gets `LOCKED_MEM_ACCESS` too, not
+/// `UNAUTHORIZED_ACCESS`.
+//fusa:req REQ-RMAP-037
+pub fn general_decode_write_request(b: &[u8]) -> Result<GeneralWriteRejection, GeneralRegmapError> {
+    use crate::lifecycle::{check_field_writable, FieldKind, RcServerState, WriterCtx};
+
+    // c-RCP's `rcp_acf_decode_abb` (`c-RCP/src/acf.c:400`) reports
+    // `acf_msg_length * 4 < 8` and `pad > body_len` as SHORT_FRAME, where
+    // `crate::acf` reports them as `InvalidSize`; both map to `ShortFrame`.
+    let msg = crate::acf::decode_acf_abb(b).map_err(|e| match e {
+        RcpError::ShortFrame | RcpError::InvalidSize => GeneralRegmapError::ShortFrame,
+        _ => GeneralRegmapError::BadMsgType,
+    })?;
+    if msg.info.byte_bus_id != crate::ep0::EP0_BYTE_BUS_ID {
+        return Err(GeneralRegmapError::WrongBus);
+    }
+    if !msg.info.op {
+        return Err(GeneralRegmapError::WrongOp);
+    }
+    let error = match check_field_writable(
+        RcServerState::RcpConfigured,
+        FieldKind::ReadOnly,
+        WriterCtx::default(),
+    ) {
+        Err(e) => e,
+        Ok(()) => RcpError::LockedMemAccess,
+    };
+    Ok(GeneralWriteRejection {
+        error,
+        transaction_num: msg.info.transaction_num,
+    })
+}
+
 // ── ConfigTableRow / encode_rows / decode_rows ────────────────────────────────
 
 /// Shared row-codec contract for this module's five `§3.7`-`§3.11` child
@@ -1907,6 +1986,92 @@ impl ConfigTableRow for SequencerStateEntry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── General block write requests (c-RCP golden frame) ───────────────
+
+    /// `GENWR_FRAME` from `testdata/c_rcp_lifecycle_golden.txt`: c-RCP's
+    /// `rcp_acf_encode_abb` output for an EP0 write, transaction_num 0x5A,
+    /// payload 01 02 03 04.
+    const C_RCP_GENWR_FRAME: [u8; 12] = [
+        0x1C, 0x03, 0x00, 0x00, 0x00, 0x5A, 0x80, 0x00, 0x01, 0x02, 0x03, 0x04,
+    ];
+
+    #[test]
+    //fusa:test REQ-RMAP-037
+    fn general_write_request_is_locked_mem_access_like_c_rcp() {
+        let golden = include_str!("../testdata/c_rcp_lifecycle_golden.txt");
+        assert!(golden.contains("GENWR_FRAME 1C030000005A800001020304"));
+        // c-RCP: GENWR 0 <LOCKED_MEM_ACCESS> 0x5A
+        assert!(golden.contains("GENWR 0 4 0x5A"));
+        let r = general_decode_write_request(&C_RCP_GENWR_FRAME).unwrap();
+        assert_eq!(r.error, RcpError::LockedMemAccess);
+        assert_eq!(r.error.tc18_wire_code(), Some(4));
+        assert_eq!(r.transaction_num, 0x5A);
+    }
+
+    #[test]
+    //fusa:test REQ-RMAP-037
+    fn general_write_request_rejects_malformed_read_and_wrong_bus_like_c_rcp() {
+        // c-RCP: GENWR_SHORT 1
+        assert_eq!(
+            general_decode_write_request(&C_RCP_GENWR_FRAME[..4]),
+            Err(GeneralRegmapError::ShortFrame)
+        );
+        // c-RCP: GENWR_READ 4 (op bit cleared)
+        let mut read = C_RCP_GENWR_FRAME;
+        read[6] &= !0x80;
+        assert_eq!(
+            general_decode_write_request(&read),
+            Err(GeneralRegmapError::WrongOp)
+        );
+        // c-RCP: GENWR_BUS 3 (byte_bus_id 1)
+        let mut bus = C_RCP_GENWR_FRAME;
+        bus[3] = 0x01;
+        assert_eq!(
+            general_decode_write_request(&bus),
+            Err(GeneralRegmapError::WrongBus)
+        );
+        // c-RCP: GENWR_GBB 2 (an ACF_GBB message type is not an ABB)
+        let mut gbb = C_RCP_GENWR_FRAME;
+        gbb[0] = (crate::acf::ACF_GBB_MSG_TYPE << 1) | (gbb[0] & 1);
+        assert_eq!(
+            general_decode_write_request(&gbb),
+            Err(GeneralRegmapError::BadMsgType)
+        );
+    }
+
+    #[test]
+    //fusa:test REQ-RMAP-037
+    fn general_write_request_bad_length_or_pad_is_short_frame_like_c_rcp() {
+        let golden = include_str!("../testdata/c_rcp_lifecycle_golden.txt");
+        let c_rcp = |key: &str| -> u8 {
+            golden
+                .lines()
+                .find_map(|l| l.strip_prefix(key)?.strip_prefix(' '))
+                .unwrap_or_else(|| panic!("{key} missing from golden"))
+                .trim()
+                .parse()
+                .unwrap()
+        };
+        let rust = |f: &[u8]| general_decode_write_request(f).unwrap_err() as u8;
+        // acf_msg_length 0 and 1: declared total shorter than the header.
+        let mut m = C_RCP_GENWR_FRAME;
+        m[1] = 0x00;
+        assert_eq!(rust(&m), c_rcp("GENWR_LEN0"));
+        assert_eq!(rust(&m), GeneralRegmapError::ShortFrame as u8);
+        m[1] = 0x01;
+        assert_eq!(rust(&m), c_rcp("GENWR_LEN1"));
+        // acf_msg_length 2 (header only) with pad 1 > body_len 0.
+        m[1] = 0x02;
+        m[2] |= 0x40;
+        assert_eq!(rust(&m), c_rcp("GENWR_PAD"));
+        assert_eq!(rust(&m), GeneralRegmapError::ShortFrame as u8);
+        // Truncated and wrong message type agree too.
+        assert_eq!(rust(&C_RCP_GENWR_FRAME[..4]), c_rcp("GENWR_SHORT"));
+        let mut gbb = C_RCP_GENWR_FRAME;
+        gbb[0] = (crate::acf::ACF_GBB_MSG_TYPE << 1) | (gbb[0] & 1);
+        assert_eq!(rust(&gbb), c_rcp("GENWR_GBB"));
+    }
 
     const ALL_ENDPOINT_TYPES: [EndpointType; 13] = [
         EndpointType::Wakeup,
