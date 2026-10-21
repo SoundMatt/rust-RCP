@@ -330,28 +330,35 @@ impl L2Transport {
     /// Dropped: frames that are too short or not EtherType
     /// [`ETHERTYPE_AVTP`] (c-RCP `src/l2.c:228-237`: dropped and re-polled,
     /// not surfaced as an error); frames whose source MAC is this
-    /// transport's own `src_mac` (our own transmission looped back — the
-    /// transport-level counterpart of c-RCP `src/l2.c:226`'s
-    /// `PACKET_OUTGOING` drop, which also covers sockets with no `pkttype`
-    /// metadata, e.g. a mock or a multicast `dest_mac` the kernel loops
-    /// back); and frames whose destination is neither this host's
-    /// `src_mac` nor, when `dest_mac` is a group (multicast/broadcast)
-    /// address, that configured `dest_mac`.
+    /// transport's own `src_mac` (our own transmission looped back, e.g.
+    /// by a mock socket with no `pkttype` metadata or a multicast
+    /// `dest_mac` the kernel loops back); and frames whose destination is
+    /// a unicast MAC other than this host's `src_mac`. Every group
+    /// (multicast or broadcast) destination is admitted, whatever
+    /// `dest_mac` is: which groups reach this socket is left to the
+    /// kernel's own multicast membership, as in c-RCP. A c-RCP responder
+    /// replies to its own configured `dst_mac` (c-RCP `src/l2.c:150,158`),
+    /// which may be broadcast or a group even when this client addresses
+    /// that peer by its unicast MAC.
     ///
-    /// c-RCP parity: c-RCP `src/l2.c` `l2_avtp_recv()` has no explicit
-    /// destination-MAC check and relies on the NIC/kernel address filter
-    /// alone (which already discards `PACKET_OTHERHOST` frames unless the
-    /// interface is promiscuous); the explicit check here (rust-RCP#206)
-    /// only drops frames c-RCP's kernel filter would also have dropped on
-    /// a non-promiscuous interface, so wire interop is unchanged.
+    /// c-RCP parity: c-RCP `src/l2.c` `l2_avtp_recv()` (lines 186-250)
+    /// has no source-MAC or destination-MAC check at all; it drops only
+    /// `PACKET_OUTGOING` (line 226) and non-AVTP/short frames (228-237).
+    /// Two rust-only checks (rust-RCP#206) diverge from it: (1) the
+    /// own-`src_mac` source drop, which on a real socket only removes
+    /// frames c-RCP also drops (another socket's transmission on the same
+    /// interface is also `PACKET_OUTGOING`) and otherwise covers sockets
+    /// without `pkttype` metadata; (2) the drop of unicast frames for
+    /// another host, which a non-promiscuous interface never delivers
+    /// (`PACKET_OTHERHOST`) but which c-RCP would accept on a promiscuous
+    /// interface. Neither check drops any broadcast or multicast frame
+    /// c-RCP would accept.
     fn accept_response<'a>(&self, frame: &'a [u8]) -> Option<&'a [u8]> {
         let (dest, src, avtpdu) = decode_ethernet_frame(frame).ok()?;
         if src == self.src_mac {
             return None;
         }
-        let to_this_host = dest == self.src_mac;
-        let to_configured_group = !mac_is_unicast(self.dest_mac) && dest == self.dest_mac;
-        if to_this_host || to_configured_group {
+        if dest == self.src_mac || !mac_is_unicast(dest) {
             Some(avtpdu)
         } else {
             None
@@ -366,7 +373,9 @@ impl L2Transport {
     /// elapsed. Socket errors propagate unchanged.
     //fusa:req REQ-L2-010
     fn recv_avtpdu(&self, timeout: Option<Duration>) -> Result<Vec<u8>, RcpError> {
-        let deadline = timeout.map(|d| Instant::now() + d);
+        // `checked_add`: a huge timeout (e.g. `Duration::MAX`) means no
+        // deadline rather than an `Instant` overflow panic.
+        let deadline = timeout.and_then(|d| Instant::now().checked_add(d));
         loop {
             let remaining = match deadline {
                 Some(dl) => {
@@ -544,7 +553,7 @@ mod raw_socket {
         //fusa:req REQ-L2-009
         fn recv(&self, timeout: Option<Duration>) -> Result<Vec<u8>, RcpError> {
             let deadline = match timeout {
-                Some(d) if !d.is_zero() => Some(Instant::now() + d),
+                Some(d) if !d.is_zero() => Instant::now().checked_add(d),
                 _ => None,
             };
             let mut buf = [0u8; 65535];
@@ -971,21 +980,55 @@ mod tests {
         wrong_ethertype[13] = 0x00;
         let short = vec![0u8; 13];
         let other_host = abb_response_frame([0x02, 0, 0, 0, 0, 0x99], DEST_MAC, 7);
-        // Group-addressed, but not our configured dest_mac (which is
-        // unicast here): dropped.
-        let foreign_group = abb_response_frame([0x01, 0x00, 0x5E, 0, 0, 1], DEST_MAC, 7);
         let good = abb_response_frame(SRC_MAC, DEST_MAC, 7);
-        let socket = QueuedL2::with_inbound(vec![
-            wrong_ethertype,
-            short,
-            other_host,
-            foreign_group,
-            good,
-        ]);
+        let socket = QueuedL2::with_inbound(vec![wrong_ethertype, short, other_host, good]);
         let transport = L2Transport::new(local_stream(), socket.clone(), DEST_MAC, SRC_MAC);
         let resp = transport.send_acf_abb(&request(7), 0, None).unwrap();
         assert_eq!(resp.payload, vec![0xC3]);
         assert!(socket.inbound.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    //fusa:test REQ-L2-010
+    fn l2_transport_accepts_broadcast_reply_under_unicast_dest_mac() {
+        // A c-RCP responder replies to its own configured dst_mac (c-RCP
+        // src/l2.c:150,158), here broadcast, while this client addresses
+        // it by its unicast MAC: the reply must be admitted, as c-RCP's
+        // l2_avtp_recv() admits it. Mutation-sensitive: dropping group
+        // destinations that differ from dest_mac makes this fail.
+        let socket = QueuedL2::with_inbound(vec![abb_response_frame([0xFF; 6], DEST_MAC, 7)]);
+        let transport = L2Transport::new(local_stream(), socket, DEST_MAC, SRC_MAC);
+        let resp = transport
+            .send_acf_abb(&request(7), 0, Some(Duration::from_secs(1)))
+            .unwrap();
+        assert!(resp.info.rsp);
+        assert_eq!(resp.payload, vec![0xC3]);
+    }
+
+    #[test]
+    //fusa:test REQ-L2-010
+    fn l2_transport_accepts_any_group_reply_leaving_membership_to_the_kernel() {
+        // A multicast group other than dest_mac (unicast here) is
+        // admitted: group membership filtering is the kernel's job, as in
+        // c-RCP.
+        let group = [0x01, 0x00, 0x5E, 0, 0, 1];
+        let socket = QueuedL2::with_inbound(vec![abb_response_frame(group, DEST_MAC, 7)]);
+        let transport = L2Transport::new(local_stream(), socket, DEST_MAC, SRC_MAC);
+        let resp = transport.send_acf_abb(&request(7), 0, None).unwrap();
+        assert!(resp.info.rsp);
+    }
+
+    #[test]
+    //fusa:test REQ-L2-010
+    fn l2_transport_huge_timeout_does_not_overflow_the_deadline() {
+        // `Instant::now() + Duration::MAX` would panic; it must instead
+        // mean "no deadline".
+        let socket = QueuedL2::with_inbound(vec![abb_response_frame(SRC_MAC, DEST_MAC, 7)]);
+        let transport = L2Transport::new(local_stream(), socket, DEST_MAC, SRC_MAC);
+        let resp = transport
+            .send_acf_abb(&request(7), 0, Some(Duration::MAX))
+            .unwrap();
+        assert!(resp.info.rsp);
     }
 
     #[test]

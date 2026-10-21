@@ -5559,8 +5559,8 @@
     },
     {
       "id": "REQ-L2-010",
-      "title": "L2Transport admits only responses addressed to this host or its configured group address",
-      "text": "L2Transport::send_acf_abb/send_acf_gbb shall drop and re-poll past, within the caller's single overall timeout, every received frame that is too short or not EtherType 0x22F0, whose source MAC is this transport's own src_mac (its own transmission looped back), or whose destination MAC is neither this transport's src_mac nor, when dest_mac is a group (multicast/broadcast) address, that configured dest_mac; Err(RcpError::Timeout) is returned once the timeout elapses with no admitted frame",
+      "title": "L2Transport admits only responses addressed to this host or to a group address",
+      "text": "L2Transport::send_acf_abb/send_acf_gbb shall drop and re-poll past, within the caller's single overall timeout, every received frame that is too short or not EtherType 0x22F0, whose source MAC is this transport's own src_mac (its own transmission looped back), or whose destination MAC is a unicast address other than this transport's src_mac (every group, i.e. multicast or broadcast, destination is admitted regardless of dest_mac, group filtering being left to the kernel as in c-RCP src/l2.c:186-250); Err(RcpError::Timeout) is returned once the timeout elapses with no admitted frame",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
