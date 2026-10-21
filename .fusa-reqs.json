@@ -6282,7 +6282,7 @@
       "status": "implemented"
     },
     {
-      "id": "REQ-WIREERR-006",
+      "id": "REQ-WIREERR-007",
       "title": "RcpError::tc18_wire_code maps CrcError to POCI_FAILURE (12), as c-RCP maps a CRC mismatch",
       "text": "RcpError::tc18_wire_code shall return Some(12) (POCI_FAILURE) for RcpError::CrcError -- the code the governing spec's own numbered error-code table assigns a CRC mismatch, mirroring c-RCP's rcp_e2e_wire_error() (src/e2e.c:28-34) -- so a CRC-32 safe-point failure produces a real err=1 response via build_error_response.",
       "standard": "iso26262",
@@ -6295,7 +6295,7 @@
       "status": "implemented"
     },
     {
-      "id": "REQ-SRV-016",
+      "id": "REQ-SRV-043",
       "title": "evt_requests_acknowledge detects evt[3] and build_acknowledge_response builds a §11.3.1 Acknowledge",
       "text": "evt_requests_acknowledge(evt) shall return true iff evt[3] (0x08) is set, TC18 §13.5's endpoint-type-independent acknowledge-request bit; build_acknowledge_response(byte_bus_id, transaction_num) shall build an ACF_ABB Acknowledge with evt = 0xF, err = 0, rsp = 1, op = 1 and no byte_msg_payload, byte-identical to c-RCP's rcp_acf_build_acknowledge_response() (src/acf.c:316-336). Dispatch wiring is a separate item.",
       "standard": "iso26262",
@@ -6308,7 +6308,7 @@
       "status": "implemented"
     },
     {
-      "id": "REQ-ACF-033",
+      "id": "REQ-ACF-055",
       "title": "build_acknowledge_rejected_response builds TC18 §11.3.1's Acknowledge-shaped storage-admission-rejection response",
       "text": "build_acknowledge_rejected_response(byte_bus_id, transaction_num, error) shall build an ACF_ABB message with evt = 0xF, err = 1, rsp = 1, op = 1 and a one-octet byte_msg_payload equal to error's Table 30 wire code, classifying as ResponseKind::Acknowledge, byte-identical to c-RCP's rcp_acf_build_acknowledge_rejected_response() (src/acf.c:338-357); it returns None when error has no Table 30 wire code.",
       "standard": "iso26262",
@@ -6321,7 +6321,7 @@
       "status": "implemented"
     },
     {
-      "id": "REQ-ACF-050",
+      "id": "REQ-ACF-056",
       "title": "header_is_request identifies a decoded message as a request, not a response",
       "text": "header_is_request(info) shall return true iff info's rsp bit is 0; a received message whose rsp bit is set shall not be admitted as a request, per TC18 §11.3's rsp=1b response marker.",
       "standard": "iso26262",
@@ -9171,6 +9171,17 @@
       "id": "REQ-AVTP-028",
       "title": "Loopback transport recv rejects after close once queued frames are exhausted",
       "text": "After LoopbackTransport::close has been called, recv_frame shall return Closed once any already-queued frames are exhausted, and close shall wake any receiver blocked in recv_frame (c-RCP REQ-AVTP-028).",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "scope": "implementation",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-UDP-015",
+      "title": "UdpAvtpTransport::dial connects a UDP socket to a fixed peer",
+      "text": "UdpAvtpTransport::dial(host, port, tss) shall create a UDP socket and connect it to the IPv4 host:port, returning an AvtpTransport over it, and shall return Err(Other) for a non-IPv4 host or a socket/connect failure (c-RCP REQ-UDP-001/003, src/udp.c:296-324).",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",

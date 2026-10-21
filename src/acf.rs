@@ -1098,14 +1098,14 @@ fn fresh_response_info(
 
 /// `evt[3]`, TC18 §13.5's acknowledge-request bit: "`evt[3]=1` requests
 /// acknowledge" (TC18.txt line 4072).
-//fusa:req REQ-SRV-016
+//fusa:req REQ-SRV-043
 pub const EVT_ACK_REQUEST_BIT: u8 = 0x08;
 
 /// True iff a request's raw 4-bit `evt` nibble sets `evt[3]`, TC18 §13.5's
 /// endpoint-type-independent acknowledge-request bit. Mirrors c-RCP's
 /// `rcp_acf_evt_requests_acknowledge()` (`src/acf.c:316`). For a decoded
 /// header, pass `info.evt.raw_nibble()`.
-//fusa:req REQ-SRV-016
+//fusa:req REQ-SRV-043
 pub fn evt_requests_acknowledge(evt: u8) -> bool {
     evt & EVT_ACK_REQUEST_BIT != 0
 }
@@ -1120,7 +1120,7 @@ pub fn evt_requests_acknowledge(evt: u8) -> bool {
 /// c-RCP parity: as in [`build_error_response`], `op` is always `1`
 /// (c-RCP `RCP_ACF_OP_NONE`, `acf.c:331`), not mirrored from the request
 /// as TC18 RC5 Table 17 says.
-//fusa:req REQ-SRV-016
+//fusa:req REQ-SRV-043
 pub fn build_acknowledge_response(byte_bus_id: u16, transaction_num: u8) -> AcfAbbMessage {
     AcfAbbMessage {
         info: fresh_response_info(
@@ -1147,7 +1147,7 @@ pub fn build_acknowledge_response(byte_bus_id: u16, transaction_num: u8) -> AcfA
 ///
 /// c-RCP parity: `op` is always `1` (c-RCP `RCP_ACF_OP_NONE`,
 /// `acf.c:348`), not mirrored from the request as TC18 RC5 Table 17 says.
-//fusa:req REQ-ACF-033
+//fusa:req REQ-ACF-055
 pub fn build_acknowledge_rejected_response(
     byte_bus_id: u16,
     transaction_num: u8,
@@ -1165,7 +1165,7 @@ pub fn build_acknowledge_rejected_response(
 /// True iff `info` is a request, i.e. its `rsp` bit is 0 (TC18 §11.2.1
 /// Table 4; Table 17's `rsp = 1b` marks a response). Mirrors c-RCP's
 /// `rcp_acf_header_is_request()` (`src/acf.c:206`).
-//fusa:req REQ-ACF-050
+//fusa:req REQ-ACF-056
 pub fn header_is_request(info: &ByteMessageInfo) -> bool {
     !info.rsp
 }
@@ -2364,7 +2364,7 @@ mod tests {
     }
 
     #[test]
-    //fusa:test REQ-WIREERR-006
+    //fusa:test REQ-WIREERR-007
     fn crc_failure_produces_a_poci_failure_error_response() {
         // #175: corrupt the CRC and expect a wire error response.
         let coverage = [0x01u8, 0x02, 0x03, 0x04];
@@ -2378,7 +2378,7 @@ mod tests {
     }
 
     #[test]
-    //fusa:test REQ-SRV-016
+    //fusa:test REQ-SRV-043
     fn evt_requests_acknowledge_is_evt_bit_3_like_c_rcp() {
         for evt in 0u8..16 {
             assert_eq!(evt_requests_acknowledge(evt), evt >= 8, "evt {evt:#x}");
@@ -2388,7 +2388,7 @@ mod tests {
     }
 
     #[test]
-    //fusa:test REQ-SRV-016
+    //fusa:test REQ-SRV-043
     fn build_acknowledge_response_matches_c_rcp_bytes() {
         let ack = build_acknowledge_response(0x123, 0x42);
         assert!(ack.payload.is_empty());
@@ -2398,7 +2398,7 @@ mod tests {
     }
 
     #[test]
-    //fusa:test REQ-ACF-033
+    //fusa:test REQ-ACF-055
     fn build_acknowledge_rejected_response_matches_c_rcp_bytes() {
         let rej =
             build_acknowledge_rejected_response(0x7FF, 0x07, &RcpError::ReqStorageOvfl).unwrap();
@@ -2412,7 +2412,7 @@ mod tests {
     }
 
     #[test]
-    //fusa:test REQ-ACF-050
+    //fusa:test REQ-ACF-056
     fn header_is_request_is_rsp_clear() {
         let mut info = sample_info();
         info.rsp = false;
