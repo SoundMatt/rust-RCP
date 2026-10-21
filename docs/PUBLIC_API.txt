@@ -1231,6 +1231,32 @@ impl<'a> core::marker::Unpin for rcp::e2e::AcfCoverageMessage<'a>
 impl<'a> core::marker::UnsafeUnpin for rcp::e2e::AcfCoverageMessage<'a>
 impl<'a> core::panic::unwind_safe::RefUnwindSafe for rcp::e2e::AcfCoverageMessage<'a>
 impl<'a> core::panic::unwind_safe::UnwindSafe for rcp::e2e::AcfCoverageMessage<'a>
+pub enum rcp::e2e::E2eError
+pub rcp::e2e::E2eError::CrcMismatch
+pub rcp::e2e::E2eError::CrcMismatch::acf_frame: alloc::vec::Vec<u8>
+pub rcp::e2e::E2eError::ShortFrame
+impl rcp::e2e::E2eError
+pub fn rcp::e2e::E2eError::code(&self) -> u8
+pub fn rcp::e2e::E2eError::strerror(&self) -> &'static str
+pub fn rcp::e2e::E2eError::wire_error(&self) -> core::option::Option<rcp::RcpError>
+impl core::clone::Clone for rcp::e2e::E2eError
+pub fn rcp::e2e::E2eError::clone(&self) -> Self
+impl core::cmp::Eq for rcp::e2e::E2eError
+impl core::cmp::PartialEq for rcp::e2e::E2eError
+pub fn rcp::e2e::E2eError::eq(&self, &Self) -> bool
+impl core::error::Error for rcp::e2e::E2eError
+impl core::fmt::Debug for rcp::e2e::E2eError
+pub fn rcp::e2e::E2eError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rcp::e2e::E2eError
+pub fn rcp::e2e::E2eError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rcp::e2e::E2eError
+impl core::marker::Freeze for rcp::e2e::E2eError
+impl core::marker::Send for rcp::e2e::E2eError
+impl core::marker::Sync for rcp::e2e::E2eError
+impl core::marker::Unpin for rcp::e2e::E2eError
+impl core::marker::UnsafeUnpin for rcp::e2e::E2eError
+impl core::panic::unwind_safe::RefUnwindSafe for rcp::e2e::E2eError
+impl core::panic::unwind_safe::UnwindSafe for rcp::e2e::E2eError
 pub enum rcp::e2e::FragmentCrcExpectation
 pub rcp::e2e::FragmentCrcExpectation::Expected
 pub rcp::e2e::FragmentCrcExpectation::NotExpected
@@ -1275,11 +1301,22 @@ pub const rcp::e2e::CRC_TRAILER_QUADLETS: u16
 pub fn rcp::e2e::build_crc32_coverage_buffer(&rcp::avtp::HeaderVariant, &rcp::e2e::AcfCoverageMessage<'_>) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::e2e::build_crc32_coverage_buffer_for_fragment_train(&rcp::avtp::HeaderVariant, &rcp::e2e::AcfCoverageMessage<'_>, &[&[u8]]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub fn rcp::e2e::check_fragment_crc_placement(bool, bool) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::e2e::compute_crc(u8, u8, bool, u64, u32, &[u8]) -> u32
+pub fn rcp::e2e::compute_fragmented_crc(u8, u8, bool, u64, u32, &[u8], &[u8]) -> u32
 pub fn rcp::e2e::crc32_tc18(&[u8]) -> u32
 pub fn rcp::e2e::crc32_tc18_for_fragment_train(&rcp::avtp::HeaderVariant, &rcp::e2e::AcfCoverageMessage<'_>, &[&[u8]]) -> core::result::Result<u32, rcp::RcpError>
+pub fn rcp::e2e::data_length_for_protected_members(usize) -> usize
 pub fn rcp::e2e::finalize_crc_trailer(&mut alloc::vec::Vec<u8>, u32) -> core::result::Result<(), rcp::RcpError>
+pub fn rcp::e2e::fragment_carries_crc(bool) -> bool
 pub fn rcp::e2e::fragment_crc_expectation(bool) -> rcp::e2e::FragmentCrcExpectation
+pub fn rcp::e2e::length_with_crc(usize) -> usize
 pub fn rcp::e2e::split_crc_trailer(&[u8]) -> core::result::Result<(alloc::vec::Vec<u8>, u32), rcp::RcpError>
+pub fn rcp::e2e::unwrap(u8, u8, bool, u64, u32, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::e2e::E2eError>
+pub fn rcp::e2e::unwrap_for_header(&rcp::avtp::HeaderVariant, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::e2e::E2eError>
+pub fn rcp::e2e::unwrap_framed(u64, bool, u8, bool, u32, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::e2e::E2eError>
+pub fn rcp::e2e::wrap(u8, u8, bool, u64, u32, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::e2e::wrap_for_header(&rcp::avtp::HeaderVariant, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
+pub fn rcp::e2e::wrap_framed(u64, bool, u8, bool, u32, &[u8]) -> core::result::Result<alloc::vec::Vec<u8>, rcp::RcpError>
 pub mod rcp::ep0
 pub enum rcp::ep0::Ep0AccessKind
 pub rcp::ep0::Ep0AccessKind::Read

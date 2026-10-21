@@ -100,29 +100,18 @@
 //! `acf_msg_length` counts **quadlets over the entire ACF message** —
 //! header (+ `message_timestamp` for ACF_GBB) + payload + pad, rounded up
 //! to whole quadlets — not payload-only and not octets. This is confirmed
-//! by the specification's own two worked examples (Figure 19: a single
-//! ACF_ABB with an 8-byte header + 6 payload bytes + 2 pad bytes + 4-byte
-//! CRC32 trailer = 20 bytes = 5 quadlets, `acf_msg_length = 0x05`;
-//! Figure 20: a single ACF_GBB with an 8-byte header + 8-byte timestamp +
-//! 7 payload bytes + 1 pad byte + 4-byte CRC32 trailer = 28 bytes =
-//! 7 quadlets, `acf_msg_length = 0x07`). Both figures' real wire byte
-//! order — header (+ `message_timestamp`), payload, `pad`, THEN the CRC32
-//! trailer, pad strictly *before* the CRC — is pinned byte-for-byte by
-//! [`crate::e2e::finalize_crc_trailer`]'s own golden-vector tests
-//! (`finalize_crc_trailer_matches_figure_19_worked_example`/
-//! `finalize_crc_trailer_matches_figure_20_worked_example`), not here: this
-//! module's own `encode_acf_abb`/`encode_acf_gbb` have no CRC-trailer
-//! concept of their own (see the "acf_msg_length quadlet semantics" note
-//! below), so a byte-for-byte CRC-inclusive worked-example test belongs
-//! with the module that actually assembles a CRC-protected frame out of
-//! them, not here. An earlier revision of this module pinned both figures
-//! locally instead, by concatenating `payload + crc_bytes` into one blob
-//! before calling `encode_acf_abb`/`encode_acf_gbb` — which put the
-//! encoder's own automatic `pad` after the CRC instead of before it (the
-//! reversed, non-conformant order) while still passing, since it only
-//! checked total length/quadlet-count/pad-count, all of which stay
-//! identical either way. See `crate::e2e`'s "CRC trailer wire placement"
-//! doc section for the fix and the full explanation.
+//! by the specification's own two worked examples (TC18 RC5 Figure 20: a
+//! single ACF_ABB with an 8-byte header + 6 payload bytes + 4-byte CRC32
+//! trailer + 2 pad bytes = 20 bytes = 5 quadlets, `acf_msg_length = 0x05`;
+//! Figure 21: a single ACF_GBB with an 8-byte header + 8-byte timestamp +
+//! 5 payload bytes + 4-byte CRC32 trailer + 3 pad bytes = 28 bytes =
+//! 7 quadlets, `acf_msg_length = 0x07`). Both figures' wire order —
+//! header (+ `message_timestamp`), payload, CRC32, THEN `pad` — is pinned
+//! by [`crate::e2e`]'s `finalize_crc_trailer_matches_figure_20_layout`/
+//! `_figure_21_layout` tests and its c-RCP golden vectors, not here: this
+//! module's encoders have no CRC-trailer concept of their own (see the
+//! "acf_msg_length quadlet semantics" note below); [`crate::e2e::wrap`]
+//! adds the trailer to their output.
 //!
 //! ## Provenance note
 //!
@@ -611,25 +600,11 @@ pub const ACF_GBB_HEADER_LEN: usize = BYTE_MESSAGE_INFO_LEN + 8;
 // `payload` itself — this module has no separate CRC-trailer field of its
 // own (CRC computation itself lives in `crate::e2e`).
 //
-// TC18.txt citation-drift note (issue #164 batch 1): the current TC18.txt
-// revision renumbers and re-paginates these two worked examples as Figure
-// 20 ("ACF_ABB under TSCF header (example)", caption at TC18.txt line
-// 4231) and Figure 21 ("ACF_GBB under NTSCF header (example)", caption at
-// line ~4256) rather than Figure 19/Figure 20. The ACF_ABB example's own
-// numbers (6 payload + 2 pad + 4-byte CRC32 = 20 bytes = 5 quadlets) are
-// confirmed unchanged under its new Figure 20 label. The ACF_GBB example
-// now shows a *different* split of the same 28-byte/7-quadlet total (5
-// payload + 3 pad, CRC32 still 4 bytes split 3+1 across quadlets, vs. the
-// 7 payload + 1 pad this comment states) — TC18.txt carries a `Commented
-// [BE39]: 051RC4 - text and figure updated` marker immediately after it,
-// so this is a genuine content revision, not just a renumbering. The
-// `acf_msg_length = 0x07` total this crate's logic actually depends on is
-// unaffected either way. This module's own doc comments and
-// `crate::e2e`'s `finalize_crc_trailer_matches_figure_19_worked_example`/
-// `_figure_20_worked_example` test names deliberately still say "Figure
-// 19"/"Figure 20" throughout — renumbering them is left for a follow-up
-// that also renames those `crate::e2e` test functions, rather than mixing
-// old and new figure numbers across the two files.
+// TC18 RC5 numbers these worked examples Figure 20 (ACF_ABB under TSCF:
+// 6 payload + CRC32 + 2 pad = 20 bytes = 5 quadlets) and Figure 21
+// (ACF_GBB under NTSCF: 5 payload + CRC32 + 3 pad = 28 bytes = 7
+// quadlets); `crate::e2e`'s `finalize_crc_trailer_matches_figure_20_layout`/
+// `_figure_21_layout` tests pin both.
 
 /// Number of bytes in one quadlet — the unit `acf_msg_length` counts in.
 pub const QUADLET_LEN: usize = 4;
@@ -2291,19 +2266,10 @@ mod tests {
         );
     }
 
-    // ── Golden vectors: TC18 Figure 19 / Figure 20 worked examples ──────────
+    // ── Golden vectors: TC18 RC5 Figure 20 / Figure 21 worked examples ──────
     //
-    // Moved to `crate::e2e` (`finalize_crc_trailer_matches_figure_19_worked_example`/
-    // `finalize_crc_trailer_matches_figure_20_worked_example`) and
-    // strengthened to pin the ACTUAL byte sequence, not just totals. This
-    // module's own `encode_acf_abb`/`encode_acf_gbb` have no CRC-trailer
-    // concept of their own (see the "acf_msg_length quadlet semantics" note
-    // above), so a worked example that includes the CRC trailer belongs
-    // with the module that actually assembles a CRC-protected frame —
-    // see `crate::e2e`'s "CRC trailer wire placement" doc section for why
-    // the two tests that used to live here (concatenating `payload +
-    // crc_bytes` into one blob before calling `encode_acf_abb`/
-    // `encode_acf_gbb`) produced the wrong, reversed `payload, CRC, pad`
-    // wire order while still passing — they only checked total length,
-    // quadlet count, and pad count, all of which are identical either way.
+    // These live in `crate::e2e` (`finalize_crc_trailer_matches_figure_20_layout`/
+    // `_figure_21_layout`, plus the c-RCP golden vectors), which owns the
+    // CRC trailer: this module's encoders have no CRC-trailer concept of
+    // their own (see the "acf_msg_length quadlet semantics" note above).
 }
