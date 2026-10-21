@@ -54,12 +54,12 @@
 //! (register-map-driven dispatch, discovery integration)". It is
 //! [`UdpTransport`]'s server-side counterpart — where [`UdpTransport`] is a
 //! client sending one request/response pair to some other, unmodeled party,
-//! [`UdpRcServer`] is that other party: it drives an actual
-//! [`crate::mock::RcServer`] register-map/lifecycle-gated dispatch engine
-//! from real inbound datagrams ([`UdpSocket::recv_from`]), and separately
-//! recognizes and answers [`crate::discovery`] broadcast reads and
-//! discovery-stream configure/claim attempts, in any lifecycle state, per
-//! that module's own "Multi-client coexistence" rules. See
+//! [`UdpRcServer`] is that other party: it feeds real inbound datagrams
+//! ([`AvtpTransport::recv_frame`]) to [`crate::server::RcServer::dispatch_frame`],
+//! the RC Server's single frame-level entry point, which also recognizes
+//! and answers [`crate::discovery`] broadcast reads and discovery-stream
+//! configure/claim attempts, in any lifecycle state, per that module's own
+//! "Multi-client coexistence" rules. See
 //! [`UdpRcServer`]'s own doc comment for the full design, including the
 //! judgment calls this item had to make where the roadmap and Milestone 1-3
 //! plumbing left a real wire-level choice unstated.
@@ -131,12 +131,12 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use crate::acf::{self, AcfAbbMessage, AcfGbbMessage, ByteMessageInfo};
+use crate::acf::{AcfAbbMessage, AcfGbbMessage};
 use crate::addressing::{EndpointId, EndpointTable};
 use crate::avtp::{self, AvtpTransport, StreamId, AVTP_MAX_FRAME_LEN};
-use crate::discovery::{self, DiscoveryAccessKind, DiscoveryClaim};
+use crate::discovery::DiscoveryClaim;
 use crate::ep0::{self, RequestRoute};
-use crate::mock::RcServer;
+use crate::server::{FrameDispatch, Peer, RcServer};
 use crate::RcpError;
 
 // ── UdpSocket trait ───────────────────────────────────────────────────────────
@@ -684,82 +684,17 @@ pub fn resolve_endpoint(
 
 // ── UdpRcServer ──────────────────────────────────────────────────────────────
 
-/// `UdpTransport`'s server-side counterpart: drives a
-/// [`crate::mock::RcServer`] register-map/lifecycle-gated dispatch engine
-/// from real inbound UDP datagrams, closing `udp`'s own still-open REPLACE
-/// row (`ROADMAP.md` Milestone 9's "a real RC-Server-endpoint-level rebuild:
-/// register-map-driven dispatch, discovery integration").
+/// `UdpTransport`'s server-side counterpart: feeds real inbound UDP
+/// datagrams to [`RcServer::dispatch_frame`] — the RC Server's single
+/// frame-level entry point (issue #224) — and sends the framed responses
+/// back.
 ///
-/// # Composing `mock::RcServer` from non-test code — a flagged judgment call
-///
-/// Per this crate's Guiding Principle 5, this is called out explicitly
-/// rather than silently assumed: [`crate::mock::RcServer`] lives in a module
-/// whose own doc comment describes it as "in-process test doubles," yet
-/// [`UdpRcServer`] — real, non-test dispatch code — depends on it directly
-/// rather than lifting/duplicating its `handle_abb` logic into a new home.
-/// Three reasons this crate's own precedent favors reuse over duplication
-/// here:
-///
-/// 1. `mock.rs`'s own doc comment already anticipated this exact caller —
-///    "leaving `udp`'s own still-open deeper rebuild as the most likely next
-///    caller, per `ROADMAP.md`'s own Progress note for this bullet" — so
-///    this is not a new architectural decision this item is making
-///    unilaterally; it is executing one `mock.rs` already flagged.
-/// 2. `RcServer` is a plain `pub` item in a plain `pub mod mock` (not behind
-///    `#[cfg(test)]`) — nothing about its compilation is test-only, only its
-///    *name* and doc comment suggest that. Duplicating its `handle_abb`
-///    routing (EP0 gating, `EndpointTable` lookup, echo-back verification)
-///    into a second copy here would create two independently-maintained
-///    implementations of the same dispatch rule, actively working against
-///    this crate's own "reuse, don't duplicate" discipline (see
-///    [`crate::discovery::is_discovery_configure_request`]'s own doc comment
-///    for the same call made the other direction).
-/// 3. `RcServer`'s only real "mock" characteristic is [`crate::mock::Endpoint`]
-///    having exactly one implementation ([`crate::mock::MockEndpoint`]) —
-///    a limitation `UdpRcServer` inherits unchanged, not one it introduces.
-///
-/// This item does not rename or relocate `RcServer`/`mock.rs` — that is a
-/// separate, not-yet-scoped cleanup (renaming `mock` once it stops being
-/// exclusively test-only is a naming question, not a dispatch-logic one) —
-/// flagged here for whichever later item takes it up, rather than bundled
-/// silently into this one.
-///
-/// # Discovery integration
-///
-/// [`Self::serve_one`] recognizes three request shapes, checked in this
-/// order, before falling through to normal [`RcServer::handle_abb`]
-/// dispatch:
-///
-/// 1. [`crate::discovery::is_discovery_request`] — a broadcast-or-direct
-///    discovery read. Answered via [`crate::discovery::build_discovery_response`]
-///    in any lifecycle state, gated (as a formality —
-///    [`DiscoveryAccessKind::Read`] never actually rejects) through
-///    [`crate::discovery::check_discovery_access`] so a future change to
-///    either function's contract is caught by this module's own tests
-///    rather than by a caller, mirroring [`RcServer::handle_abb`]'s own
-///    `verify_echo_back` discipline.
-/// 2. [`crate::discovery::is_discovery_configure_request`] (added by this
-///    item — see its own doc comment) — a discovery-stream configure/claim
-///    attempt. Gated via [`crate::discovery::check_discovery_access`]
-///    with [`DiscoveryAccessKind::Configure`], then — only once that
-///    succeeds — actually granted/refreshed via
-///    [`crate::discovery::try_claim_discovery_stream`], whose result becomes
-///    this server's newly held claim. Composing both rather than either
-///    alone demonstrates they agree, the same discipline item 1 already
-///    applies.
-/// 3. Anything else arriving under
-///    [`crate::discovery::DISCOVERY_BROADCAST_STREAM_ID`] is rejected with
-///    `Err(RcpError::InvalidParameter)` without ever reaching
-///    `RcServer::handle_abb` — the broadcast sentinel names no single real
-///    client (per `crate::discovery`'s own Provenance note), so dispatching
-///    it as if it were one (e.g. an EP0 root-client check, or an
-///    `EndpointTable` lookup keyed by the sentinel) would misuse the
-///    sentinel rather than honor its documented meaning.
-///
-/// Every other request — including a *direct* (non-broadcast-addressed)
-/// discovery read, which is legitimate per `crate::discovery`'s own
-/// "Multi-client coexistence" section — falls through to
-/// [`RcServer::handle_abb`] unchanged.
+/// Discovery handling (broadcast and direct discovery reads, the
+/// discovery-stream configure/claim, and the rejection of any other request
+/// under [`crate::discovery::DISCOVERY_BROADCAST_STREAM_ID`]) is part of
+/// that dispatch pipeline; the discovery claim lives on the [`RcServer`]
+/// (as `rcp_mock_server_t` holds `discovery_claim`,
+/// `c-RCP/src/mock.c:663`). [`Self::discovery_claim`] delegates to it.
 ///
 /// # Response frame addressing — a flagged judgment call
 ///
@@ -793,17 +728,26 @@ pub struct UdpRcServer {
     local_stream: StreamId,
     transport: Arc<dyn AvtpTransport>,
     server: Arc<RcServer>,
-    discovery_claim: Mutex<Option<DiscoveryClaim>>,
+}
+
+/// What one [`UdpRcServer::serve_one`] call did with the datagram it
+/// received.
+#[derive(Debug, Clone, PartialEq)]
+//fusa:req REQ-UDP-032
+pub struct ServeReport {
+    /// The per-member dispatch outcome. [`FrameDispatch::error`] is set for
+    /// a malformed datagram, which was dropped.
+    pub dispatch: FrameDispatch,
+    /// Whether a response frame was sent back.
+    pub response_sent: bool,
+    /// Why a non-empty response could not be framed, if it could not.
+    pub response_error: Option<RcpError>,
 }
 
 impl UdpRcServer {
     /// Construct a server addressed as `local_stream`, receiving/sending
     /// over `transport` (normally [`UdpAvtpTransport::bind`]), dispatching
-    /// non-discovery requests through `server`.
-    ///
-    /// Starts with no discovery-stream claim held by anyone, matching
-    /// [`crate::discovery::try_claim_discovery_stream`]'s own "`current` is
-    /// `None`" unclaimed starting condition.
+    /// through `server`.
     //fusa:req REQ-UDP-008
     //fusa:req REQ-UDP-031
     pub fn new(
@@ -815,74 +759,57 @@ impl UdpRcServer {
             local_stream,
             transport,
             server,
-            discovery_claim: Mutex::new(None),
         }
     }
 
     /// This server's local [`StreamId`] — the identity every response frame
     /// this server sends is addressed under (see this type's own doc
     /// comment, "Response frame addressing").
+    //fusa:req REQ-UDP-008
     pub fn local_stream(&self) -> StreamId {
         self.local_stream
     }
 
-    /// The [`crate::mock::RcServer`] this server dispatches non-discovery
-    /// requests through.
+    /// The [`RcServer`] this server dispatches through.
+    //fusa:req REQ-UDP-008
     pub fn rc_server(&self) -> &Arc<RcServer> {
         &self.server
     }
 
-    /// The discovery-stream claim this server currently holds, if any.
+    /// The discovery-stream claim the RC Server currently holds, if any.
+    //fusa:req REQ-UDP-010
     pub fn discovery_claim(&self) -> Option<DiscoveryClaim> {
-        *self.discovery_claim.lock().unwrap()
+        self.server.discovery_claim()
     }
 
-    /// Receive one inbound frame (via [`AvtpTransport::recv_frame`]), decode
-    /// it as an NTSCF-framed ACF_ABB request, dispatch it, and send the
-    /// NTSCF-framed ACF_ABB response back over the same transport (for a
-    /// bind-mode [`UdpAvtpTransport`], to whichever address the request
-    /// arrived from).
+    /// Receive one inbound frame (via [`AvtpTransport::recv_frame`]),
+    /// dispatch it through [`RcServer::dispatch_frame`] (the requesting
+    /// stream taken from the frame's own NTSCF header), and send every
+    /// member's response, concatenated in frame order (TC18 §12.9.1.1), back
+    /// over the same transport (for a bind-mode [`UdpAvtpTransport`], to
+    /// whichever address the request arrived from) in one NTSCF frame
+    /// addressed under [`Self::local_stream`] with `sequence_num`.
     ///
     /// `recv_timeout` bounds the receive: it becomes the
     /// [`AvtpTransport::recv_frame`] deadline (`None` waits without limit),
     /// so the transport's own error handling applies (transient socket
     /// errors and short datagrams are polled past; `Err(Timeout)` once the
-    /// deadline passes; `Err(Closed)` after close). `sequence_num` is this response frame's
-    /// NTSCF `sequence_num` — a caller-supplied value, matching
-    /// [`UdpTransport::send_acf_abb`]'s own "no hidden counter" discipline
-    /// (this deliberately does not reuse [`crate::mock::RcServer`]'s own
-    /// internal free-running counter, which that module's own doc comment
-    /// already flags as "this test double's own simplification, not a spec
-    /// requirement" — `UdpRcServer`, non-test code, holds this crate's
-    /// stricter explicit-parameter line instead). `now`/`discovery_timeout`
-    /// are threaded straight through to every `crate::discovery` call this
-    /// method makes, matching that module's own "no real-clock read of its
-    /// own" discipline.
+    /// deadline passes; `Err(Closed)` after close). `now` is the time of
+    /// receipt and `discovery_timeout` the discovery-claim timeout, both
+    /// threaded into the RC Server.
     ///
-    /// This method handles exactly one request-frame/response-frame cycle;
-    /// it spawns no thread and runs no loop of its own, matching every
-    /// other transport in this crate (`UdpTransport` included) — a caller
-    /// composes it into whatever receive loop or async task fits its own
-    /// runtime. Returns whatever error the receive or decode step first
-    /// produces (there is no request context yet to answer those on the
-    /// wire); a per-request dispatch failure with a TC18 Table 27 wire code
-    /// is instead answered with a real `err=1` response frame
-    /// (rust-RCP-W04, [`acf::build_error_response`]) rather than returned
-    /// to this method's own caller — see [`Self::dispatch_request`]'s doc
-    /// comment.
-    ///
-    /// A single inbound *frame* may carry more than one concatenated
-    /// ACF_ABB request (TC18 §12.9.1.1, "Handling multiple requests in
-    /// incoming messages" — rust-RCP-W03); this method uses
-    /// [`acf::decode_acf_abb_messages`] and dispatches each decoded request
-    /// through [`Self::dispatch_request`] in wire order, concatenating
-    /// every response into the one outgoing frame in the same order. See
-    /// [`crate::mock::RcServer::handle_ntscf_frame`]'s own doc comment for
-    /// the same multi-request handling.
+    /// Returns `Err` only when the transport itself fails (receive or send).
+    /// A malformed datagram never does: c-RCP's `dispatch_frame` reports a
+    /// per-member result and never aborts on a bad frame
+    /// (`c-RCP/src/mock.c:3068`), so this method returns a [`ServeReport`]
+    /// recording the drop and sends nothing, and a receive loop survives it
+    /// (issue #89). Nothing is sent when no member produced a response
+    /// (queued without acknowledge, dropped, suppressed).
     //fusa:req REQ-UDP-008
     //fusa:req REQ-UDP-009
     //fusa:req REQ-UDP-010
     //fusa:req REQ-UDP-011
+    //fusa:req REQ-UDP-032
     //fusa:req REQ-UDP-031
     pub fn serve_one(
         &self,
@@ -890,90 +817,31 @@ impl UdpRcServer {
         sequence_num: u8,
         now: Instant,
         discovery_timeout: Duration,
-    ) -> Result<(), RcpError> {
+    ) -> Result<ServeReport, RcpError> {
         let deadline = recv_timeout.map(|t| Instant::now() + t);
         let mut frame = vec![0u8; AVTP_MAX_FRAME_LEN];
         let n = self.transport.recv_frame(deadline, &mut frame)?;
-        let (hdr, acf_bytes) = avtp::decode_ntscf_frame(&frame[..n])?;
-        let requester_stream = StreamId::from_u64(hdr.stream_id);
-        let requests = acf::decode_acf_abb_messages(acf_bytes)?;
-
-        let mut response_bytes = Vec::new();
-        for request in &requests {
-            let response =
-                match self.dispatch_request(requester_stream, request, now, discovery_timeout) {
-                    Ok(response) => response,
-                    Err(e) => match acf::build_error_response(&request.info, &e) {
-                        Some(error_response) => error_response,
-                        None => return Err(e),
-                    },
-                };
-            response_bytes.extend_from_slice(&acf::encode_acf_abb(&response)?);
+        self.server.set_discovery_timeout(discovery_timeout);
+        let dispatch = self
+            .server
+            .dispatch_frame(&frame[..n], &Peer::from_header(now));
+        let mut report = ServeReport {
+            dispatch,
+            response_sent: false,
+            response_error: None,
+        };
+        let body = report.dispatch.response_bytes();
+        if body.is_empty() {
+            return Ok(report);
         }
-
-        let response_frame =
-            avtp::encode_ntscf_frame(self.local_stream, sequence_num, &response_bytes)?;
-        self.transport.send_frame(&response_frame)?;
-        Ok(())
-    }
-
-    /// The decoded-request half of [`Self::serve_one`] — see this type's own
-    /// doc comment, "Discovery integration", for the three-case recognition
-    /// order this implements.
-    //fusa:req REQ-UDP-008
-    //fusa:req REQ-UDP-009
-    //fusa:req REQ-UDP-010
-    //fusa:req REQ-UDP-011
-    fn dispatch_request(
-        &self,
-        requester_stream: StreamId,
-        request: &AcfAbbMessage,
-        now: Instant,
-        discovery_timeout: Duration,
-    ) -> Result<AcfAbbMessage, RcpError> {
-        if discovery::is_discovery_request(request) {
-            discovery::check_discovery_access(
-                self.discovery_claim(),
-                requester_stream,
-                DiscoveryAccessKind::Read,
-                now,
-                discovery_timeout,
-            )?;
-            let state = self.server.state();
-            let general = self.server.general_registers();
-            return discovery::build_discovery_response(&request.info, state, &general);
+        match avtp::encode_ntscf_frame(self.local_stream, sequence_num, &body) {
+            Ok(response_frame) => {
+                self.transport.send_frame(&response_frame)?;
+                report.response_sent = true;
+            }
+            Err(e) => report.response_error = Some(e),
         }
-
-        if discovery::is_discovery_configure_request(request) {
-            let mut claim_guard = self.discovery_claim.lock().unwrap();
-            discovery::check_discovery_access(
-                *claim_guard,
-                requester_stream,
-                DiscoveryAccessKind::Configure,
-                now,
-                discovery_timeout,
-            )?;
-            let claim = discovery::try_claim_discovery_stream(
-                *claim_guard,
-                requester_stream,
-                now,
-                discovery_timeout,
-            )?;
-            *claim_guard = Some(claim);
-            drop(claim_guard);
-
-            let response_info = acf::build_response_info(&request.info, ByteMessageInfo::default());
-            return Ok(AcfAbbMessage {
-                info: response_info,
-                payload: Vec::new(),
-            });
-        }
-
-        if discovery::is_discovery_broadcast_stream_id(requester_stream) {
-            return Err(RcpError::InvalidParameter);
-        }
-
-        self.server.handle_abb(requester_stream, request)
+        Ok(report)
     }
 }
 
@@ -983,7 +851,9 @@ impl UdpRcServer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::acf::ByteMessageInfo;
+    use crate::acf::{self, ByteMessageInfo};
+    use crate::discovery;
+    use std::sync::Mutex;
 
     // ── Annex J encapsulation (pure byte manipulation, no socket) ─────────
 
@@ -1564,23 +1434,106 @@ mod tests {
 
         #[test]
         //fusa:test REQ-UDP-008
-        fn serve_one_answers_unregistered_endpoint_with_a_wire_error_response() {
-            // rust-RCP-W04: EpNotFound has a TC18 Table 27 wire code, so it
-            // is answered with a real err=1 response frame, not just
-            // propagated to serve_one's own caller as a local Result.
+        fn serve_one_drops_a_request_for_an_unregistered_endpoint_silently() {
+            // TC18 §12.9.1 / c-RCP REQ-MOCK-030 (c-RCP/src/mock.c:1508):
+            // "If the lookup of the byte_bus_id in the context of the
+            // stream_id does not point to an Endpoint, the request is
+            // dropped without further notification." Nothing is sent.
             let rc = RcServer::new(GeneralRegisters::default());
             let request = abb(9, false, Vec::new());
             let frame = frame_for(client_stream(3), &request);
             let socket = QueuedUdpSocket::with_inbound(vec![(frame, client_addr())]);
             let srv = UdpRcServer::new(server_stream(), socket.clone(), rc);
 
-            srv.serve_one(None, 0, Instant::now(), discovery::DISCOVERY_TIME_OUT)
+            let report = srv
+                .serve_one(None, 0, Instant::now(), discovery::DISCOVERY_TIME_OUT)
                 .unwrap();
 
+            assert!(socket.sent().is_empty());
+            assert!(!report.response_sent);
+            assert_eq!(
+                report.dispatch.members[0].result,
+                crate::server::DispatchResult::ErrUnknownBus
+            );
+        }
+
+        #[test]
+        //fusa:test REQ-UDP-032
+        fn serve_one_survives_malformed_datagrams_and_keeps_serving() {
+            // issue #89: one bad datagram must not end the serve loop. Each
+            // malformed datagram is reported and dropped (nothing sent), and
+            // the next well-formed request is still answered.
+            let general = GeneralRegisters {
+                svr_vendor_id: 0x5150,
+                ..Default::default()
+            };
+            let rc = RcServer::new(general);
+            let good = frame_for(
+                client_stream(1),
+                &abb(ep0::EP0_BYTE_BUS_ID, false, Vec::new()),
+            );
+            let bad_acf = avtp::encode_ntscf_frame(client_stream(1), 1, &[0xFF; 8]).unwrap();
+
+            let socket = QueuedUdpSocket::with_inbound(vec![
+                (Vec::new(), client_addr()),
+                (vec![0xFF; 3], client_addr()),
+                (bad_acf, client_addr()),
+                (good, client_addr()),
+            ]);
+            let srv = UdpRcServer::new(server_stream(), socket.clone(), rc);
+
+            for _ in 0..3 {
+                let report = srv
+                    .serve_one(None, 0, Instant::now(), discovery::DISCOVERY_TIME_OUT)
+                    .expect("a malformed datagram is reported, never fatal");
+                assert!(report.dispatch.error.is_some());
+                assert!(report.dispatch.members.is_empty());
+                assert!(!report.response_sent);
+            }
+            assert!(socket.sent().is_empty());
+
+            let report = srv
+                .serve_one(None, 7, Instant::now(), discovery::DISCOVERY_TIME_OUT)
+                .unwrap();
+            assert!(report.response_sent);
             let sent = socket.sent();
+            assert_eq!(sent.len(), 1);
             let (_, resp) = decode_response(&sent[0].0);
-            assert!(resp.info.err);
-            assert_eq!(resp.payload, vec![8]); // EP_NOT_FOUND = 8
+            assert_eq!(
+                GeneralRegisters::decode(&resp.payload)
+                    .unwrap()
+                    .svr_vendor_id,
+                0x5150
+            );
+
+            // The socket itself running dry is still an error.
+            assert_eq!(
+                srv.serve_one(None, 0, Instant::now(), discovery::DISCOVERY_TIME_OUT)
+                    .unwrap_err(),
+                RcpError::Timeout
+            );
+        }
+
+        #[test]
+        //fusa:test REQ-UDP-032
+        fn serve_one_reports_a_response_too_large_to_frame_instead_of_failing() {
+            // 31 EP0 reads in one frame answer with 31 general-register
+            // snapshots, more than one NTSCF frame's 11-bit data length can
+            // carry: reported, nothing sent, not fatal.
+            let rc = RcServer::new(GeneralRegisters::default());
+            let one = acf::encode_acf_abb(&abb(ep0::EP0_BYTE_BUS_ID, false, Vec::new())).unwrap();
+            let body: Vec<u8> = one.iter().copied().cycle().take(one.len() * 31).collect();
+            let frame = avtp::encode_ntscf_frame(client_stream(1), 0, &body).unwrap();
+            let socket = QueuedUdpSocket::with_inbound(vec![(frame, client_addr())]);
+            let srv = UdpRcServer::new(server_stream(), socket.clone(), rc);
+
+            let report = srv
+                .serve_one(None, 0, Instant::now(), discovery::DISCOVERY_TIME_OUT)
+                .unwrap();
+            assert_eq!(report.dispatch.members.len(), 31);
+            assert!(report.response_error.is_some());
+            assert!(!report.response_sent);
+            assert!(socket.sent().is_empty());
         }
 
         // ── discovery integration: broadcast read ────────────────────────
