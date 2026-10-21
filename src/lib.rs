@@ -118,6 +118,7 @@ pub mod sim;
 pub mod spi;
 pub mod timestamp;
 pub mod tlstransport;
+pub mod tsn;
 pub mod uart;
 pub mod udp;
 pub mod wakeup;
