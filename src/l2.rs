@@ -102,9 +102,9 @@
 //! MAC; `recv_frame` polls in 20 ms slices (so `close` from another thread
 //! unblocks it), skips transient socket errors and frames that are short or
 //! not [`ETHERTYPE_AVTP`] (`l2.c:215-237`), and returns only the AVTPDU.
-//! [`RawEthernetSocket::recv`] additionally skips the kernel's loopback copy
-//! of this socket's own transmitted frames (`PACKET_OUTGOING`,
-//! `l2.c:216-226`). [`L2Transport`]'s `send_acf_abb`/`send_acf_gbb` are now
+//! [`RawEthernetSocket::recv`] additionally skips the transmit-tap copies
+//! of frames that other local sockets send on the same interface
+//! (`PACKET_OUTGOING`, `l2.c:216-226`). [`L2Transport`]'s `send_acf_abb`/`send_acf_gbb` are now
 //! thin wrappers over [`crate::avtp::request_acf_abb`]/
 //! [`crate::avtp::request_acf_gbb`] on an inner [`L2AvtpTransport`].
 
@@ -262,6 +262,12 @@ impl L2Transport {
     /// discipline. Receives through [`L2AvtpTransport`], so socket errors
     /// and non-AVTP frames are polled past until `timeout` elapses
     /// (`None` waits without limit).
+    ///
+    /// c-RCP parity: with `timeout` `None`, a persistent socket error (e.g.
+    /// `ENETDOWN`) is retried forever rather than returned, because
+    /// c-RCP's `l2_avtp_recv()` `continue`s past every `recvfrom` error
+    /// (`c-RCP/src/l2.c:215`). Before issue #205 this wrapper returned the
+    /// error.
     //fusa:req REQ-L2-005
     //fusa:req REQ-L2-006
     pub fn send_acf_abb(
@@ -386,6 +392,12 @@ impl AvtpTransport for L2AvtpTransport {
     /// (`l2_avtp_recv()`, `l2.c:166-254`): transient socket errors and
     /// short/non-[`ETHERTYPE_AVTP`] frames are skipped; a frame larger than
     /// `buf` is dropped and `Err(Busy)` returned.
+    ///
+    /// c-RCP parity: every socket error is treated as transient and
+    /// re-polled (`n < 0 → continue`, `c-RCP/src/l2.c:215`), so an
+    /// [`L2Socket`] that fails immediately makes this loop spin without
+    /// sleeping until `deadline` (forever for `None`) or `close`. c-RCP has
+    /// the same behaviour; it is not throttled here.
     //fusa:req REQ-L2-010
     //fusa:req REQ-L2-011
     fn recv_frame(&self, deadline: Option<Instant>, buf: &mut [u8]) -> Result<usize, RcpError> {
@@ -428,7 +440,7 @@ impl AvtpTransport for L2AvtpTransport {
 #[cfg(target_os = "linux")]
 mod raw_socket {
     use std::os::fd::{AsRawFd, OwnedFd};
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
     use nix::ifaddrs::getifaddrs;
     use nix::sys::socket::sockopt::ReceiveTimeout;
@@ -568,13 +580,29 @@ mod raw_socket {
             .map_err(|e| RcpError::Other(format!("l2: sendto: {e}")))
         }
 
-        /// Receives one frame genuinely received from the wire: an
-        /// `AF_PACKET` socket also queues a copy of every frame it itself
-        /// transmits (`sll_pkttype == PACKET_OUTGOING`); those are skipped,
-        /// as c-RCP's `l2_avtp_recv()` does (`c-RCP/src/l2.c:216-226`).
+        /// Receives one frame that arrived on the bound interface from the
+        /// wire. This socket is bound with `ETH_P_ALL`, so the kernel's
+        /// transmit tap (`dev_queue_xmit_nit`) also hands it a copy of
+        /// every frame that *other* local sockets transmit on the same
+        /// interface, marked `sll_pkttype == PACKET_OUTGOING`. (Linux never
+        /// loops a socket's *own* transmitted frames back to it: the tap
+        /// skips the sending socket.) Those outgoing copies are skipped, so
+        /// a second endpoint on the same host and interface never sees
+        /// another local endpoint's transmissions as received traffic.
+        ///
+        /// c-RCP parity: `c-RCP/src/l2.c:216-226` (`l2_avtp_recv()`) applies
+        /// the same `PACKET_OUTGOING` filter. Its comment says the filter
+        /// drops "a copy of every frame this same socket itself transmits",
+        /// which Linux does not deliver; the filter's real effect is the one
+        /// described above. The filter is ported unchanged.
+        ///
+        /// `timeout` bounds the whole call: after each skipped frame the
+        /// receive timeout is re-armed to the time left, so a steady stream
+        /// of filtered frames cannot extend the call past `timeout`.
         //fusa:req REQ-L2-007
         //fusa:req REQ-L2-012
         fn recv(&self, timeout: Option<Duration>) -> Result<Vec<u8>, RcpError> {
+            let deadline = timeout.map(|t| Instant::now() + t);
             self.set_recv_timeout(timeout)?;
             let mut buf = [0u8; 65535];
             loop {
@@ -587,6 +615,13 @@ mod raw_socket {
                         }
                     })?;
                 if peer.is_some_and(|p| p.pkttype() == nix::libc::PACKET_OUTGOING) {
+                    if let Some(d) = deadline {
+                        let left = d.saturating_duration_since(Instant::now());
+                        if left.is_zero() {
+                            return Err(RcpError::Timeout);
+                        }
+                        self.set_recv_timeout(Some(left))?;
+                    }
                     continue;
                 }
                 return Ok(buf[..n].to_vec());
@@ -929,14 +964,33 @@ mod tests {
         let avtpdu = vec![0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x01, 0x02, 0x03];
         let frame = encode_ethernet_frame(dest_mac, src_mac, &avtpdu);
 
+        // A second socket on the *sending* interface. Linux's transmit tap
+        // never hands tx its own frame, but it does hand tx_peer a copy of
+        // tx's frame marked PACKET_OUTGOING. Bound before the send so the
+        // copy is queued.
+        let tx_peer =
+            RawEthernetSocket::bind("veth0").expect("bind second veth0 socket (needs sudo)");
+
         tx.send(&frame).expect("send over veth0");
 
-        // REQ-L2-012: tx's own socket must not hand back its own
-        // transmitted copy (PACKET_OUTGOING) as if it were received.
-        match tx.recv(Some(Duration::from_millis(200))) {
-            Err(RcpError::Timeout) => {}
-            Ok(other) => assert_ne!(other, frame, "own outgoing frame looped back"),
-            Err(e) => panic!("unexpected recv error on veth0: {e}"),
+        // REQ-L2-012: tx_peer must skip that PACKET_OUTGOING copy, so it
+        // never returns `frame` (it may still see unrelated inbound
+        // link-local traffic, e.g. NDP, which is fine). With the filter
+        // removed, this loop returns `frame` and the assertion fails.
+        let peer_deadline = std::time::Instant::now() + Duration::from_millis(300);
+        loop {
+            let left = peer_deadline.saturating_duration_since(std::time::Instant::now());
+            if left.is_zero() {
+                break;
+            }
+            match tx_peer.recv(Some(left)) {
+                Err(RcpError::Timeout) => break,
+                Ok(other) => assert_ne!(
+                    other, frame,
+                    "another local socket's outgoing frame was returned as received"
+                ),
+                Err(e) => panic!("unexpected recv error on second veth0 socket: {e}"),
+            }
         }
 
         // veth1 may also see other link-local traffic (e.g. NDP/ARP) on a

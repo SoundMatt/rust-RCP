@@ -122,7 +122,9 @@
 //! (returning [`RcpError::Busy`]) a datagram too large for the caller's
 //! buffer. [`UdpTransport`]'s `send_acf_abb`/`send_acf_gbb` are now thin
 //! wrappers over [`crate::avtp::request_acf_abb`]/
-//! [`crate::avtp::request_acf_gbb`]; [`UdpRcServer`] is unchanged.
+//! [`crate::avtp::request_acf_gbb`], and [`UdpRcServer`] receives and
+//! replies over any [`AvtpTransport`] (normally a bind-mode
+//! [`UdpAvtpTransport`]).
 
 use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -206,7 +208,7 @@ pub fn decode_annex_j_udp_payload(buf: &[u8]) -> Result<(u32, &[u8]), RcpError> 
 /// `send_to` prepends, and `recv_from` strips, the 4-byte encapsulation
 /// sequence number [`encode_annex_j_udp_payload`]/
 /// [`decode_annex_j_udp_payload`] implement — entirely transparent to
-/// [`UdpSocket`] trait callers ([`UdpTransport`], [`UdpRcServer`]), which
+/// [`UdpSocket`] trait callers (e.g. [`UdpTransport`]), which
 /// see only already-framed NTSCF/AVTPDU bytes, the same contract the
 /// mock `EchoUdp`/`QueuedUdpSocket` test doubles already provide.
 /// `send_to`'s sequence number is a per-`StdUdpSocket` monotonically
@@ -539,7 +541,14 @@ impl AvtpTransport for UdpSocketLink<'_> {
     }
 
     fn recv_frame(&self, deadline: Option<Instant>, buf: &mut [u8]) -> Result<usize, RcpError> {
-        let (frame, _) = self.socket.recv_from(avtp::remaining(deadline))?;
+        // A deadline that has already passed is a timeout, not a zero
+        // socket timeout (which `std::net::UdpSocket::set_read_timeout`
+        // rejects, and which `SO_RCVTIMEO` reads as "block forever").
+        let timeout = match avtp::remaining(deadline) {
+            Some(r) if r.is_zero() => return Err(RcpError::Timeout),
+            other => other,
+        };
+        let (frame, _) = self.socket.recv_from(timeout)?;
         let dst = buf.get_mut(..frame.len()).ok_or(RcpError::Busy)?;
         dst.copy_from_slice(&frame);
         Ok(frame.len())
@@ -772,25 +781,39 @@ pub fn resolve_endpoint(
 /// - Every other response likewise carries this server's identity, not the
 ///   requester's — consistent with `stream_id` always naming a frame's
 ///   sender, on both the request and the response leg.
+///
+/// # Transport (issue #205)
+///
+/// The server receives and replies over any shared [`AvtpTransport`],
+/// normally a bind-mode [`UdpAvtpTransport`]: that transport learns the
+/// requester's address from each received datagram (`udp.c:250`) and
+/// [`AvtpTransport::send_frame`] replies to it, so the response goes back
+/// to whichever address the request arrived from.
 pub struct UdpRcServer {
     local_stream: StreamId,
-    socket: Arc<dyn UdpSocket>,
+    transport: Arc<dyn AvtpTransport>,
     server: Arc<RcServer>,
     discovery_claim: Mutex<Option<DiscoveryClaim>>,
 }
 
 impl UdpRcServer {
     /// Construct a server addressed as `local_stream`, receiving/sending
-    /// over `socket`, dispatching non-discovery requests through `server`.
+    /// over `transport` (normally [`UdpAvtpTransport::bind`]), dispatching
+    /// non-discovery requests through `server`.
     ///
     /// Starts with no discovery-stream claim held by anyone, matching
     /// [`crate::discovery::try_claim_discovery_stream`]'s own "`current` is
     /// `None`" unclaimed starting condition.
     //fusa:req REQ-UDP-008
-    pub fn new(local_stream: StreamId, socket: Arc<dyn UdpSocket>, server: Arc<RcServer>) -> Self {
+    //fusa:req REQ-UDP-031
+    pub fn new(
+        local_stream: StreamId,
+        transport: Arc<dyn AvtpTransport>,
+        server: Arc<RcServer>,
+    ) -> Self {
         UdpRcServer {
             local_stream,
-            socket,
+            transport,
             server,
             discovery_claim: Mutex::new(None),
         }
@@ -814,13 +837,17 @@ impl UdpRcServer {
         *self.discovery_claim.lock().unwrap()
     }
 
-    /// Receive one inbound datagram (via [`UdpSocket::recv_from`]), decode
+    /// Receive one inbound frame (via [`AvtpTransport::recv_frame`]), decode
     /// it as an NTSCF-framed ACF_ABB request, dispatch it, and send the
-    /// NTSCF-framed ACF_ABB response back to whichever address the request
-    /// arrived from.
+    /// NTSCF-framed ACF_ABB response back over the same transport (for a
+    /// bind-mode [`UdpAvtpTransport`], to whichever address the request
+    /// arrived from).
     ///
-    /// `recv_timeout` is passed straight through to
-    /// [`UdpSocket::recv_from`]. `sequence_num` is this response frame's
+    /// `recv_timeout` bounds the receive: it becomes the
+    /// [`AvtpTransport::recv_frame`] deadline (`None` waits without limit),
+    /// so the transport's own error handling applies (transient socket
+    /// errors and short datagrams are polled past; `Err(Timeout)` once the
+    /// deadline passes; `Err(Closed)` after close). `sequence_num` is this response frame's
     /// NTSCF `sequence_num` — a caller-supplied value, matching
     /// [`UdpTransport::send_acf_abb`]'s own "no hidden counter" discipline
     /// (this deliberately does not reuse [`crate::mock::RcServer`]'s own
@@ -856,6 +883,7 @@ impl UdpRcServer {
     //fusa:req REQ-UDP-009
     //fusa:req REQ-UDP-010
     //fusa:req REQ-UDP-011
+    //fusa:req REQ-UDP-031
     pub fn serve_one(
         &self,
         recv_timeout: Option<Duration>,
@@ -863,8 +891,10 @@ impl UdpRcServer {
         now: Instant,
         discovery_timeout: Duration,
     ) -> Result<(), RcpError> {
-        let (frame, peer_addr) = self.socket.recv_from(recv_timeout)?;
-        let (hdr, acf_bytes) = avtp::decode_ntscf_frame(&frame)?;
+        let deadline = recv_timeout.map(|t| Instant::now() + t);
+        let mut frame = vec![0u8; AVTP_MAX_FRAME_LEN];
+        let n = self.transport.recv_frame(deadline, &mut frame)?;
+        let (hdr, acf_bytes) = avtp::decode_ntscf_frame(&frame[..n])?;
         let requester_stream = StreamId::from_u64(hdr.stream_id);
         let requests = acf::decode_acf_abb_messages(acf_bytes)?;
 
@@ -883,7 +913,7 @@ impl UdpRcServer {
 
         let response_frame =
             avtp::encode_ntscf_frame(self.local_stream, sequence_num, &response_bytes)?;
-        self.socket.send_to(&response_frame, peer_addr)?;
+        self.transport.send_frame(&response_frame)?;
         Ok(())
     }
 
@@ -1017,23 +1047,25 @@ mod tests {
     #[test]
     //fusa:test REQ-UDP-013
     //fusa:test REQ-UDP-014
+    //fusa:test REQ-UDP-031
     fn std_udp_socket_and_udp_rc_server_serve_a_real_discovery_request_end_to_end() {
         // The same composition `src/bin/rcp.rs`'s `serve` command builds
-        // (StdUdpSocket + UdpRcServer), but with both a real client and a
-        // real server talking over real loopback sockets — proving
-        // StdUdpSocket works end-to-end through UdpRcServer's own request
-        // dispatch, not just as a bare send/recv byte pipe.
+        // (a bind-mode UdpAvtpTransport + UdpRcServer), with a real
+        // StdUdpSocket client and the server talking over real loopback
+        // sockets — proving both Annex J paths interoperate end-to-end
+        // through UdpRcServer's own request dispatch, and that the reply
+        // goes back to the learned requester address.
         use crate::regmap::GeneralRegisters;
 
         let server_stream = StreamId::new([0x02, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA], 0x00AA);
-        let server_socket = StdUdpSocket::bind("127.0.0.1:0".parse().unwrap()).unwrap();
-        let server_addr = server_socket.local_addr().unwrap();
+        let server_transport = UdpAvtpTransport::bind("127.0.0.1", 0, false).unwrap();
+        let server_addr = server_transport.local_addr().unwrap();
         let general = GeneralRegisters {
             svr_vendor_id: 0x4242,
             ..Default::default()
         };
         let rc_server = RcServer::new(general);
-        let server = UdpRcServer::new(server_stream, Arc::new(server_socket), rc_server);
+        let server = UdpRcServer::new(server_stream, Arc::new(server_transport), rc_server);
 
         let client_stream = local_stream();
         let client_socket = StdUdpSocket::bind("127.0.0.1:0".parse().unwrap()).unwrap();
@@ -1058,6 +1090,38 @@ mod tests {
         let resp = acf::decode_acf_abb(acf_bytes).unwrap();
         let regs = GeneralRegisters::decode(&resp.payload).unwrap();
         assert_eq!(regs.svr_vendor_id, 0x4242);
+    }
+
+    #[test]
+    //fusa:test REQ-UDP-031
+    fn udp_rc_server_serve_one_returns_the_transports_timeout_and_closed() {
+        use crate::regmap::GeneralRegisters;
+
+        let server_stream = StreamId::new([0x02, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA], 0x00AA);
+        let transport = Arc::new(UdpAvtpTransport::bind("127.0.0.1", 0, false).unwrap());
+        let server = UdpRcServer::new(
+            server_stream,
+            transport.clone(),
+            RcServer::new(GeneralRegisters::default()),
+        );
+
+        let start = Instant::now();
+        let err = server
+            .serve_one(
+                Some(Duration::from_millis(50)),
+                0,
+                Instant::now(),
+                discovery::DISCOVERY_TIME_OUT,
+            )
+            .unwrap_err();
+        assert_eq!(err, RcpError::Timeout);
+        assert!(start.elapsed() >= Duration::from_millis(50));
+
+        transport.close().unwrap();
+        let err = server
+            .serve_one(None, 0, Instant::now(), discovery::DISCOVERY_TIME_OUT)
+            .unwrap_err();
+        assert_eq!(err, RcpError::Closed);
     }
 
     #[test]
@@ -1196,6 +1260,42 @@ mod tests {
         assert_eq!(err, RcpError::Timeout);
     }
 
+    /// A socket whose recv rejects a zero timeout the way
+    /// `std::net::UdpSocket::set_read_timeout` does.
+    struct ZeroTimeoutRejectingUdp;
+
+    impl UdpSocket for ZeroTimeoutRejectingUdp {
+        fn send_to(&self, buf: &[u8], _addr: SocketAddr) -> Result<usize, RcpError> {
+            Ok(buf.len())
+        }
+
+        fn recv_from(&self, timeout: Option<Duration>) -> Result<(Vec<u8>, SocketAddr), RcpError> {
+            if timeout == Some(Duration::ZERO) {
+                return Err(RcpError::Other("zero read timeout".into()));
+            }
+            EchoUdp { mismatch: false }.recv_from(timeout)
+        }
+    }
+
+    #[test]
+    //fusa:test REQ-UDP-003
+    fn udp_socket_link_maps_an_already_passed_deadline_to_timeout() {
+        let socket = ZeroTimeoutRejectingUdp;
+        let link = UdpSocketLink {
+            socket: &socket,
+            remote: "127.0.0.1:9000".parse().unwrap(),
+        };
+        let mut buf = vec![0u8; AVTP_MAX_FRAME_LEN];
+        // The request deadline has already passed when the receive starts
+        // (a tiny timeout can elapse between computing the deadline and
+        // the receive).
+        let err = link.recv_frame(Some(Instant::now()), &mut buf).unwrap_err();
+        assert_eq!(err, RcpError::Timeout);
+        // A live deadline still receives normally.
+        let deadline = Some(Instant::now() + Duration::from_secs(5));
+        assert!(link.recv_frame(deadline, &mut buf).unwrap() > 0);
+    }
+
     #[test]
     //fusa:test REQ-UDP-002
     fn local_stream_getter_matches_constructor() {
@@ -1264,15 +1364,17 @@ mod tests {
         use crate::regmap::{EndpointType, GeneralRegisters};
         use std::collections::VecDeque;
 
-        /// A test double `UdpSocket` for `UdpRcServer`: `recv_from` yields
-        /// queued inbound `(frame, peer_addr)` pairs one at a time —
-        /// `Err(RcpError::Timeout)` once the queue is empty, mirroring a
-        /// real socket timing out with nothing to receive — and `send_to`
-        /// records every outbound `(frame, addr)` pair for a test's own
-        /// later inspection.
+        /// A test double [`AvtpTransport`] for `UdpRcServer`, shaped like a
+        /// bind-mode [`UdpAvtpTransport`]: `recv_frame` yields queued
+        /// inbound `(frame, peer_addr)` pairs one at a time, learning
+        /// `peer_addr` as the reply peer — `Err(RcpError::Timeout)` once the
+        /// queue is empty, mirroring a real transport timing out with
+        /// nothing to receive — and `send_frame` records every outbound
+        /// `(frame, learned peer)` pair for a test's own later inspection.
         struct QueuedUdpSocket {
             inbound: Mutex<VecDeque<(Vec<u8>, SocketAddr)>>,
             outbound: Mutex<Vec<(Vec<u8>, SocketAddr)>>,
+            peer: Mutex<Option<SocketAddr>>,
         }
 
         impl QueuedUdpSocket {
@@ -1280,6 +1382,7 @@ mod tests {
                 Arc::new(Self {
                     inbound: Mutex::new(frames.into()),
                     outbound: Mutex::new(Vec::new()),
+                    peer: Mutex::new(None),
                 })
             }
 
@@ -1288,21 +1391,35 @@ mod tests {
             }
         }
 
-        impl UdpSocket for QueuedUdpSocket {
-            fn send_to(&self, buf: &[u8], addr: SocketAddr) -> Result<usize, RcpError> {
-                self.outbound.lock().unwrap().push((buf.to_vec(), addr));
-                Ok(buf.len())
+        impl AvtpTransport for QueuedUdpSocket {
+            fn send_frame(&self, frame: &[u8]) -> Result<(), RcpError> {
+                let peer = (*self.peer.lock().unwrap()).ok_or(RcpError::Busy)?;
+                self.outbound.lock().unwrap().push((frame.to_vec(), peer));
+                Ok(())
             }
 
-            fn recv_from(
+            fn recv_frame(
                 &self,
-                _timeout: Option<Duration>,
-            ) -> Result<(Vec<u8>, SocketAddr), RcpError> {
-                self.inbound
+                _deadline: Option<Instant>,
+                buf: &mut [u8],
+            ) -> Result<usize, RcpError> {
+                let (frame, from) = self
+                    .inbound
                     .lock()
                     .unwrap()
                     .pop_front()
-                    .ok_or(RcpError::Timeout)
+                    .ok_or(RcpError::Timeout)?;
+                *self.peer.lock().unwrap() = Some(from);
+                buf[..frame.len()].copy_from_slice(&frame);
+                Ok(frame.len())
+            }
+
+            fn close(&self) -> Result<(), RcpError> {
+                Ok(())
+            }
+
+            fn time_sync_supported(&self) -> bool {
+                false
             }
         }
 

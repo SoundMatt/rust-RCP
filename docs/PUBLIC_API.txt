@@ -5166,7 +5166,7 @@ pub struct rcp::udp::UdpRcServer
 impl rcp::udp::UdpRcServer
 pub fn rcp::udp::UdpRcServer::discovery_claim(&self) -> core::option::Option<rcp::discovery::DiscoveryClaim>
 pub fn rcp::udp::UdpRcServer::local_stream(&self) -> rcp::avtp::StreamId
-pub fn rcp::udp::UdpRcServer::new(rcp::avtp::StreamId, alloc::rcs::arc::Arc<dyn rcp::udp::UdpSocket>, alloc::rcs::arc::Arc<rcp::mock::RcServer>) -> Self
+pub fn rcp::udp::UdpRcServer::new(rcp::avtp::StreamId, alloc::rcs::arc::Arc<dyn rcp::avtp::AvtpTransport>, alloc::rcs::arc::Arc<rcp::mock::RcServer>) -> Self
 pub fn rcp::udp::UdpRcServer::rc_server(&self) -> &alloc::rcs::arc::Arc<rcp::mock::RcServer>
 pub fn rcp::udp::UdpRcServer::serve_one(&self, core::option::Option<core::time::Duration>, u8, std::time::Instant, core::time::Duration) -> core::result::Result<(), rcp::RcpError>
 impl !core::marker::Freeze for rcp::udp::UdpRcServer

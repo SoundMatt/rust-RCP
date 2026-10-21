@@ -1461,7 +1461,7 @@
     {
       "id": "REQ-UDP-003",
       "title": "Requests encoded as NTSCF-headed AVTPDU frames",
-      "text": "UdpTransport::send_acf_abb/send_acf_gbb encode their message via acf::encode_acf_abb/encode_acf_gbb and avtp::encode_ntscf_frame, and decode the response via avtp::decode_ntscf_frame and acf::decode_acf_abb/decode_acf_gbb, rejecting a zero timeout with Err(Timeout) before ever touching the socket",
+      "text": "UdpTransport::send_acf_abb/send_acf_gbb encode their message via acf::encode_acf_abb/encode_acf_gbb and avtp::encode_ntscf_frame, and decode the response via avtp::decode_ntscf_frame and acf::decode_acf_abb/decode_acf_gbb, rejecting a zero timeout with Err(Timeout) before ever touching the socket, and returning Err(Timeout) (never a zero socket read timeout) when the request deadline has already passed by the time the receive starts",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -7810,6 +7810,17 @@
       "status": "implemented"
     },
     {
+      "id": "REQ-UDP-031",
+      "title": "UdpRcServer serves over the shared AvtpTransport",
+      "text": "UdpRcServer shall receive each request frame via AvtpTransport::recv_frame with a deadline derived from serve_one's recv_timeout (None waits without limit), returning the transport's error (e.g. Timeout, Closed) unchanged, and shall send each response frame via AvtpTransport::send_frame on the same transport, so that over a bind-mode UdpAvtpTransport the response reaches the address the request arrived from (issue #205; c-RCP has no UDP server side; the receive path is c-RCP's udp_avtp_recv, src/udp.c:184-271).",
+      "standard": "iso26262",
+      "level": "HLR",
+      "asil": "ASIL-B",
+      "verificationMethod": "test",
+      "scope": "implementation",
+      "status": "implemented"
+    },
+    {
       "id": "REQ-L2-009",
       "title": "L2AvtpTransport send frames outgoing AVTPDUs with the configured MACs",
       "text": "L2AvtpTransport::send_frame shall wrap each AVTPDU via encode_ethernet_frame using the transport's destination and source MAC before handing it to its L2Socket, and shall return Closed once close has been called or on any socket send error (c-RCP REQ-L2-006, src/l2.c:136-165).",
@@ -7846,8 +7857,8 @@
     },
     {
       "id": "REQ-L2-012",
-      "title": "RawEthernetSocket recv ignores its own transmitted copies",
-      "text": "RawEthernetSocket::recv shall skip (continue waiting past) any frame the AF_PACKET socket reports as this same socket's own locally-transmitted outgoing copy (sll_pkttype == PACKET_OUTGOING) (c-RCP REQ-L2-007, src/l2.c:216-226).",
+      "title": "RawEthernetSocket recv ignores locally-transmitted outgoing copies",
+      "text": "RawEthernetSocket::recv shall skip (continue waiting past, within the caller's overall timeout) any frame the AF_PACKET socket reports as a locally-transmitted outgoing copy (sll_pkttype == PACKET_OUTGOING), i.e. a frame another local socket transmitted on the same interface, so that only frames received from the wire are returned (c-RCP REQ-L2-007, src/l2.c:216-226; c-RCP parity: c-RCP's comment attributes these copies to the receiving socket's own transmissions, which Linux never loops back; the filter is ported unchanged).",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
@@ -8016,7 +8027,7 @@
     {
       "id": "REQ-TSN-004",
       "title": "TsnTransport send tags SO_PRIORITY from the classified kind, then delegates",
-      "text": "TsnTransport::send_frame shall, when a SoPriority socket is configured, set SO_PRIORITY to the PCP value the configured map assigns to the outgoing frame's classified kind (ignoring the setsockopt result), and shall in every case delegate the send to the inner transport; SoPriority for std::net::UdpSocket and RawEthernetSocket shall set SOL_SOCKET/SO_PRIORITY on Linux and be a no-op elsewhere (c-RCP REQ-TSN-004).",
+      "text": "TsnTransport::send_frame shall, when a SoPriority socket is configured, set SO_PRIORITY to the PCP value the configured map assigns to the outgoing frame's classified kind (ignoring the setsockopt result), and shall in every case delegate the send to the inner transport; SoPriority for std::net::UdpSocket and RawEthernetSocket shall set SOL_SOCKET/SO_PRIORITY on Linux; off Linux, SoPriority for std::net::UdpSocket shall be a no-op, and RawEthernetSocket cannot be constructed (its bind always fails), so its SoPriority is unreachable (c-RCP REQ-TSN-004).",
       "standard": "iso26262",
       "level": "HLR",
       "asil": "ASIL-B",
