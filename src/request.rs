@@ -1753,10 +1753,16 @@ pub fn encode_compound_request(req: &CompoundRequest) -> Result<Vec<u8>, RcpErro
 ///
 /// Fails with [`RequestCodecError::ShortFrame`], [`RequestCodecError::BadMsgType`],
 /// [`RequestCodecError::NotRepurposed`], or [`RequestCodecError::UnknownType`]
-/// (opcode is not `0x0F`/`0x8F`/`0x0B`/`0x8B`). `hs`/`cs` and every
-/// sub-field value are accepted unvalidated, exactly as
-/// `rcp_compound_decode_request()` (`c-RCP/src/request.c:208-238`) does.
-/// Never panics for any input.
+/// (opcode is not `0x0F`/`0x8F`/`0x0B`/`0x8B`). Never panics for any input.
+///
+/// c-RCP parity: `rcp_compound_decode_request()` (`c-RCP/src/request.c:208-238`)
+/// checks only the GBB framing, `mtv` and the opcode; it never inspects
+/// `hs`, `cs`, `rsp` or `err`, and accepts every `cmp_*`/`cmpw_*` sub-field
+/// value. TC18 RC5 Table 7 (TC18-11.2.2.2-007) and Table 8
+/// (TC18-11.2.2.3-009) assign meaning to `cs` only for compound-wait
+/// requests (TC18-11.2.2.3-008) and describe `rsp`/`err` as response-only
+/// bits, so a strict reading would reject a request that sets them. This
+/// decoder copies c-RCP and accepts them unvalidated.
 //fusa:req REQ-CMP-011
 //fusa:req REQ-CMP-012
 //fusa:req REQ-CMP-013
@@ -1846,6 +1852,12 @@ pub fn encode_triggered_request(req: &TriggeredRequest) -> Result<Vec<u8>, RcpEr
 /// any opcode other than `0x0E`/`0x8E`. Mirrors
 /// `rcp_triggered_decode_request()` (`c-RCP/src/request.c:477-503`). Never
 /// panics for any input.
+///
+/// c-RCP parity: TC18 RC5 Table 10 (TC18-11.2.2.5-006) requires `hs=0b`,
+/// `cs=0b`, `rsp=0b` and `err=0b` in a triggered request, but
+/// `rcp_triggered_decode_request()` (`c-RCP/src/request.c:477-503`) checks
+/// none of them. This decoder copies c-RCP: a triggered request with any of
+/// those bits set decodes successfully and the bits are ignored.
 //fusa:req REQ-TRIG-006
 //fusa:req REQ-TRIG-007
 //fusa:req REQ-TRIG-016
@@ -1908,9 +1920,13 @@ pub fn encode_chained_member(member: &ChainedMember) -> Result<Vec<u8>, RcpError
 /// Decode a chained-request member: [`RequestCodecError::UnknownType`] for an
 /// opcode other than `0x01`, [`RequestCodecError::ReservedNonzero`] if any
 /// of octets 1..3 or 6..7 is nonzero, otherwise the same failure modes as
-/// [`decode_compound_request`]. `hs`/`evt` are accepted unvalidated, as in
-/// `rcp_chained_decode_member()` (`c-RCP/src/request.c:631-661`). Never
-/// panics for any input.
+/// [`decode_compound_request`]. Never panics for any input.
+///
+/// c-RCP parity: TC18 RC5 Table 11 (TC18-11.2.2.6-010) requires `hs=0b`,
+/// `rsp=0b` and `err=0b` in a chained-request member, but
+/// `rcp_chained_decode_member()` (`c-RCP/src/request.c:631-661`) checks only
+/// the reserved octets and never inspects `hs`, `rsp`, `err` or `evt`. This
+/// decoder copies c-RCP and accepts those bits unvalidated.
 //fusa:req REQ-CHAIN-005
 //fusa:req REQ-CHAIN-006
 //fusa:req REQ-CHAIN-007
@@ -1977,9 +1993,16 @@ pub fn encode_timed_request(req: &TimedRequest) -> Result<Vec<u8>, RcpError> {
 /// other than `0x0A`, [`RequestCodecError::ReservedNonzero`] if octet 1 is
 /// nonzero, [`RequestCodecError::UnsupportedCmd`] if `hs` or `cs` is set
 /// (checked in that order), otherwise the same failure modes as
-/// [`decode_compound_request`]. `evt` is accepted unvalidated. Mirrors
+/// [`decode_compound_request`]. Mirrors
 /// `rcp_timed_decode_request()` (`c-RCP/src/request.c:806-837`). Never
 /// panics for any input.
+///
+/// c-RCP parity: TC18 RC5 Table 12 (TC18-11.2.2.7-004) lists `evt`, `rsp`
+/// and `err` as the standard request fields, with `rsp`/`err` meaningful only
+/// in responses, while TC18-11.2.2.7-005 rejects only `hs`/`cs`.
+/// `rcp_timed_decode_request()` (`c-RCP/src/request.c:806-837`) enforces the
+/// reserved octet and `hs`/`cs` but never inspects `evt`, `rsp` or `err`.
+/// This decoder copies c-RCP and accepts those bits unvalidated.
 //fusa:req REQ-TIMED-004
 //fusa:req REQ-TIMED-005
 //fusa:req REQ-TIMED-009
